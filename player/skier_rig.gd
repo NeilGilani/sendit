@@ -18,6 +18,7 @@ var ski_l: MeshInstance3D
 var ski_r: MeshInstance3D
 var pole_l: MeshInstance3D
 var pole_r: MeshInstance3D
+var chair: MeshInstance3D
 
 # Smoothed pose drivers.
 var _crouch := 0.2
@@ -96,6 +97,11 @@ func _build_gear() -> void:
 	pole_r.mesh = pole_mesh
 	visual.add_child(pole_l)
 	visual.add_child(pole_r)
+	chair = MeshInstance3D.new()
+	chair.mesh = Lifts.chair_mesh()
+	chair.transform = Transform3D(Basis(Vector3.UP, PI), Vector3(0, 2.35, 0.15))
+	chair.visible = false
+	add_child(chair)
 	# Helmet + goggles follow the head bone.
 	var att := BoneAttachment3D.new()
 	att.bone_name = "Head"
@@ -246,7 +252,8 @@ func _process(dt: float) -> void:
 	basis = basis * Basis(Vector3.FORWARD, _lean * MAX_LEAN * clampf(skier.speed / 6.0, 0.0, 1.0))
 	basis = basis * Basis(Vector3.FORWARD, _crash_roll)
 	visual.basis = basis
-	visual.position = Vector3(0, -_sit * (rest_global[bone.pelvis].origin.y - 0.05), 0)
+	visual.position = Vector3(0, -_sit * (rest_global[bone.pelvis].origin.y - 0.14), 0)
+	chair.visible = sitting
 
 	_pose_skeleton()
 	_place_gear()

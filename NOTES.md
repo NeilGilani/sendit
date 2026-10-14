@@ -4,7 +4,7 @@ Godot 4.4.1, Forward+, GDScript. Headless binary for checks lives outside the re
 Heavy commands run with `nice -n 19`.
 
 ## Current phase
-Phase 4 — Character (done)
+Phase 5 — Camera (done)
 
 ## Files
 - project.godot — config, autoloads, input map, physics interpolation on.
@@ -31,6 +31,9 @@ Phase 4 — Character (done)
 - tools/prep_character.py — copies Quaternius Superhero_Male glTF to assets/models/skier/skier.gltf, bakes COLOR_0 zones (R jacket, G pants, B gloves/boots, A coverage), 1K textures.
 - player/skier_rig.gd — class SkierRig (child "Rig" of Skier): Visual node (lean/skid/tumble), model rotated 180° (model faces +Z), bone posing in skeleton space (+Z fwd, +X = model left): pelvis drop/pitch, spine bend, head counter, analytic 2-bone leg IK (knee pole fwd), arm aim blends (stance/tuck/air/sit/crash); skis follow feet, poles from hands; helmet/strap/goggles on BoneAttachment3D(Head).
 - rendering/skier_suit.gdshader — outfit from zones (teal "Northwake" jacket w/ amber band, charcoal pants), slight inflation along normals.
+
+- camera/chase_camera.gd — class ChaseCamera (top_level, interpolation off, _process): smooth-damped follow (floaty), lagged yaw toward travel, SpringArm3D (mask 1, sphere 0.35) + terrain floor clamp, FOV 68→80 with speed, slow orbit after 3 s still, mouse/right-stick look easing back, lift/crash framing, main-menu flyover orbiting the highest summit. snap() on respawn/lift arrival.
+- NOTE: new class_name scripts need `godot --headless --import` once to refresh the class cache before running.
 
 ## Coordinates
 x = east, z = south (north = -Z), metres, origin = box centre. Heading yaw 0 = facing -Z.

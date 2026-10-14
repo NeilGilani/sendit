@@ -28,21 +28,18 @@ func _ready() -> void:
 	sun.rotation_degrees = Vector3(-20, 120, 0)
 	sun.shadow_enabled = true
 	add_child(sun)
-	var cam := Camera3D.new()
-	cam.far = 30000.0
+	var cam := ChaseCamera.new()
+	cam.name = "ChaseCamera"
+	cam.skier = skier
 	add_child(cam)
 	_autotest = "--autotest" in OS.get_cmdline_user_args()
 	GameState.mode = GameState.Mode.RIDING
 	skier.start_riding()
+	if DisplayServer.get_name() != "headless":
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _process(delta: float) -> void:
-	var cam := get_viewport().get_camera_3d()
-	if cam and skier:
-		var p := skier.get_global_transform_interpolated().origin
-		var side := Vector3(-skier.forward_dir().z, 0, skier.forward_dir().x)
-		cam.global_position = p + skier.forward_dir() * 2.2 + side * 2.0 + Vector3(0, 1.0, 0)
-		cam.look_at(p + Vector3(0, 0.9, 0))
 	if _autotest:
 		_run_autotest(delta)
 	for a in OS.get_cmdline_user_args():

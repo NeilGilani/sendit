@@ -203,11 +203,12 @@ func _make_chairs(lift: Dictionary) -> void:
 	var count := maxi(2, int(loop / spacing))
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.mesh = _gondola_mesh() if lift.type in ["gondola", "cable_car"] else _chair_mesh()
+	mm.mesh = _gondola_mesh() if lift.type in ["gondola", "cable_car"] else chair_mesh()
 	mm.instance_count = count
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = mm
 	mmi.name = "Chairs_" + str(lift.name)
+	mmi.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	add_child(mmi)
 	lift["chairs"] = mmi
 	lift["loop"] = loop
@@ -282,7 +283,8 @@ func ride_length(lift: Dictionary) -> float:
 ## Seat transform (skier hips) at distance d along the up line.
 func seat_transform(lift: Dictionary, d: float) -> Transform3D:
 	var t := chair_transform(lift, d, ride_length(lift))
-	return Transform3D(t.basis, t.origin + Vector3(0, -2.35, 0) + t.basis.z * 0.15)
+	# Chairs face +Z along travel; the skier faces -Z, so turn the seat around.
+	return Transform3D(t.basis * Basis(Vector3.UP, PI), t.origin + Vector3(0, -2.35, 0) + t.basis.z * 0.15)
 
 
 # ------------------------------------------------------------------ meshes
@@ -391,7 +393,7 @@ func _wheel_mesh() -> Mesh:
 	return merge([[w, Transform3D(), _metal(Color(0.35, 0.36, 0.38))]])
 
 
-func _chair_mesh() -> Mesh:
+static func chair_mesh() -> Mesh:
 	var hanger := BoxMesh.new()
 	hanger.size = Vector3(0.08, 2.1, 0.08)
 	var seat := BoxMesh.new()
