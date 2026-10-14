@@ -1,0 +1,27 @@
+{
+ "size_m": 6000.0,
+ "res": 2048,
+ "spacing": 2.9311187103077674,
+ "far_size_m": 30000.0,
+ "far_res": 512,
+ "min_height": 1792.1342122963867,
+ "max_height": 4331.172086630703,
+ "far_min_height": 1219.1058984469034,
+ "far_max_height": 4533.2609047316155,
+ "center_lat": 45.983,
+ "center_lon": 7.688,
+ "treeline": 2350.0,
+ "spawn": {
+  "position": [
+   857.11,
+   2763.46,
+   -685.77
+  ],
+  "heading": 2.2628777301175194,
+  "piste": "Sunthread"
+ },
+ "sources": [
+  "Copernicus GLO-30 DEM (ESA, DLR/Airbus)",
+  "OpenStreetMap contributors (ODbL)"
+ ]
+}
