@@ -60,3 +60,26 @@ input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
 #creditsText code { font-size: 13px; background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px; }
 
 #fade { position: fixed; inset: 0; background: #06070a; opacity: 1; pointer-events: none; z-index: 20; transition: opacity 1s ease-in-out; }
+
+/* ---------- stylized look: punchy sporty type, animated popups ---------- */
+.title { font-weight: 900; font-style: italic; letter-spacing: 0.06em;
+  background: linear-gradient(100deg, #ffffff 0%, #fff3d6 40%, #ff9fd0 75%, #7ff9ea 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 4px 0 rgba(26, 20, 70, 0.55)) drop-shadow(0 10px 30px rgba(0,0,0,0.25)); }
+.title.small { font-size: 52px; }
+button { font-weight: 700; font-style: italic; letter-spacing: 0.02em; }
+button.primary { border-left: 4px solid #2ff5d6; }
+#speed span { font-weight: 900; font-style: italic; font-size: 54px; color: #fff; -webkit-text-stroke: 2px #1b1446; paint-order: stroke fill; }
+#speed small { color: #2ff5d6; font-weight: 800; }
+.note { font-weight: 800; font-style: italic; -webkit-text-stroke: 1px #1b1446; paint-order: stroke fill; }
+.note b { color: #2ff5d6; }
+.bigpop { position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%) scale(1.8) rotate(-4deg); opacity: 0;
+  font-size: clamp(48px, 7vw, 92px); font-weight: 900; font-style: italic; letter-spacing: 0.03em; white-space: nowrap;
+  -webkit-text-stroke: 4px #1b1446; paint-order: stroke fill; text-shadow: 0 6px 0 rgba(27, 20, 70, 0.6);
+  transition: transform .28s cubic-bezier(.2, 1.6, .4, 1), opacity .2s; pointer-events: none; }
+.bigpop.small { font-size: clamp(26px, 3.4vw, 40px); top: 24%; -webkit-text-stroke: 3px #1b1446; }
+.bigpop.on { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-4deg); }
+.bigpop.out { opacity: 0; transform: translate(-50%, -80%) scale(0.9) rotate(-4deg); transition: transform .45s ease-in, opacity .45s; }
+.bigpop.gold { color: #ffd34d; }
+.bigpop.pink { color: #ff5fb0; }
+.bigpop.cyan { color: #2ff5d6; }

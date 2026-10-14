@@ -3,7 +3,24 @@
 Godot 4.4.1, Forward+, GDScript. Headless binary for checks lives outside the repo (scratchpad).
 Heavy commands run with `nice -n 19`.
 
-## Current phase
+## Web build (web/, Three.js) — the primary target now
+Stylized arcade snowboarding ("vibey anime" cel look). Run: `cd web && npm install && npm run dev` → http://localhost:5173 (`?ride` skip menu, `?quality=0|1|2`, `?kicker=0..2` start before a kicker, `?at=x,z,heading`).
+- web/src/config.js — ALL tunables: PHYSICS, ANIM (juice), CAMERA, FX, ART (sun, toon bands, rim, outline, neon, sky, fog, wind).
+- world.js — shader chunk patches (stylized fog, baked mountain-shadow factor), toonMaterial() 3-band cel shading (cream/periwinkle/indigo) + Fresnel rim + emissive neon hook, outlineMaterial() inverted hull (skinned too), noise tex, math helpers.
+- terrain.js — DEM chunks w/ LOD + skirts, cel snow shader (drifts, corduroy, vector sparkle, carved-track map sampling), baked sun mask/sky vis, far backdrop; getHeight() adds park features.
+- sky.js — gradient sky, sun disk/halo, cel clouds, sun + texel-snapped shadow box, hemisphere fill.
+- scatter.js — procedural faceted pines (wind sway vertex shader) + low-poly rocks, instanced per 750 m cell; obstacle hash, nearest() for close shaves.
+- features.js — kickers S/M/L on the opening run (height field), flags + start banner (wave shaders, fictional Northwake/Valcrest canvas art), bobbing crowd billboards, valley fog pockets.
+- lifts.js — OSM lifts (toon materials), chairs, ride API.
+- player.js — PlayerPhysics (arcade snowboard): carving, squat-charged jump, auto-tuck, spins, landing eval (clean / stumble 20–45° / crash), near-miss + hard-brake events, lifts.
+- rider.js — Quaternius rig as snowboarder: edge-dig roll, squat scale, squash & stretch spring, chatter, hip lean, flail, tuck; outlines, neon suit + board, helmet/goggles.
+- camera.js — CameraController: FoV elasticity + snap, trauma shake, big-air side swing, intro drop, menu flyover.
+- fx.js — FXManager: instanced particles (cruise fog / carve wedges / brake fan / landing ring / jump pop / speed lines) + TrackMap render texture (ping-pong recentring).
+- audio.js — WebAudio loops + one-shots; ui.js/style.css — menu, HUD, big popups; input.js — keyboard/mouse/gamepad; state.js — modes/score/settings.
+- main.js — boot, post stack (N8AO indigo AO, bloom for neon, WindEffect streaks, saturation/contrast, SMAA), fixed-step loop.
+- web/scripts/shot.mjs — headless Chromium (SwiftShader) screenshot + console errors.
+
+## Current phase (Godot)
 FINAL — all phases done (1-8). Verified: headless autotest + UI flow script; Forward+ frames via lavapipe (xvfb, VK_ICD_FILENAMES=.../lvp_icd.json).
 
 ## Files

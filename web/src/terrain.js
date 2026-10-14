@@ -1,8 +1,10 @@
 // Real-mountain terrain: 2048² Copernicus heights, chunked CPU geometry with distance LOD and
-// skirts, a photoscanned snow/rock shader, baked mountain shadows + sky visibility, and a 30 km
-// backdrop. Also answers height/normal/surface queries for gameplay.
+// skirts, a cel-shaded "vibey anime" snow shader (cream / periwinkle / indigo bands, vector
+// sparkle, corduroy, persistent carved tracks), baked mountain shadows + sky visibility and a
+// 30 km backdrop. Answers height/normal/surface queries; park features add to the height field.
 import * as THREE from 'three';
-import { globals, withWorld, SUN_DIR } from './world.js';
+import { globals, toonMaterial, SUN_DIR } from './world.js';
+import { ART } from './config.js';
 
 const CHUNK = 128;
 const LODS = 5;
@@ -14,6 +16,7 @@ export class Terrain {
     this.chunks = [];
     this.cache = new Map();
     this.lodDistances = [450, 1000, 2000, 3800];
+    this.features = null;     // optional { heightAt(x, z) -> number | null }
   }
 
   async load(base = '/terrain/', onProgress = () => {}) {
@@ -124,49 +127,19 @@ export class Terrain {
   }
 
   buildMaterials(tex) {
-    const noise = tex.noise;
     const terrainUniforms = {
-      normalTex: { value: this.normalTex }, splatTex: { value: this.splatTex },
-      snowAlb: { value: tex.snowAlb }, snowNor: { value: tex.snowNor }, snowRgh: { value: tex.snowRgh },
-      packAlb: { value: tex.packAlb }, packNor: { value: tex.packNor }, packRgh: { value: tex.packRgh },
-      rockAlb: { value: tex.rockAlb }, rockNor: { value: tex.rockNor }, noiseTex: { value: noise },
-      sparkle: { value: 1.0 }, terrainRes: { value: this.res }, terrainSpacing: { value: this.spacing },
+      normalTex: { value: this.normalTex }, splatTex: { value: this.splatTex }, noiseTex: { value: tex.noise },
+      sparkle: { value: ART.snowSparkleIntensity }, terrainRes: { value: this.res }, terrainSpacing: { value: this.spacing },
     };
     this.terrainUniforms = terrainUniforms;
-    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: 0.0 });
-    mat.name = 'terrain';
-    withWorld(mat, {
-      uniforms: terrainUniforms,
-      fragPars: TERRAIN_PARS,
-      frag: TERRAIN_FRAG,
-    });
-    const prev = mat.onBeforeCompile;
-    mat.onBeforeCompile = (shader, r) => {
+    this.material = toonMaterial({ name: 'terrainToon', uniforms: terrainUniforms, fragPars: TERRAIN_PARS, frag: TERRAIN_FRAG });
+    const prev = this.material.onBeforeCompile;
+    this.material.onBeforeCompile = (shader, r) => {
       prev(shader, r);
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;')
-        .replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(tN, 0.0)).xyz);')
-        .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
-  {
-    vec3 sv = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz);
-    vec3 hv = normalize(sv + geometryViewDir);
-    reflectedLight.directSpecular += tGlint * uSunColor * sunMaskFactor * pow(max(dot(normal, hv), 0.0), 50.0) * 1.4;
-    // Snow translucency: a little light wraps around the terminator.
-    float wrapL = max(dot(normal, sv) + 0.35, 0.0) / 1.35 - max(dot(normal, sv), 0.0);
-    reflectedLight.directDiffuse += max(wrapL, 0.0) * uSunColor * sunMaskFactor * diffuseColor.rgb * 0.18 * (1.0 - tRock);
-  }`);
+        .replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(tN, 0.0)).xyz);');
     };
-    this.material = mat;
-
-    const far = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 });
-    far.name = 'terrainFar';
-    withWorld(far, {
-      uniforms: { rockAlb: { value: tex.rockAlb }, noiseTex: { value: noise }, nearHalf: { value: this.half } },
-      fragPars: 'uniform sampler2D rockAlb; uniform sampler2D noiseTex;',
-      frag: FAR_FRAG,
-      skyAO: false,
-    });
-    this.farMaterial = far;
+    this.farMaterial = toonMaterial({ name: 'terrainFar', uniforms: { noiseTex: { value: tex.noise } }, fragPars: 'uniform sampler2D noiseTex;', frag: FAR_FRAG });
   }
 
   build() {
@@ -279,7 +252,7 @@ export class Terrain {
   setQuality(q) {
     const s = [0.6, 1.0, 1.5][q];
     this.lodDistances = [450 * s, 1000 * s, 2000 * s, 3800 * s];
-    if (this.terrainUniforms) this.terrainUniforms.sparkle.value = q === 0 ? 0 : 1;
+    if (this.terrainUniforms) this.terrainUniforms.sparkle.value = q === 0 ? 0 : ART.snowSparkleIntensity;
     this._lastFocus = null;
   }
 
@@ -305,6 +278,15 @@ export class Terrain {
 
   // ---------------------------------------------------------------- queries
   getHeight(x, z) {
+    const base = this.baseHeight(x, z);
+    if (this.features) {
+      const f = this.features.heightAt(x, z, base);
+      if (f !== null && f > base) return f;
+    }
+    return base;
+  }
+
+  baseHeight(x, z) {
     const N = this.res;
     const fx = Math.min(Math.max((x + this.half) / this.spacing, 0), N - 1.001);
     const fz = Math.min(Math.max((z + this.half) / this.spacing, 0), N - 1.001);
@@ -360,20 +342,16 @@ function dataTex(data, n, format, mips) {
 }
 
 const TERRAIN_PARS = /* glsl */`
-uniform sampler2D normalTex; uniform sampler2D splatTex;
-uniform sampler2D snowAlb; uniform sampler2D snowNor; uniform sampler2D snowRgh;
-uniform sampler2D packAlb; uniform sampler2D packNor; uniform sampler2D packRgh;
-uniform sampler2D rockAlb; uniform sampler2D rockNor; uniform sampler2D noiseTex;
+uniform sampler2D normalTex; uniform sampler2D splatTex; uniform sampler2D noiseTex;
 uniform float sparkle; uniform float terrainRes; uniform float terrainSpacing;
-vec3 tN; float tRough; float tGlint; float tRock;
+uniform sampler2D uTrackMap; uniform vec3 uTrackRegion;
+vec3 tN;
 vec2 tUV(vec2 xz) { return ((xz + terrainSize * 0.5) / terrainSpacing + 0.5) / terrainRes; }
 float hash13(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
-vec2 rot2(vec2 p, float a) { float c = cos(a), s = sin(a); return vec2(c * p.x - s * p.y, s * p.x + c * p.y); }
-vec3 unpackN(vec4 t) { return t.xyz * 2.0 - 1.0; }
-vec3 applyXZ(vec3 N, vec3 tn, float k) {
-  vec3 T = normalize(vec3(1.0, 0.0, 0.0) - N * N.x);
-  vec3 B = normalize(vec3(0.0, 0.0, 1.0) - N * N.z);
-  return normalize(N + (T * tn.x - B * tn.y) * k);
+float trackAt(vec2 xz) {
+  vec2 uv = (xz - uTrackRegion.xy) / uTrackRegion.z + 0.5;
+  if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return 0.0;
+  return texture2D(uTrackMap, uv).r;
 }
 `;
 
@@ -384,83 +362,63 @@ const TERRAIN_FRAG = /* glsl */`
   vec3 N = normalize(vec3(nn.x, sqrt(max(0.0, 1.0 - dot(nn, nn))), nn.y));
   vec3 s = texture2D(splatTex, uv).rgb;
   float dist = length(vW - cameraPosition);
-  float nearF = 1.0 - smoothstep(120.0, 600.0, dist);
-  float midF = 1.0 - smoothstep(600.0, 2200.0, dist);
+  float near = 1.0 - smoothstep(60.0, 400.0, dist);
   float m1 = texture2D(noiseTex, vW.xz * 0.0011).r;
   float m2 = texture2D(noiseTex, vW.xz * 0.0093 + 0.37).r;
-  float m3 = texture2D(noiseTex, vW.xz * 0.061 + 0.71).g;
+  float m3 = texture2D(noiseTex, vW.xz * 0.06 + 0.71).g;
+
+  // Sculpted drifts: big soft dunes plus fine wind ripples give the cel bands organic shapes.
+  vec2 q1 = vW.xz * 0.011 + vec2(0.13, 0.7);
+  float d0 = texture2D(noiseTex, q1).r;
+  vec2 dg = vec2(texture2D(noiseTex, q1 + vec2(0.003, 0.0)).r - d0, texture2D(noiseTex, q1 + vec2(0.0, 0.003)).r - d0);
+  vec2 q2 = vW.xz * 0.05 + vec2(0.4, 0.2);
+  float r0 = texture2D(noiseTex, q2).g;
+  vec2 rg = vec2(texture2D(noiseTex, q2 + vec2(0.004, 0.0)).g - r0, texture2D(noiseTex, q2 + vec2(0.0, 0.004)).g - r0);
+  float sculpt = (1.0 - smoothstep(0.25, 0.75, s.r) * 0.7);
+  N = normalize(N - vec3(dg.x, 0.0, dg.y) * 55.0 * sculpt - vec3(rg.x, 0.0, rg.y) * 10.0 * near * sculpt);
 
   float groomed = smoothstep(0.25, 0.75, s.r);
   float forest = s.b;
-  float rockRaw = s.g + (m2 - 0.5) * 0.5 * s.g + (m3 - 0.5) * 0.25 * s.g;
-  float flatness = smoothstep(0.62, 0.86, N.y + (m3 - 0.5) * 0.14);
-  float rock = clamp(smoothstep(0.32, 0.6, rockRaw) * (1.0 - flatness * 0.85), 0.0, 1.0);
+  float flatness = smoothstep(0.6, 0.85, N.y + (m3 - 0.5) * 0.12);
+  float rock = clamp(smoothstep(0.3, 0.58, s.g + (m2 - 0.5) * 0.45 * s.g) * (1.0 - flatness * 0.9), 0.0, 1.0);
 
-  // Powder, two scales rotated against each other (anti-tiling)
-  vec2 pa = vW.xz * 0.29;
-  vec2 pb = rot2(vW.xz, 0.83) * 0.071;
-  float ab = smoothstep(0.3, 0.7, m2);
-  vec3 sa = texture2D(snowAlb, pa).rgb, sb = texture2D(snowAlb, pb).rgb;
-  float lum = dot(mix(sa, sb, ab), vec3(0.3, 0.59, 0.11));
-  vec3 powder = vec3(0.90, 0.93, 0.98) * mix(0.93, 1.03, smoothstep(0.35, 0.85, lum));
-  powder *= mix(0.95, 1.02, m1) * mix(0.97, 1.01, m3);
-  vec3 pn = mix(unpackN(texture2D(snowNor, pa)), unpackN(texture2D(snowNor, pb)), ab);
-  float pr = mix(texture2D(snowRgh, pa).r, texture2D(snowRgh, pb).r, ab);
+  // Rock: cool slate with stratified ledges catching snow (cel look).
+  float strata = texture2D(noiseTex, vec2(vW.y * 0.03 + m2, vW.x * 0.002 + vW.z * 0.002)).b;
+  vec3 rockCol = mix(vec3(0.42, 0.44, 0.55), vec3(0.58, 0.58, 0.66), step(0.55, strata));
+  rockCol *= mix(0.85, 1.05, m3);
+  float ledgeSnow = step(0.72, N.y + (m3 - 0.5) * 0.35) * step(0.4, strata);
+  rock *= 1.0 - ledgeSnow;
 
-  // Groomed packed snow + corduroy along the fall line in 4.8 m groomer lanes
-  vec2 ga = rot2(vW.xz, 0.31) * 0.23;
-  float klum = dot(texture2D(packAlb, ga).rgb, vec3(0.3, 0.59, 0.11));
-  vec3 packed = vec3(0.86, 0.9, 0.96) * mix(0.95, 1.02, smoothstep(0.35, 0.85, klum));
-  vec3 kn = unpackN(texture2D(packNor, ga)) * vec3(0.5, 0.5, 1.0);
-  float kr = texture2D(packRgh, ga).r * 0.8;
+  vec3 snow = vec3(1.0);
+  snow = mix(snow, vec3(0.95, 0.97, 1.0), forest * 0.5);
+  // Groomed corduroy: crisp thin periwinkle lines along the fall line, fading with distance.
   vec2 fall = normalize(N.xz + vec2(1e-4));
-  vec2 perp = vec2(-fall.y, fall.x);
-  float u = dot(vW.xz, perp);
-  float laneF = fract(u / 4.8);
-  float ridgeW = fwidth(u / 0.045);
-  float cord = (1.0 - smoothstep(0.12, 0.45, ridgeW)) * (1.0 - smoothstep(6.0, 22.0, dist));
-  float laneTone = (hash13(vec3(floor(u / 4.8), 1.7, 3.1)) - 0.5) * 0.03;
-  float laneEdge = smoothstep(0.03, 0.0, laneF) + smoothstep(0.97, 1.0, laneF);
-  packed *= 1.0 + laneTone * midF - laneEdge * 0.02 * nearF;
+  float u = dot(vW.xz, vec2(-fall.y, fall.x));
+  float lines = smoothstep(0.42, 0.5, abs(fract(u / 0.6) - 0.5)) * groomed * (1.0 - smoothstep(8.0, 40.0, dist));
+  float lane = step(0.5, fract(u / 4.8)) * groomed * 0.03 * (1.0 - smoothstep(200.0, 900.0, dist));
+  snow *= 1.0 - lines * 0.05 - lane;
 
-  // Rock: triplanar, near detail fading to big crags far away
-  vec3 w = pow(abs(N), vec3(4.0)); w /= (w.x + w.y + w.z);
-  float farRock = smoothstep(40.0, 320.0, dist);
-  float rs = mix(0.13, 0.017, farRock);
-  vec3 rcol = texture2D(rockAlb, vW.zy * rs).rgb * w.x + texture2D(rockAlb, vW.xz * rs * 0.7).rgb * w.y + texture2D(rockAlb, vW.xy * rs).rgb * w.z;
-  float rl = dot(rcol, vec3(0.3, 0.59, 0.11));
-  rcol = mix(vec3(rl), rcol, 0.4) * vec3(0.62, 0.58, 0.55) * 1.3 * mix(0.8, 1.12, m2);
-  vec3 tx = unpackN(texture2D(rockNor, vW.zy * rs)), ty = unpackN(texture2D(rockNor, vW.xz * rs * 0.7)), tz = unpackN(texture2D(rockNor, vW.xy * rs));
-  float rk = mix(1.0, 1.8, farRock);
-  vec3 nx = vec3(tx.xy * rk + N.zy, abs(tx.z) * N.x);
-  vec3 ny = vec3(ty.xy * rk + N.xz, abs(ty.z) * N.y);
-  vec3 nz = vec3(tz.xy * rk + N.xy, abs(tz.z) * N.z);
-  vec3 rockN = normalize(nx.zyx * w.x + ny.xzy * w.y + nz.xyz * w.z);
-  // Snow caught on ledges and in gullies: follows the rock's own detail normal, broken up organically.
-  float ln = texture2D(noiseTex, vW.xz * 0.013 + vec2(vW.y * 0.004)).g * 0.6 + texture2D(noiseTex, vW.xz * 0.05 + 0.3).r * 0.4;
-  float ledge = smoothstep(0.62, 0.82, rockN.y + (ln - 0.5) * 0.7) * (0.35 + 0.65 * smoothstep(0.35, 0.6, ln));
-  rock *= 1.0 - ledge * 0.85;
+  // Persistent carved tracks: deep groove pushes the snow into the shadow bands.
+  float tr = trackAt(vW.xz);
+  float trx = trackAt(vW.xz + vec2(0.06, 0.0)) - trackAt(vW.xz - vec2(0.06, 0.0));
+  float trz = trackAt(vW.xz + vec2(0.0, 0.06)) - trackAt(vW.xz - vec2(0.0, 0.06));
+  N = normalize(N + vec3(trx, 0.0, trz) * 2.2);
+  toonDeepBias = tr * 0.32;
+  snow = mix(snow, vec3(0.88, 0.92, 1.0), tr * 0.6);
 
-  vec3 snowCol = mix(powder, packed, groomed);
-  snowCol = mix(snowCol, snowCol * vec3(0.8, 0.84, 0.9), forest * 0.6);
-  vec3 snowN = mix(pn, kn, groomed);
-  float snowR = mix(clamp(pr * 0.9, 0.45, 0.85), clamp(kr, 0.35, 0.7), groomed);
-  vec3 Nw = applyXZ(N, snowN, 0.9 * (0.35 + 0.65 * nearF));
-  // Wind-sculpted ripples on ungroomed snow (large-scale reuse of the snow normal map)
-  vec3 wn = unpackN(texture2D(snowNor, rot2(vW.xz, 0.4) * vec2(0.012, 0.035)));
-  Nw = applyXZ(Nw, wn, 0.5 * (1.0 - groomed) * (1.0 - forest) * midF);
-  vec3 perp3 = normalize(vec3(perp.x, 0.0, perp.y) - N * dot(vec3(perp.x, 0.0, perp.y), N));
-  Nw = normalize(Nw + perp3 * (-sin(u / 0.045 * 6.2832) * 0.12 * cord * groomed));
+  diffuseColor.rgb = mix(snow, rockCol, rock);
+  tN = N;
 
-  vec3 albedo = mix(snowCol, rcol, rock);
-  albedo *= 1.0 - (cos(u / 0.045 * 6.2832) * 0.5 + 0.5) * 0.02 * groomed * cord;
-  diffuseColor.rgb = albedo;
-  tN = normalize(mix(Nw, rockN, rock));
-  tRough = mix(snowR, 0.82, rock);
-  tRock = rock;
-  vec3 cell = floor(vW * 26.0);
-  vec3 vq = floor(normalize(vW - cameraPosition) * 9.0);
-  tGlint = step(0.993, hash13(cell)) * step(0.45, hash13(cell + vq * 17.0)) * (1.0 - smoothstep(25.0, 90.0, dist)) * (1.0 - rock) * sparkle;
+  // Vector-art sparkle: tiny crisp glints that twinkle as the camera moves (lit snow only).
+  vec3 cell = floor(vW * 9.0);
+  vec3 vq = floor(normalize(vW - cameraPosition) * 14.0);
+  float h1 = hash13(cell);
+  float h2 = hash13(cell + vq * 7.13);
+  vec3 fr = fract(vW * 9.0) - 0.5;
+  float star = max(1.0 - length(fr.xz) * 9.0, 0.0) + max(1.0 - abs(fr.x) * 30.0, 0.0) * max(1.0 - abs(fr.z) * 4.0, 0.0) * 0.6
+             + max(1.0 - abs(fr.z) * 30.0, 0.0) * max(1.0 - abs(fr.x) * 4.0, 0.0) * 0.6;
+  float glint = step(0.975, h1) * step(0.55, h2) * clamp(star, 0.0, 1.0) * (1.0 - smoothstep(18.0, 70.0, dist)) * (1.0 - rock) * (1.0 - tr);
+  toonSparkle = glint * sparkle * sunMaskAt(vW).r * max(dot(N, uSunDir) + 0.2, 0.0);
 }
 `;
 
@@ -470,13 +428,10 @@ const FAR_FRAG = /* glsl */`
   float m = texture2D(noiseTex, vW.xz * 0.0004).r;
   float m2 = texture2D(noiseTex, vW.xz * 0.003 + 0.5).r;
   float slope = 1.0 - N.y;
-  float rock = smoothstep(0.26, 0.42, slope + (m2 - 0.5) * 0.18);
-  vec3 w = pow(abs(N), vec3(4.0)); w /= (w.x + w.y + w.z);
-  vec3 rc = texture2D(rockAlb, vW.zy * 0.02).rgb * w.x + texture2D(rockAlb, vW.xz * 0.02).rgb * w.y + texture2D(rockAlb, vW.xy * 0.02).rgb * w.z;
-  rc = mix(vec3(dot(rc, vec3(0.3, 0.59, 0.11))), rc, 0.45) * vec3(0.62, 0.58, 0.55) * 1.3;
+  float rock = smoothstep(0.28, 0.42, slope + (m2 - 0.5) * 0.18);
   float forest = (1.0 - smoothstep(1950.0, 2250.0, vW.y + (m - 0.5) * 300.0)) * (1.0 - rock) * smoothstep(0.03, 0.12, slope);
-  vec3 col = vec3(0.90, 0.93, 0.98) * mix(0.94, 1.02, m);
-  col = mix(col, vec3(0.16, 0.2, 0.19) * mix(0.8, 1.2, m2) + vec3(0.12) * (1.0 - slope * 2.0), forest * 0.8);
-  diffuseColor.rgb = mix(col, rc, rock);
+  vec3 col = vec3(1.0);
+  col = mix(col, vec3(0.2, 0.36, 0.4), forest * 0.75);
+  diffuseColor.rgb = mix(col, vec3(0.45, 0.47, 0.58), rock);
 }
 `;

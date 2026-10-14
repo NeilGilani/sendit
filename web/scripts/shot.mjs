@@ -13,7 +13,7 @@ await page.waitForFunction(() => window.__sendit, null, { timeout: 240000 });
 console.log('booted');
 if (keys) { for (const k of keys.split(',')) await page.keyboard.down(k); }
 await page.waitForTimeout(Number(wait) * 1000);
-const info = await page.evaluate(() => { const s = window.__sendit; return { mode: s.game.mode, state: s.skier.state, speed: s.skier.speed.toFixed(1), pos: s.skier.position.toArray().map((v) => v.toFixed(1)), calls: s.renderer.info.render.calls, tris: s.renderer.info.render.triangles }; });
+const info = await page.evaluate(() => { const s = window.__sendit; return { mode: s.game.mode, state: s.player.state, speed: s.player.speed.toFixed(1), pos: s.player.position.toArray().map((v) => v.toFixed(1)), calls: s.renderer.info.render.calls, tris: s.renderer.info.render.triangles }; });
 console.log(JSON.stringify(info));
 await page.screenshot({ path: out, timeout: 300000 });
 await browser.close();

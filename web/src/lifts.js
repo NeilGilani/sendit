@@ -11,7 +11,7 @@ export function mergeGeometries(list, groups = false) {
     return n;
   }), groups);
 }
-import { withWorld } from './world.js';
+import { toonMaterial } from './world.js';
 
 const RIDEABLE = ['chair_lift', 'mixed_lift', 'gondola', 'cable_car'];
 const CABLE_H = { chair_lift: 9, mixed_lift: 10, gondola: 12, cable_car: 22, drag_lift: 6, 't-bar': 6, 'j-bar': 6, platter: 6 };
@@ -47,15 +47,15 @@ export class Lifts {
       addCable(cablePos, lift.up);
       addCable(cablePos, lift.down);
     }
-    const steel = metal(0x8c9096, 0.4), dark = metal(0x333438, 0.5);
+    const steel = metal(0x9aa3c4, 0.4), dark = metal(0x2a2f45, 0.5);
     this.addInstances(poleGeo(), steel, poles);
     this.addInstances(armGeo(), steel, arms);
-    this.addInstances(stationGeo(), [paint(0x8c5c3d), paint(0x4a4b52), paint(0xf2f4fa)], stations);
+    this.addInstances(stationGeo(), [paint(0xd9603b), paint(0x2a2f45), paint(0xffffff)], stations);
     this.addInstances(wheelGeo(), dark, wheels);
     const cg = new THREE.BufferGeometry();
     cg.setAttribute('position', new THREE.Float32BufferAttribute(cablePos, 3));
     cg.computeVertexNormals();
-    const cable = new THREE.Mesh(cg, metal(0x1e1e21, 0.45, true));
+    const cable = new THREE.Mesh(cg, metal(0x1a1d30, 0.45, true));
     cable.name = 'Cables';
     this.group.add(cable);
     const chairG = chairGeo(), gondolaG = gondolaGeo();
@@ -250,13 +250,12 @@ function addCable(out, line) {
   }
 }
 
-function metal(color, rough, double = false) {
-  const m = new THREE.MeshStandardMaterial({ color, metalness: 0.6, roughness: rough, side: double ? THREE.DoubleSide : THREE.FrontSide });
-  return withWorld(m, { skyAO: false });
+function metal(color, _rough, double = false) {
+  return toonMaterial({ name: 'liftMetal', color, side: double ? THREE.DoubleSide : THREE.FrontSide, rim: 0.3 });
 }
 
 function paint(color) {
-  return withWorld(new THREE.MeshStandardMaterial({ color, roughness: 0.7 }), { skyAO: false });
+  return toonMaterial({ name: 'liftPaint', color });
 }
 
 function poleGeo() {
@@ -301,7 +300,7 @@ export function chairGeo() {
   const back = new THREE.BoxGeometry(1.9, 0.6, 0.08); back.rotateX(-0.15); back.translate(0, -2.05, -0.22);
   const bar = new THREE.BoxGeometry(1.9, 0.05, 0.05); bar.translate(0, -1.75, 0.55);
   const g = mergeGeometries([mergeGeometries([hanger, bar]), mergeGeometries([seat, back])], true);
-  g.userData.materials = [metal(0x404247, 0.4), paint(0x2e5280)];
+  g.userData.materials = [metal(0x2a2f45, 0.4), paint(0xff3d7f)];
   return g;
 }
 
@@ -310,7 +309,7 @@ function gondolaGeo() {
   const cabin = new THREE.BoxGeometry(1.9, 2.1, 1.9); cabin.translate(0, -2.5, 0);
   const glass = new THREE.BoxGeometry(1.95, 0.8, 1.95); glass.translate(0, -2.1, 0);
   const g = mergeGeometries([hanger, cabin, glass], true);
-  const gm = new THREE.MeshStandardMaterial({ color: 0x334050, metalness: 0.3, roughness: 0.1 });
-  g.userData.materials = [metal(0x404247, 0.4), paint(0xd1523a), gm];
+  const gm = toonMaterial({ name: 'gondolaGlass', color: 0x6fd8ff, rim: 1.0 });
+  g.userData.materials = [metal(0x2a2f45, 0.4), paint(0xffb02e), gm];
   return g;
 }

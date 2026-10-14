@@ -2,7 +2,7 @@
 // surface, speed and turning; ambient + speed wind; landing thumps; distant birds; and calm music
 // that loops seamlessly and breathes in and out. Nothing pops — every gain glides.
 import * as THREE from 'three';
-import { State } from './skier.js';
+import { State } from './player.js';
 import { game, Mode, on, settings } from './state.js';
 
 const LOOPS = ['snow_powder', 'snow_groomed', 'snow_carve', 'wind_speed', 'wind_ambient'];
@@ -47,8 +47,16 @@ export class SoundScape {
     this.birdPanner.maxDistance = 400;
     const bg = c.createGain(); bg.gain.value = 0.35;
     this.birdPanner.connect(bg); bg.connect(this.sfx);
-    on('landed', ({ impact }) => { if (impact > 0.8) this.thump(Math.min(0.7, Math.max(0.15, impact / 10)), 0.9 + Math.random() * 0.2); });
-    on('crashed', () => this.thump(0.55, 0.8));
+    on('landed', ({ impact, perfect }) => {
+      if (impact > 0.8) this.oneShot(impact > 7 ? 'land_hard' : 'land_soft', Math.min(0.9, Math.max(0.2, impact / 10)), 0.92 + Math.random() * 0.16);
+      if (perfect) this.oneShot('perfect', 0.6, 1);
+    });
+    on('crashed', () => this.oneShot('crash', 0.8, 1));
+    on('jumped', (d) => this.oneShot('jump_pop', 0.4 + d * 0.5, 0.95 + Math.random() * 0.15));
+    on('nearMiss', () => this.oneShot('near_miss', 0.55, 0.95 + Math.random() * 0.2));
+    on('stumble', () => this.oneShot('combo_lost', 0.4, 1.2));
+    on('hardBrake', () => this.oneShot('boost', 0.25, 0.7));
+    on('score', ({ points }) => { if (points >= 60) this.oneShot('combo_tick', 0.35, 1 + Math.min(points, 400) / 400); });
     this.ready = true;
   }
 
@@ -78,6 +86,16 @@ export class SoundScape {
     if (Math.abs(L.level - target) < 0.002) return;
     L.level = target;
     L.gain.gain.setTargetAtTime(target, this.ctx.currentTime, tc);
+  }
+
+  async oneShot(name, gain, rate) {
+    if (!this.ctx) return;
+    this.extra = this.extra || {};
+    if (!this.extra[name]) this.extra[name] = this.load(name);
+    const buf = await this.extra[name];
+    const src = this.ctx.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate;
+    const g = this.ctx.createGain(); g.gain.value = gain;
+    src.connect(g); g.connect(this.sfx); src.start();
   }
 
   thump(gain, rate) {

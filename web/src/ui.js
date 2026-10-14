@@ -1,7 +1,7 @@
 // Minimal, elegant HTML UI: menu over the flyover, fading HUD, soft score notes, hints, pause,
 // settings, credits (rendered from CREDITS.md) and the fade curtain.
 import { game, Mode, on, settings, setSetting } from './state.js';
-import { State } from './skier.js';
+import { State } from './player.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -20,6 +20,10 @@ export class UI {
     on('hint', (t) => this.hint(t));
     on('liftBoarded', (name) => { $('liftlabel').textContent = `${name}  ·  hold W to hurry`; });
     on('mode', () => this.refresh());
+    on('landed', ({ perfect }) => { if (perfect) this.pop('PERFECT!', 'gold'); });
+    on('stumble', () => this.pop('WOBBLE!', 'pink'));
+    on('nearMiss', () => this.pop('CLOSE SHAVE', 'cyan', true));
+    on('crashed', (kind) => this.pop(['YARD SALE!', 'SNOW ANGEL!', 'FACEPLANT!', 'TREE HUGGER!'][kind === 'tree' ? 3 : Math.floor(Math.random() * 3)], 'pink'));
   }
 
   act(a) {
@@ -80,6 +84,17 @@ export class UI {
     requestAnimationFrame(() => el.classList.add('on'));
     setTimeout(() => el.classList.remove('on'), 2900);
     setTimeout(() => el.remove(), 3700);
+  }
+
+  pop(text, tone = 'gold', small = false) {
+    if (game.mode !== Mode.RIDING) return;
+    const el = document.createElement('div');
+    el.className = `bigpop ${tone}${small ? ' small' : ''}`;
+    el.textContent = text;
+    document.getElementById('hud').appendChild(el);
+    requestAnimationFrame(() => el.classList.add('on'));
+    setTimeout(() => el.classList.add('out'), small ? 650 : 1000);
+    setTimeout(() => el.remove(), small ? 1100 : 1500);
   }
 
   hint(text) {

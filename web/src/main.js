@@ -1,17 +1,22 @@
-// SENDIT (web) — boots the renderer, loads the real mountain, and runs the menu → ride → pause flow.
+// SENDIT (web) — stylized arcade snowboarding on the real Matterhorn.
+// Systems: InputController (input.js), PlayerPhysics (player.js), Rider animation (rider.js),
+// CameraController (camera.js), FXManager (fx.js), world art (terrain/sky/scatter/features/lifts).
+// All tunables live in config.js.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { EffectComposer, RenderPass, EffectPass, BloomEffect, ToneMappingEffect, ToneMappingMode, SMAAEffect, SMAAPreset, VignetteEffect } from 'postprocessing';
+import { EffectComposer, RenderPass, EffectPass, BloomEffect, SMAAEffect, SMAAPreset, Effect, BlendFunction, HueSaturationEffect, BrightnessContrastEffect } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
 import { patchShaderChunks, globals, makeNoiseTexture } from './world.js';
+import { ART } from './config.js';
 import { Terrain } from './terrain.js';
 import { Sky } from './sky.js';
 import { Scatter } from './scatter.js';
 import { Lifts } from './lifts.js';
-import { Skier, State } from './skier.js';
-import { SkierRig } from './rig.js';
-import { ChaseCamera } from './camera.js';
-import { SkiTrails, PowderSpray, Snowfall } from './effects.js';
+import { Features } from './features.js';
+import { Player, State } from './player.js';
+import { Rider } from './rider.js';
+import { CameraController } from './camera.js';
+import { FXManager } from './fx.js';
 import { SoundScape } from './audio.js';
 import { UI } from './ui.js';
 import { Input } from './input.js';
@@ -29,111 +34,129 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(new THREE.Color(0.72, 0.82, 1.0), 0.00004);
-const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.25, 40000);
+scene.fog = new THREE.FogExp2(new THREE.Color(...ART.fogColor), ART.fogDensity);
+const camera = new THREE.PerspectiveCamera(66, innerWidth / innerHeight, 0.25, 40000);
 camera.position.set(0, 4000, 0);
 
 const input = new Input(canvas);
-const ui = new UI({ ride: () => startRide(), resume: () => resume(), top: () => skier.resetToTop(), menu: () => toMenu() });
+const ui = new UI({ ride: () => startRide(), resume: () => resume(), top: () => player.resetToTop(), menu: () => toMenu() });
 
-let terrain, sky, scatter, lifts, skier, rig, chase, trails, spray, snowfall, sound, composer, aoPass, bloom;
+let terrain, sky, scatter, lifts, features, player, rider, cam, fx, sound, composer, aoPass, bloom, wind;
+
+/** Stylized speed wind: tapered streaks radiating from the frame edges + a light zoom blur. */
+class WindEffect extends Effect {
+  constructor() {
+    super('WindEffect', /* glsl */`
+      uniform float intensity;
+      uniform float windTime;
+      float h1(float n) { return fract(sin(n * 91.345) * 47453.21); }
+      void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
+        vec2 d = uv - vec2(0.5, 0.48);
+        float r = length(d * vec2(aspect, 1.0));
+        vec3 col = inputColor.rgb;
+        if (intensity > 0.001) {
+          vec3 acc = vec3(0.0);
+          for (int i = 1; i <= 6; i++) acc += texture2D(inputBuffer, uv - d * float(i) * 0.006 * intensity * smoothstep(0.15, 0.7, r)).rgb;
+          col = mix(col, acc / 6.0, 0.85);
+          float ang = atan(d.y, d.x);
+          float lane = floor(ang * 60.0 / 3.14159);
+          float seed = h1(lane);
+          float trav = fract(seed * 7.0 + windTime * (1.2 + seed * 1.8));
+          float along = 1.0 - fract(r * 1.35 - trav + 0.3);
+          float taper = smoothstep(0.0, 0.5, along) * smoothstep(1.0, 0.75, along);
+          float thin = 1.0 - smoothstep(0.0, 0.18 + 0.1 * seed, abs(fract(ang * 60.0 / 3.14159) - 0.5));
+          float streak = thin * taper * step(0.62, seed) * smoothstep(0.3, 0.78, r);
+          col = mix(col, vec3(1.0), streak * intensity * 0.55);
+          col *= 1.0 - intensity * 0.22 * smoothstep(0.45, 0.95, r);
+        }
+        outputColor = vec4(col, inputColor.a);
+      }`, {
+      blendFunction: BlendFunction.NORMAL,
+      uniforms: new Map([['intensity', new THREE.Uniform(0)], ['windTime', new THREE.Uniform(0)]]),
+    });
+  }
+}
 
 async function boot() {
   const loader = new GLTFLoader();
   terrain = new Terrain();
-  await terrain.load('/terrain/', (p) => ui.loading(p * 0.5, 'Reading Copernicus elevation…'));
-  ui.loading(0.5, 'Loading photoscanned snow and rock…');
-  const tl = new THREE.TextureLoader();
-  const maxAniso = renderer.capabilities.getMaxAnisotropy();
-  const tex = (f, srgb) => {
-    const t = tl.load(`/textures/${f}`);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.anisotropy = maxAniso;
-    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  };
-  const textures = {
-    snowAlb: tex('snow_02_diff_2k.jpg', true), snowNor: tex('snow_02_nor_gl_2k.jpg'), snowRgh: tex('snow_02_rough_2k.jpg'),
-    packAlb: tex('snow_01_diff_2k.jpg', true), packNor: tex('snow_01_nor_gl_2k.jpg'), packRgh: tex('snow_01_rough_2k.jpg'),
-    rockAlb: tex('rock_face_03_diff_2k.jpg', true), rockNor: tex('rock_face_03_nor_gl_2k.jpg'),
-    noise: makeNoiseTexture(512, 11),
-  };
+  await terrain.load('/terrain/', (p) => ui.loading(p * 0.5, 'Reading the mountain…'));
+  ui.loading(0.5, 'Painting the snow…');
   terrain.bakeSunMask(renderer);
-  terrain.buildMaterials(textures);
+  terrain.buildMaterials({ noise: makeNoiseTexture(512, 11) });
   terrain.build();
   scene.add(terrain.group);
-
   sky = new Sky(scene);
-  scene.environment = sky.bakeEnvironment(renderer);
-  scene.environmentIntensity = 0.55;
 
-  ui.loading(0.62, 'Planting larches and placing boulders…');
-  const [scatterData, liftData] = await Promise.all([
+  ui.loading(0.62, 'Planting pines…');
+  const [scatterData, liftData, pistes] = await Promise.all([
     fetch('/terrain/scatter.json').then((r) => r.json()),
     fetch('/terrain/lifts.json').then((r) => r.json()),
+    fetch('/terrain/pistes.json').then((r) => r.json()),
   ]);
-  scatter = new Scatter(terrain);
-  await scatter.load(loader, scatterData);
-  scene.add(scatter.group);
-  ui.loading(0.8, 'Stringing the chairlifts…');
-  lifts = new Lifts(terrain);
-  lifts.build(liftData);
-  scene.add(lifts.group);
-
-  ui.loading(0.88, 'Waxing skis…');
-  skier = new Skier(terrain, scatter, lifts, input);
-  skier.fade = (b, d) => ui.fade(b, d);
-  rig = new SkierRig(skier);
-  await rig.load(loader);
-  scene.add(rig.root);
-  const s = terrain.getSpawn();
-  skier.place(s.position, s.heading);
-  skier.state = State.FROZEN;
-
-  chase = new ChaseCamera(camera, skier, terrain, input);
-  trails = new SkiTrails(skier, terrain);
-  scene.add(trails.mesh);
-  spray = new PowderSpray(skier, renderer);
-  scene.add(spray.points);
-  snowfall = new Snowfall();
-  scene.add(snowfall.points);
-  sound = new SoundScape(skier, terrain);
-
-  setupPost();
-  applyQuality();
-  on('settings', ({ key }) => { if (key === 'quality') applyQuality(); if (key === 'snowfall') snowfall.points.visible = settings.snowfall; });
-  snowfall.points.visible = settings.snowfall;
-  addEventListener('resize', onResize);
-  onResize();
-
-  // Warm up shaders so the first frames don't hitch.
-  renderer.compile(scene, camera);
-  ui.loading(1, '');
-  ui.doneLoading();
-  ui.fade(false, 2.5);
   if (params.has('at')) {
     const [x, z, h] = params.get('at').split(',').map(Number);
     terrain.meta.spawn = { position: [x, 0, z], heading: h || 0 };
   }
+  scatter = new Scatter(terrain);
+  await scatter.load(loader, scatterData);
+  scene.add(scatter.group);
+  ui.loading(0.75, 'Building the park…');
+  features = new Features(terrain);
+  features.build(pistes);
+  scene.add(features.group);
+  for (const o of features.obstaclePoints || []) scatter.addObstacle(o[0], o[1], o[2], o[3]);
+  if (params.has('kicker')) {
+    // Debug: start 40 m before a kicker, aimed at it.
+    const k = features.kickers[Number(params.get('kicker'))] || features.kickers[0];
+    const p0 = k.o.clone().addScaledVector(k.f, -40);
+    terrain.meta.spawn = { position: [p0.x, 0, p0.y], heading: Math.atan2(-k.f.x, -k.f.y) };
+  }
+  lifts = new Lifts(terrain);
+  lifts.build(liftData);
+  scene.add(lifts.group);
+
+  ui.loading(0.88, 'Waxing the board…');
+  player = new Player(terrain, scatter, lifts, input);
+  player.fade = (b, d) => ui.fade(b, d);
+  rider = new Rider(player);
+  await rider.load(loader);
+  scene.add(rider.root);
+  const s = terrain.getSpawn();
+  player.place(s.position, s.heading);
+  player.state = State.FROZEN;
+
+  cam = new CameraController(camera, player, terrain, input);
+  fx = new FXManager(player, renderer, scene);
+  sound = new SoundScape(player, terrain);
+
+  setupPost();
+  applyQuality();
+  on('settings', ({ key }) => { if (key === 'quality') applyQuality(); });
+  addEventListener('resize', onResize);
+  onResize();
+  renderer.compile(scene, camera);
+  ui.loading(1, '');
+  ui.doneLoading();
+  ui.fade(false, 2.0);
   if (params.has('ride')) startRide(true);
   else { setMode(Mode.MENU); ui.refresh(); }
-  window.__sendit = { skier, terrain, camera, game, scene, renderer };
+  window.__sendit = { player, terrain, camera, game, scene, renderer, features };
 }
 
 function setupPost() {
   composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
   composer.addPass(new RenderPass(scene, camera));
   aoPass = new N8AOPostPass(scene, camera, innerWidth, innerHeight);
-  aoPass.configuration.aoRadius = 2.5;
-  aoPass.configuration.distanceFalloff = 1.2;
-  aoPass.configuration.intensity = 2.2;
-  aoPass.configuration.color = new THREE.Color(0.08, 0.12, 0.22);
+  aoPass.configuration.aoRadius = 3.0;
+  aoPass.configuration.distanceFalloff = 1.0;
+  aoPass.configuration.intensity = 2.5;
+  aoPass.configuration.color = new THREE.Color(0.22, 0.2, 0.55);   // stylized indigo occlusion
   aoPass.setQualityMode('Medium');
   composer.addPass(aoPass);
-  bloom = new BloomEffect({ intensity: 0.55, luminanceThreshold: 0.95, luminanceSmoothing: 0.25, mipmapBlur: true, radius: 0.72 });
-  const tone = new ToneMappingEffect({ mode: ToneMappingMode.AGX });
-  const vignette = new VignetteEffect({ offset: 0.3, darkness: 0.38 });
-  composer.addPass(new EffectPass(camera, bloom, tone, vignette));
+  bloom = new BloomEffect({ intensity: 1.2, luminanceThreshold: 1.08, luminanceSmoothing: 0.08, mipmapBlur: true, radius: 0.7 });
+  wind = new WindEffect();
+  composer.addPass(new EffectPass(camera, bloom, wind, new HueSaturationEffect({ saturation: 0.18 }), new BrightnessContrastEffect({ contrast: 0.1, brightness: -0.02 })));
   composer.addPass(new EffectPass(camera, new SMAAEffect({ preset: SMAAPreset.HIGH })));
 }
 
@@ -141,10 +164,9 @@ function applyQuality() {
   const q = settings.quality;
   const dpr = Math.min(devicePixelRatio || 1, 2);
   renderer.setPixelRatio([Math.min(dpr, 1) * 0.75, Math.min(dpr, 1.5), dpr][q]);
-  sky.setShadowBox([45, 70, 95][q], [1024, 2048, 4096][q]);
+  sky.setShadowBox([40, 60, 85][q], [1024, 2048, 4096][q]);
   aoPass.enabled = q > 0;
   if (q > 0) aoPass.setQualityMode(q === 2 ? 'High' : 'Medium');
-  bloom.intensity = [0.4, 0.55, 0.6][q];
   terrain.setQuality(q);
   scatter.setQuality(q);
   onResize();
@@ -166,15 +188,12 @@ async function startRide(instant = false) {
   await sound.init().catch(() => {});
   sound.resume();
   if (!instant) input.lock();
-  if (!instant) await ui.fade(true, 0.9);
   resetScore();
+  player.startRiding();
   setMode(Mode.RIDING);
-  skier.startRiding();
-  chase.snap();
+  if (!instant) cam.startIntro(); else cam.snap();
   ui.refresh();
   emit('rideStarted');
-  await new Promise((r) => setTimeout(r, 200));
-  ui.fade(false, 1.6);
   busy = false;
 }
 
@@ -196,11 +215,11 @@ function resume() {
 async function toMenu() {
   if (busy) return;
   busy = true;
-  await ui.fade(true, 0.9);
-  skier.state = State.FROZEN;
+  await ui.fade(true, 0.6);
+  player.state = State.FROZEN;
   setMode(Mode.MENU);
   ui.refresh();
-  ui.fade(false, 1.6);
+  ui.fade(false, 1.2);
   busy = false;
 }
 
@@ -209,7 +228,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 canvas.addEventListener('click', () => { if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) input.lock(); });
 
-// ---------------------------------------------------------------- loop
+// ---------------------------------------------------------------- loop (fixed 60 Hz physics, interpolated render)
 const STEP = 1 / 60;
 let acc = 0, last = performance.now(), time = 0;
 function frame(now) {
@@ -227,26 +246,28 @@ function frame(now) {
     time += dt;
     acc += dt;
     let n = 0;
-    while (acc >= STEP && n < 8) { skier.step(STEP); trails.update(); acc -= STEP; n++; }
+    while (acc >= STEP && n < 8) { player.step(STEP); acc -= STEP; n++; }
     if (n === 8) acc = 0;
-    skier.interpolate(acc / STEP);
+    player.interpolate(acc / STEP);
   }
   globals.uTime.value = time;
-  rig.update(paused ? 0 : dt);
-  chase.update(dt);
-  const focus = game.mode === Mode.MENU ? camera.position : skier.renderPos;
-  sky.update(camera, game.mode === Mode.MENU ? camera.position.clone().add(new THREE.Vector3(0, -200, 0)) : skier.renderPos);
+  rider.update(paused ? 0 : dt, camera);
+  cam.update(paused ? 0 : dt);
+  sky.update(camera, game.mode === Mode.MENU ? camera.position.clone().add(new THREE.Vector3(0, -200, 0)) : player.renderPos, time);
   terrain.update(camera.position);
   scatter.update(camera.position);
   lifts.update(time, camera.position);
-  trails.rebuild();
-  if (!paused) spray.update(dt, renderer.domElement.height);
-  snowfall.update(dt, camera, renderer.domElement.height);
+  if (!paused) fx.update(dt, camera);
   sound.update(dt, camera);
-  ui.update(dt, skier);
+  ui.update(dt, player);
+  // Wind streaks fade in near top speed.
+  const riding = game.mode === Mode.RIDING;
+  const wantWind = riding ? THREE.MathUtils.smoothstep(player.speedRatio, 0.7, 1.0) : 0;
+  const wu = wind.uniforms.get('intensity');
+  wu.value += (wantWind - wu.value) * (1 - Math.exp(-3 * dt));
+  wind.uniforms.get('windTime').value = time;
   input.endFrame();
   composer.render(dt);
-  void focus;
 }
 requestAnimationFrame(frame);
 
