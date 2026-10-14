@@ -4,14 +4,14 @@ Godot 4.4.1, Forward+, GDScript. Headless binary for checks lives outside the re
 Heavy commands run with `nice -n 19`.
 
 ## Current phase
-Phase 5 — Camera (done)
+FINAL — all phases done (1-8). Verified: headless autotest + UI flow script; Forward+ frames via lavapipe (xvfb, VK_ICD_FILENAMES=.../lvp_icd.json).
 
 ## Files
 - project.godot — config, autoloads, input map, physics interpolation on.
 - default_bus_layout.tres — buses: Master, Music, SFX.
 - core/event_bus.gd — autoload EventBus: global signals.
 - core/game_state.gd — autoload GameState: Mode/Quality enums, settings (user://settings.cfg), relaxed score.
-- core/main.tscn / main.gd — root; builds Terrain, Scatter, Lifts, Skier (+ temporary sun/camera). `-- --autotest` runs a scripted headless ride printing diagnostics.
+- core/main.tscn / main.gd — root; builds Terrain, Scatter, Lifts, Atmosphere, Skier, SkiTrails, PowderSpray, ChaseCamera, SoundScape, UIRoot; flow MENU -> start_ride() -> RIDING (pause via UI) -> to_menu(). `-- --autotest` scripted ride w/ diagnostics; `-- --shot=file.png` saves frame 40.
 - tools/build_mountain.py — downloads Copernicus GLO-30 tiles (AWS) + OSM (Overpass, mirror fallback) for a 6x6 km box centred 45.983N 7.688E (Matterhorn + Schwarzsee/Furgg ski area). Writes assets/terrain/*. Caches in tools/cache (gitignored). tools/.gdignore hides tools/ from Godot.
 - tools/write_import_settings.py — writes .import files (mipmaps, VRAM, normal-map flag) for textures; run before first import.
 - tools/preview/ — heightmap16.png (16-bit) and splat.png previews.
@@ -35,12 +35,36 @@ Phase 5 — Camera (done)
 - camera/chase_camera.gd — class ChaseCamera (top_level, interpolation off, _process): smooth-damped follow (floaty), lagged yaw toward travel, SpringArm3D (mask 1, sphere 0.35) + terrain floor clamp, FOV 68→80 with speed, slow orbit after 3 s still, mouse/right-stick look easing back, lift/crash framing, main-menu flyover orbiting the highest summit. snap() on respawn/lift arrival.
 - NOTE: new class_name scripts need `godot --headless --import` once to refresh the class cache before running.
 
+- rendering/atmosphere.gd — class Atmosphere: WorldEnvironment (custom sky shader, AgX, soft glow, exp fog + aerial perspective + valley height fog), golden-hour sun (WNW, 14°), quality presets (shadows, SSAO M/H, SSIL/SDFGI/volumetric fog High only, TAA M/H, FSR on Low, LOD threshold, aniso), snowfall GPUParticles following camera (setting).
+- rendering/sky.gdshader — single-scattering Rayleigh/Mie/ozone atmosphere from 3000 m, sun disk, high cloud layer (NoiseTexture2D), hazy below-horizon.
+- rendering/terrain.gdshader — full snow shader: powder (snow_02) / groomed (snow_01) two-scale anti-tiling, triplanar rock_face_03, wind sastrugi (cellular normal noise), corduroy ridges + groomer lanes along fall line, custom light(): wrap translucency, GGX spec, sparkle glints, blue shadow fill.
+- rendering/terrain_far.gdshader — backdrop with triplanar rock, snow, low-valley forest tint.
+- rendering/terrain_materials.gd — loads textures, macro/wind NoiseTextures, apply_quality().
+- rendering/ski_trails.gd + ski_trail.gdshader — two groove ribbons (ImmediateMesh, 700 pts each), tangent across groove.
+- rendering/powder_spray.gd — GPUParticles spray (amount_ratio from skid/carve/speed/powder) + landing puff.
+- rendering/soft_sprite.gd — shared radial sprite.
+- assets/models/rocks/ — Poly Haven rock_07, rock_09 (1K glTF) used by Scatter (ROCK_SCALE per variant).
+- assets/textures/ — Poly Haven snow_02, snow_01, rock_face_03 (2K). Import settings via tools/write_import_settings.py.
+- tools/gen_audio.py — synthesizes all audio (CC0) to assets/audio/*.ogg.
+- audio/sound_scape.gd — class SoundScape: loops powder/groomed/carve/wind_speed/wind ambient blended by surface/speed/turn; landing thumps; random distant birds (3D); music with slow fades and occasional rests.
+- ui/ui_root.gd — class UIRoot (CanvasLayer, process always): theme in code; main menu (Ride/Settings/Credits/Quit) over flyover; HUD (speed km/h fades when idle, soft score notes, hints, lift label); pause (stats, resume, back to top, settings, main menu, quit); settings (quality, volumes, mouse/camera sensitivity, snowfall, fullscreen); credits parsed from CREDITS.md; fade overlay (EventBus.fade_request).
+- export_presets.cfg — Linux/Windows with include filter *.bin, *.json, CREDITS.md.
+
 ## Coordinates
 x = east, z = south (north = -Z), metres, origin = box centre. Heading yaw 0 = facing -Z.
 
 ## Input map
 W/Up/LStick-up/RT = speed_up · S/Down/LStick-down/LT = brake · A/D/LStick-x = carve · Space/A = jump (hold to charge) · Shift/RB/B = tuck · R/Y = reset · Esc/Start = pause · RStick = camera.
 
+## Testing recipes
+- Import/class cache: `godot --headless --import --path .`
+- Scripted ride: `godot --headless --path . --quit-after 900 -- --autotest`
+- Screenshot (software Vulkan, slow): `VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a godot --rendering-driver vulkan --path . --quit-after 46 -- --autotest --shot=/tmp/x.png` (add `--charcam` for a side view of the skier).
+
 ## Known issues
 - Copernicus DSM has void-filled blocky patches on the Matterhorn's steepest faces; summit reads ~4330 m.
-- .bin/.json data are read with FileAccess: exports need include filter `*.bin, *.json` (see export notes, later).
+- .bin/.json data are read with FileAccess: export_presets.cfg includes `*.bin, *.json, CREDITS.md`.
+- Headless (dummy audio driver) quits with "resources still in use" for the looping OGG streams — harmless.
+- Pines are stylized Quaternius models re-shaded; photoreal conifers (Poly Haven) are millions of polys and unsuitable for scattering.
+- Lift boarding is automatic: glide slowly (<7 m/s) within ~22 m of a rideable lift's bottom station. The skier rides a personal chair that may overlap a moving chair.
+- Spawn piste is chosen automatically by tools/build_mountain.py (longest easy/intermediate run near a lift top).
