@@ -1,8 +1,7 @@
 extends Node3D
-## Root of the game: builds the world (terrain, scatter, lifts, atmosphere), the skier with trails
-## and spray, the camera, the soundscape and the UI, and runs the menu -> ride -> pause flow.
+## Root of the game: builds the world and every system, and runs the menu -> ride -> pause flow.
 ## Command-line extras (after `--`): `--autotest` scripted ride with diagnostics,
-## `--shot=<file.png>` saves a frame after warm-up.
+## `--shot=<file.png>` saves a frame after warm-up, `--charcam` side view of the skier.
 
 var terrain: Terrain
 var scatter: Scatter
@@ -12,6 +11,8 @@ var atmosphere: Atmosphere
 var camera_rig: ChaseCamera
 var sound: SoundScape
 var ui: UIRoot
+var juice: Juice
+var screen_fx: ScreenFX
 var _autotest := false
 var _t := 0.0
 var _busy := false
@@ -19,6 +20,7 @@ var _busy := false
 
 func _ready() -> void:
 	GameState.apply_settings()
+	juice = _add(Juice.new(), "Juice")
 	terrain = _add(Terrain.new(), "Terrain")
 	scatter = _add(Scatter.new(), "Scatter")
 	lifts = _add(Lifts.new(), "Lifts")
@@ -36,6 +38,11 @@ func _ready() -> void:
 	sound = SoundScape.new()
 	sound.skier = skier
 	_add(sound, "SoundScape")
+	_add(Sfx.new(), "Sfx")
+	screen_fx = ScreenFX.new()
+	screen_fx.skier = skier
+	_add(screen_fx, "ScreenFX")
+	_add(Popups.new(), "Popups")
 	ui = UIRoot.new()
 	ui.skier = skier
 	_add(ui, "UI")
@@ -60,19 +67,18 @@ func _add(n: Node, node_name: String) -> Node:
 	return n
 
 
+## Seamless: the camera swoops from the flyover down to the skier while the title fades.
 func start_ride() -> void:
 	if _busy:
 		return
 	_busy = true
-	EventBus.fade_request.emit(true, 0.9)
-	await get_tree().create_timer(1.0).timeout
 	GameState.reset_score()
-	GameState.mode = GameState.Mode.RIDING
 	skier.start_riding()
-	camera_rig.snap()
+	GameState.mode = GameState.Mode.RIDING
+	camera_rig.start_intro_drop(2.8)
 	EventBus.ride_started.emit()
-	await get_tree().create_timer(0.2).timeout
-	EventBus.fade_request.emit(false, 1.6)
+	EventBus.sfx.emit("whoosh_slow", 0.6, 1.2)
+	await get_tree().create_timer(1.0).timeout
 	_busy = false
 
 
@@ -81,8 +87,9 @@ func to_menu() -> void:
 		return
 	_busy = true
 	get_tree().paused = false
+	Juice.normal_time(20.0)
 	EventBus.fade_request.emit(true, 0.9)
-	await get_tree().create_timer(1.0).timeout
+	await get_tree().create_timer(1.0, true, false, true).timeout
 	GameState.save_settings()
 	skier.state = Skier.State.FROZEN
 	GameState.mode = GameState.Mode.MENU
@@ -106,18 +113,16 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	if _autotest:
 		_run_autotest(delta)
-	if "--charcam" in OS.get_cmdline_user_args():
-		camera_rig.set_process(false)
+	var args := OS.get_cmdline_user_args()
+	if "--charcam" in args:
+		camera_rig.external = true
 		var p := skier.get_global_transform_interpolated().origin
 		var f := skier.forward_dir()
 		var side := Vector3(-f.z, 0, f.x)
-		camera_rig.global_position = p + f * 2.6 + side * 2.2 + Vector3(0, 1.1, 0)
-		camera_rig.yaw_pivot.rotation = Vector3.ZERO
-		camera_rig.pitch_pivot.rotation = Vector3.ZERO
-		camera_rig.arm.spring_length = 0.0
-		camera_rig.yaw_pivot.look_at(p + Vector3(0, 0.9, 0))
+		var cp := p + f * 2.6 + side * 2.2 + Vector3(0, 1.1, 0)
+		camera_rig.camera.global_transform = Transform3D(Basis.looking_at(p + Vector3(0, 0.9, 0) - cp, Vector3.UP), cp)
 		camera_rig.camera.fov = 50.0
-	for a in OS.get_cmdline_user_args():
+	for a in args:
 		if a.begins_with("--shot="):
 			if Engine.get_process_frames() > 40 and not has_meta("shot_done"):
 				set_meta("shot_done", true)
@@ -140,4 +145,5 @@ func _run_autotest(delta: float) -> void:
 		else:
 			Input.action_release("jump")
 	if int(_t * 2.0) != int((_t - delta) * 2.0):
-		print("t=%.1f state=%d speed=%.1f pos=%s air=%.2f skid=%.2f score=%d arm=%.2f/%.2f cam_dy=%.2f" % [_t, skier.state, skier.speed, skier.position.snapped(Vector3.ONE * 0.1), skier.air_time, skier.skid, GameState.score, camera_rig.arm.get_hit_length(), camera_rig.arm.spring_length, camera_rig.camera.global_position.y - skier.position.y])
+		print("t=%.1f state=%d speed=%.1f pos=%s air=%.2f skid=%.2f score=%d ts=%.2f" % [_t, skier.state, skier.speed,
+			skier.position.snapped(Vector3.ONE * 0.1), skier.air_time, skier.skid, GameState.score, Engine.time_scale])

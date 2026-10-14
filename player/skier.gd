@@ -4,7 +4,7 @@ extends Node3D
 ## charged jumps, slow air spins, soft auto-aligning landings, gentle crashes, and lift rides.
 ## Runs in _physics_process; physics interpolation smooths the rendered motion.
 
-enum State { FROZEN, GROUNDED, AIR, CRASH, LIFT }
+enum State { FROZEN, GROUNDED, AIR, CRASH, LIFT, GRIND }
 
 const SAFE_POINT_INTERVAL := 1.5
 
@@ -29,6 +29,10 @@ var crash_t := 0.0
 var lift_t := 0.0             ## 0..1 progress of a lift ride
 var surface := Vector4(1, 0, 0, 0)
 var landing_squash := 0.0     ## 0..1 decaying after touchdown
+var boosting := false
+var grind_metal := true
+var air_height := 0.0         ## metres above the snow while airborne
+var _apex_sent := false
 
 var _orient := Basis()
 var _align_timer := 0.0
@@ -239,11 +243,13 @@ func _jump() -> void:
 	velocity += ground_normal * pop
 	position += ground_normal * 0.06
 	EventBus.player_jumped.emit(charge)
+	EventBus.sfx.emit("jump_pop", 0.5 + charge * 0.5, randf_range(0.95, 1.1))
 	charge = 0.0
 	_enter_air()
 
 
 func _enter_air() -> void:
+	_apex_sent = false
 	state = State.AIR
 	air_time = 0.0
 	_spin_total = 0.0
@@ -262,9 +268,14 @@ func _air_step(dt: float) -> void:
 	skid = lerpf(skid, 0.0, 1.0 - exp(-4.0 * dt))
 	air_time += dt
 	speed = velocity.length()
+	var vy_before := velocity.y
 	position += velocity * dt
 	var tr := Terrain.instance
 	var gh := tr.get_height(position.x, position.z)
+	air_height = position.y - gh
+	if not _apex_sent and vy_before <= 0.0 and air_time > 0.25:
+		_apex_sent = true
+		EventBus.air_apex.emit(air_height)
 	if position.y <= gh:
 		position.y = gh
 		_land()
@@ -294,6 +305,11 @@ func _land() -> void:
 	_align_timer = 0.45
 	landing_squash = clampf(impact / 8.0, 0.25, 1.0)
 	EventBus.player_landed.emit(impact, air_time)
+	EventBus.sfx.emit("land_hard" if impact > 7.0 else "land_soft", clampf(impact / 10.0, 0.25, 1.0), randf_range(0.9, 1.08))
+	if air_time > 0.7 and diff < 0.22 and impact < 11.0:
+		EventBus.perfect_landing.emit()
+		EventBus.popup.emit("PERFECT", "perfect")
+		EventBus.sfx.emit("perfect", 0.8, 1.0)
 	if air_time > 0.8:
 		var pts := int(air_time * 60.0) + spins * 120
 		var label := "Air %.1fs" % air_time

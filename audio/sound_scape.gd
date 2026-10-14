@@ -49,7 +49,7 @@ func _ready() -> void:
 		_gains[p] = 0.0
 		p.volume_db = -80.0
 		p.play(randf() * 4.0 if p != _music else 0.0)
-	EventBus.player_landed.connect(_on_landed)
+	pass  # landing thumps now come from Sfx via EventBus.sfx
 	EventBus.player_crashed.connect(func(): _thump(0.55, 0.8))
 
 
