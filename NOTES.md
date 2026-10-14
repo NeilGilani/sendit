@@ -4,7 +4,7 @@ Godot 4.4.1, Forward+, GDScript. Headless binary for checks lives outside the re
 Heavy commands run with `nice -n 19`.
 
 ## Current phase
-Phase 3 — Skiing controller (done)
+Phase 4 — Character (done)
 
 ## Files
 - project.godot — config, autoloads, input map, physics interpolation on.
@@ -27,6 +27,10 @@ Phase 3 — Skiing controller (done)
 
 - player/ski_tuning.gd + ski_tuning.tres — SkiTuning resource: ALL ski tunables (input smoothing, carving, friction, drag, soft speed cap, jump, spins, crash thresholds, lift ride).
 - player/skier.gd — class Skier (Node3D, _physics_process). States FROZEN/GROUNDED/AIR/CRASH/LIFT. Slope gravity, grip w/ carve redirection, auto-align, downhill settle, push, skid brake, charged jump, air spins, soft landings (auto-align, backwards = pivot), gentle crash -> fade -> respawn at safe point, obstacle bump/crash, map bounds, scoring (distance per 250 m, air >0.8 s + spins, smooth turns), lift boarding (slow within 22 m of a rideable base) and ride (W = faster) + dismount. Public: state, velocity, speed, heading, steer, brake, tuck, charge, carve, skid, air_time, spin_rate, crash_t, lift_t, surface, landing_squash, ground_normal, forward_dir(), start_riding(), place().
+
+- tools/prep_character.py — copies Quaternius Superhero_Male glTF to assets/models/skier/skier.gltf, bakes COLOR_0 zones (R jacket, G pants, B gloves/boots, A coverage), 1K textures.
+- player/skier_rig.gd — class SkierRig (child "Rig" of Skier): Visual node (lean/skid/tumble), model rotated 180° (model faces +Z), bone posing in skeleton space (+Z fwd, +X = model left): pelvis drop/pitch, spine bend, head counter, analytic 2-bone leg IK (knee pole fwd), arm aim blends (stance/tuck/air/sit/crash); skis follow feet, poles from hands; helmet/strap/goggles on BoneAttachment3D(Head).
+- rendering/skier_suit.gdshader — outfit from zones (teal "Northwake" jacket w/ amber band, charcoal pants), slight inflation along normals.
 
 ## Coordinates
 x = east, z = south (north = -Z), metres, origin = box centre. Heading yaw 0 = facing -Z.

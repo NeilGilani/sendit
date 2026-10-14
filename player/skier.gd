@@ -49,8 +49,14 @@ var _hint_cool := 0.0
 var _last_heading := 0.0
 
 
+var rig: SkierRig
+
+
 func _ready() -> void:
 	EventBus.ride_reset.connect(_on_ride_reset)
+	rig = SkierRig.new()
+	rig.name = "Rig"
+	add_child(rig)
 
 
 # ------------------------------------------------------------------ public

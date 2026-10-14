@@ -40,10 +40,17 @@ func _process(delta: float) -> void:
 	var cam := get_viewport().get_camera_3d()
 	if cam and skier:
 		var p := skier.get_global_transform_interpolated().origin
-		cam.global_position = p + skier.forward_dir() * -7.0 + Vector3(0, 3, 0)
-		cam.look_at(p + Vector3(0, 1, 0))
+		var side := Vector3(-skier.forward_dir().z, 0, skier.forward_dir().x)
+		cam.global_position = p + skier.forward_dir() * 2.2 + side * 2.0 + Vector3(0, 1.0, 0)
+		cam.look_at(p + Vector3(0, 0.9, 0))
 	if _autotest:
 		_run_autotest(delta)
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--shot="):
+			if Engine.get_process_frames() > 40 and not has_meta("shot_done"):
+				set_meta("shot_done", true)
+				get_viewport().get_texture().get_image().save_png(a.substr(7))
+				print("saved ", a.substr(7))
 
 
 func _run_autotest(delta: float) -> void:

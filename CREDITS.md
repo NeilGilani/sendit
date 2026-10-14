@@ -12,3 +12,4 @@ All resort, lift, piste, gear and brand names in the game are invented.
 
 ## 3D models (CC0)
 - **Pine trees and rocks:** "Stylized Nature MegaKit" (Standard) by Quaternius — CC0 1.0 — https://quaternius.itch.io/stylized-nature-megakit (textures downsized to 1K).
+- **Skier character:** "Universal Base Characters" (Standard, Superhero_Male) by Quaternius — CC0 1.0 — https://quaternius.itch.io/universal-base-characters. Prepared with `tools/prep_character.py` (clothing zones baked as vertex colours, textures downsized to 1K). Skis, poles, helmet and goggles are procedural meshes made in code.
