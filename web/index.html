@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SENDIT — golden hour</title>
+  <meta name="description" content="A peaceful skiing game on a real mountain at golden hour." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f6c58e'/%3E%3Cstop offset='1' stop-color='%238fb3d9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='128' height='128' rx='24' fill='url(%23s)'/%3E%3Cpath d='M14 104 L52 40 L66 60 L80 30 L114 104 Z' fill='%23f4f7fb'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="loading" class="screen">
+    <div class="title">SENDIT</div>
+    <div class="sub">Preparing the mountain…</div>
+    <div class="bar"><div id="loadbar"></div></div>
+    <div id="loadmsg" class="tiny"></div>
+  </div>
+
+  <div id="menu" class="screen hidden">
+    <div class="vignette"></div>
+    <div class="panel-left">
+      <div class="title">SENDIT</div>
+      <div class="sub">Valcrest Alpine Resort · golden hour</div>
+      <nav>
+        <button data-act="ride" class="primary">Ride</button>
+        <button data-act="settings">Settings</button>
+        <button data-act="credits">Credits</button>
+      </nav>
+    </div>
+    <div class="foot">W glide · A/D carve · S brake · Shift tuck · hold Space to jump · R back to top · Esc pause · mouse to look</div>
+  </div>
+
+  <div id="hud" class="hidden">
+    <div id="speed"><span id="kmh">0</span><small>km/h</small></div>
+    <div id="notes"></div>
+    <div id="hint"></div>
+    <div id="liftlabel"></div>
+  </div>
+
+  <div id="pause" class="screen hidden">
+    <div class="vignette dim"></div>
+    <div class="panel-left">
+      <div class="title small">Paused</div>
+      <div id="stats" class="sub"></div>
+      <nav>
+        <button data-act="resume" class="primary">Resume</button>
+        <button data-act="top">Back to the top</button>
+        <button data-act="settings">Settings</button>
+        <button data-act="menu">Main menu</button>
+      </nav>
+    </div>
+  </div>
+
+  <div id="settings" class="screen hidden">
+    <div class="vignette dim"></div>
+    <div class="card">
+      <h2>Settings</h2>
+      <div class="grid">
+        <label>Quality</label>
+        <div class="seg" data-key="quality"><button data-v="0">Low</button><button data-v="1">Medium</button><button data-v="2">High</button></div>
+        <label>Master volume</label><input type="range" min="0" max="1" step="0.01" data-key="master" />
+        <label>Music volume</label><input type="range" min="0" max="1" step="0.01" data-key="music" />
+        <label>Effects volume</label><input type="range" min="0" max="1" step="0.01" data-key="sfx" />
+        <label>Mouse sensitivity</label><input type="range" min="0.2" max="3" step="0.01" data-key="mouseSens" />
+        <label>Camera sensitivity</label><input type="range" min="0.2" max="3" step="0.01" data-key="camSens" />
+        <label>Light snowfall</label><input type="checkbox" data-key="snowfall" />
+        <label>Fullscreen</label><input type="checkbox" data-key="fullscreen" />
+      </div>
+      <button data-act="back">Back</button>
+    </div>
+  </div>
+
+  <div id="credits" class="screen hidden">
+    <div class="vignette dim"></div>
+    <div class="card wide">
+      <div id="creditsText"></div>
+      <button data-act="back">Back</button>
+    </div>
+  </div>
+
+  <div id="fade"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
