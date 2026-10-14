@@ -6,15 +6,15 @@
 // ------------------------------------------------------------------ PlayerPhysics
 export const PHYSICS = {
   gravity: 9.81,
-  maxVelocity: 34,            // m/s — "max" used by all speed ratios (~122 km/h)
-  softCapDrag: 0.05,          // extra drag above maxVelocity keeps things arcade but bounded
+  maxVelocity: 23,            // m/s — "max" used by all speed ratios (~83 km/h): a real riding pace
+  softCapDrag: 0.09,          // extra drag above maxVelocity keeps things arcade but bounded
   frictionGroomed: 0.028,
-  frictionPowder: 0.06,
+  frictionPowder: 0.075,
   frictionRock: 0.12,
-  dragUpright: 0.0030,        // quadratic air drag
-  dragTuck: 0.0011,
+  dragUpright: 0.0058,        // quadratic air drag
+  dragTuck: 0.0030,
   turnRateSlow: 2.6,          // rad/s carving at low speed
-  turnRateFast: 1.55,         // rad/s at max speed — wide fast arcs
+  turnRateFast: 1.8,          // rad/s at max speed — wide fast arcs
   steerResponse: 9.0,         // how fast steering input eases in (1/s) — snappy & arcade
   grip: 6.0,                  // lateral velocity decay (1/s)
   powderGrip: 4.2,
@@ -71,7 +71,7 @@ export const ANIM = {
 // ------------------------------------------------------------------ CameraController
 export const CAMERA = {
   baseFov: 66,
-  maxFovBonus: 22,            // currentFoV = baseFoV + velocityRatio * maxFovBonus
+  maxFovBonus: 12,            // currentFoV = baseFoV + velocityRatio * maxFovBonus
   fovRiseRate: 2.2,           // 1/s easing up
   fovSnapRate: 14,            // 1/s snapping back on crash / hard brake
   distance: 4.7,
@@ -110,10 +110,9 @@ export const FX = {
 // ------------------------------------------------------------------ Art style (materials)
 // Lighting, the snow palette, sky, fog and environment spawning live in scene.js (the scene file).
 export const ART = {
-  toonSoftness: 0.02,                 // band edge softness for objects (pines, rider, lifts)
   rimLightColor: [1.0, 0.78, 0.5],
   rimPower: 3.0,
-  rimStrength: 0.9,
+  rimStrength: 0.45,
   neonColor: [0.1, 1.0, 0.85],        // cyan neon trim
   neonColor2: [1.0, 0.2, 0.75],       // pink neon trim
   windSpeed: 1.3,
@@ -122,7 +121,7 @@ export const ART = {
 
 // ------------------------------------------------------------------ HUD
 export const HUD = {
-  speedMilestones: [50, 100, 150],    // km/h — the speed readout bounces when crossing these
-  windStreakFrom: 0.8,                // speed ratio where corner wind streaks start
+  speedMilestones: [30, 50, 70],      // km/h — the speed readout bounces when crossing these
+  windStreakFrom: 0.85,               // speed ratio where corner wind streaks start
   windStreakFull: 1.0,
 };

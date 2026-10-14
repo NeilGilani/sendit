@@ -182,7 +182,7 @@ export class Scatter {
       trees++;
     }
 
-    // ---- frozen rock formations (boulder clusters + ice shards)
+    // ---- rock formations (warm brown boulder clusters with snow caps)
     const cMin = Math.cos(S.rockMinSlope * DEG), cMax = Math.cos(S.rockMaxSlope * DEG);
     let formations = 0;
     for (let z = minZ; z < maxZ; z += S.rockClusterStep) {
@@ -389,7 +389,8 @@ function pineGeometry(tiers, stretch, rnd) {
   const parts = [];
   const trunk = new THREE.CylinderGeometry(0.16, 0.26, 2.2, 6);
   trunk.translate(0, 1.1, 0);
-  paint(trunk, () => [0.2, 0.1, 0.06]);
+  paint(trunk, () => [0.16, 0.08, 0.045]);
+  const greens = SPAWN.pineGreens.map((h) => { const c = col(h); return [c.r, c.g, c.b]; });
   parts.push(trunk);
   const H = 8.0 * stretch;
   for (let i = 0; i < tiers; i++) {
@@ -414,7 +415,7 @@ function pineGeometry(tiers, stretch, rnd) {
     paint(cone, (px, py) => {
       const rel = (py - y) / h;
       const snow = rel > 0.5 - 0.12 * Math.sin(px * 3.0) ? 1 : 0;
-      return snow ? [0.97, 0.97, 0.95] : (i % 2 ? [0.035, 0.16, 0.15] : [0.045, 0.19, 0.17]);
+      return snow ? [0.93, 0.93, 0.92] : (i % 2 ? greens[0] : greens[1]);
     });
     parts.push(cone);
   }
@@ -440,12 +441,12 @@ function rockGeometry(detail, rnd) {
   }
   g.computeVertexNormals();
   const nor = g.attributes.normal;
-  const ice = col(SPAWN.iceTint);
+  const browns = SPAWN.rockColors.map((h) => { const c = col(h); return [c.r, c.g, c.b]; });
   const cols = new Float32Array(pos.count * 3);
   for (let f = 0; f < pos.count; f += 3) {
     const ny = (nor.getY(f) + nor.getY(f + 1) + nor.getY(f + 2)) / 3;
     const r = rnd();
-    const c = ny > 0.5 ? [0.97, 0.97, 0.95] : r < 0.14 ? [ice.r, ice.g, ice.b] : r < 0.55 ? [0.09, 0.1, 0.19] : [0.13, 0.14, 0.26];
+    const c = ny > 0.55 ? [0.93, 0.93, 0.92] : browns[Math.min(browns.length - 1, Math.floor(r * browns.length))];
     for (let j = 0; j < 3; j++) cols.set(c, (f + j) * 3);
   }
   g.setAttribute('color', new THREE.BufferAttribute(cols, 3));

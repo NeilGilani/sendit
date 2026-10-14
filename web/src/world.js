@@ -2,7 +2,7 @@
 // The palette, sun and atmosphere come from scene.js (the scene file).
 import * as THREE from 'three';
 import { ART } from './config.js';
-import { LIGHTING, OBJECT_BANDS, OUTLINE, sunDirection, fogParsFragmentGLSL, fogFragmentGLSL } from './scene.js';
+import { LIGHTING, OUTLINE, sunDirection, lightingUniforms, fogParsFragmentGLSL, fogFragmentGLSL } from './scene.js';
 
 export const SUN_DIR = sunDirection();
 export const SUN_COLOR = new THREE.Color(LIGHTING.sunColor);
@@ -17,11 +17,7 @@ export const globals = {
   uSunDir: { value: SUN_DIR.clone() },
   uSunLum: { value: SUN_INTENSITY * (0.2126 * SUN_COLOR.r + 0.7152 * SUN_COLOR.g + 0.0722 * SUN_COLOR.b) },
   uTime: { value: 0 },
-  uLit: { value: new THREE.Color(OBJECT_BANDS.lit) },
-  uMid: { value: new THREE.Color(OBJECT_BANDS.mid) },
-  uDeep: { value: new THREE.Color(OBJECT_BANDS.deep) },
-  uToonT: { value: new THREE.Vector2(OBJECT_BANDS.litThreshold, OBJECT_BANDS.deepFacing) },
-  uToonSoft: { value: ART.toonSoftness },
+  ...lightingUniforms(),
   uResolution: { value: new THREE.Vector2(1280, 720) },   // CSS px, for screen-space outlines
   uRimColor: { value: c3(ART.rimLightColor) },
   uWind: { value: new THREE.Vector2(ART.windSpeed, ART.windIntensity) },
@@ -32,7 +28,8 @@ export const globals = {
 /**
  * Patch three's shader chunks once:
  *  - fog: lavender aerial perspective + teal/indigo valley mist (scene.js)
- *  - lights: directional light is attenuated by `sunMaskFactor` (baked mountain shadows)
+ *  - lights: directional light is attenuated by `sunMaskFactor` (baked mountain shadows) and the
+ *    shadowed sun colour is captured in `sunShadowCol` for the soft light model
  */
 export function patchShaderChunks() {
   const C = THREE.ShaderChunk;
@@ -47,10 +44,10 @@ export function patchShaderChunks() {
   C.fog_pars_fragment = fogParsFragmentGLSL();
   C.fog_fragment = fogFragmentGLSL(SUN_DIR);
   if (!C.lights_pars_begin.includes('sunMaskFactor')) {
-    C.lights_pars_begin = 'float sunMaskFactor = 1.0;\n' + C.lights_pars_begin;
+    C.lights_pars_begin = 'float sunMaskFactor = 1.0;\nvec3 sunShadowCol = vec3(0.0);\n' + C.lights_pars_begin;
     C.lights_fragment_begin = C.lights_fragment_begin.replaceAll(
       'RE_Direct( directLight, geometryPosition',
-      'directLight.color *= sunMaskFactor;\n\t\tRE_Direct( directLight, geometryPosition');
+      'directLight.color *= sunMaskFactor;\n\t\tsunShadowCol = directLight.color;\n\t\tRE_Direct( directLight, geometryPosition');
   }
 }
 
@@ -66,11 +63,11 @@ vec2 sunMaskAt(vec3 wp) {
 `;
 
 /**
- * Toon (cel) material: three-band shading — warm cream light, periwinkle mid-tone, indigo deep —
- * driven by the real light (N·L × shadow maps × baked mountain shadow) and sky occlusion.
+ * Soft-shaded stylized material: wrapped warm sun (shadow maps + baked mountain shadows), cool
+ * sky fill, baked terrain AO and a gentle highlight roll-off (light model in scene.js LIGHTING).
  * Options:
  *   color, map, frag (GLSL run after the albedo is known; may set diffuseColor, toonSparkle,
- *   toonEmissive, toonRim), band (GLSL that writes \`band\` — replaces the generic 3 bands),
+ *   toonEmissive, toonRim), band (GLSL that may rewrite \`light\` — e.g. the snow model),
  *   vert/vertPars (vertex hooks), uniforms, rim (0..1), side, transparent.
  */
 export function toonMaterial(opts = {}) {
@@ -110,7 +107,7 @@ ${opts.vertPre || ''}`)
 varying vec3 vW;
 varying vec3 vWN;
 uniform vec3 uSunDir; uniform float uSunLum; uniform float uTime;
-uniform vec3 uLit; uniform vec3 uMid; uniform vec3 uDeep; uniform vec2 uToonT; uniform float uToonSoft;
+uniform vec3 uSunCol; uniform vec3 uSkyAmb; uniform vec3 uGroundAmb; uniform float uLightWrap; uniform float uAOFloor; uniform float uExposure;
 uniform vec3 uRimColor; uniform float uRim; uniform float uEmissiveBoost;
 float skyVis = 1.0;
 float toonSparkle = 0.0;
@@ -127,24 +124,25 @@ ${opts.frag || ''}`)
   }
   #include <lights_fragment_begin>`)
       .replace('#include <opaque_fragment>', `{
-    float alb = max(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)), 1e-3);
-    float direct = dot(reflectedLight.directDiffuse, vec3(0.2126, 0.7152, 0.0722)) * PI / (alb * uSunLum);
-    vec3 band = vec3(1.0);
-    ${opts.band || `{
-      float b1 = smoothstep(uToonT.x - uToonSoft, uToonT.x + uToonSoft, direct);
-      float ndl = dot(normal, normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz));
-      float occl = skyVis - toonDeepBias;
-      float b2 = smoothstep(uToonT.y - uToonSoft, uToonT.y + uToonSoft, ndl) * smoothstep(0.2, 0.3, occl);
-      band = mix(mix(uDeep, uMid, b2), uLit, b1);
-    }`}
-    vec3 col = band * diffuseColor.rgb;
-    // Fresnel rim light — glows hardest when the rider is backlit by the low sun.
+    // Soft stylized daylight: wrapped warm sun (with shadow maps + baked mountain shadows),
+    // cool sky fill by normal direction, baked terrain AO, gentle highlight roll-off.
+    vec3 sunV = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz);
+    float ndl = dot(normal, sunV);
+    float shadow = clamp(dot(sunShadowCol, vec3(0.2126, 0.7152, 0.0722)) / uSunLum, 0.0, 1.0);
+    vec3 nW = inverseTransformDirection(normal, viewMatrix);
+    float wrapD = clamp((ndl + uLightWrap) / (1.0 + uLightWrap), 0.0, 1.0);
+    float occl = mix(uAOFloor, 1.0, skyVis) * (1.0 - toonDeepBias);
+    vec3 sky = mix(uGroundAmb, uSkyAmb, nW.y * 0.5 + 0.5) * occl;
+    vec3 light = uSunCol * wrapD * shadow + sky;
+    ${opts.band || ''}
+    vec3 col = diffuseColor.rgb * light;
+    col = 1.0 - exp(-col * uExposure);
+    // Fresnel rim light (strongest when backlit).
     vec3 V = normalize(vViewPosition);
     float fres = pow(1.0 - clamp(dot(normal, V), 0.0, 1.0), ${ART.rimPower.toFixed(2)});
-    vec3 sunV = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz);
     float back = 0.35 + 0.65 * clamp(dot(-V, sunV) * 0.5 + 0.5, 0.0, 1.0);
-    col += uRimColor * fres * uRim * ${ART.rimStrength.toFixed(2)} * back * sunMaskFactor;
-    col += toonSparkle * vec3(1.0, 0.98, 0.9);
+    col += uRimColor * fres * uRim * ${ART.rimStrength.toFixed(2)} * back * shadow;
+    col += toonSparkle * vec3(1.0, 0.98, 0.92);
     col += toonEmissive * (1.0 + uEmissiveBoost);
     outgoingLight = col;
   }

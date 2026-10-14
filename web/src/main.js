@@ -4,11 +4,11 @@
 // All tunables live in config.js.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { EffectComposer, RenderPass, EffectPass, BloomEffect, SMAAEffect, SMAAPreset, Effect, BlendFunction } from 'postprocessing';
+import { EffectComposer, RenderPass, EffectPass, BloomEffect, SMAAEffect, SMAAPreset, Effect, BlendFunction, VignetteEffect } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
 import { patchShaderChunks, globals, makeNoiseTexture } from './world.js';
 import { HUD } from './config.js';
-import { ATMOSPHERE, SNOW, col } from './scene.js';
+import { ATMOSPHERE, col, createSnowfall } from './scene.js';
 import { Terrain } from './terrain.js';
 import { Sky } from './sky.js';
 import { Scatter } from './scatter.js';
@@ -43,7 +43,7 @@ camera.position.set(0, 4000, 0);
 const input = new Input(canvas);
 const ui = new UI({ ride: () => startRide(), resume: () => resume(), top: () => player.resetToTop(), menu: () => toMenu() });
 
-let terrain, sky, scatter, lifts, features, player, rider, cam, fx, sound, composer, aoPass, bloom, wind;
+let snowfall, terrain, sky, scatter, lifts, features, player, rider, cam, fx, sound, composer, aoPass, bloom, wind;
 
 /**
  * Speed wind: smooth, organic, tapered alpha streaks that live only in the four screen corners and
@@ -103,14 +103,6 @@ async function boot() {
   const loader = new GLTFLoader();
   terrain = new Terrain();
   await terrain.load('/terrain/', (p) => ui.loading(p * 0.5, 'Reading the mountain…'));
-  ui.loading(0.5, 'Painting the snow…');
-  terrain.bakeSunMask(renderer);
-  terrain.buildMaterials({ noise: makeNoiseTexture(512, 11) });
-  terrain.build();
-  scene.add(terrain.group);
-  sky = new Sky(scene);
-
-  ui.loading(0.62, 'Planting pines…');
   const [scatterData, liftData, pistes] = await Promise.all([
     fetch('/terrain/scatter.json').then((r) => r.json()),
     fetch('/terrain/lifts.json').then((r) => r.json()),
@@ -120,12 +112,25 @@ async function boot() {
     const [x, z, h] = params.get('at').split(',').map(Number);
     terrain.meta.spawn = { position: [x, 0, z], heading: h || 0 };
   }
+  ui.loading(0.45, 'Shaping jumps and pillows…');
+  features = new Features(terrain);
+  features.plan(pistes);
+  ui.loading(0.5, 'Painting the snow…');
+  terrain.bakeSunMask(renderer);
+  terrain.buildMaterials({ noise: makeNoiseTexture(512, 11) });
+  terrain.build();
+  scene.add(terrain.group);
+  sky = new Sky(scene);
+
+  snowfall = createSnowfall();
+  scene.add(snowfall.points);
+
+  ui.loading(0.62, 'Planting pines…');
   scatter = new Scatter(terrain);
   await scatter.load(loader, scatterData);
   scene.add(scatter.group);
   ui.loading(0.75, 'Building the park…');
-  features = new Features(terrain);
-  features.build(pistes);
+  features.build();
   scene.add(features.group);
   for (const o of features.obstaclePoints || []) scatter.addObstacle(o[0], o[1], o[2], o[3]);
   ui.loading(0.8, 'Growing the forest…');
@@ -173,16 +178,15 @@ function setupPost() {
   composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
   composer.addPass(new RenderPass(scene, camera));
   aoPass = new N8AOPostPass(scene, camera, innerWidth, innerHeight);
-  aoPass.configuration.aoRadius = 2.2;
+  aoPass.configuration.aoRadius = 2.5;
   aoPass.configuration.distanceFalloff = 1.0;
-  aoPass.configuration.intensity = 2.2;
-  aoPass.configuration.color = col(SNOW.deep);   // contact shadows in the deep-indigo band colour
+  aoPass.configuration.intensity = 1.6;
+  aoPass.configuration.color = col('#6f7fa3');   // soft cool contact shadows
   aoPass.setQualityMode('Medium');
   composer.addPass(aoPass);
-  bloom = new BloomEffect({ intensity: 1.2, luminanceThreshold: 1.08, luminanceSmoothing: 0.08, mipmapBlur: true, radius: 0.7 });
+  bloom = new BloomEffect({ intensity: 0.45, luminanceThreshold: 0.86, luminanceSmoothing: 0.12, mipmapBlur: true, radius: 0.75 });
   wind = new WindEffect();
-  // No global colour grading: the palette in scene.js reaches the screen exactly as authored.
-  composer.addPass(new EffectPass(camera, bloom, wind));
+  composer.addPass(new EffectPass(camera, bloom, wind, new VignetteEffect({ offset: 0.32, darkness: 0.38 })));
   composer.addPass(new EffectPass(camera, new SMAAEffect({ preset: SMAAPreset.HIGH })));
 }
 
@@ -284,6 +288,7 @@ function frame(now) {
   terrain.update(camera.position);
   scatter.update(camera.position);
   lifts.update(time, camera.position);
+  snowfall.update(camera, time, innerHeight);
   if (!paused) fx.update(dt, camera);
   sound.update(dt, camera);
   ui.update(dt, player);

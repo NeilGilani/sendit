@@ -40,7 +40,7 @@ export class FXManager {
     this.geo = geo;
     this.material = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false,
-      uniforms: { uLit: { value: new THREE.Color(1.0, 0.97, 0.92) }, uShade: { value: new THREE.Color(0.66, 0.72, 1.0) }, uSunDir: globals.uSunDir },
+      uniforms: { uLit: { value: new THREE.Color(1.0, 0.99, 0.97) }, uShade: { value: new THREE.Color(0.7, 0.77, 0.9) }, uSunDir: globals.uSunDir },
       vertexShader: /* glsl */`
         attribute vec3 iPos; attribute vec3 iVel; attribute vec3 iData;
         varying vec2 vQ; varying float vA; varying float vKind; varying float vShade;

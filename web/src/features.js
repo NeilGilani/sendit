@@ -4,13 +4,16 @@
 // rider's physics launches off them naturally.
 import * as THREE from 'three';
 import { toonMaterial, outlineMaterial, globals, mulberry32 } from './world.js';
-import { ATMOSPHERE, col } from './scene.js';
+import { ATMOSPHERE, JUMPS, col } from './scene.js';
 
+// Signature kickers near the top (with crowds); the rest of the run is laid out from JUMPS.
 const KICKERS = [
   { at: 110, L: 6, H: 1.4, W: 5, name: 'S' },
   { at: 210, L: 9, H: 2.4, W: 6, name: 'M' },
   { at: 330, L: 12, H: 3.6, W: 7, name: 'L' },
 ];
+
+const smooth01 = (t) => { const x = Math.min(1, Math.max(0, t)); return x * x * (3 - 2 * x); };
 
 export class Features {
   constructor(terrain) {
@@ -21,7 +24,12 @@ export class Features {
     this.flagPoles = [];
   }
 
-  build(pistes) {
+  /**
+   * Plan the opening run before the terrain is built: find the run, lay out kickers, and bake
+   * rollers + snow pillows straight into the height field (so physics, normals, shadows and the
+   * rendered snow all agree). Layout parameters: JUMPS in scene.js.
+   */
+  plan(pistes) {
     const T = this.terrain;
     const spawn = T.getSpawn();
     // The run the rider starts on: the piste passing closest to the spawn.
@@ -33,49 +41,140 @@ export class Features {
       }
     }
     const line = best ? best.line.map((q) => new THREE.Vector2(q[0], q[2])) : [];
+    const sp2 = new THREE.Vector2(spawn.position.x, spawn.position.z);
     let start = 0;
-    for (let i = 0; i < line.length; i++) if (line[i].distanceTo(new THREE.Vector2(spawn.position.x, spawn.position.z)) < line[start].distanceTo(new THREE.Vector2(spawn.position.x, spawn.position.z))) start = i;
+    for (let i = 0; i < line.length; i++) if (line[i].distanceTo(sp2) < line[start].distanceTo(sp2)) start = i;
     const path = line.slice(start);
     if (path.length < 2) {
       const f = new THREE.Vector2(-Math.sin(spawn.heading), -Math.cos(spawn.heading));
-      path.splice(0, path.length, new THREE.Vector2(spawn.position.x, spawn.position.z), new THREE.Vector2(spawn.position.x, spawn.position.z).addScaledVector(f, 600));
+      path.splice(0, path.length, sp2.clone(), sp2.clone().addScaledVector(f, 1500));
     }
     this.path = path;
+    let len = 0;
+    for (let i = 0; i < path.length - 1; i++) len += path[i].distanceTo(path[i + 1]);
+    this.runLength = len;
     const at = (d) => {
       let acc = 0;
       for (let i = 0; i < path.length - 1; i++) {
         const seg = path[i].distanceTo(path[i + 1]);
         if (acc + seg >= d || i === path.length - 2) {
           const t = Math.min(1, (d - acc) / seg);
-          const p = path[i].clone().lerp(path[i + 1], t);
-          const dir = path[i + 1].clone().sub(path[i]).normalize();
-          return { p, dir };
+          return { p: path[i].clone().lerp(path[i + 1], t), dir: path[i + 1].clone().sub(path[i]).normalize() };
         }
         acc += seg;
       }
-      return { p: path[0], dir: new THREE.Vector2(0, -1) };
+      return { p: path[0].clone(), dir: new THREE.Vector2(0, -1) };
     };
+    this.at = at;
 
+    const J = JUMPS;
+    const rnd = mulberry32(2024);
+    const rr = (a) => a[0] + (a[1] - a[0]) * rnd();
+    const ri = (a) => a[0] + Math.floor(rnd() * (a[1] - a[0] + 1));
+    const bumps = [];   // { x, z, kind: 'roller'|'pillow', ... }
+    // Signature park kickers (with crowds) near the top.
+    for (const k of KICKERS) this.planKicker(at(k.at), 0, k, true);
+    // Then a stream of features all the way down.
+    const end = Math.min(J.endAt, len - 40);
+    for (let d = J.startAt; d < end; d += rr(J.spacing)) {
+      if (KICKERS.some((k) => Math.abs(k.at - d) < 28)) continue;
+      const { p, dir } = at(d);
+      const r = new THREE.Vector2(-dir.y, dir.x);
+      const w = rnd();
+      if (w < J.weights.kicker) {
+        const k = J.kickers[Math.floor(rnd() * J.kickers.length)];
+        this.planKicker({ p, dir }, (rnd() * 2 - 1) * J.kickerLateral, k, false);
+      } else if (w < J.weights.kicker + J.weights.roller) {
+        bumps.push({ kind: 'roller', x: p.x, z: p.y, f: dir, r, H: rr(J.rollerHeight), sig: rr(J.rollerSigma), hw: J.rollerHalfWidth });
+      } else {
+        const n = ri(J.pillowsPerGroup);
+        const side = rnd() < 0.5 ? -1 : 1;
+        for (let i = 0; i < n; i++) {
+          const off = side * rr(J.pillowOffset) * (i % 2 ? -1 : 1);
+          const c = p.clone().addScaledVector(dir, (i - n / 2) * 7 + (rnd() - 0.5) * 4).addScaledVector(r, off);
+          bumps.push({ kind: 'pillow', x: c.x, z: c.y, R: rr(J.pillowRadius), H: rr(J.pillowHeight) });
+        }
+      }
+    }
+    // Off-piste pillow fields around the run.
+    const samples = [];
+    for (let d = 0; d < Math.min(len, J.endAt); d += 25) samples.push(at(d));
+    for (let i = 0; i < J.freePillows && samples.length; i++) {
+      const s0 = samples[Math.floor(rnd() * samples.length)];
+      const r = new THREE.Vector2(-s0.dir.y, s0.dir.x);
+      const off = (rnd() < 0.5 ? -1 : 1) * (28 + rnd() * J.freePillowRegion);
+      const c = s0.p.clone().addScaledVector(r, off).addScaledVector(s0.dir, (rnd() - 0.5) * 30);
+      if (!T.isInside(c.x, c.y, 60)) continue;
+      bumps.push({ kind: 'pillow', x: c.x, z: c.y, R: rr(J.pillowRadius) * 1.2, H: rr(J.pillowHeight) * 1.1 });
+    }
+    this.bakeBumps(bumps);
+    this.bumps = bumps;
+    T.features = { heightAt: (x, z, base) => this.heightAt(x, z, base) };
+  }
+
+  planKicker({ p, dir }, lateral, k, signature) {
+    const r = new THREE.Vector2(-dir.y, dir.x);
+    const o = p.clone().addScaledVector(r, lateral);
+    const kick = { o, f: dir.clone(), r, L: k.L, H: k.H, W: k.W, name: k.name, signature };
+    kick.box = [Math.min(o.x, o.x + dir.x * k.L) - k.W - 2, Math.max(o.x, o.x + dir.x * k.L) + k.W + 2,
+      Math.min(o.y, o.y + dir.y * k.L) - k.W - 2, Math.max(o.y, o.y + dir.y * k.L) + k.W + 2];
+    this.kickers.push(kick);
+  }
+
+  /** Add rollers / pillows to the terrain height grid, then refresh normals + GPU textures. */
+  bakeBumps(bumps) {
+    const T = this.terrain;
+    const N = T.res, sp = T.spacing, half = T.half, H = T.heights;
+    let x0 = N, x1 = 0, z0 = N, z1 = 0;
+    const grid = (v) => Math.round((v + half) / sp);
+    for (const b of bumps) {
+      const reach = b.kind === 'roller' ? Math.max(b.hw + 6, b.sig * 3) : b.R + 1;
+      const gi0 = Math.max(1, grid(b.x - reach)), gi1 = Math.min(N - 2, grid(b.x + reach));
+      const gj0 = Math.max(1, grid(b.z - reach)), gj1 = Math.min(N - 2, grid(b.z + reach));
+      for (let j = gj0; j <= gj1; j++) for (let i = gi0; i <= gi1; i++) {
+        const x = -half + i * sp, z = -half + j * sp;
+        const dx = x - b.x, dz = z - b.z;
+        let dh = 0;
+        if (b.kind === 'roller') {
+          const a = dx * b.f.x + dz * b.f.y, l = Math.abs(dx * b.r.x + dz * b.r.y);
+          const edge = 1 - smooth01((l - b.hw) / 6);
+          dh = b.H * Math.exp(-(a * a) / (b.sig * b.sig)) * edge;
+        } else {
+          const d = Math.hypot(dx, dz) / b.R;
+          if (d < 1) dh = b.H * Math.pow(1 - d * d, 1.6);
+        }
+        if (dh > 0) H[j * N + i] += dh;
+      }
+      x0 = Math.min(x0, gi0); x1 = Math.max(x1, gi1); z0 = Math.min(z0, gj0); z1 = Math.max(z1, gj1);
+    }
+    if (x1 < x0) return;
+    // Recompute the stored normals over the touched area (same convention as getNormal).
+    const nrm = T.normals;
+    for (let j = Math.max(1, z0 - 1); j <= Math.min(N - 2, z1 + 1); j++) for (let i = Math.max(1, x0 - 1); i <= Math.min(N - 2, x1 + 1); i++) {
+      const nx = H[j * N + i - 1] - H[j * N + i + 1], ny = 2 * sp, nz = H[(j - 1) * N + i] - H[(j + 1) * N + i];
+      const l = Math.hypot(nx, ny, nz);
+      nrm[(j * N + i) * 2] = Math.round((nx / l) * 127.5 + 127.5);
+      nrm[(j * N + i) * 2 + 1] = Math.round((nz / l) * 127.5 + 127.5);
+    }
+    T.normalTex.needsUpdate = true;
+    T.heightTex.needsUpdate = true;
+  }
+
+  /** Meshes for the planned features (after the terrain is built). */
+  build() {
     const snowMat = toonMaterial({ name: 'kicker', vertexColors: true });
-    for (const k of KICKERS) {
-      const { p, dir } = at(k.at);
-      const kick = { o: p, f: dir, r: new THREE.Vector2(-dir.y, dir.x), L: k.L, H: k.H, W: k.W, name: k.name };
-      this.kickers.push(kick);
+    for (const kick of this.kickers) {
       const mesh = new THREE.Mesh(this.kickerGeometry(kick), snowMat);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       this.group.add(mesh);
-      // Flags at both lip corners + a crowd along the landing.
       for (const side of [-1, 1]) {
-        const c = p.clone().addScaledVector(dir, k.L).addScaledVector(kick.r, side * (k.W / 2 + 1.2));
+        const c = kick.o.clone().addScaledVector(kick.f, kick.L).addScaledVector(kick.r, side * (kick.W / 2 + 1.2));
         this.addFlag(c.x, c.y, side > 0 ? 0 : 1);
-        if (k.name !== 'S') this.addCrowd(p.clone().addScaledVector(dir, k.L + 10), dir, kick.r, side, k.name === 'L' ? 14 : 8);
+        if (kick.signature && kick.name !== 'S') this.addCrowd(kick.o.clone().addScaledVector(kick.f, kick.L + 10), kick.f, kick.r, side, kick.name === 'L' ? 14 : 8);
       }
     }
-    T.features = { heightAt: (x, z, base) => this.heightAt(x, z, base) };
-
-    // Start banner across the run.
-    const s0 = at(18);
+    const s0 = this.at(18);
     this.addBanner(s0.p, s0.dir);
     this.addFogPockets();
     this.buildSpectators();
@@ -85,6 +184,7 @@ export class Features {
   /** Height of park features at x/z (null if none). */
   heightAt(x, z, base) {
     for (const k of this.kickers) {
+      if (x < k.box[0] || x > k.box[1] || z < k.box[2] || z > k.box[3]) continue;
       const dx = x - k.o.x, dz = z - k.o.y;
       const a = dx * k.f.x + dz * k.f.y;
       if (a < 0 || a > k.L) continue;
@@ -112,7 +212,7 @@ export class Features {
       const y = (lift ? g + k.H * Math.pow(a / k.L, 1.7) * side : T.baseHeight(x, z) - 0.3) + 0.03;
       pos.push(x, y, z);
       const lip = a > k.L - 0.35 && lift ? 1 : 0;
-      col.push(lip ? 0.25 : 1, lip ? 0.45 : 1, 1);
+      col.push(lip ? 0.3 : 0.93, lip ? 0.5 : 0.93, lip ? 0.85 : 0.93);
     };
     for (let i = 0; i <= nA; i++) for (let j = 0; j <= nB; j++) vert((i / nA) * k.L, (j / nB - 0.5) * (k.W + 1.6), true);
     for (let i = 0; i < nA; i++) for (let j = 0; j < nB; j++) {
