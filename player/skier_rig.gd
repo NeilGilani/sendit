@@ -228,7 +228,7 @@ func _process(dt: float) -> void:
 	var crashed := st == Skier.State.CRASH
 
 	var speed_c := clampf(skier.speed / 18.0, 0.0, 1.0)
-	var crouch_t := 0.34 + speed_c * 0.12 + skier.tuck * 0.45 + skier.charge * 0.5 + skier.landing_squash * 0.45 + skier.brake * 0.12
+	var crouch_t := 0.46 + speed_c * 0.14 + skier.tuck * 0.45 + skier.charge * 0.5 + skier.landing_squash * 0.45 + skier.brake * 0.12
 	if in_air:
 		crouch_t = 0.3
 	_crouch = lerpf(_crouch, clampf(crouch_t, 0.0, 1.0), 1.0 - exp(-(14.0 if skier.landing_squash > 0.5 else 7.0) * dt))
@@ -265,7 +265,7 @@ func _pose_skeleton() -> void:
 	var root: int = bone.root
 	_g[root] = rest_global[root]
 	var pelvis: int = bone.pelvis
-	var drop := _crouch * 0.32 + _tuck * 0.06
+	var drop := _crouch * 0.36 + _tuck * 0.06
 	var hip_pitch := deg_to_rad(8.0 + _crouch * 26.0 + _tuck * 18.0) * (1.0 - _sit)
 	var rp: Transform3D = rest_global[pelvis]
 	var ppos := rp.origin + Vector3(0, -drop * (1.0 - _sit), -_crouch * 0.07 * (1.0 - _sit))
@@ -274,7 +274,7 @@ func _pose_skeleton() -> void:
 	_set_global(pelvis, Transform3D(pbasis, ppos))
 
 	# Spine curls forward in a tuck; counter-angulation keeps the head level.
-	var bend := deg_to_rad(4.0 + _crouch * 10.0 + _tuck * 22.0) * (1.0 - _air * 0.4)
+	var bend := deg_to_rad(8.0 + _crouch * 14.0 + _tuck * 22.0) * (1.0 - _air * 0.4)
 	bend -= deg_to_rad(12.0) * _sit
 	var spine_chain := ["spine_01", "spine_02", "spine_03"]
 	for s in spine_chain:

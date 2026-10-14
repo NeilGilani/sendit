@@ -206,7 +206,7 @@ func _ground_step(dt: float) -> void:
 
 	# Hold still on gentle slopes or when braking to a stop.
 	var slope := 1.0 - n.y
-	if v.length() < 0.35 and (slope < t.hold_still_slope * 0.35 or brake > 0.6):
+	if v.length() < 0.35 and (slope < t.hold_still_slope or brake > 0.6):
 		if not (is_controllable() and Input.is_action_pressed("speed_up")):
 			v = Vector3.ZERO
 

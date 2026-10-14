@@ -9,9 +9,9 @@ const TREE_SCENES := [
 	"res://assets/models/nature/Pine_5.gltf",
 ]
 const ROCK_SCENES := [
-	"res://assets/models/nature/Rock_Medium_1.gltf", "res://assets/models/nature/Rock_Medium_2.gltf",
-	"res://assets/models/nature/Rock_Medium_3.gltf",
+	"res://assets/models/rocks/rock_07/rock_07_1k.gltf", "res://assets/models/rocks/rock_09/rock_09_1k.gltf",
 ]
+const ROCK_SCALE := [0.55, 1.1]
 const CELL := 750.0
 const HASH_CELL := 16.0
 
@@ -71,9 +71,9 @@ func _place(items: Array, meshes: Array[Mesh], radius_factor: float, is_tree: bo
 	for it in items:
 		var x: float = it[0]
 		var z: float = it[2]
-		var y := Terrain.instance.get_height(x, z) - (0.25 if is_tree else 0.5)
-		var s: float = it[4]
+		var y: float = Terrain.instance.get_height(x, z) - (0.25 if is_tree else 0.35 * float(it[4]))
 		var v := int(it[5]) % meshes.size()
+		var s: float = it[4] * (1.0 if is_tree else ROCK_SCALE[v])
 		var basis := Basis(Vector3.UP, it[3]).scaled(Vector3.ONE * s)
 		if not is_tree:
 			# Rocks settle into the slope.

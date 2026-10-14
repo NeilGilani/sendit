@@ -220,6 +220,7 @@ func _apply_quality() -> void:
 	lod_distances = PackedFloat32Array([420.0 * scale, 950.0 * scale, 1900.0 * scale, 3600.0 * scale])
 	_chunk_lod.fill(-1)
 	update_focus(_focus, true)
+	TerrainMaterials.apply_quality(material)
 
 
 # ------------------------------------------------------------------ LOD + collision

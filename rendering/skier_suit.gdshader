@@ -14,7 +14,6 @@ varying vec3 obj_pos;
 void vertex() {
 	zone = COLOR;
 	obj_pos = VERTEX;
-	VERTEX += NORMAL * zone.a * (0.01 + zone.r * 0.014 + zone.g * 0.006);
 }
 
 void fragment() {
@@ -26,9 +25,10 @@ void fragment() {
 	jacket = mix(jacket, jacket_accent, band);
 	vec3 cloth = (jacket * zone.r + pants_color * zone.g + dark_color * zone.b) / tot;
 	ALBEDO = mix(skin, cloth, zone.a);
-	ROUGHNESS = mix(texture(rough_tex, UV).r, 0.72, zone.a);
+	// Soft-shell fabric: matte, with a faint sheen at grazing angles.
+	ROUGHNESS = mix(texture(rough_tex, UV).r, 0.68, zone.a);
 	NORMAL_MAP = texture(normal_tex, UV).rgb;
-	NORMAL_MAP_DEPTH = mix(1.0, 0.18, zone.a);
+	NORMAL_MAP_DEPTH = mix(1.0, 0.0, zone.a);
 	RIM = zone.a * 0.25;
 	RIM_TINT = 0.6;
 	SSS_STRENGTH = (1.0 - zone.a) * 0.3;

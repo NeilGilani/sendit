@@ -3,9 +3,9 @@ extends Node3D
 ## Floaty chase camera: lagged follow, FOV that breathes with speed, a SpringArm3D that never clips,
 ## a slow orbit when standing still, mouse/stick look, and a calm flyover for the main menu.
 
-@export var base_distance := 4.8
-@export var height := 1.45
-@export var base_pitch := -13.0
+@export var base_distance := 5.4
+@export var height := 1.9
+@export var base_pitch := -16.0
 @export var base_fov := 68.0
 @export var fast_fov := 80.0
 
@@ -176,7 +176,12 @@ func _follow(dt: float) -> void:
 		_look_pitch = lerpf(_look_pitch, 0.0, 1.0 - exp(-1.2 * dt))
 
 	var speed01 := clampf(speed / 24.0, 0.0, 1.0)
-	var want_pitch := base_pitch - speed01 * 3.0 + _look_pitch
+	# Lift the view over the uphill slope behind the skier so the arm never folds into it.
+	var back := Vector3(sin(_yaw), 0, cos(_yaw))
+	var n := skier.ground_normal
+	var rise := -back.dot(Vector3(n.x, 0, n.z)) / maxf(n.y, 0.2)
+	var slope_deg := rad_to_deg(atan(maxf(rise, 0.0)))
+	var want_pitch := base_pitch - speed01 * 3.0 - slope_deg * 0.75 + _look_pitch
 	if orbiting:
 		want_pitch = -8.0 + _look_pitch
 	if riding_lift:

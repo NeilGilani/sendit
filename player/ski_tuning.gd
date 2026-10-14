@@ -30,7 +30,7 @@ extends Resource
 @export var push_max_speed := 7.0
 @export var brake_decel := 5.5
 @export var brake_skid_angle := 1.15     ## rad: how sideways the skis turn when skidding
-@export var hold_still_slope := 0.16     ## below this slope (1 - n.y) a stopped skier stays put
+@export var hold_still_slope := 0.006    ## below this slope (1 - n.y, ~6°) a stopped skier stays put
 
 @export_group("Air")
 @export var takeoff_gap := 0.35          ## metres the ground must fall away to leave it

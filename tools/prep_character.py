@@ -48,6 +48,70 @@ def read_accessor(g, binbuf, idx):
     return out
 
 
+def weld(pos):
+    key = np.round(pos * 1e4).astype(np.int64)
+    _, inv = np.unique(key, axis=0, return_inverse=True)
+    return inv.reshape(-1)
+
+
+def tailor(pos, idx, col):
+    """Smooth away muscle definition under clothing (Taubin) and puff the fabric out."""
+    grp = weld(pos)
+    ng = grp.max() + 1
+    gpos = np.zeros((ng, 3))
+    np.add.at(gpos, grp, pos)
+    cnt = np.bincount(grp, minlength=ng)[:, None]
+    gpos /= cnt
+    gcol = np.zeros((ng, 4))
+    np.add.at(gcol, grp, col)
+    gcol /= cnt
+    # Hands keep their fingers; everything else under fabric gets smoothed.
+    hands = (gcol[:, 2] > 0.5) & (gpos[:, 1] > 0.5)
+    w = np.clip(gcol[:, 3], 0, 1) * (~hands)
+    e = np.concatenate([idx[:, [0, 1]], idx[:, [1, 2]], idx[:, [2, 0]]])
+    e = grp[e]
+    e = np.concatenate([e, e[:, ::-1]])
+    deg = np.bincount(e[:, 0], minlength=ng).astype(np.float64)[:, None]
+    for it in range(30):
+        for lam in (0.5, -0.52):
+            acc = np.zeros((ng, 3))
+            np.add.at(acc, e[:, 0], gpos[e[:, 1]])
+            lap = acc / np.maximum(deg, 1) - gpos
+            gpos += lam * lap * w[:, None]
+    # Inflate along smoothed normals: jacket most, boots chunky, pants loose.
+    gidx = grp[idx]
+    gn = vertex_normals(gpos, gidx)
+    puff = gcol[:, 0] * 0.028 + gcol[:, 1] * 0.022 + gcol[:, 2] * 0.03 * (gpos[:, 1] < 0.5)
+    puff += gcol[:, 2] * 0.006 * (gpos[:, 1] >= 0.5)
+    gpos += gn * puff[:, None] * gcol[:, 3:4]
+    return gpos[grp]
+
+
+def vertex_normals(pos, idx):
+    a, b, c = pos[idx[:, 0]], pos[idx[:, 1]], pos[idx[:, 2]]
+    fn = np.cross(b - a, c - a)
+    grp = weld(pos)
+    ng = grp.max() + 1
+    gn = np.zeros((ng, 3))
+    for k in range(3):
+        np.add.at(gn, grp[idx[:, k]], fn)
+    gn /= np.maximum(np.linalg.norm(gn, axis=1, keepdims=True), 1e-9)
+    return gn[grp]
+
+
+def write_vec3(g, binbuf, acc_idx, arr):
+    a = g["accessors"][acc_idx]
+    bv = g["bufferViews"][a["bufferView"]]
+    stride = bv.get("byteStride", 12)
+    off = bv.get("byteOffset", 0) + a.get("byteOffset", 0)
+    data = arr.astype("<f4")
+    for i in range(a["count"]):
+        binbuf[off + i * stride: off + i * stride + 12] = data[i].tobytes()
+    if "min" in a:
+        a["min"] = data.min(axis=0).tolist()
+        a["max"] = data.max(axis=0).tolist()
+
+
 def main():
     src_root = sys.argv[1] if len(sys.argv) > 1 else "."
     src = os.path.join(src_root, "Base Characters", "Godot - UE")
@@ -83,6 +147,23 @@ def main():
             col /= np.maximum(weights.sum(axis=1, keepdims=True), 1e-6)
             # Sharpen clothing seams a little.
             col[:, 3] = np.clip((col[:, 3] - 0.5) * 3.0 + 0.5, 0, 1)
+            # Height-based zones read better than bones alone: a long jacket over the hips,
+            # tall ski boots below the shin.
+            pos = read_accessor(g, binbuf, attrs["POSITION"]).astype(np.float64)
+            y = pos[:, 1]
+            clothed = col[:, 3] > 0.5
+            hand = col[:, 2] > 0.5
+            jacket_h = clothed & ~hand & (y > 0.86)
+            col[jacket_h] = [1, 0, 0, 1]
+            legs = clothed & (y <= 0.86) & ~hand
+            col[legs & (y > 0.36)] = [0, 1, 0, 1]
+            col[legs & (y <= 0.36)] = [0, 0, 1, 1]
+            col[(col[:, 2] > 0.5) & (y < 0.4)] = [0, 0, 1, 1]
+            idx = read_accessor(g, binbuf, prim["indices"]).astype(np.int64).reshape(-1, 3)
+            new_pos = tailor(pos, idx, col)
+            nrm = vertex_normals(new_pos, idx)
+            write_vec3(g, binbuf, attrs["POSITION"], new_pos)
+            write_vec3(g, binbuf, attrs["NORMAL"], nrm)
             data = (np.clip(col, 0, 1) * 255 + 0.5).astype(np.uint8).tobytes()
             while len(binbuf) % 4:
                 binbuf.append(0)

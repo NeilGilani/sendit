@@ -21,6 +21,10 @@ static func make_for(src: Material, foliage: bool) -> Material:
 		if b.normal_enabled and b.normal_texture:
 			mat.set_shader_parameter("normal_tex", b.normal_texture)
 			mat.set_shader_parameter("use_normal", true)
-	mat.set_shader_parameter("snow_amount", 0.75 if foliage else 0.9)
+		if b.roughness_texture:
+			mat.set_shader_parameter("rough_tex", b.roughness_texture)
+			mat.set_shader_parameter("use_rough", true)
+	mat.set_shader_parameter("snow_amount", 0.75 if foliage else 0.85)
+	mat.set_shader_parameter("desaturate", 0.2 if foliage else 0.4)
 	_cache[key] = mat
 	return mat
