@@ -4,14 +4,14 @@ Godot 4.4.1, Forward+, GDScript. Headless binary for checks lives outside the re
 Heavy commands run with `nice -n 19`.
 
 ## Current phase
-Phase 2 — Real mountain (done)
+Phase 3 — Skiing controller (done)
 
 ## Files
 - project.godot — config, autoloads, input map, physics interpolation on.
 - default_bus_layout.tres — buses: Master, Music, SFX.
 - core/event_bus.gd — autoload EventBus: global signals.
 - core/game_state.gd — autoload GameState: Mode/Quality enums, settings (user://settings.cfg), relaxed score.
-- core/main.tscn / main.gd — root; builds Terrain, Scatter, Lifts (+ temporary sun/camera in phase 2).
+- core/main.tscn / main.gd — root; builds Terrain, Scatter, Lifts, Skier (+ temporary sun/camera). `-- --autotest` runs a scripted headless ride printing diagnostics.
 - tools/build_mountain.py — downloads Copernicus GLO-30 tiles (AWS) + OSM (Overpass, mirror fallback) for a 6x6 km box centred 45.983N 7.688E (Matterhorn + Schwarzsee/Furgg ski area). Writes assets/terrain/*. Caches in tools/cache (gitignored). tools/.gdignore hides tools/ from Godot.
 - tools/write_import_settings.py — writes .import files (mipmaps, VRAM, normal-map flag) for textures; run before first import.
 - tools/preview/ — heightmap16.png (16-bit) and splat.png previews.
@@ -24,6 +24,9 @@ Phase 2 — Real mountain (done)
 - rendering/terrain_materials.gd — static hooks to configure terrain materials.
 - rendering/snow_materials.gd, foliage_snow.gdshader, prop_snow.gdshader — snow-dusted materials for pines/rocks.
 - assets/models/nature/ — Quaternius pines (Pine_1..5) and rocks (Rock_Medium_1..3), CC0.
+
+- player/ski_tuning.gd + ski_tuning.tres — SkiTuning resource: ALL ski tunables (input smoothing, carving, friction, drag, soft speed cap, jump, spins, crash thresholds, lift ride).
+- player/skier.gd — class Skier (Node3D, _physics_process). States FROZEN/GROUNDED/AIR/CRASH/LIFT. Slope gravity, grip w/ carve redirection, auto-align, downhill settle, push, skid brake, charged jump, air spins, soft landings (auto-align, backwards = pivot), gentle crash -> fade -> respawn at safe point, obstacle bump/crash, map bounds, scoring (distance per 250 m, air >0.8 s + spins, smooth turns), lift boarding (slow within 22 m of a rideable base) and ride (W = faster) + dismount. Public: state, velocity, speed, heading, steer, brake, tuck, charge, carve, skid, air_time, spin_rate, crash_t, lift_t, surface, landing_squash, ground_normal, forward_dir(), start_riding(), place().
 
 ## Coordinates
 x = east, z = south (north = -Z), metres, origin = box centre. Heading yaw 0 = facing -Z.

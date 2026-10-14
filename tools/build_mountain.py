@@ -470,8 +470,17 @@ def main():
     cands = sorted(piste_out, key=lambda p: -(p["length"] - near_top(p["line"][0]) * 2
                                                  - (0 if p["difficulty"] in ("easy", "intermediate", "novice") else 800)))
     for p in cands:
+        # Start a little way down the run, where the slope invites gliding.
         a = p["line"][0]
-        b = next((q for q in p["line"][1:] if math.dist((a[0], a[2]), (q[0], q[2])) > 25), p["line"][-1])
+        acc = 0.0
+        for q0, q1 in zip(p["line"], p["line"][1:]):
+            acc += math.dist((q0[0], q0[2]), (q1[0], q1[2]))
+            ci = min(RES - 1, max(0, int((q1[0] + half) / ps)))
+            cj = min(RES - 1, max(0, int((q1[2] + half) / ps)))
+            if acc > 45 and (slope_deg[cj, ci] > 7 or acc > 160):
+                a = q1
+                break
+        b = next((q for q in p["line"][p["line"].index(a) + 1:] if math.dist((a[0], a[2]), (q[0], q[2])) > 25), p["line"][-1])
         if inside(a[0], a[2], 200):
             spawn = {"position": [a[0], a[1], a[2]], "heading": math.atan2(-(b[0] - a[0]), -(b[2] - a[2])),
                      "piste": p["name"]}

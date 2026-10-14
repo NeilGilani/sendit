@@ -13,12 +13,12 @@
  "treeline": 2350.0,
  "spawn": {
   "position": [
-   857.11,
-   2763.46,
-   -685.77
+   1578.27,
+   3125.6,
+   2654.97
   ],
-  "heading": 2.2628777301175194,
-  "piste": "Sunthread"
+  "heading": 0.13070925164745278,
+  "piste": "Golden Mile"
  },
  "sources": [
   "Copernicus GLO-30 DEM (ESA, DLR/Airbus)",
