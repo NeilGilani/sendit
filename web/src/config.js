@@ -107,30 +107,22 @@ export const FX = {
   trackWidth: 0.34,           // metres (board)
 };
 
-// ------------------------------------------------------------------ Art style
+// ------------------------------------------------------------------ Art style (materials)
+// Lighting, the snow palette, sky, fog and environment spawning live in scene.js (the scene file).
 export const ART = {
-  sunElevation: 26,           // degrees — crisp alpine golden hour
-  sunBearing: 335,            // degrees from north — low sun ahead of the run: lit snow + backlit rim on the rider
-  sunColor: [1.0, 0.86, 0.68],
-  sunIntensity: 3.2,
-  // 3-band toon snow
-  snowLit: [1.0, 0.975, 0.93],        // band 1: warm cream
-  snowMid: [0.62, 0.69, 0.98],        // band 2: periwinkle
-  snowDeep: [0.27, 0.25, 0.62],       // band 3: saturated indigo
-  toonThresholds: [0.2, 0.06],        // lit > t0, mid > t1, deep otherwise
-  toonSoftness: 0.025,
-  snowSparkleIntensity: 2.4,
+  toonSoftness: 0.02,                 // band edge softness for objects (pines, rider, lifts)
   rimLightColor: [1.0, 0.78, 0.5],
   rimPower: 3.0,
   rimStrength: 0.9,
-  outlineColor: [0.05, 0.06, 0.16],
-  outlineWidth: 0.024,
   neonColor: [0.1, 1.0, 0.85],        // cyan neon trim
   neonColor2: [1.0, 0.2, 0.75],       // pink neon trim
-  skyZenith: [0.16, 0.36, 0.78],
-  skyHorizon: [1.0, 0.8, 0.62],
-  fogColor: [0.78, 0.82, 0.98],
-  fogDensity: 0.000028,
   windSpeed: 1.3,
   windIntensity: 0.05,
+};
+
+// ------------------------------------------------------------------ HUD
+export const HUD = {
+  speedMilestones: [50, 100, 150],    // km/h — the speed readout bounces when crossing these
+  windStreakFrom: 0.8,                // speed ratio where corner wind streaks start
+  windStreakFull: 1.0,
 };

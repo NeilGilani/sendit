@@ -1,16 +1,12 @@
 // Shared world constants, global shader patches, the toon (cel) material system and helpers.
+// The palette, sun and atmosphere come from scene.js (the scene file).
 import * as THREE from 'three';
 import { ART } from './config.js';
+import { LIGHTING, OBJECT_BANDS, OUTLINE, sunDirection, fogParsFragmentGLSL, fogFragmentGLSL } from './scene.js';
 
-const SUN_BEARING = THREE.MathUtils.degToRad(ART.sunBearing);
-const SUN_ELEV = THREE.MathUtils.degToRad(ART.sunElevation);
-export const SUN_DIR = new THREE.Vector3(
-  Math.sin(SUN_BEARING) * Math.cos(SUN_ELEV),
-  Math.sin(SUN_ELEV),
-  -Math.cos(SUN_BEARING) * Math.cos(SUN_ELEV),
-).normalize();
-export const SUN_COLOR = new THREE.Color(...ART.sunColor);
-export const SUN_INTENSITY = ART.sunIntensity;
+export const SUN_DIR = sunDirection();
+export const SUN_COLOR = new THREE.Color(LIGHTING.sunColor);
+export const SUN_INTENSITY = LIGHTING.sunIntensity;
 
 const c3 = (a) => new THREE.Color(a[0], a[1], a[2]);
 
@@ -19,24 +15,23 @@ export const globals = {
   sunMaskTex: { value: null },       // baked mountain shadows (r) + sky visibility (g)
   terrainSize: { value: 6000 },
   uSunDir: { value: SUN_DIR.clone() },
-  uSunLum: { value: SUN_INTENSITY * (0.2126 * ART.sunColor[0] + 0.7152 * ART.sunColor[1] + 0.0722 * ART.sunColor[2]) },
+  uSunLum: { value: SUN_INTENSITY * (0.2126 * SUN_COLOR.r + 0.7152 * SUN_COLOR.g + 0.0722 * SUN_COLOR.b) },
   uTime: { value: 0 },
-  uLit: { value: c3(ART.snowLit) },
-  uMid: { value: c3(ART.snowMid) },
-  uDeep: { value: c3(ART.snowDeep) },
-  uToonT: { value: new THREE.Vector2(...ART.toonThresholds) },
+  uLit: { value: new THREE.Color(OBJECT_BANDS.lit) },
+  uMid: { value: new THREE.Color(OBJECT_BANDS.mid) },
+  uDeep: { value: new THREE.Color(OBJECT_BANDS.deep) },
+  uToonT: { value: new THREE.Vector2(OBJECT_BANDS.litThreshold, OBJECT_BANDS.deepFacing) },
   uToonSoft: { value: ART.toonSoftness },
+  uResolution: { value: new THREE.Vector2(1280, 720) },   // CSS px, for screen-space outlines
   uRimColor: { value: c3(ART.rimLightColor) },
   uWind: { value: new THREE.Vector2(ART.windSpeed, ART.windIntensity) },
   uTrackMap: { value: null },
   uTrackRegion: { value: new THREE.Vector3(0, 0, 140) },  // centre x, centre z, size
 };
 
-const v3 = (v) => `vec3(${v.x.toFixed(5)}, ${v.y.toFixed(5)}, ${v.z.toFixed(5)})`;
-
 /**
  * Patch three's shader chunks once:
- *  - fog: stylized aerial perspective + valley height fog tinted toward the sky and the sun
+ *  - fog: lavender aerial perspective + teal/indigo valley mist (scene.js)
  *  - lights: directional light is attenuated by `sunMaskFactor` (baked mountain shadows)
  */
 export function patchShaderChunks() {
@@ -49,27 +44,8 @@ export function patchShaderChunks() {
     vFogWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
   #endif
 #endif\n`;
-  C.fog_pars_fragment = `#ifdef USE_FOG
-  varying vec3 vFogWorld;
-  uniform vec3 fogColor;
-  uniform float fogDensity;
-#endif\n`;
-  C.fog_fragment = `#ifdef USE_FOG
-  {
-    vec3 fdir = vFogWorld - cameraPosition;
-    float fdist = length(fdir);
-    fdir /= max(fdist, 1e-3);
-    float aerial = 1.0 - exp(-fdist * fogDensity);
-    float h0 = 2200.0, b = 0.003, a = 0.0001;
-    float hc = cameraPosition.y - h0;
-    float k = b * fdir.y;
-    float hf = a * exp(-b * hc) * (abs(k) > 1e-5 ? (1.0 - exp(-k * fdist)) / k : fdist);
-    float fogAmt = clamp(1.0 - exp(-hf) + aerial, 0.0, 0.92);
-    float sunAmt = pow(max(dot(fdir, ${v3(SUN_DIR)}), 0.0), 5.0);
-    vec3 fc = mix(fogColor, vec3(1.0, 0.82, 0.66), sunAmt * 0.8);
-    gl_FragColor.rgb = mix(gl_FragColor.rgb, fc, fogAmt);
-  }
-#endif\n`;
+  C.fog_pars_fragment = fogParsFragmentGLSL();
+  C.fog_fragment = fogFragmentGLSL(SUN_DIR);
   if (!C.lights_pars_begin.includes('sunMaskFactor')) {
     C.lights_pars_begin = 'float sunMaskFactor = 1.0;\n' + C.lights_pars_begin;
     C.lights_fragment_begin = C.lights_fragment_begin.replaceAll(
@@ -94,7 +70,8 @@ vec2 sunMaskAt(vec3 wp) {
  * driven by the real light (N·L × shadow maps × baked mountain shadow) and sky occlusion.
  * Options:
  *   color, map, frag (GLSL run after the albedo is known; may set diffuseColor, toonSparkle,
- *   toonEmissive, toonRim), vert/vertPars (vertex hooks), uniforms, rim (0..1), side, transparent.
+ *   toonEmissive, toonRim), band (GLSL that writes \`band\` — replaces the generic 3 bands),
+ *   vert/vertPars (vertex hooks), uniforms, rim (0..1), side, transparent.
  */
 export function toonMaterial(opts = {}) {
   const m = new THREE.MeshLambertMaterial({
@@ -152,10 +129,14 @@ ${opts.frag || ''}`)
       .replace('#include <opaque_fragment>', `{
     float alb = max(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)), 1e-3);
     float direct = dot(reflectedLight.directDiffuse, vec3(0.2126, 0.7152, 0.0722)) * PI / (alb * uSunLum);
-    float occl = mix(0.55, 1.0, skyVis) - toonDeepBias;
-    float b1 = smoothstep(uToonT.x - uToonSoft, uToonT.x + uToonSoft, direct);
-    float b2 = smoothstep(uToonT.y - uToonSoft, uToonT.y + uToonSoft, max(direct, 0.25) * occl);
-    vec3 band = mix(mix(uDeep, uMid, b2), uLit, b1);
+    vec3 band = vec3(1.0);
+    ${opts.band || `{
+      float b1 = smoothstep(uToonT.x - uToonSoft, uToonT.x + uToonSoft, direct);
+      float ndl = dot(normal, normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz));
+      float occl = skyVis - toonDeepBias;
+      float b2 = smoothstep(uToonT.y - uToonSoft, uToonT.y + uToonSoft, ndl) * smoothstep(0.2, 0.3, occl);
+      band = mix(mix(uDeep, uMid, b2), uLit, b1);
+    }`}
     vec3 col = band * diffuseColor.rgb;
     // Fresnel rim light — glows hardest when the rider is backlit by the low sun.
     vec3 V = normalize(vViewPosition);
@@ -169,24 +150,36 @@ ${opts.frag || ''}`)
   }
   #include <opaque_fragment>`);
   };
-  m.customProgramCacheKey = () => m.name + (opts.frag || '').length + (opts.vert || '').length + (opts.vertPre || '').length;
+  m.customProgramCacheKey = () => m.name + (opts.frag || '').length + (opts.band || '').length + (opts.vert || '').length + (opts.vertPre || '').length;
   return m;
 }
 
-/** Inverted-hull outline for meshes (and skinned meshes): back faces pushed out along normals. */
-export function outlineMaterial(width = ART.outlineWidth, color = ART.outlineColor) {
-  const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(...color), side: THREE.BackSide });
+/**
+ * Inverted-hull outline with a constant screen-space thickness: back faces are pushed out along
+ * their projected normal by `px` CSS pixels, so the silhouette line stays crisp at any distance.
+ */
+export function outlineMaterial(px = OUTLINE.px, color = OUTLINE.color) {
+  const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(color), side: THREE.BackSide });
   m.name = 'outline';
   m.onBeforeCompile = (shader) => {
-    shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', `
-#ifdef USE_SKINNING
-  transformed += normalize(objectNormal) * ${width.toFixed(4)};
-#else
-  transformed += normalize(normal) * ${width.toFixed(4)};
-#endif
-#include <project_vertex>`);
+    shader.uniforms.uResolution = globals.uResolution;
+    shader.uniforms.uOutlinePx = { value: px };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform vec2 uResolution;\nuniform float uOutlinePx;')
+      .replace('#include <project_vertex>', `#include <project_vertex>
+  {
+  #ifdef USE_SKINNING
+    vec3 oN = objectNormal;
+  #else
+    vec3 oN = normal;
+  #endif
+    vec4 cn = projectionMatrix * vec4(normalMatrix * oN, 0.0);
+    vec2 sd = cn.xy * uResolution;
+    float sl = length(sd);
+    if (sl > 1e-6) gl_Position.xy += (sd / sl) * uOutlinePx * 2.0 / uResolution * gl_Position.w;
+  }`);
   };
-  m.customProgramCacheKey = () => 'outline' + width;
+  m.customProgramCacheKey = () => 'outlinePx' + px;
   return m;
 }
 

@@ -2,6 +2,7 @@
 // settings, credits (rendered from CREDITS.md) and the fade curtain.
 import { game, Mode, on, settings, setSetting } from './state.js';
 import { State } from './player.js';
+import { HUD } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -111,8 +112,29 @@ export class UI {
     const want = riding && this.idle < 3 ? 1 : 0;
     this.hudAlpha += (want - this.hudAlpha) * (1 - Math.exp(-(want > this.hudAlpha ? 2.5 : 1.2) * dt));
     $('speed').style.opacity = this.hudAlpha.toFixed(3);
-    $('kmh').textContent = Math.round(skier.speed * 3.6);
+    this.updateSpeed(Math.round(skier.speed * 3.6));
     $('liftlabel').classList.toggle('on', game.mode === Mode.LIFT);
+  }
+
+  /** Arcade speed readout: tier colour + a scale bounce whenever a milestone (50/100/150) is crossed. */
+  updateSpeed(kmh) {
+    if (kmh !== this._kmh) { $('kmh').textContent = kmh; this._kmh = kmh; }
+    const M = HUD.speedMilestones;
+    const up = M.filter((m) => kmh >= m).length;
+    const down = M.filter((m) => kmh >= m - 4).length;   // a little hysteresis on the way down
+    const cur = this.speedTier || 0;
+    let next = cur;
+    if (up > cur) next = up; else if (down < cur) next = down;
+    if (next === cur) return;
+    const el = $('speed');
+    el.classList.remove(`tier${cur}`);
+    el.classList.add(`tier${next}`);
+    if (next > cur) {
+      el.classList.remove('bump');
+      void el.offsetWidth;   // restart the animation
+      el.classList.add('bump');
+    }
+    this.speedTier = next;
   }
 
   bindSettings() {

@@ -4,10 +4,11 @@
 // All tunables live in config.js.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { EffectComposer, RenderPass, EffectPass, BloomEffect, SMAAEffect, SMAAPreset, Effect, BlendFunction, HueSaturationEffect, BrightnessContrastEffect } from 'postprocessing';
+import { EffectComposer, RenderPass, EffectPass, BloomEffect, SMAAEffect, SMAAPreset, Effect, BlendFunction } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
 import { patchShaderChunks, globals, makeNoiseTexture } from './world.js';
-import { ART } from './config.js';
+import { HUD } from './config.js';
+import { ATMOSPHERE, SNOW, col } from './scene.js';
 import { Terrain } from './terrain.js';
 import { Sky } from './sky.js';
 import { Scatter } from './scatter.js';
@@ -34,7 +35,8 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(new THREE.Color(...ART.fogColor), ART.fogDensity);
+scene.fog = new THREE.FogExp2(col(ATMOSPHERE.aerialColor), ATMOSPHERE.aerialDensity);
+scene.background = col(ATMOSPHERE.skyZenith);
 const camera = new THREE.PerspectiveCamera(66, innerWidth / innerHeight, 0.25, 40000);
 camera.position.set(0, 4000, 0);
 
@@ -43,7 +45,10 @@ const ui = new UI({ ride: () => startRide(), resume: () => resume(), top: () => 
 
 let terrain, sky, scatter, lifts, features, player, rider, cam, fx, sound, composer, aoPass, bloom, wind;
 
-/** Stylized speed wind: tapered streaks radiating from the frame edges + a light zoom blur. */
+/**
+ * Speed wind: smooth, organic, tapered alpha streaks that live only in the four screen corners and
+ * only at extreme speed (no fullscreen radial lines), plus a soft corner-only motion smear.
+ */
 class WindEffect extends Effect {
   constructor() {
     super('WindEffect', /* glsl */`
@@ -51,23 +56,40 @@ class WindEffect extends Effect {
       uniform float windTime;
       float h1(float n) { return fract(sin(n * 91.345) * 47453.21); }
       void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
-        vec2 d = uv - vec2(0.5, 0.48);
-        float r = length(d * vec2(aspect, 1.0));
         vec3 col = inputColor.rgb;
         if (intensity > 0.001) {
-          vec3 acc = vec3(0.0);
-          for (int i = 1; i <= 6; i++) acc += texture2D(inputBuffer, uv - d * float(i) * 0.006 * intensity * smoothstep(0.15, 0.7, r)).rgb;
-          col = mix(col, acc / 6.0, 0.85);
-          float ang = atan(d.y, d.x);
-          float lane = floor(ang * 60.0 / 3.14159);
-          float seed = h1(lane);
-          float trav = fract(seed * 7.0 + windTime * (1.2 + seed * 1.8));
-          float along = 1.0 - fract(r * 1.35 - trav + 0.3);
-          float taper = smoothstep(0.0, 0.5, along) * smoothstep(1.0, 0.75, along);
-          float thin = 1.0 - smoothstep(0.0, 0.18 + 0.1 * seed, abs(fract(ang * 60.0 / 3.14159) - 0.5));
-          float streak = thin * taper * step(0.62, seed) * smoothstep(0.3, 0.78, r);
-          col = mix(col, vec3(1.0), streak * intensity * 0.55);
-          col *= 1.0 - intensity * 0.22 * smoothstep(0.45, 0.95, r);
+          vec2 d = uv - vec2(0.5);
+          vec2 ds = d * vec2(aspect, 1.0);
+          float r = length(ds);
+          vec2 ad = abs(d) * 2.0;                                  // 0 centre -> 1 frame edge
+          float corner = smoothstep(0.42, 0.9, ad.x) * smoothstep(0.36, 0.86, ad.y);
+          if (corner > 0.001) {
+            vec3 acc = vec3(0.0);
+            for (int i = 1; i <= 5; i++) acc += texture2D(inputBuffer, uv - d * float(i) * 0.007 * intensity).rgb;
+            col = mix(col, acc / 5.0, corner * 0.6 * intensity);
+            float ang = atan(ds.y, ds.x);
+            float alpha = 0.0;
+            for (int k = 0; k < 2; k++) {
+              float fk = float(k);
+              float lanes = 64.0 + fk * 41.0;
+              float a = ang + 0.045 * sin(r * 8.0 + fk * 2.3 + windTime * 0.8);   // gentle organic curve
+              float x = a * lanes / 6.2831853;
+              float lane = floor(x);
+              float seed = h1(lane + fk * 113.0);
+              if (seed < 0.55) continue;
+              float head = fract(seed * 13.7 + windTime * (0.7 + seed * 1.3));
+              float rr = 0.45 + head * 0.7;                          // streak head radius
+              float len = 0.14 + seed * 0.22;
+              float t = (rr - r) / len;                              // 0 head -> 1 tail
+              float body = smoothstep(0.0, 0.1, t) * (1.0 - smoothstep(0.3, 1.0, t));
+              float w = (0.06 + 0.1 * (seed - 0.55)) * (1.0 - clamp(t, 0.0, 1.0) * 0.8);   // tapers to the tail
+              float across = abs(fract(x) - 0.5) * 2.0;
+              float thin = exp(-(across * across) / max(w * w, 1e-4));
+              alpha = max(alpha, thin * body * smoothstep(0.0, 0.25, head) * (1.0 - smoothstep(0.75, 1.0, head)));
+            }
+            col = mix(col, vec3(0.94, 0.95, 1.0), clamp(alpha * corner * intensity * 0.6, 0.0, 1.0));
+            col *= 1.0 - corner * intensity * 0.1;
+          }
         }
         outputColor = vec4(col, inputColor.a);
       }`, {
@@ -106,6 +128,9 @@ async function boot() {
   features.build(pistes);
   scene.add(features.group);
   for (const o of features.obstaclePoints || []) scatter.addObstacle(o[0], o[1], o[2], o[3]);
+  ui.loading(0.8, 'Growing the forest…');
+  scatter.addEnvironment(features.path || []);
+  console.log('[sendit] environment', JSON.stringify(scatter.envStats || {}));
   if (params.has('kicker')) {
     // Debug: start 40 m before a kicker, aimed at it.
     const k = features.kickers[Number(params.get('kicker'))] || features.kickers[0];
@@ -141,22 +166,23 @@ async function boot() {
   ui.fade(false, 2.0);
   if (params.has('ride')) startRide(true);
   else { setMode(Mode.MENU); ui.refresh(); }
-  window.__sendit = { player, terrain, camera, game, scene, renderer, features };
+  window.__sendit = { player, terrain, camera, game, scene, renderer, features, scatter };
 }
 
 function setupPost() {
   composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
   composer.addPass(new RenderPass(scene, camera));
   aoPass = new N8AOPostPass(scene, camera, innerWidth, innerHeight);
-  aoPass.configuration.aoRadius = 3.0;
+  aoPass.configuration.aoRadius = 2.2;
   aoPass.configuration.distanceFalloff = 1.0;
-  aoPass.configuration.intensity = 2.5;
-  aoPass.configuration.color = new THREE.Color(0.22, 0.2, 0.55);   // stylized indigo occlusion
+  aoPass.configuration.intensity = 2.2;
+  aoPass.configuration.color = col(SNOW.deep);   // contact shadows in the deep-indigo band colour
   aoPass.setQualityMode('Medium');
   composer.addPass(aoPass);
   bloom = new BloomEffect({ intensity: 1.2, luminanceThreshold: 1.08, luminanceSmoothing: 0.08, mipmapBlur: true, radius: 0.7 });
   wind = new WindEffect();
-  composer.addPass(new EffectPass(camera, bloom, wind, new HueSaturationEffect({ saturation: 0.18 }), new BrightnessContrastEffect({ contrast: 0.1, brightness: -0.02 })));
+  // No global colour grading: the palette in scene.js reaches the screen exactly as authored.
+  composer.addPass(new EffectPass(camera, bloom, wind));
   composer.addPass(new EffectPass(camera, new SMAAEffect({ preset: SMAAPreset.HIGH })));
 }
 
@@ -175,6 +201,7 @@ function applyQuality() {
 function onResize() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false);
+  globals.uResolution.value.set(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   composer?.setSize(w, h);
@@ -262,7 +289,7 @@ function frame(now) {
   ui.update(dt, player);
   // Wind streaks fade in near top speed.
   const riding = game.mode === Mode.RIDING;
-  const wantWind = riding ? THREE.MathUtils.smoothstep(player.speedRatio, 0.7, 1.0) : 0;
+  const wantWind = riding ? THREE.MathUtils.smoothstep(player.speedRatio, HUD.windStreakFrom, HUD.windStreakFull) : 0;
   const wu = wind.uniforms.get('intensity');
   wu.value += (wantWind - wu.value) * (1 - Math.exp(-3 * dt));
   wind.uniforms.get('windTime').value = time;

@@ -5,7 +5,8 @@ Heavy commands run with `nice -n 19`.
 
 ## Web build (web/, Three.js) — the primary target now
 Stylized arcade snowboarding ("vibey anime" cel look). Run: `cd web && npm install && npm run dev` → http://localhost:5173 (`?ride` skip menu, `?quality=0|1|2`, `?kicker=0..2` start before a kicker, `?at=x,z,heading`).
-- web/src/config.js — ALL tunables: PHYSICS, ANIM (juice), CAMERA, FX, ART (sun, toon bands, rim, outline, neon, sky, fog, wind).
+- web/src/scene.js — THE SCENE FILE: LIGHTING (low side sun, ambient 0.18), SNOW (hard 3-band #fcfaf2/#cbdcf7/#313b73, micro-normal map, terrain AO thresholds) + the snow GLSL, ATMOSPHERE (twilight sky, layered low-poly ranges, lavender aerial fog, teal/indigo valley mist), OUTLINE (2px screen-space navy), SPAWN (pine clusters, frozen rock formations, run + ridge-crest fences).
+- web/src/config.js — gameplay tunables: PHYSICS, ANIM (juice), CAMERA, FX, ART (rim, neon, wind), HUD (speed milestones 50/100/150, corner wind-streak speeds).
 - world.js — shader chunk patches (stylized fog, baked mountain-shadow factor), toonMaterial() 3-band cel shading (cream/periwinkle/indigo) + Fresnel rim + emissive neon hook, outlineMaterial() inverted hull (skinned too), noise tex, math helpers.
 - terrain.js — DEM chunks w/ LOD + skirts, cel snow shader (drifts, corduroy, vector sparkle, carved-track map sampling), baked sun mask/sky vis, far backdrop; getHeight() adds park features.
 - sky.js — gradient sky, sun disk/halo, cel clouds, sun + texel-snapped shadow box, hemisphere fill.

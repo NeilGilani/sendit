@@ -69,8 +69,27 @@ input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
 .title.small { font-size: 52px; }
 button { font-weight: 700; font-style: italic; letter-spacing: 0.02em; }
 button.primary { border-left: 4px solid #2ff5d6; }
-#speed span { font-weight: 900; font-style: italic; font-size: 54px; color: #fff; -webkit-text-stroke: 2px #1b1446; paint-order: stroke fill; }
-#speed small { color: #2ff5d6; font-weight: 800; }
+/* Arcade speed readout: heavy italic, thick navy outline + offset drop shadow, milestone bounce. */
+#speed { --arcade: "Arial Black", "Segoe UI Black", "Helvetica Neue", Impact, "Franklin Gothic Heavy", sans-serif;
+  bottom: 34px; text-shadow: none; display: flex; align-items: baseline; gap: 10px; }
+#speed span { display: inline-block; font-family: var(--arcade); font-weight: 900; font-style: italic; font-size: 72px; line-height: 1;
+  letter-spacing: -0.02em; color: #fcfaf2; transform: skewX(-12deg); transform-origin: 50% 80%;
+  -webkit-text-stroke: 4px #141a3c; paint-order: stroke fill;
+  text-shadow: 6px 6px 0 #141a3c, 9px 10px 0 rgba(20, 26, 60, 0.45); font-variant-numeric: tabular-nums;
+  transition: color .2s; }
+#speed small { font-family: var(--arcade); font-style: italic; font-weight: 900; font-size: 18px; letter-spacing: 0.08em;
+  color: #2ff5d6; -webkit-text-stroke: 2px #141a3c; paint-order: stroke fill; text-shadow: 3px 3px 0 #141a3c; transform: skewX(-12deg); }
+#speed.tier1 span { color: #7ff9ea; }
+#speed.tier2 span { color: #ffd34d; }
+#speed.tier3 span { color: #ff5fb0; }
+#speed.bump span { animation: kmhBounce .55s cubic-bezier(.2, 1.7, .35, 1); }
+@keyframes kmhBounce {
+  0% { transform: skewX(-12deg) scale(1); }
+  22% { transform: skewX(-12deg) scale(1.5) rotate(-4deg); }
+  45% { transform: skewX(-12deg) scale(0.9); }
+  70% { transform: skewX(-12deg) scale(1.08); }
+  100% { transform: skewX(-12deg) scale(1); }
+}
 .note { font-weight: 800; font-style: italic; -webkit-text-stroke: 1px #1b1446; paint-order: stroke fill; }
 .note b { color: #2ff5d6; }
 .bigpop { position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%) scale(1.8) rotate(-4deg); opacity: 0;

@@ -54,7 +54,7 @@ export class Rider {
     });
     for (const o of outlines) {
       if (!o.isSkinnedMesh) continue;
-      const hull = new THREE.SkinnedMesh(o.geometry, outlineMaterial(0.022));
+      const hull = new THREE.SkinnedMesh(o.geometry, outlineMaterial());
       hull.bind(o.skeleton, o.bindMatrix);
       hull.frustumCulled = false;
       o.parent.add(hull);
@@ -88,7 +88,7 @@ export class Rider {
     // Board along the root's Z axis (nose = −Z), neon edges.
     this.board = new THREE.Mesh(boardGeometry(), boardMaterial());
     this.board.castShadow = true;
-    this.boardOutline = new THREE.Mesh(this.board.geometry, outlineMaterial(0.012));
+    this.boardOutline = new THREE.Mesh(this.board.geometry, outlineMaterial());
     this.board.add(this.boardOutline);
     this.visual.add(this.board);
     this.boardMat = this.board.material;
@@ -104,7 +104,7 @@ export class Rider {
     const inv = this.restGlobal.get(head).clone().invert();
     const place = (mesh, m) => {
       mesh.matrixAutoUpdate = false; mesh.matrix.copy(inv.clone().multiply(m)); mesh.castShadow = true; head.add(mesh);
-      const o = new THREE.Mesh(mesh.geometry, outlineMaterial(0.01)); mesh.add(o);
+      const o = new THREE.Mesh(mesh.geometry, outlineMaterial(1.5)); mesh.add(o);
     };
     place(new THREE.Mesh(new THREE.SphereGeometry(0.135, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), toonMaterial({ name: 'helmet', color: 0xff3d7f, rim: 0.8 })),
       new THREE.Matrix4().compose(new THREE.Vector3(0, 1.69, -0.006), new THREE.Quaternion(), new THREE.Vector3(0.95, 1.02, 1.1)));

@@ -1,9 +1,10 @@
 // Liveliness and things to hit: snow kickers (small/medium/large) along the opening run, wind-
 // rippling branded flags and a start banner, cheering billboard spectators that bob out of sync,
-// and soft animated fog pockets in the valleys. Kickers add to the terrain height field so the
+// and soft animated teal/indigo mist pockets in the valleys. Kickers add to the terrain height field so the
 // rider's physics launches off them naturally.
 import * as THREE from 'three';
 import { toonMaterial, outlineMaterial, globals, mulberry32 } from './world.js';
+import { ATMOSPHERE, col } from './scene.js';
 
 const KICKERS = [
   { at: 110, L: 6, H: 1.4, W: 5, name: 'S' },
@@ -39,6 +40,7 @@ export class Features {
       const f = new THREE.Vector2(-Math.sin(spawn.heading), -Math.cos(spawn.heading));
       path.splice(0, path.length, new THREE.Vector2(spawn.position.x, spawn.position.z), new THREE.Vector2(spawn.position.x, spawn.position.z).addScaledVector(f, 600));
     }
+    this.path = path;
     const at = (d) => {
       let acc = 0;
       for (let i = 0; i < path.length - 1; i++) {
@@ -266,7 +268,7 @@ export class Features {
     for (let k = 0; k < 400 && pts.length < 26; k++) {
       const x = (rnd() - 0.5) * T.size * 0.9, z = (rnd() - 0.5) * T.size * 0.9;
       const h = T.baseHeight(x, z);
-      if (h < 2350) pts.push([x, h + 25 + rnd() * 30, z, 140 + rnd() * 160]);
+      if (h < ATMOSPHERE.mistTop - 150) pts.push([x, h + 25 + rnd() * 30, z, 140 + rnd() * 160]);
     }
     if (!pts.length) return;
     const geo = new THREE.InstancedBufferGeometry();
@@ -275,7 +277,7 @@ export class Features {
     geo.setAttribute('aFog', new THREE.InstancedBufferAttribute(new Float32Array(pts.flat()), 4));
     geo.instanceCount = pts.length;
     const mat = new THREE.ShaderMaterial({
-      uniforms: { noise: { value: null }, uTime: globals.uTime },
+      uniforms: { noise: { value: null }, uTime: globals.uTime, uMistTeal: { value: col(ATMOSPHERE.mistColor) }, uMistDeep: { value: col(ATMOSPHERE.mistDeepColor) } },
       transparent: true, depthWrite: false,
       vertexShader: /* glsl */`
         attribute vec4 aFog; uniform float uTime; varying vec2 vP; varying float vFade; varying float vSeed;
@@ -289,15 +291,16 @@ export class Features {
           gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
         }`,
       fragmentShader: /* glsl */`
-        uniform float uTime; varying vec2 vP; varying float vFade; varying float vSeed;
+        uniform float uTime; uniform vec3 uMistTeal; uniform vec3 uMistDeep; varying vec2 vP; varying float vFade; varying float vSeed;
         float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float n2(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
           return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
         void main() {
           float r = length(vP * vec2(1.0, 1.6));
           float n = n2(vP * 2.5 + vec2(uTime * 0.03 + vSeed, vSeed)) * 0.6 + n2(vP * 5.0 - uTime * 0.05) * 0.4;
-          float a = smoothstep(1.0, 0.2, r + (n - 0.5) * 0.5) * 0.55 * vFade;
-          gl_FragColor = vec4(vec3(0.93, 0.94, 1.0), a);
+          float a = smoothstep(1.0, 0.2, r + (n - 0.5) * 0.5) * 0.5 * vFade;
+          vec3 c = mix(uMistDeep, uMistTeal, smoothstep(-0.6, 0.7, vP.y + (n - 0.5) * 0.4));
+          gl_FragColor = vec4(c, a);
         }`,
     });
     const mesh = new THREE.Mesh(geo, mat);
