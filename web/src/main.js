@@ -206,13 +206,19 @@ async function boot() {
   };
 }
 
-/** Build the lobby stage once (scene, preview rider, shaders). */
+/**
+ * Build the lobby stage once (scene, preview rider, shaders). Never rejects: if the stage fails,
+ * the lobby UI still works over the world's menu flyover (frame() renders the world instead).
+ */
 function ensureStage() {
   if (!stageReady) {
     stageReady = stage.init(new GLTFLoader()).then(async () => {
       await stage.setEquipment(profileStore.equipment, { animate: false });
       stage.resize(innerWidth, innerHeight);
       stage.compile();
+    }).catch((e) => {
+      console.error('[lobby] stage failed to build; showing the lobby over the world instead', e);
+      stage.ready = false;
     });
   }
   return stageReady;

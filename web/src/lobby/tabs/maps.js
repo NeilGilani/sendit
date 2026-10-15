@@ -59,6 +59,7 @@ registerLobbyTab({
             const g = document.createElement('details');
             g.className = 'mp-group';
             g.innerHTML = `<summary>${esc(group)}</summary>`;
+            g.open = runs.some((v) => isCurrent(map, v.value));
             for (const v of runs) {
               const b = document.createElement('button');
               b.type = 'button';
