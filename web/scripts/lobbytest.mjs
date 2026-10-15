@@ -63,15 +63,15 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await countFrames(page);
   let s = await state(page);
   ok(s.mode === 0 && s.lobby, 'boots into the lobby');
-  ok(s.equipment === 'skis' && s.gear === 'builtin', 'default equipment is skis');
+  ok(s.equipment === 'skis' && s.gear === 'native', 'default equipment is skis (native rider gear)');
   ok(s.stored?.version === 1, 'profile v1 written to localStorage');
   ok(/lb-ride/.test(s.focus), 'Ride button has focus');
 
   await page.click('.eq-opt[data-type=snowboard]');
-  await page.waitForFunction(() => window.__sendit.stage.gearMode === 'placeholder', null, { timeout: 60000 });
+  await page.waitForFunction(() => window.__sendit.stage.pl?.equipment?.type === 'snowboard' && window.__sendit.stage.gearMode === 'native', null, { timeout: 60000 });
   s = await state(page);
   ok(s.equipment === 'snowboard' && s.stored.loadout.equipment === 'snowboard', 'snowboard selected and saved');
-  ok(await page.isVisible('.eq-badge'), 'placeholder badge shown');
+  ok(!(await page.isVisible('.eq-badge')), 'real snowboard: no placeholder badge');
   await shot(page, 't1_snowboard');
 
   await page.reload();
@@ -79,7 +79,7 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await countFrames(page);
   s = await state(page);
   ok(s.equipment === 'snowboard', 'snowboard persists across reload');
-  await page.waitForFunction(() => window.__sendit.stage.gearMode === 'placeholder', null, { timeout: 60000 });
+  await page.waitForFunction(() => window.__sendit.stage.pl?.equipment?.type === 'snowboard' && window.__sendit.stage.gearMode === 'native', null, { timeout: 60000 });
   ok(await page.getAttribute('.eq-opt[data-type=snowboard]', 'aria-pressed') === 'true', 'toggle shows the saved choice');
 
   // Keyboard: Q/E tabs, arrows move focus.

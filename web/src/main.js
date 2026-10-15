@@ -28,11 +28,13 @@ import { profileStore } from './profile/store.js';
 import { installRideTracker } from './profile/tracker.js';
 import { services } from './services/index.js';
 import { Lobby, LobbyStage, applyEquipment } from './lobby/index.js';
+import { normalizeType } from './equipment/registry.js';
 
 patchShaderChunks();
 profileStore.load();
 
 const params = new URLSearchParams(location.search);
+const gearVariant = params.get('variant') || undefined;   // ?variant=<model id> (debug; the lobby will pick models later)
 if (params.has('quality')) settings.quality = Number(params.get('quality'));
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false, depth: true });
@@ -160,6 +162,10 @@ async function boot() {
   ui.loading(0.88, 'Waxing the board…');
   player = new Player(terrain, scatter, lifts, input);
   player.fade = (b, d) => ui.fade(b, d);
+  // ?equip=ski|snowboard overrides the saved loadout (and is saved, so the lobby agrees); ?variant picks a model.
+  if (params.has('equip')) profileStore.setEquipment(normalizeType(params.get('equip')) === 'snowboard' ? 'snowboard' : 'skis');
+  player.setEquipment(profileStore.equipment, gearVariant);
+  if (params.has('stance')) player.setStance(params.get('stance'));                       // ?stance=regular|goofy
   rider = new Rider(player);
   await rider.load(loader);
   scene.add(rider.root);
@@ -226,7 +232,7 @@ function ensureStage() {
 
 /** Give the in-game rider/player the profile's equipment (optional API, see lobby/equipmentBridge.js). */
 function applyGameEquipment(type) {
-  gearSupported = applyEquipment({ rider, player }, type) === 'native' || type === 'skis';
+  gearSupported = applyEquipment({ rider, player }, type, gearVariant) === 'native' || type === 'skis';
 }
 
 // Loadout changes (lobby toggle, other tabs, profile sync) reach the preview and the game rider.
@@ -370,6 +376,7 @@ function frame(now) {
   last = now;
   if (!composer) return;
   input.poll();
+  if (game.mode === Mode.RIDING && input.pressed.has('KeyE') && rider) profileStore.setEquipment(profileStore.equipment === 'snowboard' ? 'skis' : 'snowboard');   // debug: swap gear while riding (via the profile, so the lobby stays in sync)
   if (input.justPressed('pause')) {
     if (ui.back()) { /* closed an overlay (settings / credits) */ }
     else if (game.mode === Mode.PAUSED) resume();

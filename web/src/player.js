@@ -1,15 +1,20 @@
-// PlayerPhysics — arcade snowboard controller on the real mountain (fixed 60 Hz step, interpolated
-// for rendering). Slope gravity, snappy carving that keeps momentum, squat-charged jumps, air spins,
-// aerodynamic auto-tuck, landing evaluation (clean / stumble & recover / crash), near-miss and
-// hard-brake events for the FX and camera, plus lift rides. Every tunable lives in config.js.
+// PlayerPhysics — rider controller on the mountain (fixed 60 Hz step, interpolated for rendering).
+// Owns the state machine (grounded / air / crash / lift), terrain following, take-off detection,
+// collisions, near-misses, scoring, respawns and lifts. Everything that depends on the equipment —
+// edge carving, skids, brakes, pop, spins, grabs and landing evaluation — is delegated to a
+// SkiPhysics or SnowboardPhysics instance (physics/), chosen with setEquipment(type, variant).
+// Tunables: PHYSICS (+ PHYSICS.ski / PHYSICS.snowboard) in config.js.
 import * as THREE from 'three';
 import { PHYSICS as P, FX } from './config.js';
 import { game, Mode, setMode, emit, addScore } from './state.js';
-import { angleDiff, lerpAngle, clamp } from './world.js';
+import { angleDiff, lerpAngle, clamp } from './physics/math.js';
+import { SkiPhysics } from './physics/ski.js';
+import { SnowboardPhysics } from './physics/snowboard.js';
+import { getEquipmentSpec, deriveHandling, normalizeType } from './equipment/registry.js';
 
 export const State = { FROZEN: 0, GROUNDED: 1, AIR: 2, CRASH: 3, LIFT: 4 };
 const UP = new THREE.Vector3(0, 1, 0);
-const _n = new THREE.Vector3(), _f = new THREE.Vector3(), _r = new THREE.Vector3(), _v = new THREE.Vector3();
+const _n = new THREE.Vector3(), _v = new THREE.Vector3(), _t1 = new THREE.Vector3(), _t2 = new THREE.Vector3();
 
 export class Player {
   constructor(terrain, scatter, lifts, input) {
@@ -17,17 +22,17 @@ export class Player {
     this.state = State.FROZEN;
     this.position = new THREE.Vector3();
     this.velocity = new THREE.Vector3();
-    this.heading = 0;                 // board nose direction (yaw, 0 = facing -Z)
+    this.heading = 0;                 // equipment NOSE direction (yaw, 0 = facing −Z); switch = nose trailing
     this.groundNormal = new THREE.Vector3(0, 1, 0);
     this.speed = 0;
-    this.turnInput = 0;               // smoothed −1..1
-    this.turnVelocity = 0;            // rad/s actually turning (drives edge roll)
+    this.turnInput = 0;               // smoothed −1..1 (+ = right)
+    this.turnVelocity = 0;            // rad/s actually turning (+ = left, legacy sign)
     this.brake = 0;
     this.tuck = 0;                    // 0..1 (manual or aerodynamic auto-tuck)
     this.squat = 0;                   // 0..1 pre-jump compression
     this.carve = 0;
     this.skid = 0;
-    this.sink = 0;                    // metres the skis sit below the powder surface (visual)
+    this.sink = 0;                    // metres the skis / board sit below the powder surface (visual)
     this.powder = 0;                  // 0..1 how deep / soft the snow underfoot is
     this.airTime = 0;
     this.spinRate = 0;
@@ -41,13 +46,60 @@ export class Player {
     this.prevPos = new THREE.Vector3(); this.prevOrient = new THREE.Quaternion();
     this.renderPos = new THREE.Vector3(); this.renderOrient = new THREE.Quaternion();
     this.fade = async () => {};
-    this._noInputT = 0; this._charging = false; this._spinTotal = 0; this._alignTimer = 0;
+    this._spinTotal = 0; this._alignTimer = 0;
     this._safe = []; this._safeTimer = 0; this._busy = false; this._hintCool = 0; this._crashStage = 0;
     this._lift = null; this._liftD = 0; this._dist = 0; this._nearCool = 0; this._lastNear = null;
     this._prevBrakeIn = 0;
+    // Equipment-driven state (read by the rider, FX and the graphics' contact points).
+    this.stance = 'regular';          // 'regular' (left foot forward) | 'goofy' — snowboard only
+    this.travelSign = 1;              // +1 nose first, −1 riding switch (tail first)
+    this.edgeAngle = 0;               // signed edge angle (rad), + = right-turn edge
+    this.skidAngle = 0;               // rad between the equipment axis and the path (+ = rotated right)
+    this.latAccel = 0;                // m/s² centripetal (+ = turning right)
+    this.gearLatAccel = 0;            // m/s² contact force across the gear, nose frame (+ = toward the nose's right)
+    this.carveQuality = 1;            // 1 = clean carve, → 0 washing out / skidding
+    this.plow = 0; this.stop = 0; this.stopSide = 1; this.stopToe = false;
+    this.press = 0; this.butter = 0; this.grab = 0; this.windup = 0; this.grabName = null;
+    this._ctrl = { steer: 0, brake: 0, up: 0, jump: false, tuck: 0, active: false };
+    this.setEquipment('ski');
   }
 
-  get speedRatio() { return clamp(this.speed / P.maxVelocity, 0, 1); }
+  /**
+   * Swap equipment at runtime: type 'ski' | 'snowboard', variant id or (partial) spec object (see
+   * equipment/). Keeps position and velocity; emits 'equipmentChanged' so the rider rebuilds its gear.
+   */
+  setEquipment(type, variant) {
+    const t = normalizeType(type);
+    const spec = getEquipmentSpec(t, variant);
+    const custom = variant && typeof variant === 'object';
+    if (this.equipment && this.equipment.type === t && this.equipment.variant === spec.id && !custom) return this.equipment;
+    const handling = deriveHandling(t, spec);
+    const prev = this.dyn;
+    this.dyn = t === 'snowboard' ? new SnowboardPhysics(this, spec, handling) : new SkiPhysics(this, spec, handling);
+    if (prev) {
+      this.dyn.edge = prev.edge;
+      // New gear goes on facing the direction of travel (a switch rider swaps to forward-facing gear).
+      if (prev.travel < 0) {
+        this.heading += Math.PI;
+        groundQuat(this.groundNormal, this.heading, this.orient);
+        this.prevOrient.copy(this.orient); this.renderOrient.copy(this.orient);
+        this.travelSign = 1;   // edge angles are relative to travel, so they carry over unchanged
+      }
+    }
+    this.equipment = { type: t, variant: spec.id, spec, handling };
+    this.plow = 0; this.stop = 0; this.press = 0; this.butter = 0; this.grab = 0;
+    emit('equipmentChanged', { type: t, variant: spec.id, spec, stance: this.stance, player: this });
+    return this.equipment;
+  }
+
+  /** Snowboard stance: 'regular' (left foot forward) or 'goofy'. */
+  setStance(stance) {
+    this.stance = stance === 'goofy' ? 'goofy' : 'regular';
+    emit('equipmentChanged', { type: this.equipment.type, variant: this.equipment.variant, spec: this.equipment.spec, stance: this.stance, player: this });
+  }
+
+  get isSwitch() { return this.travelSign < 0; }
+  get speedRatio() { return clamp(this.speed / this.dyn.maxVelocity, 0, 1); }
   get handling() { return this.stumbleT > 0 ? P.stumbleHandling : 1; }
   forward(out = new THREE.Vector3()) { return out.set(-Math.sin(this.heading), 0, -Math.cos(this.heading)); }
   controllable() { return game.mode === Mode.RIDING && !this._busy; }
@@ -61,7 +113,9 @@ export class Player {
     T.getNormal(pos.x, pos.z, P.normalRadius, this.groundNormal);
     groundQuat(this.groundNormal, yaw, this.orient);
     this.state = State.GROUNDED;
-    this.airTime = 0; this.squat = 0; this._charging = false; this.stumbleT = 0;
+    this.airTime = 0; this.squat = 0; this.stumbleT = 0;
+    this.dyn.charge = 0; this.dyn.charging = false; this.dyn.travel = 1; this.dyn.edge = 0; this.dyn.stop = 0;
+    this.travelSign = 1; this.edgeAngle = 0; this.skidAngle = 0; this.latAccel = 0;
     this._safe = [[this.position.clone(), yaw]];
     this.snapRender();
   }
@@ -78,6 +132,7 @@ export class Player {
   }
 
   step(dt) {
+    this.simulated = true;            // riders fall back to pose-only cues for players that never step (lobby previews)
     this.prevPos.copy(this.position);
     this.prevOrient.copy(this.orient);
     if (this.state === State.FROZEN) return;
@@ -100,101 +155,76 @@ export class Player {
   }
 
   readInput(dt) {
-    const I = this.input;
-    let turn = 0, b = 0, k = 0;
-    if (this.controllable() && this.state !== State.LIFT) {
-      turn = I.strength('right') - I.strength('left');
-      b = I.strength('brake');
-      k = Math.max(I.strength('tuck'), I.strength('speedUp'));
+    const I = this.input, c = this._ctrl;
+    c.active = this.controllable() && this.state !== State.LIFT;
+    c.steer = 0; c.brake = 0; c.up = 0; c.jump = false; c.tuck = 0;
+    if (c.active) {
+      c.steer = I.strength('right') - I.strength('left');
+      c.brake = I.strength('brake');
+      c.up = I.strength('speedUp');
+      c.tuck = I.strength('tuck');
+      c.jump = I.strength('jump') > 0.5;
       if (I.justPressed('reset')) this.resetToTop();
     }
+    if (this.script) this.script(c, this);   // headless tests / demos can drive the controls
     // Hard brake: a fan of snow + camera FoV snap.
-    if (b > 0.6 && this._prevBrakeIn <= 0.6 && this.speed > 10 && this.state === State.GROUNDED) emit('hardBrake', this.speed);
-    this._prevBrakeIn = b;
-    this.turnInput += (turn - this.turnInput) * (1 - Math.exp(-P.steerResponse * this.handling * dt));
-    this.brake += (b - this.brake) * (1 - Math.exp(-6 * dt));
-    // Aerodynamic auto-tuck after a while without directional input at speed.
-    const anyDir = Math.abs(turn) > 0.1 || b > 0.1;
-    this._noInputT = anyDir ? 0 : this._noInputT + dt;
-    const auto = this._noInputT > P.autoTuckDelay && this.speedRatio > P.autoTuckSpeedRatio ? 1 : 0;
-    const want = Math.max(k, auto) * (1 - b);
-    this.tuck += (want - this.tuck) * (1 - Math.exp(-3.5 * dt));
-    if (this.controllable() && this.state === State.GROUNDED) {
-      if (I.strength('jump') > 0.5) { this._charging = true; this.squat = Math.min(1, this.squat + dt / P.chargeTime); }
-      else if (this._charging) { this._charging = false; this.jump(); }
-    } else this._charging = false;
-    if (!this._charging) this.squat = Math.max(0, this.squat - dt * 6);
+    if (c.brake > 0.6 && this._prevBrakeIn <= 0.6 && this.speed > 10 && this.state === State.GROUNDED) emit('hardBrake', this.speed);
+    this._prevBrakeIn = c.brake;
+    if (this.dyn.control(dt, c, this.state === State.GROUNDED)) this.jump();
+  }
+
+  /**
+   * Ground normal for physics. The terrain's own normal is sampled at grid spacing (~3 m), which
+   * smears across kicker lips; on park features use a fine finite difference of the true height.
+   */
+  normalAt(x, z, out) {
+    const T = this.terrain;
+    const feat = T.baseHeight ? Math.max(T.getHeight(x, z) - T.baseHeight(x, z), T.getHeight(x + 1.5, z) - T.baseHeight(x + 1.5, z),
+      T.getHeight(x - 1.5, z) - T.baseHeight(x - 1.5, z), T.getHeight(x, z + 1.5) - T.baseHeight(x, z + 1.5), T.getHeight(x, z - 1.5) - T.baseHeight(x, z - 1.5)) : 0;
+    if (feat < 0.02) return T.getNormal(x, z, P.normalRadius, out);
+    // One-sided along the direction of travel (never looks past a lip), centred across it.
+    const e = 0.35, sp = Math.hypot(this.velocity.x, this.velocity.z);
+    const dx = sp > 0.5 ? this.velocity.x / sp : -Math.sin(this.heading), dz = sp > 0.5 ? this.velocity.z / sp : -Math.cos(this.heading);
+    const rx = -dz, rz = dx;
+    const h0 = T.getHeight(x, z), hb = T.getHeight(x - dx * e, z - dz * e);
+    const hl = T.getHeight(x + rx * e, z + rz * e), hr = T.getHeight(x - rx * e, z - rz * e);
+    _t1.set(dx * e, h0 - hb, dz * e); _t2.set(rx * 2 * e, hl - hr, rz * 2 * e);
+    out.crossVectors(_t2, _t1).normalize();
+    if (out.y < 0) out.negate();
+    return out;
   }
 
   groundStep(dt) {
     const T = this.terrain;
-    const n = T.getNormal(this.position.x, this.position.z, P.normalRadius, _n);
+    const n = this.normalAt(this.position.x, this.position.z, _n);
     this.groundNormal.copy(n);
     T.getSurface(this.position.x, this.position.z, this.surface);
     const g = new THREE.Vector3(0, -P.gravity, 0);
     const gTan = g.clone().addScaledVector(n, -g.dot(n));
     const v = this.velocity.clone().addScaledVector(n, -this.velocity.dot(n));
-    const speed = v.length();
-    const velYaw = Math.atan2(-v.x, -v.z);
-
-    const rate = (P.turnRateSlow + (P.turnRateFast - P.turnRateSlow) * this.speedRatio) * this.handling;
-    const before = this.heading;
-    this.heading -= this.turnInput * rate * dt;
-    if (this._alignTimer > 0) {
-      this._alignTimer -= dt;
-      if (speed > 1) this.heading = lerpAngle(this.heading, velYaw, 1 - Math.exp(-P.landAlignRate * dt));
-    } else if (speed > 2 && Math.abs(this.turnInput) < 0.2 && Math.abs(angleDiff(this.heading, velYaw)) < 1.6) {
-      this.heading = lerpAngle(this.heading, velYaw, 1 - Math.exp(-P.autoAlign * dt));
+    if (this._alignTimer > 0) this._alignTimer -= dt;
+    // Downhill settle when stopped and not steering: the gear slowly points down the fall line.
+    if (v.length() < 1.5 && Math.abs(this.turnInput) < 0.1 && n.y < 0.995 && this.stop < 0.1) {
+      this.heading = lerpAngle(this.heading, Math.atan2(-n.x, -n.z) + (this.travelSign < 0 ? Math.PI : 0), 1 - Math.exp(-1.4 * dt));
     }
-    if (speed < 1.5 && Math.abs(this.turnInput) < 0.1 && n.y < 0.995) {
-      this.heading = lerpAngle(this.heading, Math.atan2(-n.x, -n.z), 1 - Math.exp(-1.4 * dt));
-    }
-    this.turnVelocity = angleDiff(before, this.heading) / dt;
-
-    const ff = this.forward(_f);
-    const fwd = ff.clone().addScaledVector(n, -ff.dot(n)).normalize();
-    const right = _r.crossVectors(fwd, n).normalize();
-    let vf = v.dot(fwd), vl = v.dot(right);
-    const grip = (P.grip + (P.powderGrip - P.grip) * this.surface.y) * (1 - this.brake * 0.8) * this.handling;
-    const nl = vl * Math.exp(-grip * dt);
-    vf += (Math.abs(vl) - Math.abs(nl)) * P.carveEfficiency * (1 - this.brake) * (vf >= 0 ? 1 : -1);
-    vl = nl;
-    v.copy(fwd).multiplyScalar(vf).addScaledVector(right, vl);
-    this.skid += (clamp(Math.abs(vl) / Math.max(speed, 2) * 2 + this.brake * 0.8, 0, 1) - this.skid) * (1 - Math.exp(-6 * dt));
-    this.carve += (clamp(this.turnInput * clamp(speed / 8, 0, 1), -1, 1) - this.carve) * (1 - Math.exp(-7 * dt));
-    v.addScaledVector(gTan, dt);
-    if (this.controllable() && this.input.strength('speedUp') > 0.3 && v.length() < P.pushMaxSpeed) v.addScaledVector(fwd, P.pushAccel * dt);
-    const S = this.surface;
-    const mu = (P.frictionGroomed * S.x + P.frictionPowder * S.y + P.frictionRock * S.z + P.frictionPowder * S.w) / Math.max(1e-3, S.x + S.y + S.z + S.w);
-    const sp = v.length();
-    let decel = mu * P.gravity * n.y;
-    decel += (P.dragUpright + (P.dragTuck - P.dragUpright) * this.tuck) * sp * sp;
-    decel += P.softCapDrag * Math.max(0, sp - P.maxVelocity) ** 2;
-    decel += this.brake * P.brakeDecel;
-    // Sugary powder: carving through deep snow scrubs speed; slow skis sink, fast skis plane up.
-    const pw = clamp(S.y + S.w, 0, 1);
-    this.powder = pw;
-    decel += P.turnScrub * Math.abs(this.carve) * sp * pw;
-    const plane = clamp((sp - P.planeSpeed[0]) / (P.planeSpeed[1] - P.planeSpeed[0]), 0, 1);
-    const sinkT = pw * (P.powderSink + (P.powderSinkFast - P.powderSink) * plane * plane * (3 - 2 * plane));
-    this.sink += (sinkT - this.sink) * (1 - Math.exp(-4 * dt));
-    if (sp > 1e-4) v.multiplyScalar(Math.max(0, sp - decel * dt) / sp);
-    if (v.length() < 0.35 && (1 - n.y < P.holdStillSlope || this.brake > 0.6) && !(this.controllable() && this.input.strength('speedUp') > 0.3)) v.set(0, 0, 0);
-
+    this.dyn.ground(dt, n, v, gTan);
     this.velocity.copy(v);
     this.speed = v.length();
     const np = this.position.clone().addScaledVector(v, dt);
     const gh = T.getHeight(np.x, np.z);
     if (np.y - gh > P.takeoffGap && this.speed > 4) {
       this.position.copy(np);
-      this.enterAir();
+      this.enterAir(false);
     } else {
       np.y = gh;
-      const n2 = T.getNormal(np.x, np.z, P.normalRadius, _v);
+      const n2 = this.normalAt(np.x, np.z, _v);
       const into = this.velocity.dot(n2);
       if (into < 0) {
         const mag = this.velocity.length();
-        this.velocity.addScaledVector(n2, -into).normalize().multiplyScalar(mag * 0.997);
+        // Follow the terrain: rotate the velocity onto the new surface (keeps speed; a dip costs a little).
+        const loss = Math.min(0.03 * mag, Math.max(0, -into - P.smoothFollow) * P.terrainImpactLoss);
+        this.velocity.addScaledVector(n2, -into).normalize().multiplyScalar(mag - loss);
+        this._followLoss = (this._followLoss || 0) + loss;
       }
       this.position.copy(np);
     }
@@ -204,25 +234,32 @@ export class Player {
 
   jump() {
     if (this.state !== State.GROUNDED) return;
-    const depth = this.squat;
-    const pop = P.jumpMin + (P.jumpMax - P.jumpMin) * depth;
+    const depth = this.dyn.charge;
+    // Popping off a kicker / roller lip springs much higher than an ollie on the flat (arcade bonus).
+    const T = this.terrain;
+    const feature = T.baseHeight ? T.getHeight(this.position.x, this.position.z) - T.baseHeight(this.position.x, this.position.z) : 0;
+    const lip = clamp(feature / 0.5, 0, 1);
+    const pop = this.dyn.pop() * (1 + (P.lipPopBonus - 1) * lip);
+    this.lastLip = lip;
+    this.lastPop = pop;
     this.velocity.addScaledVector(this.groundNormal, pop);
     this.position.addScaledVector(this.groundNormal, 0.06);
     emit('jumped', depth);
-    this.squat = 0;
-    this.enterAir();
+    this.enterAir(true);
   }
 
-  enterAir() { this.state = State.AIR; this.airTime = 0; this._spinTotal = 0; this.spinRate = 0; this.turnVelocity = 0; }
+  enterAir(popped = false) {
+    this.state = State.AIR; this.airTime = 0; this._spinTotal = 0; this.spinRate = 0; this.turnVelocity = 0;
+    this.grab = 0; this.stop = 0; this.butter = 0; this.press = 0;
+    this.dyn.takeoffInfo(popped);
+    emit('takeoff', { popped, switch: this.isSwitch, type: this.equipment.type });
+  }
 
   airStep(dt) {
     this.velocity.y -= P.gravity * dt;
     this.velocity.multiplyScalar(1 - P.airDrag * this.velocity.length() * dt * 0.1);
-    const target = this.controllable() ? -this.turnInput * P.spinRateMax : 0;
-    this.spinRate += (target - this.spinRate) * (1 - Math.exp(-P.spinResponse * dt));
-    this.heading += this.spinRate * dt;
+    this.dyn.air(dt, this._ctrl);
     this._spinTotal += this.spinRate * dt;
-    this.turnVelocity = this.spinRate;
     this.carve *= Math.exp(-3 * dt);
     this.sink *= Math.exp(-8 * dt);
     this.skid *= Math.exp(-4 * dt);
@@ -230,38 +267,50 @@ export class Player {
     this.speed = this.velocity.length();
     this.position.addScaledVector(this.velocity, dt);
     const gh = this.terrain.getHeight(this.position.x, this.position.z);
-    if (this.position.y <= gh) { this.position.y = gh; this.land(); }
+    if (this.position.y <= gh) {
+      this.position.y = gh;
+      // Just popped on a rising ramp and still moving away from the surface: ride up it airborne.
+      const n = this.normalAt(this.position.x, this.position.z, _n);
+      if (this.airTime < 0.25 && this.velocity.dot(n) > 0.8) return;
+      this.land();
+    }
   }
 
   land() {
-    const n = this.terrain.getNormal(this.position.x, this.position.z, P.normalRadius, this.groundNormal);
+    const n = this.normalAt(this.position.x, this.position.z, this.groundNormal);
     const vn = this.velocity.dot(n);
     const impact = Math.max(0, -vn);
     this.landingVy = impact;
     this.velocity.addScaledVector(n, -vn);
     const velYaw = Math.atan2(-this.velocity.x, -this.velocity.z);
-    let diff = Math.abs(angleDiff(this.heading, velYaw));
-    const switchStance = diff > Math.PI / 2;
-    if (switchStance) diff = Math.PI - diff;        // boards ride both ways
-    const dev = THREE.MathUtils.radToDeg(diff);
+    const devNose = Math.abs(angleDiff(this.heading, velYaw));
     const spins = Math.round(Math.abs(this._spinTotal) / Math.PI);  // 180s
-    if (impact > P.crashImpact || dev > P.crashAngle) { this.crash('landing'); return; }
-    if (switchStance) this.heading = velYaw + (angleDiff(velYaw, this.heading) > 0 ? Math.PI : -Math.PI);
+    const slow = this.velocity.length() < 1.5;
+    const ev = slow ? { result: 'clean', switch: this.isSwitch, dev: 0 } : this.dyn.land(devNose);
+    const t = this.dyn.takeoff || { switch: false, spin: 0 };
+    this.grab = 0;
+    if (impact > P.crashImpact || ev.result === 'crash') { this.crash('landing'); return; }
+    this.dyn.travel = ev.switch ? -1 : 1;
+    this.travelSign = this.dyn.travel;
     this.state = State.GROUNDED;
     this._alignTimer = 0.35;
     this.landingEvent++;
-    if (dev > P.stumbleAngle) {
-      this.stumbleT = P.stumbleTime;
-      this.velocity.multiplyScalar(0.85);
-      emit('stumble');
+    const clean = ev.result === 'clean';
+    if (!clean) {
+      this.stumbleT = ev.result === 'slide' ? P.stumbleTime * 1.4 : P.stumbleTime;
+      this.velocity.multiplyScalar(ev.result === 'slide' ? 0.62 : 0.82);
+      emit('stumble', ev.result);
     }
-    emit('landed', { impact, air: this.airTime, clean: dev <= P.stumbleAngle, perfect: dev < 8 && this.airTime > 0.6 });
-    if (this.airTime > 0.7 && dev <= P.stumbleAngle) {
-      const deg = spins * 180;
-      let label = deg >= 180 ? `${deg}` : `Air ${this.airTime.toFixed(1)}s`;
-      if (dev < 8) label = `Perfect ${label}`;
+    const perfect = ev.dev < 8 && this.airTime > 0.6;
+    const trick = this.dyn.trickLabel(t, spins);
+    this.lastLanding = { ...ev, impact, air: this.airTime, spins, trick };
+    emit('landed', { impact, air: this.airTime, clean, perfect, switch: ev.switch, result: ev.result, trick });
+    if (clean && (this.airTime > 0.7 || (trick && this.airTime > 0.35))) {
+      let label = trick || `Air ${this.airTime.toFixed(1)}s`;
+      if (perfect) label = `Perfect ${label}`;
       game.airTotal += this.airTime;
-      addScore(label, Math.floor(this.airTime * 80) + spins * 90 + (dev < 8 ? 50 : 0));
+      const grabPts = t.grab && t.grabT > 0.25 ? 40 + Math.floor(t.grabT * 60) : 0;
+      addScore(label, Math.floor(this.airTime * 80) + spins * 90 + grabPts + (t.switch ? 30 : 0) + (perfect ? 50 : 0));
     }
     this.airTime = 0;
   }
@@ -357,6 +406,7 @@ export class Player {
     this._safeTimer += dt;
     if (this._safeTimer > 1.5 && this.speed > 1.5 && this.skid < 0.5) {
       this._safeTimer = 0;
+      // Respawn nose-first along the path (a switch rider respawns riding forward).
       this._safe.push([this.position.clone(), Math.atan2(-this.velocity.x, -this.velocity.z)]);
       if (this._safe.length > 12) this._safe.shift();
     }
@@ -421,7 +471,9 @@ export class Player {
     if (this.state === State.LIFT) { this.orient.setFromAxisAngle(UP, this.heading); return; }
     const n = this.state === State.AIR ? _v.set(0, 1, 0).lerp(this.groundNormal, 0.3).normalize() : this.groundNormal;
     const target = groundQuat(n, this.heading, new THREE.Quaternion());
-    this.orient.slerp(target, 1 - Math.exp(-12 * dt));
+    // Fast follow on the ground (stops / butters / spins rotate quickly), smoothing only the terrain.
+    const k = this.state === State.GROUNDED ? 22 : 30;
+    this.orient.slerp(target, 1 - Math.exp(-k * dt));
   }
 }
 

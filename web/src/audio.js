@@ -52,7 +52,8 @@ export class SoundScape {
       if (perfect) this.oneShot('perfect', 0.6, 1);
     });
     on('crashed', () => this.oneShot('crash', 0.8, 1));
-    on('jumped', (d) => this.oneShot('jump_pop', 0.4 + d * 0.5, 0.95 + Math.random() * 0.15));
+    // A board's tail slap pops lower than a skier's hop.
+    on('jumped', (d) => this.oneShot('jump_pop', 0.4 + d * 0.5, (this.skier.equipment?.type === 'snowboard' ? 0.78 : 0.95) + Math.random() * 0.15));
     on('nearMiss', () => this.oneShot('near_miss', 0.55, 0.95 + Math.random() * 0.2));
     on('stumble', () => this.oneShot('combo_lost', 0.4, 1.2));
     on('hardBrake', () => this.oneShot('boost', 0.25, 0.7));
@@ -130,6 +131,9 @@ export class SoundScape {
     this.layers.snow_powder.src.playbackRate.setTargetAtTime(0.92 + 0.2 * s01, c.currentTime, 0.3);
     this.layers.snow_groomed.src.playbackRate.setTargetAtTime(0.9 + 0.25 * s01, c.currentTime, 0.3);
     this.layers.wind_speed.src.playbackRate.setTargetAtTime(0.85 + 0.35 * s01, c.currentTime, 0.5);
+    // Edge sound: a board's single wide edge growls lower; slide / hockey stops scrape brighter.
+    const board = s.equipment?.type === 'snowboard';
+    this.layers.snow_carve.src.playbackRate.setTargetAtTime((board ? 0.8 : 1.0) + 0.15 * s01 + (s.stop || 0) * 0.18, c.currentTime, 0.2);
 
     // Music: seamless loop that sometimes rests quietly between passes.
     const dur = this.buf.music_golden_hour.duration;

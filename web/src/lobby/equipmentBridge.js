@@ -33,10 +33,10 @@ export function loadEquipmentFactory() {
 export const riderSupportsEquipment = (rider) => typeof rider?.setEquipment === 'function';
 
 /** Tell a rider + player pair what to ride. */
-export function applyEquipment({ rider, player }, type) {
-  player?.setEquipment?.(type);
+export function applyEquipment({ rider, player }, type, variant) {
+  player?.setEquipment?.(type, variant);
   if (riderSupportsEquipment(rider)) {
-    rider.setEquipment(type);
+    rider.setEquipment(type, variant);
     return 'native';
   }
   return 'unsupported';
