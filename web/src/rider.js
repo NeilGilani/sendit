@@ -205,7 +205,7 @@ export class Rider {
     this.root.position.y -= this.sinkVis;
     this.root.quaternion.copy(pl.renderOrient);
     // Flips turn about the centre of mass (≈ hip height), not the feet.
-    const fl = (pl.renderFlip || 0) * (pl.travelSign || 1);
+    const fl = pl.renderFlip || 0;   // signed about the gear's +X, already in renderOrient
     if (fl) {
       const c = _v1.set(0, ANIM.flipPivot, 0);
       const full = c.clone().applyQuaternion(pl.renderOrient);

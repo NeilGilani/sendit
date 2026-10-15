@@ -85,11 +85,13 @@ export class EdgePhysics {
       steer = Math.sign(steer) * Math.min(1, P.digitalSteerStart + this._holdT / P.digitalSteerRamp * (1 - P.digitalSteerStart));
     } else { this._holdT = 0; this._holdSign = 0; }
     pl.turnInput += (steer - pl.turnInput) * (1 - Math.exp(-(C.steerResponse ?? P.steerResponse) * pl.handling * dt));
-    pl.brake += (ctrl.brake - pl.brake) * (1 - Math.exp(-6 * dt));
+    // S while charging a pop is a backflip preload, not a brake.
+    const brakeIn = this.charging ? 0 : ctrl.brake;
+    pl.brake += (brakeIn - pl.brake) * (1 - Math.exp(-6 * dt));
     const anyDir = Math.abs(ctrl.steer) > 0.1 || ctrl.brake > 0.1;
     this._noInputT = anyDir ? 0 : (this._noInputT || 0) + dt;
     const auto = this._noInputT > P.autoTuckDelay && pl.speedRatio > P.autoTuckSpeedRatio ? 1 : 0;
-    const want = Math.max(ctrl.tuck, this.tuckFromUp(ctrl), auto) * (1 - ctrl.brake);
+    const want = Math.max(ctrl.tuck, this.tuckFromUp(ctrl), auto) * (1 - brakeIn);
     pl.tuck += (want - pl.tuck) * (1 - Math.exp(-3.5 * dt));
     let fire = false;
     if (ctrl.active && grounded) {
@@ -341,8 +343,9 @@ export class EdgePhysics {
     // W / S already held at take-off (tuck, brake, nollie) don't start a flip until pressed again.
     const c = pl._ctrl || {};
     this._flipLock = { up: (c.up || 0) > 0.2, brake: (c.brake || 0) > 0.2 };
-    // Carving over a crest (short, unpopped hop): the held turn doesn't become a spin until re-pressed.
-    this._spinLock = !popped && Math.abs(c.steer || 0) > 0.2 && this.timeToLand() < P.spinLockAir ? Math.sign(c.steer) : 0;
+    // Rolling off a crest / lip without popping: the turn held from the ground is carving, not a spin
+    // — it only spins once steer is let go and pressed again (popped jumps spin straight away).
+    this._spinLock = !popped && Math.abs(c.steer || 0) > 0.2 ? Math.sign(c.steer) : 0;
     // Pre-wind: carry part of the ground rotation into the air.
     pl.spinRate = -this.yawRate * this.C.prewind;
     if (popped) pl.spinRate += -(this.windup || 0) * this.C.windupSpin * this.H.spin;
@@ -460,11 +463,33 @@ export class EdgePhysics {
 
   /** Predicted seconds until touchdown (ballistic, flat ground under the rider). */
   timeToLand() {
-    const pl = this.pl;
-    if (!pl.terrain) return 0.6;
-    const h = Math.max(0, pl.position.y - pl.terrain.getHeight(pl.position.x, pl.position.z));
-    const vy = pl.velocity.y, g = P.gravity;
-    return (vy + Math.sqrt(Math.max(0, vy * vy + 2 * g * h))) / g;
+    // March the ballistic path against the real terrain (a drop or a downhill landing is longer than
+    // the height above the snow right below suggests).
+    const pl = this.pl, T = pl.terrain;
+    if (!T) return 0.6;
+    const g = P.gravity, h = 0.04;
+    let x = pl.position.x, y = pl.position.y, z = pl.position.z, vy = pl.velocity.y;
+    const vx = pl.velocity.x, vz = pl.velocity.z;
+    for (let t = h; t <= 3; t += h) {
+      vy -= g * h; x += vx * h; y += vy * h; z += vz * h;
+      if (y <= T.getHeight(x, z)) return t;
+    }
+    return 3;
+  }
+
+  /** Late pop (coyote time): add the loaded wind-up / preload to the air already under way. */
+  latePop() {
+    const pl = this.pl, C = this.C, t = this.takeoff;
+    if (t) { t.popped = true; t.end = this._popEnd; }
+    const cap = C.spinRateMax * this.H.spin;
+    pl.spinRate = clamp(pl.spinRate - (this.windup || 0) * C.windupSpin * this.H.spin, -cap, cap);
+    if ((this.flipLoad || 0) > 0.25 && Math.abs(pl.flip) < 0.3) {
+      this._flipCommit = true;
+      pl.flipRate = Math.max(pl.flipRate, this.flipLoad * C.flipPreload);
+    }
+    this.windup = 0; pl.windup = 0; this.flipLoad = 0; pl.flipLoad = 0;
+    this.charge = 0; this.charging = false; pl.squat = 0; this._lateT = 0;
+    this._spinLock = 0;   // a deliberate pop: the held turn spins
   }
 
   grabName() { return 'Grab'; }

@@ -27,7 +27,6 @@ export const PHYSICS = {
   airDrag: 0.006,
   landAssistTime: 0.25,       // s before touchdown when a released stick lets the gear settle onto its path …
   landAssistAngle: 14,        // … if it's within this many degrees (SSX-style auto-righting)
-  spinLockAir: 0.6,           // s: an unpopped hop shorter than this ignores the turn held at take-off (no accidental spin)
   spinCheckAngle: 40,         // deg: stick released within this of an alignment → settle (or check back) onto it
   // Landing / crashes (yaw tolerances are per equipment type below)
   stumbleTime: 1.0,

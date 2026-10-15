@@ -56,7 +56,7 @@ function ride(type, kick, plan) {
     else if (wasAir) break;
   }
   const L = p.lastLanding;
-  const res = p.state === State.CRASH ? 'CRASH' : L ? `${L.result} yaw ${L.dev.toFixed(0)}° pitch ${(L.flipDev ?? 0).toFixed(0)}°` : '-';
+  const res = p.state === State.CRASH ? `CRASH (${p.lastCrash?.reason} yaw ${p.lastCrash?.dev?.toFixed(0)}° pitch ${p.lastCrash?.flipDev?.toFixed(0)}°, spins ${p.lastCrash?.spins})` : L ? `${L.result} yaw ${L.dev.toFixed(0)}° pitch ${(L.flipDev ?? 0).toFixed(0)}°` : '-';
   return `lip ${lipV.toFixed(1)} m/s  air ${(L?.air ?? 0).toFixed(2)} s  height ${maxH.toFixed(1)} m  impact ${(p.landingVy).toFixed(1)} m/s → ${res.padEnd(30)} "${L?.trick ?? ''}" ${scores.join(', ')}`;
 }
 const flipTo = (dir, turns) => (p) => (Math.abs(p.flip) + Math.abs(p.flipRate) * 0.25 < turns * TAU ? (dir > 0 ? { brake: 1 } : { up: 1 }) : {});
@@ -72,6 +72,7 @@ for (const type of ['ski', 'snowboard']) {
     console.log(`  kicker ${kick.name}  pop + 360         ${ride(type, kick, { pop: true, air: spinTo(360) })}`);
     console.log(`  kicker ${kick.name}  pop + backflip    ${ride(type, kick, { pop: true, air: flipTo(1, 1) })}`);
     console.log(`  kicker ${kick.name}  preload backflip  ${ride(type, kick, { pop: true, preload: true })}`);
-    console.log(`  kicker ${kick.name}  pop + cork 720    ${ride(type, kick, { pop: true, air: (p) => ({ ...flipTo(1, 1)(p), ...spinTo(720)(p) }) })}`);
+    const cork = type === 'ski' ? 360 : 720;   // skis spin slower (6.4 vs 7.6 rad/s): a ski cork 720 needs more air than these kickers give
+    console.log(`  kicker ${kick.name}  pop + cork ${cork}    ${ride(type, kick, { pop: true, air: (p) => ({ ...flipTo(1, 1)(p), ...spinTo(cork)(p) }) })}`);
   }
 }
