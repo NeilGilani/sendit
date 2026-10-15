@@ -186,6 +186,9 @@ export class PostStack {
     if (params.has('goggles')) POST.goggles = Number(params.get('goggles')) || 0;
     if (params.has('tm')) POST.toneMap = params.get('tm');
     if (params.has('exposure')) POST.exposure = Number(params.get('exposure'));
+    // Skip the synchronous shader-log readback (it stalls on first use of every program and prints
+    // benign D3D compiler warnings from third-party passes). ?shaderdebug turns the checks back on.
+    renderer.debug.checkShaderErrors = params.has('shaderdebug');
     const composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
     composer.addPass(new RenderPass(scene, camera));
     const ao = new N8AOPostPass(scene, camera, innerWidth, innerHeight);

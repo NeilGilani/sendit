@@ -140,7 +140,8 @@ function crownGeometry(kind, lod, seed) {
       const card = branchGeo(L * (0.85 + rnd() * 0.3), L * 0.78 * wMul, droop, kind === 0 ? 0.12 : 0.05, segs, (w + b) % 2, lod === 0);
       card.rotateX((rnd() - 0.5) * 0.35);
       // Spruce: lower branches sweep down, the top ones reach up; fir branches stay level.
-      card.rotateZ(kind === 0 ? (t > 0.8 ? 0.25 : -(0.12 + 0.3 * (1 - t))) + (rnd() - 0.5) * 0.15 : 0.06 + (rnd() - 0.5) * 0.12);
+      const upTop = Math.max(0, (t - 0.72) / 0.28);
+      card.rotateZ((kind === 0 ? -(0.12 + 0.3 * (1 - t)) : 0.06) * (1 - upTop) + upTop * 0.75 + (rnd() - 0.5) * 0.14);
       card.rotateY(yaw);
       card.translate(0, y, 0);
       parts.push(card);
@@ -154,6 +155,13 @@ function crownGeometry(kind, lod, seed) {
     core.setAttribute('aUnder', new THREE.Float32BufferAttribute(new Float32Array(n).fill(3), 1));   // 3 = core
     core.setAttribute('aAO', new THREE.Float32BufferAttribute(new Float32Array(n).fill(0.3), 1));
     parts.push(core);
+    // Leader: the slim spire at the very top.
+    const lead = new THREE.ConeGeometry(0.32, H * 0.2, 6, 1, true);
+    lead.translate(0, H * 0.9 + 0.2, 0);
+    const m = lead.attributes.position.count;
+    lead.setAttribute('aUnder', new THREE.Float32BufferAttribute(new Float32Array(m).fill(3), 1));
+    lead.setAttribute('aAO', new THREE.Float32BufferAttribute(new Float32Array(m).fill(0.55), 1));
+    parts.push(lead);
   }
   return mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)).map(stripTo));
 }

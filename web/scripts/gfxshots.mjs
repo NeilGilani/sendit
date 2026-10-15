@@ -8,7 +8,9 @@ import fs from 'node:fs';
 const [url = 'http://localhost:5174/?ride', outDir = '.', viewsArg = '[]', W = '960', H = '540'] = process.argv.slice(2);
 const views = JSON.parse(fs.existsSync(viewsArg) ? fs.readFileSync(viewsArg, 'utf8') : viewsArg);
 const browser = await chromium.launch({
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
+  // GPU=1 renders on the real GPU (ANGLE D3D11 on Windows) — much faster than SwiftShader.
+  args: process.env.GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required']
+    : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
 });
 const page = await browser.newPage({ viewport: { width: Number(W), height: Number(H) } });
 let errors = 0;

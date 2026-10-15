@@ -132,6 +132,12 @@ float trackAt(vec2 xz) {
   if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return 0.0;
   return texture2D(uTrackMap, uv).r;
 }
+// Explicit-LOD lookup for use inside loops (no derivatives in non-uniform control flow).
+float trackAtLod(vec2 xz) {
+  vec2 uv = (xz - uTrackRegion.xy) / uTrackRegion.z + 0.5;
+  if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return 0.0;
+  return textureLod(uTrackMap, uv, 0.0).r;
+}
 vec3 macroN(vec2 xz) {
   vec2 nn = texture2D(normalTex, tUV(xz)).rg * 2.0 - 1.0;
   return vec3(nn.x, sqrt(max(0.0, 1.0 - dot(nn, nn))), nn.y);
@@ -304,7 +310,7 @@ export const SNOW_FRAG_GLSL = /* glsl */`
       for (int i = 1; i <= 10; i++) {
         float d = float(i) / 10.0 * trD;
         vec2 q = xz + perDepth * d;
-        if (trackAt(q) * trD < d) break;
+        if (trackAtLod(q) * trD < d) break;
         tp = q; lay = d;
       }
     }
