@@ -7,7 +7,7 @@
 export const PHYSICS = {
   gravity: 9.81,
   maxVelocity: 15,            // m/s — default speed ratio reference (each equipment type has its own below)
-  softCapDrag: 0.12,          // extra drag above the equipment's maxVelocity keeps things arcade but bounded
+  softCapDrag: 0.06,          // extra drag above the equipment's maxVelocity keeps things arcade but bounded
   frictionGroomed: 0.028,     // glide μ by surface (the course "powder" blends toward groomed via powderDepth)
   frictionPowder: 0.07,
   frictionRock: 0.12,
@@ -19,7 +19,7 @@ export const PHYSICS = {
   takeoffGap: 0.3,
   terrainImpactLoss: 0.5,     // share of an abrupt impact into the terrain (beyond smoothFollow) lost as speed
   smoothFollow: 0.25,         // m/s per step of normal velocity absorbed loss-free (smooth rolls and dips)
-  lipPopBonus: 1.7,           // pop multiplier when popping on a kicker (vs an ollie on the flat)
+  lipPopBonus: 1.0,           // pop multiplier on a kicker lip (1 = a plain ollie; the pop already rides the ramp's launch angle)
   airDrag: 0.006,
   landAssistTime: 0.25,       // s before touchdown when a released stick lets the gear settle onto its path …
   landAssistAngle: 14,        // … if it's within this many degrees (SSX-style auto-righting)
@@ -27,6 +27,7 @@ export const PHYSICS = {
   // Landing / crashes (yaw tolerances are per equipment type below)
   stumbleTime: 1.0,
   stumbleHandling: 0.6,       // handling multiplier while stumbling (−40%)
+  hardLanding: 12.5,          // m/s into the slope: above this a clean landing becomes a stumble (knees buckle)
   crashImpact: 18,            // m/s into the slope
   treeCrashSpeed: 9,
   tumbleTime: 1.4,
@@ -81,7 +82,7 @@ export const PHYSICS = {
     stopMu: 0.5,              // ≈6.5 m/s² at 90° together with drag
     stopEdge: 32,             // deg edge set during the stop
     pushAccel: 4.0, pushMaxSpeed: 8.5,   // poling / skating
-    dragUpright: 0.0115, dragTuck: 0.0062,
+    dragUpright: 0.0135, dragTuck: 0.0055,   // CdA ratio ≈2.5: the tuck is worth ≈+20% top speed (16 → 20 m/s on 25°)
     // Powder: sink depth slow→fast (m), planing speed, plough drag a = k·depth·v, bog decel below planing.
     powderFloat: 1.0, sinkSlow: 0.22, sinkFast: 0.08, powderBog: 7, powderDrag: 0.3, powderBogDecel: 0.12, powderSteer: 0.7,
     // Air
@@ -112,7 +113,7 @@ export const PHYSICS = {
     // Slide stop: rotate the board ~90° across the path on the heel (or toe) edge.
     stopAngle: 86, stopTurnRate: 6, stopMuHeel: 0.42, stopMuToe: 0.33, stopEdgeHeel: 30, stopEdgeToe: 34,
     pushAccel: 2.4, pushMaxSpeed: 4.5,       // one-foot skate
-    dragUpright: 0.0125, dragTuck: 0.0088,   // a board rider can only crouch, not tuck
+    dragUpright: 0.014, dragTuck: 0.0085,    // a board rider can only crouch, not tuck (≈+14%: 16 → 18.5 m/s on 25°)
     powderFloat: 1.6, sinkSlow: 0.12, sinkFast: 0.04, powderBog: 4.5, powderDrag: 0.25, powderBogDecel: 0.12, powderSteer: 0.9,
     // Butter: press nose / tail while charging and steer → pivot on the flexed end, base flat.
     butterRate: 3.4, butterMaxSpeed: 13, butterDrag: 0.8,
@@ -152,7 +153,7 @@ export const ANIM = {
   flipPivot: 0.85,            // m above the feet the rider flips about (centre of mass)
   gearSinkVisual: 0.15,       // share of the physics powder sink shown (the snow reads as packed, so the gear rides on top)
   board: {
-    crouch: 0.12,             // m pelvis drop at rest (riders stand lower than skiers)
+    crouch: 0.17,             // m pelvis drop at rest (riders stand lower than skiers)
     crouchSpeed: 0.08,        // extra drop at speed
     shoulderOpen: 0.42,       // rad shoulders open toward the nose
     hipOpen: 0.16,            // rad hips open toward the nose

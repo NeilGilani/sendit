@@ -298,6 +298,7 @@ export class Player {
     if (fl.result === 'crash') ev.result = 'crash';
     else if (fl.result === 'stumble' && ev.result === 'clean') ev.result = 'stumble';
     ev.flipDev = fl.dev;
+    if (impact > P.hardLanding && ev.result === 'clean') ev.result = 'stumble';
     const t = this.dyn.takeoff || { switch: false, spin: 0 };
     this.grab = 0;
     this.flip = 0; this.flipRate = 0; this.prevFlip = 0;
