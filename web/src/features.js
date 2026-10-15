@@ -5,6 +5,8 @@
 import * as THREE from 'three';
 import { toonMaterial, outlineMaterial, globals, mulberry32 } from './world.js';
 import { ATMOSPHERE, JUMPS, col } from './scene.js';
+import { ATMO } from './gfx/atmosphere.js';
+import { snowUniforms, SNOW_COMMON_PARS, SNOW_BAND_GLSL } from './gfx/snow.js';
 
 // Signature kickers near the top (with crowds); the rest of the run is laid out from JUMPS.
 const KICKERS = [
@@ -149,7 +151,30 @@ export class Features {
 
   /** Meshes for the planned features (after the terrain is built). */
   build() {
-    const snowMat = toonMaterial({ name: 'kicker', vertexColors: true });
+    // Shaped park snow: packed, shovel-smoothed, glazed lip (same optics as the terrain snow).
+    const snowMat = toonMaterial({
+      name: 'kicker', vertexColors: true,
+      uniforms: { ...snowUniforms(), noiseTex: { value: this.terrain.terrainUniforms?.noiseTex.value } },
+      fragPars: SNOW_COMMON_PARS + 'vec3 kN;',
+      // Shovel-shaped packed snow: soft half-metre lumps, spade facets and a little grain.
+      frag: /* glsl */`
+        float kn = texture2D(noiseTex, vW.xz * 0.6).g;
+        diffuseColor.rgb = uSnowOld * (0.97 + 0.06 * kn) * mix(vec3(0.92, 0.96, 1.02), vec3(1.0), vColor.r);
+        tGlaze = 0.8; tGlintMask = 0.6;
+        vec3 q = vW * 1.9;
+        float h0 = texture2D(noiseTex, q.xz * 0.11 + q.y * 0.03).r;
+        vec2 g = vec2(texture2D(noiseTex, (q.xz + vec2(0.3, 0.0)) * 0.11 + q.y * 0.03).r - h0,
+                      texture2D(noiseTex, (q.xz + vec2(0.0, 0.3)) * 0.11 + q.y * 0.03).r - h0) / 0.3 * 0.9;
+        float h1 = texture2D(noiseTex, vW.xz * 0.9 + 0.4).g;
+        g += vec2(texture2D(noiseTex, vW.xz * 0.9 + vec2(0.404, 0.4)).g - h1, texture2D(noiseTex, vW.xz * 0.9 + vec2(0.4, 0.404)).g - h1) / 0.004 * 0.0025;
+        kN = normalize(normalize(vWN) - vec3(g.x, 0.0, g.y) * 0.12);`,
+      band: SNOW_BAND_GLSL,
+    });
+    const kPrev = snowMat.onBeforeCompile;
+    snowMat.onBeforeCompile = (shader, r) => {
+      kPrev(shader, r);
+      shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(kN, 0.0)).xyz);');
+    };
     for (const kick of this.kickers) {
       const mesh = new THREE.Mesh(this.kickerGeometry(kick), snowMat);
       mesh.castShadow = true;
@@ -201,7 +226,7 @@ export class Features {
       const y = (lift ? g + k.H * Math.pow(a / k.L, 1.7) * side : T.baseHeight(x, z) - 0.3) + 0.03;
       pos.push(x, y, z);
       const lip = a > k.L - 0.35 && lift ? 1 : 0;
-      col.push(lip ? 0.3 : 0.93, lip ? 0.5 : 0.93, lip ? 0.85 : 0.93);
+      col.push(lip ? 0.86 : 1.0, lip ? 0.92 : 1.0, lip ? 1.0 : 1.0);   // icy, blue-ish lip
     };
     for (let i = 0; i <= nA; i++) for (let j = 0; j <= nB; j++) vert((i / nA) * k.L, (j / nB - 0.5) * (k.W + 1.6), true);
     for (let i = 0; i < nA; i++) for (let j = 0; j < nB; j++) {
@@ -340,8 +365,7 @@ export class Features {
         void main() {
           vec4 c = texture2D(atlas, vec2((vVar + vUv.x) / 4.0, vUv.y));
           if (c.a < 0.5) discard;
-          gl_FragColor = c;
-          #include <colorspace_fragment>
+          gl_FragColor = vec4(c.rgb * 1.7, c.a);
         }`,
     });
     const mesh = new THREE.Mesh(geo, mat);
@@ -366,7 +390,7 @@ export class Features {
     geo.setAttribute('aFog', new THREE.InstancedBufferAttribute(new Float32Array(pts.flat()), 4));
     geo.instanceCount = pts.length;
     const mat = new THREE.ShaderMaterial({
-      uniforms: { noise: { value: null }, uTime: globals.uTime, uMistTeal: { value: col(ATMOSPHERE.mistColor) }, uMistDeep: { value: col(ATMOSPHERE.mistDeepColor) } },
+      uniforms: { noise: { value: null }, uTime: globals.uTime, uMistTeal: { value: new THREE.Color(...ATMO.hor.side) }, uMistDeep: { value: new THREE.Color(...ATMO.hor.away).multiplyScalar(0.85) } },
       transparent: true, depthWrite: false,
       vertexShader: /* glsl */`
         attribute vec4 aFog; uniform float uTime; varying vec2 vP; varying float vFade; varying float vSeed;

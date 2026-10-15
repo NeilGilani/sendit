@@ -7,7 +7,10 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toonMaterial, outlineMaterial, mulberry32 } from './world.js';
-import { SPAWN, col } from './scene.js';
+import { SPAWN, TREES, col } from './scene.js';
+import { TreeSystem } from './gfx/trees.js';
+import { buildCornices } from './gfx/cornices.js';
+import { snowUniforms, SNOW_COMMON_PARS, SNOW_BAND_GLSL } from './gfx/snow.js';
 
 const HASH = 16;
 const CELL = 750;
@@ -30,33 +33,19 @@ export class Scatter {
     const rnd = mulberry32(5);
     this.rnd = rnd;
     this.geos = {
-      tree: [pineGeometry(4, 1.0, rnd), pineGeometry(5, 1.15, rnd), pineGeometry(3, 0.85, rnd), pineGeometry(6, 1.3, rnd)],
-      rock: [rockGeometry(1, rnd), rockGeometry(2, rnd), rockGeometry(1, rnd)],
+      rock: [boulderGeometry(101, 2), boulderGeometry(202, 2), boulderGeometry(303, 2)],
+      rockLo: [boulderGeometry(101, 1), boulderGeometry(202, 1), boulderGeometry(303, 1)],
       ice: [iceGeometry(5, rnd), iceGeometry(6, rnd)],
       post: [postGeometry()],
       rail: [railGeometry()],
     };
-    const treeMat = toonMaterial({
-      name: 'pine', vertexColors: true, rim: 0.25,
-      vertPre: /* glsl */`
-        #ifdef USE_INSTANCING
-          vec3 ip = instanceMatrix[3].xyz;
-        #else
-          vec3 ip = vec3(0.0);
-        #endif
-        float sway = sin(uTime * uWind.x + ip.x * 0.05 + ip.z * 0.07 + position.y * 0.15) * uWind.y;
-        float bend = max(position.y - 1.2, 0.0);
-        transformed.x += sway * bend;
-        transformed.z += cos(uTime * uWind.x * 0.8 + ip.z * 0.05) * uWind.y * 0.6 * bend;`,
-    });
-    treeMat.flatShading = true;
-    const rockMat = toonMaterial({ name: 'rock', vertexColors: true });
-    rockMat.flatShading = true;
+    this.trees = new TreeSystem(this.group);
+    const rockMat = boulderMaterial(this.terrain);
     const iceMat = toonMaterial({ name: 'ice', color: col(SPAWN.iceTint), rim: 1.0 });
     iceMat.flatShading = true;
     const woodMat = toonMaterial({ name: 'fence', vertexColors: true });
     woodMat.flatShading = true;
-    this.mats = { tree: treeMat, rock: rockMat, ice: iceMat, post: woodMat, rail: woodMat };
+    this.mats = { rock: rockMat, ice: iceMat, post: woodMat, rail: woodMat };
 
     const q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), m = new THREE.Matrix4();
     const up = new THREE.Vector3(0, 1, 0), n = new THREE.Vector3();
@@ -65,7 +54,7 @@ export class Scatter {
       q.setFromAxisAngle(up, t[3]);
       p.set(t[0], T.getHeight(t[0], t[2]) - 0.3, t[2]);
       s.set(scale * (0.9 + rnd() * 0.25), scale, scale * (0.9 + rnd() * 0.25));
-      this.add('tree', t[5] % 3, t[0], t[2], m.compose(p, q, s));
+      this.addTree(t[0], t[2], t[3], scale, rnd);
       this.addObstacle(t[0], t[2], 0.4 * scale, 'tree');
     }
     for (const r of data.rocks) {
@@ -96,7 +85,8 @@ export class Scatter {
       im.computeBoundingSphere();
       im.castShadow = true;
       im.receiveShadow = true;
-      im.userData = { kind: b.kind, center: new THREE.Vector2(b.cx / b.list.length, b.cz / b.list.length) };
+      im.userData = { kind: b.kind, center: new THREE.Vector2(b.cx / b.list.length, b.cz / b.list.length),
+        hi: this.geos[b.kind][b.variant], lo: this.geos[b.kind + 'Lo']?.[b.variant] };
       this.group.add(im);
       this.cells.push(im);
     }
@@ -123,7 +113,7 @@ export class Scatter {
       for (let d = 0; d < L; d += 6) samples.push([a.x + (b.x - a.x) * d / L, a.y + (b.y - a.y) * d / L, run + d]);
       run += L;
     }
-    if (!samples.length) { this.flush(); return; }
+    if (!samples.length) { this.flush(); this.trees.build(); this.buildTreeMask(); return; }
     const PH = 48, ph = new Map();
     for (const sp of samples) {
       const k = `${Math.floor(sp[0] / PH)},${Math.floor(sp[1] / PH)}`;
@@ -185,10 +175,7 @@ export class Scatter {
     let trees = 0;
     for (const [tx, tz, thin] of chosen) {
       const sc = S.treeScale[0] + (S.treeScale[1] - S.treeScale[0]) * Math.pow(rnd(), 0.8) * (0.6 + 0.4 * thin);
-      q.setFromAxisAngle(up, rnd() * Math.PI * 2);
-      p.set(tx, T.getHeight(tx, tz) - 0.3, tz);
-      s.set(sc * (0.88 + rnd() * 0.25), sc * (0.9 + rnd() * 0.2), sc * (0.88 + rnd() * 0.25));
-      this.add('tree', Math.floor(rnd() * 4), tx, tz, m.compose(p, q, s));
+      this.addTree(tx, tz, rnd() * Math.PI * 2, sc, rnd);
       this.addObstacle(tx, tz, 0.4 * sc, 'tree');
       trees++;
     }
@@ -297,7 +284,11 @@ export class Scatter {
     }
     for (const line of posts) this.addFence(line);
     this.flush();
-    this.envStats = { trees, formations, fences: posts.length, crestSegs };
+    this.trees.build();
+    this.buildTreeMask();
+    const corn = buildCornices(T, { minX, maxX, minZ, maxZ }, runDist, T.terrainUniforms?.noiseTex.value);
+    if (corn) this.group.add(corn);
+    this.envStats = { trees, formations, fences: posts.length, crestSegs, cornices: corn ? corn.userData.count : 0 };
   }
 
   /** Posts + two rails between consecutive posts, snow on top. */
@@ -327,6 +318,42 @@ export class Scatter {
         this.add('rail', 0, p.x, p.z, m.compose(p, q, s));
       }
     }
+  }
+
+  /** One conifer (rendered by gfx/trees.js) + its tree-well footprint. */
+  addTree(x, z, yaw, sc, rnd) {
+    const kind = rnd() < TREES.firShare ? 1 : 0;
+    const w = kind ? 1.05 + rnd() * 0.2 : 0.85 + rnd() * 0.25;
+    const y = this.terrain.getHeight(x, z) - 0.3;
+    this.trees.add(x, y, z, yaw, sc * w, sc * (0.85 + rnd() * 0.3), sc * w, kind);
+    (this.wells || (this.wells = [])).push([x, z, sc]);
+  }
+
+  /** Bake tree wells / under-canopy shade into a terrain-resolution mask for the snow shader. */
+  buildTreeMask() {
+    const T = this.terrain;
+    const N = T.res, sp = T.spacing, half = T.half;
+    const data = new Uint8Array(N * N);
+    for (const [x, z, sc] of this.wells || []) {
+      const rw = TREES.wellRadius * sc + 0.6, rc = 2.6 * sc;
+      const gi = (x + half) / sp, gj = (z + half) / sp;
+      const R = Math.ceil(rc / sp);
+      for (let j = Math.max(0, Math.floor(gj - R)); j <= Math.min(N - 1, Math.ceil(gj + R)); j++) {
+        for (let i = Math.max(0, Math.floor(gi - R)); i <= Math.min(N - 1, Math.ceil(gi + R)); i++) {
+          const d = Math.hypot(i - gi, j - gj) * sp;
+          const well = d < rw ? Math.pow(1 - d / rw, 1.3) : 0;
+          const canopy = d < rc ? 0.25 * (1 - d / rc) : 0;
+          const v = Math.min(255, Math.round(Math.max(well, canopy) * 255));
+          const k = j * N + i;
+          if (v > data[k]) data[k] = v;
+        }
+      }
+    }
+    const tex = new THREE.DataTexture(data, N, N, THREE.RedFormat, THREE.UnsignedByteType);
+    tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter;
+    tex.unpackAlignment = 1;
+    tex.needsUpdate = true;
+    if (T.terrainUniforms) T.terrainUniforms.uTreeMask.value = tex;
   }
 
   addObstacle(x, z, r, kind) {
@@ -363,16 +390,23 @@ export class Scatter {
   }
 
   setQuality(q) {
+    this.trees.setQuality(q);
     this.treeDistance = [1800, 3000, 4500][q];
-    this.rockDistance = [800, 1400, 2200][q];
+    this.rockDistance = [500, 900, 1400][q];
   }
 
   update(cam) {
+    this.trees.update(cam);
     for (const im of this.cells) {
       const c = im.userData.center;
       const d = Math.hypot(c.x - cam.x, c.y - cam.z) - CELL * 0.7;
       const kind = im.userData.kind;
-      im.visible = d < (kind === 'tree' ? this.treeDistance : kind === 'rock' ? this.rockDistance : this.rockDistance * 0.7);
+      im.visible = d < (kind === 'rock' ? this.rockDistance : this.rockDistance * 0.7);
+      // Boulder LOD per cell: full detail only for the cell(s) around the camera.
+      if (im.userData.lo) {
+        const g = d < 120 ? im.userData.hi : im.userData.lo;
+        if (im.geometry !== g) im.geometry = g;
+      }
     }
   }
 }
@@ -395,45 +429,53 @@ function valueNoise2D(seed) {
   };
 }
 
-/** Faceted pine: brown trunk + jagged cone tiers, deep teal needles with snow loaded on top. */
-function pineGeometry(tiers, stretch, rnd) {
-  const parts = [];
-  const trunk = new THREE.CylinderGeometry(0.16, 0.26, 2.2, 6);
-  trunk.translate(0, 1.1, 0);
-  paint(trunk, () => [0.16, 0.08, 0.045]);
-  const greens = SPAWN.pineGreens.map((h) => { const c = col(h); return [c.r, c.g, c.b]; });
-  parts.push(trunk);
-  const H = 8.0 * stretch;
-  for (let i = 0; i < tiers; i++) {
-    const t = i / tiers;
-    const r = (2.6 - t * 1.9) * (0.9 + rnd() * 0.2);
-    const h = (H / tiers) * 1.55;
-    const y = 1.6 + t * (H - 2.0);
-    const cone = new THREE.ConeGeometry(r, h, 7, 2, false);
-    const pos = cone.attributes.position;
-    for (let k = 0; k < pos.count; k++) {
-      const py = pos.getY(k);
-      if (py < -h * 0.45) {
-        const a = Math.atan2(pos.getZ(k), pos.getX(k));
-        const jag = 1.0 + 0.18 * Math.sin(a * 7.0 + i);
-        pos.setX(k, pos.getX(k) * jag);
-        pos.setZ(k, pos.getZ(k) * jag);
-        pos.setY(k, py - 0.25 * Math.abs(Math.sin(a * 3.5 + i)));
-      }
-    }
-    cone.computeVertexNormals();
-    cone.translate(0, y + h / 2, 0);
-    paint(cone, (px, py) => {
-      const rel = (py - y) / h;
-      const snow = rel > 0.5 - 0.12 * Math.sin(px * 3.0) ? 1 : 0;
-      return snow ? [0.93, 0.93, 0.92] : (i % 2 ? greens[0] : greens[1]);
-    });
-    parts.push(cone);
+/** Natural boulder: subdivided sphere with multi-octave fractured displacement (smooth shaded). */
+function boulderGeometry(seed, detail) {
+  const rnd = mulberry32(seed);
+  const g = new THREE.IcosahedronGeometry(1.3, detail);
+  const pos = g.attributes.position;
+  const phase = rnd() * 100;
+  // A few cutting planes give flat fractured faces; octave noise roughens them.
+  const planes = Array.from({ length: 5 }, () => {
+    const n = new THREE.Vector3(rnd() - 0.5, rnd() - 0.3, rnd() - 0.5).normalize();
+    return [n, 0.75 + rnd() * 0.35];
+  });
+  const v = new THREE.Vector3();
+  for (let k = 0; k < pos.count; k++) {
+    v.fromBufferAttribute(pos, k);
+    const d = v.clone().normalize();
+    let r = 1.3 * (1 + 0.14 * Math.sin(d.x * 3.1 + phase) * Math.cos(d.z * 2.7 + phase) + 0.07 * Math.sin(d.y * 7.3 + phase * 2) + 0.035 * Math.sin(d.x * 13.0 + d.z * 11.0 + phase));
+    for (const [n, c] of planes) { const t = d.dot(n); if (t * r > c * 1.3) r = (c * 1.3) / Math.max(t, 1e-3); }
+    v.copy(d).multiplyScalar(r);
+    v.y *= 0.8;
+    pos.setXYZ(k, v.x, v.y, v.z);
   }
-  return mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)));
+  g.computeVertexNormals();
+  g.deleteAttribute('uv');
+  return g;
 }
 
-/** Chunky low-poly boulder with a snow cap and a few icy faces. */
+/** Boulder shading: grey rock (shared rock albedo) with a snow cap that follows the world normal. */
+function boulderMaterial(terrain) {
+  return toonMaterial({
+    name: 'boulder', uniforms: { ...snowUniforms(), noiseTex: { value: terrain.terrainUniforms?.noiseTex.value } },
+    fragPars: SNOW_COMMON_PARS,
+    frag: /* glsl */`
+    {
+      vec3 N = normalize(vWN);
+      vec2 uv = (abs(N.x) > abs(N.z) ? vW.zy : vW.xy) * 4.0;
+      vec3 rc = rockAlbedo(uv, 0.0);
+      float n = texture2D(noiseTex, vW.xz * 0.35 + vW.y * 0.2).g;
+      float snow = smoothstep(0.42, 0.72, N.y + (n - 0.5) * 0.45);
+      diffuseColor.rgb = mix(rc, uSnowAlbedo * 0.97, snow);
+      tRock = 1.0 - snow;
+      tGlintMask = 0.0;
+    }`,
+    band: SNOW_BAND_GLSL,
+  });
+}
+
+/** Chunky low-poly boulder with a snow cap and a few icy faces (legacy, unused). */
 function rockGeometry(detail, rnd) {
   const ico = new THREE.IcosahedronGeometry(1.3, detail);
   const g = ico.index ? ico.toNonIndexed() : ico;

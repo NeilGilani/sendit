@@ -13,7 +13,8 @@
 //   update(dt) · render(dt) · resize(w, h)
 //   gearMode                     'native' | 'builtin' | 'module' | 'placeholder' (what is shown)
 import * as THREE from 'three';
-import { EffectComposer, RenderPass, EffectPass, BloomEffect, SMAAEffect, SMAAPreset, VignetteEffect } from 'postprocessing';
+import { EffectComposer, RenderPass, EffectPass, BloomEffect, SMAAEffect, SMAAPreset } from 'postprocessing';
+import { GradeEffect, POST } from '../gfx/post.js';
 import { Rider } from '../rider.js';
 import { Player, State } from '../player.js';
 import { LIGHTING } from '../scene.js';
@@ -329,8 +330,14 @@ export class LobbyStage {
   setupPost() {
     const composer = new EffectComposer(this.renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
     composer.addPass(new RenderPass(this.scene, this.camera));
-    this.bloom = new BloomEffect({ intensity: 0.55, luminanceThreshold: 0.9, luminanceSmoothing: 0.15, mipmapBlur: true, radius: 0.7 });
-    composer.addPass(new EffectPass(this.camera, this.bloom, new VignetteEffect({ offset: 0.28, darkness: 0.42 })));
+    // Same HDR → display grade as the game (gfx/post.js): the shared materials render linear HDR and
+    // rely on its exposure + tone curve. No sun glare / lens flare on the stage.
+    const B = POST.bloom;
+    this.bloom = new BloomEffect({ intensity: B.intensity, luminanceThreshold: B.threshold, luminanceSmoothing: B.smoothing, mipmapBlur: true, radius: B.radius });
+    this.grade = new GradeEffect();
+    this.grade.uniforms.get('glare').value = 0;
+    this.grade.uniforms.get('flare').value = 0;
+    composer.addPass(new EffectPass(this.camera, this.bloom, this.grade));
     composer.addPass(new EffectPass(this.camera, new SMAAEffect({ preset: SMAAPreset.HIGH })));
     this.composer = composer;
     this.resize(this.size.w, this.size.h);

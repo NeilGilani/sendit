@@ -4,7 +4,8 @@
 // backdrop. Answers height/normal/surface queries; park features add to the height field.
 import * as THREE from 'three';
 import { globals, toonMaterial, SUN_DIR } from './world.js';
-import { SNOW, snowUniforms, SNOW_BAND_PARS, SNOW_PARS_GLSL, SNOW_FRAG_GLSL, SNOW_BAND_GLSL, FAR_SNOW_FRAG_GLSL } from './scene.js';
+import { RING } from './scene.js';
+import { snowUniforms, SNOW_COMMON_PARS, SNOW_PARS_GLSL, SNOW_FRAG_GLSL, SNOW_BAND_GLSL, FAR_SNOW_FRAG_GLSL } from './gfx/snow.js';
 
 const CHUNK = 128;
 const LODS = 5;
@@ -143,12 +144,15 @@ export class Terrain {
     const terrainUniforms = {
       ...snowUniforms(),
       normalTex: { value: this.normalTex }, splatTex: { value: this.splatTex }, noiseTex: { value: tex.noise },
-      sparkle: { value: SNOW.sparkle }, terrainRes: { value: this.res }, terrainSpacing: { value: this.spacing },
+      terrainRes: { value: this.res }, terrainSpacing: { value: this.spacing },
     };
+    const blank = new THREE.DataTexture(new Uint8Array(4), 1, 1);
+    blank.needsUpdate = true;
+    terrainUniforms.uTreeMask.value = blank;
     this.terrainUniforms = terrainUniforms;
     this.material = toonMaterial({
       name: 'terrainSnow', uniforms: terrainUniforms,
-      fragPars: SNOW_BAND_PARS + SNOW_PARS_GLSL, frag: SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
+      fragPars: SNOW_COMMON_PARS + SNOW_PARS_GLSL, frag: SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
     });
     const prev = this.material.onBeforeCompile;
     this.material.onBeforeCompile = (shader, r) => {
@@ -156,10 +160,21 @@ export class Terrain {
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(tN, 0.0)).xyz);');
     };
+    this.material.defines = { SNOW_TRACKS: 2, SNOW_SPARKLE: 1, SNOW_TREEMASK: 1 };
+
+    // Far forest band: real mountains use their own treeline and keep forest to the horizon.
+    const farU = snowUniforms();
+    if (this.course?.treeline) farU.uFarForest.value.set(this.course.treeline, 350, 1e6);
     this.farMaterial = toonMaterial({
-      name: 'terrainFarSnow', uniforms: { ...snowUniforms(), noiseTex: { value: tex.noise } },
-      fragPars: SNOW_BAND_PARS + 'uniform sampler2D noiseTex;', frag: FAR_SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
+      name: 'terrainFarSnow', uniforms: { ...farU, noiseTex: { value: tex.noise } },
+      fragPars: SNOW_COMMON_PARS + 'vec3 tN;', frag: FAR_SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
     });
+    const prevFar = this.farMaterial.onBeforeCompile;
+    this.farMaterial.onBeforeCompile = (shader, r) => {
+      prevFar(shader, r);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(tN, 0.0)).xyz);');
+    };
   }
 
   build() {
@@ -234,7 +249,7 @@ export class Terrain {
   buildFar() {
     const m = this.meta;
     const fres = m.far_res, fsize = m.far_size_m;
-    const n = 256;
+    const n = 320;
     const step = fsize / n;
     const pos = new Float32Array((n + 1) * (n + 1) * 3);
     const H = (x, z) => {
@@ -270,16 +285,86 @@ export class Terrain {
     mesh.receiveShadow = false;
     mesh.name = 'FarTerrain';
     this.group.add(mesh);
+    this.buildRing();
+  }
+
+  /**
+   * Distant ranges: a polar ring of procedural ridged peaks beyond the 30 km backdrop, so the
+   * horizon is layered mountains dissolving into blue haze (aerial perspective does the layering).
+   */
+  buildRing() {
+    const m = this.meta;
+    const fsize = m.far_size_m, fres = m.far_res;
+    // Ranges sit around the resort's own altitude (the backdrop rim itself is sunk away).
+    const edge = m.spawn ? this.baseHeight(m.spawn.position[0], m.spawn.position[2]) : 2500;
+    const R = RING;
+    const inner = Math.max(R.inner, fsize / 2 - 3000), outer = Math.min(inner + R.depth, R.maxRadius);
+    const NA = R.segments, NR = R.rings;
+    const rnd = (i, j, seed) => {
+      let h = (i * 374761393 + j * 668265263 + seed * 982451653) | 0;
+      h = Math.imul(h ^ (h >>> 13), 1274126177);
+      return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+    };
+    const vn = (x, y, seed) => {
+      const i = Math.floor(x), j = Math.floor(y);
+      let fx = x - i, fy = y - j; fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+      const a = rnd(i, j, seed), b = rnd(i + 1, j, seed), c = rnd(i, j + 1, seed), d = rnd(i + 1, j + 1, seed);
+      return (a + (b - a) * fx) + ((c + (d - c) * fx) - (a + (b - a) * fx)) * fy;
+    };
+    const ridged = (x, y) => {
+      let a = 0, amp = 0.5, f = 1, tot = 0;
+      for (let k = 0; k < 6; k++) { const n = 1 - Math.abs(vn(x * f, y * f, 7 + k) * 2 - 1); a += n * n * amp; tot += amp; amp *= 0.5; f *= 2.05; }
+      return a / tot;
+    };
+    const pos = new Float32Array((NA + 1) * (NR + 1) * 3);
+    let k = 0;
+    for (let j = 0; j <= NR; j++) {
+      const t = Math.pow(j / NR, 1.35);
+      const r = inner + (outer - inner) * t;
+      for (let i = 0; i <= NA; i++) {
+        const az = (i / NA) * Math.PI * 2;
+        const x = Math.cos(az) * r, z = Math.sin(az) * r;
+        const env = 0.35 + 0.65 * smooth(0, 0.12, t) * (1 - 0.3 * t);
+        const big = vn(x / 14000, z / 14000, 3);                // massifs vs. lower ranges
+        const rg = ridged(x / R.scale, z / R.scale);
+        const h = edge - 600 + env * (R.base + R.height * Math.pow(rg, 1.5) * (0.45 + 0.9 * big));
+        pos[k++] = x; pos[k++] = h; pos[k++] = z;
+      }
+    }
+    const idx = new Uint32Array(NA * NR * 6);
+    k = 0;
+    for (let j = 0; j < NR; j++) for (let i = 0; i < NA; i++) {
+      const a = j * (NA + 1) + i;
+      idx[k++] = a; idx[k++] = a + 1; idx[k++] = a + NA + 1;
+      idx[k++] = a + 1; idx[k++] = a + NA + 2; idx[k++] = a + NA + 1;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.computeVertexNormals();
+    g.computeBoundingSphere();
+    const mesh = new THREE.Mesh(g, this.farMaterial);
+    mesh.name = 'DistantRanges';
+    mesh.frustumCulled = false;
+    this.group.add(mesh);
   }
 
   setQuality(q) {
     const s = [0.6, 1.0, 1.5][q];
     this.lodDistances = [280 * s, 600 * s, 1200 * s, 2400 * s];
-    if (this.terrainUniforms) this.terrainUniforms.sparkle.value = q === 0 ? 0 : SNOW.sparkle;
+    if (this.material) {
+      // Quality tiers: low = no glints / plain normal-mapped tracks / no fine wind detail;
+      // medium = everything but parallax tracks; high = parallax trenches.
+      const d = { SNOW_TRACKS: q === 2 ? 2 : 1, SNOW_TREEMASK: 1 };
+      if (q === 0) d.ROCK_LITE = 1;
+      if (q > 0) d.SNOW_SPARKLE = 1;
+      this.material.defines = d;
+      this.material.needsUpdate = true;
+      this.terrainUniforms.uDetail.value = q;
+    }
     this._lastFocus = null;
   }
 
-  /** Update chunk LODs around the camera; builds at most a few chunks per frame. */
   /** Pick each chunk's LOD; new geometry is built nearest-first within a per-frame budget. */
   update(camPos, budget = 6) {
     const todo = [];
