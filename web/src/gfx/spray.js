@@ -43,6 +43,8 @@ export class SprayEmitter {
     this.grav = new Float32Array(n);
     this.dens = new Float32Array(n);
     this.seed = new Float32Array(n);
+    this.slide = new Uint8Array(n);   // 1 = sluff: slides down the slope on the snow surface
+    this._n = new THREE.Vector3();
     this.alive = 0;
     this.next = 0;
     this.acc = new Map();
@@ -183,6 +185,7 @@ export class SprayEmitter {
     this.grav[i] = opts.grav ?? [0.15, 7.0, 9.0, 2.5][kind];
     this.dens[i] = opts.dens ?? 0.5;
     this.seed[i] = Math.random();
+    this.slide[i] = opts.slide ? 1 : 0;
   }
 
   /** Accumulate fractional emission per key; returns the whole number of particles to spawn now. */
@@ -258,6 +261,21 @@ export class SprayEmitter {
         this.spawn(K_MIST, at(1.2), v, (0.22 + Math.random() * 0.3) * (0.6 + powder * 0.6), S.mistLife * (0.6 + Math.random() * 0.6), { dens: 0.2 + 0.4 * Math.random(), grow: 1.6 + powder * 1.8 });
       }
     });
+    // Sluff: on steep soft slopes, turns release loose snow that pours downhill on the surface.
+    const steep = 1 - nrm.y;
+    if (contacts.length && powder > 0.35 && steep > 0.07) {
+      const c0 = contacts[0];
+      const turn = contacts.reduce((m, c) => Math.max(m, Math.abs(c.edgeAngle)), 0);
+      const rate = SPRAY.sluffRate * powder * Math.min(1, (steep - 0.07) * 7) * (0.3 + Math.min(1, turn * 1.5)) * Math.min(1, c0.speed / 6);
+      const n = this.count('sluff', rate, dt);
+      const down = new THREE.Vector3(nrm.x, 0, nrm.z).normalize();
+      for (let i = 0; i < n; i++) {
+        const p = new THREE.Vector3().copy(c0.position).add(new THREE.Vector3((Math.random() - 0.5) * 1.6, 0.1, (Math.random() - 0.5) * 1.6));
+        const v = down.clone().multiplyScalar(1.5 + Math.random() * 2.5).addScaledVector(c0.direction, c0.speed * 0.15);
+        if (Math.random() < 0.3) this.spawn(K_CHUNK, p, v, 0.03 + Math.random() * 0.05, 2.0 + Math.random() * 1.5, { slide: true, drag: 0.9, grav: 0 });
+        else this.spawn(K_MIST, p, v, 0.18 + Math.random() * 0.22, 2.2 + Math.random() * 1.6, { slide: true, drag: 0.9, grav: 0, dens: 0.65, grow: 1.4 });
+      }
+    }
     for (const id of this.prev.keys()) if (!seen.has(id)) this.prev.delete(id);
   }
 
@@ -318,6 +336,16 @@ export class SprayEmitter {
       const k = i * 3;
       const kind = this.kind[i];
       const d = Math.exp(-this.drag[i] * dt);
+      if (this.slide[i]) {
+        // Sluff: gravity along the local slope, hugging the snow surface.
+        const nn = T.getNormal(this.pos[k], this.pos[k + 2], 1.5, this._n);
+        const gt = 9.81 * 0.55;
+        this.vel[k] += nn.x * nn.y * gt * dt; this.vel[k + 2] += nn.z * nn.y * gt * dt;
+        this.vel[k] *= d; this.vel[k + 2] *= d;
+        this.pos[k] += this.vel[k] * dt; this.pos[k + 2] += this.vel[k + 2] * dt;
+        this.pos[k + 1] = T.getHeight(this.pos[k], this.pos[k + 2]) + this.size0[i] * (kind === K_MIST ? 0.6 : 1.0);
+        this.vel[k + 1] = 0;
+      } else {
       this.vel[k + 1] -= this.grav[i] * dt;
       if (kind === K_MIST) {   // mist relaxes toward the wind
         this.vel[k] = wx + (this.vel[k] - wx) * d; this.vel[k + 2] = wz + (this.vel[k + 2] - wz) * d; this.vel[k + 1] *= d;
@@ -325,9 +353,10 @@ export class SprayEmitter {
         this.vel[k] *= d; this.vel[k + 1] *= d; this.vel[k + 2] *= d;
       }
       this.pos[k] += this.vel[k] * dt; this.pos[k + 1] += this.vel[k + 1] * dt; this.pos[k + 2] += this.vel[k + 2] * dt;
+      }
       const t = 1 - this.life[i] / this.max[i];
       // Heavy particles stop at the snow surface (sheet/chunks die a little after touching down).
-      if (kind !== K_MIST) {
+      if (kind !== K_MIST && !this.slide[i]) {
         const g = T.getHeight(this.pos[k], this.pos[k + 2]);
         if (this.pos[k + 1] < g) {
           this.pos[k + 1] = g;
