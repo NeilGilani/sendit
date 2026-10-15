@@ -246,6 +246,10 @@ export class Rider {
     const pushing = ground && !board && pl._ctrl?.up > 0.3 && pl.speed < (pl.dyn?.C.pushMaxSpeed ?? 8);
     p.push = (p.push || 0) + ((pushing ? 1 : 0) - (p.push || 0)) * k(6);
     if (pushing || p.push > 0.02) p.pushPhase = ((p.pushPhase || 0) + dt * 1.6) % 1;
+    // One-foot skate on the board (W when slow): rear foot out of its binding, pushing on the toe side.
+    const skating = ground && board && pl._ctrl?.up > 0.3 && pl.speed < (pl.dyn?.C.pushMaxSpeed ?? 4.5) && pl.squat < 0.05;
+    p.skate = (p.skate || 0) + ((skating ? 1 : 0) - (p.skate || 0)) * k(7);
+    if (skating || p.skate > 0.02) p.skatePhase = ((p.skatePhase || 0) + dt * 1.3) % 1;
 
     p.crashRoll += ((crashed ? Math.PI * 0.5 : 0) - p.crashRoll) * k(crashed ? 4 : 8);
     // Mid-air hip lean toward the travel direction (pitch with vertical speed) + twist to look ahead.
@@ -503,11 +507,13 @@ export class Rider {
     const wob = p.stumble * Math.sin(p.t * 9) * 0.25;
     // Shoulders open toward the nose, rotation leads the turn; in the air the spin leads.
     const lead = p.lead * BA.turnLead;
-    const spineTwist = (nx * (BA.shoulderOpen - BA.hipOpen) + lead) * ns;
+    const sk = p.skate || 0;
+    off.x += nx * 0.08 * sk;                                  // weight over the front foot while skating
+    const spineTwist = (nx * (BA.shoulderOpen - BA.hipOpen) + lead + nx * 0.45 * sk) * ns;
     const bend = (0.1 + p.crouch * 0.2 - p.toe * 0.04 + p.heel * 0.12 + p.grab * 0.26) * ns;
     // Head: look down the direction of travel (nose, or over the back shoulder when switch).
-    const headYaw = (nx * p.look * BA.headTurn - nx * BA.shoulderOpen - lead) * ns;
-    this.trunk(off, hipYaw, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist, wob - p.lean * 0.15, headYaw, -(hipPitch + bend) * 0.6);
+    const headYaw = (nx * p.look * BA.headTurn - nx * BA.shoulderOpen - lead - nx * 0.5 * sk) * ns;
+    this.trunk(off, hipYaw + nx * 0.3 * sk, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist, wob - p.lean * 0.15, headYaw, -(hipPitch + bend) * 0.6);
     // Legs: feet in the bindings across the board, knees toward the toe edge and a little duck.
     const w = st.width / 2;
     const feet = [[nx, st.front], [-nx, st.back]];   // [armature x sign, binding angle]
@@ -520,8 +526,18 @@ export class Rider {
       const pitchLift = sp * along * nx + Math.abs(sp) * this.equip.spec.length * 0.38;
       const ankle = new THREE.Vector3(along, this.ankleH + 0.02 + lift + pitchLift, 0);
       ankle.lerp(new THREE.Vector3(legSide * 0.12, this.ankleH + 0.35, 0.42), p.sit);
+      let footYaw = nx * THREE.MathUtils.degToRad(ang) * ns;
+      if (sx !== nx && sk > 0.01) {
+        // Skating foot: plant beside the front binding on the toe side, push back past the tail,
+        // then lift and swing forward again; the foot points down the board.
+        const ph = p.skatePhase || 0;
+        const push = ph < 0.6 ? ph / 0.6 : 1 - (ph - 0.6) / 0.4;
+        const lift2 = ph < 0.6 ? 0 : Math.sin((ph - 0.6) / 0.4 * Math.PI) * 0.12;
+        ankle.lerp(new THREE.Vector3(nx * (0.08 - push * 0.6), this.ankleH + lift2, 0.3), sk);
+        footYaw += (nx * Math.PI * 0.5 - footYaw) * sk;
+      }
       const pole = new THREE.Vector3(legSide * 0.25, 0, 1);
-      this.leg(legSide, ankle, pole, nx * THREE.MathUtils.degToRad(ang) * ns);
+      this.leg(legSide, ankle, pole, footYaw);
     }
     for (const side of [1, -1]) this.armBoard(side, nx, pl);
   }

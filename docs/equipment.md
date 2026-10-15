@@ -250,6 +250,7 @@ At runtime, `registerVariant(type, spec)` adds a model (for DLC or user presets)
   - Toe side: knees drive and the torso stays tall. Heel side: sits down with the arms forward.
   - Pressing shifts the pelvis to the pressed end and flexes the board up at the other end. The ollie crouch loads the tail.
   - A wind-up counter-rotates the shoulders against the coming spin; in the air the shoulders lead the spin.
+  - Pushing with W when slow: a one-foot skate cycle with the rear foot unstrapped, pushing on the toe side, and the body opened toward the nose.
   - In the air: knees tucked and arms wide for balance. Indy grab: the rear hand goes to the toe edge between the feet, and the board is pulled up.
 
 ## Testing and tuning results
