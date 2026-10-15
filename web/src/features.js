@@ -155,10 +155,26 @@ export class Features {
     const snowMat = toonMaterial({
       name: 'kicker', vertexColors: true,
       uniforms: { ...snowUniforms(), noiseTex: { value: this.terrain.terrainUniforms?.noiseTex.value } },
-      fragPars: SNOW_COMMON_PARS,
-      frag: 'float kn = texture2D(noiseTex, vW.xz * 0.6).g; diffuseColor.rgb = uSnowOld * (0.97 + 0.06 * kn); tGlaze = 0.8; tGlintMask = 0.6;',
+      fragPars: SNOW_COMMON_PARS + 'vec3 kN;',
+      // Shovel-shaped packed snow: soft half-metre lumps, spade facets and a little grain.
+      frag: /* glsl */`
+        float kn = texture2D(noiseTex, vW.xz * 0.6).g;
+        diffuseColor.rgb = uSnowOld * (0.97 + 0.06 * kn) * mix(vec3(0.92, 0.96, 1.02), vec3(1.0), vColor.r);
+        tGlaze = 0.8; tGlintMask = 0.6;
+        vec3 q = vW * 1.9;
+        float h0 = texture2D(noiseTex, q.xz * 0.11 + q.y * 0.03).r;
+        vec2 g = vec2(texture2D(noiseTex, (q.xz + vec2(0.3, 0.0)) * 0.11 + q.y * 0.03).r - h0,
+                      texture2D(noiseTex, (q.xz + vec2(0.0, 0.3)) * 0.11 + q.y * 0.03).r - h0) / 0.3 * 0.9;
+        float h1 = texture2D(noiseTex, vW.xz * 0.9 + 0.4).g;
+        g += vec2(texture2D(noiseTex, vW.xz * 0.9 + vec2(0.404, 0.4)).g - h1, texture2D(noiseTex, vW.xz * 0.9 + vec2(0.4, 0.404)).g - h1) / 0.004 * 0.0025;
+        kN = normalize(normalize(vWN) - vec3(g.x, 0.0, g.y) * 0.12);`,
       band: SNOW_BAND_GLSL,
     });
+    const kPrev = snowMat.onBeforeCompile;
+    snowMat.onBeforeCompile = (shader, r) => {
+      kPrev(shader, r);
+      shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(kN, 0.0)).xyz);');
+    };
     for (const kick of this.kickers) {
       const mesh = new THREE.Mesh(this.kickerGeometry(kick), snowMat);
       mesh.castShadow = true;
