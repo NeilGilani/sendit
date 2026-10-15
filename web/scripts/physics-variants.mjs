@@ -43,3 +43,21 @@ for (const type of ['ski', 'snowboard']) {
     console.log(`  ${type.padEnd(9)} ${id.padEnd(11)} Rsc ${String(spec.sidecutRadius).padEnd(4)} R@10 ${(R / Math.max(n, 1)).toFixed(1)}m  pop ${h.toFixed(2)}m  powder10° ${w.speed.toFixed(1)}m/s sink ${w.sink.toFixed(2)}${but}  [grip ${H.grip.toFixed(2)} pop ${H.pop.toFixed(2)} float ${H.float.toFixed(2)} pivot ${H.pivot.toFixed(2)} spin ${H.spin.toFixed(2)}]`);
   }
 }
+
+console.log('\n--- wind-up (steer while charging, release, no air input) and landing assist ---');
+for (const type of ['ski', 'snowboard']) for (const steer of [0, 1]) {
+  const p = mk(type, 'allmountain'); p.velocity.set(0, 0, -11);   // above butter speed
+  const h0 = p.heading;
+  run(p, 0.45, () => ({ jump: true, steer }));
+  run(p, 2.0, () => ({}));
+  const L = p.lastLanding || {};
+  console.log(`  ${type.padEnd(9)} wind-up ${steer ? 'right' : 'none '}: air spin ${(Math.abs(p._spinTotal) * 57.3).toFixed(0)}°, landed ${L.result} dev ${(L.dev ?? 0).toFixed(1)}° "${L.trick}"`);
+}
+for (const type of ['ski', 'snowboard']) {
+  // 12° off at touchdown with the stick released → the assist should settle it.
+  const p = mk(type, 'allmountain'); p.velocity.set(0, 0, -10); p.position.y = 0.01;
+  run(p, 0.45, (t) => ({ jump: t < 0.4 }));
+  p.heading += 12 * Math.PI / 180;
+  run(p, 2.0, () => ({}));
+  console.log(`  ${type.padEnd(9)} 12° off at take-off, stick released: landed ${p.lastLanding?.result} dev ${(p.lastLanding?.dev ?? 0).toFixed(1)}°`);
+}

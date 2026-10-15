@@ -94,6 +94,9 @@ export class EdgePhysics {
     } else this.charging = false;
     if (!this.charging && !fire) this.charge = Math.max(0, this.charge - dt * 6);
     pl.squat = this.charge;
+    // Spin wind-up: steering while loading a pop pre-rotates the shoulders; the release adds spin.
+    if (grounded) this.windup = approach(this.windup || 0, this.charging ? ctrl.steer : 0, dt / (this.charging ? 0.25 : 0.12));
+    pl.windup = this.windup || 0;
     this.onControl(dt, ctrl, grounded);
     return fire;
   }
@@ -256,18 +259,58 @@ export class EdgePhysics {
     this.takeoff = { switch: this.travel < 0, popped, spin: 0, grabT: 0, grab: null, end: this._popEnd || 'tail' };
     // Pre-wind: carry part of the ground rotation into the air.
     pl.spinRate = -this.yawRate * this.C.prewind;
+    if (popped) pl.spinRate += -(this.windup || 0) * this.C.windupSpin * this.H.spin;
+    const cap = this.C.spinRateMax * this.H.spin;
+    pl.spinRate = clamp(pl.spinRate, -cap, cap);
+    this.windup = 0; pl.windup = 0; pl.grabName = null;
     this.charge = 0; this.charging = false; pl.squat = 0;
   }
 
   air(dt, ctrl) {
     const pl = this.pl, C = this.C;
-    const target = ctrl.active ? -ctrl.steer * C.spinRateMax * this.H.spin * (1 - pl.grab * 0.15) : 0;
-    pl.spinRate += (target - pl.spinRate) * (1 - Math.exp(-C.spinResponse * dt));
+    const max = C.spinRateMax * this.H.spin * (1 - pl.grab * 0.15);
+    const tLand = this.timeToLand();
+    let target = 0, resp = C.spinResponse;
+    if (ctrl.active && Math.abs(ctrl.steer) > 0.2) target = -ctrl.steer * max;
+    else if (pl.airTime > 0.1) {
+      // Stick released: within spinCheckAngle of a rideable alignment (nose, or tail if allowed, along
+      // the path) settle onto it — checking the rotation if it just went past; farther away, momentum
+      // carries the spin on to the next alignment, arriving by touchdown when that's reachable.
+      const velYaw = Math.atan2(-pl.velocity.x, -pl.velocity.z);
+      const tail = this.tailLandings();
+      let d = angleDiff(pl.heading, velYaw);
+      if (tail && Math.abs(d) > Math.PI / 2) d = angleDiff(pl.heading, velYaw + Math.PI);
+      if (Math.abs(d) < P.spinCheckAngle * DEG) {
+        target = Math.sign(d) * Math.min(max * 0.6, Math.abs(d) / Math.max(tLand, 0.1));
+        resp = 10;
+      } else if (Math.abs(pl.spinRate) > 0.8) {
+        const dir = Math.sign(pl.spinRate), period = tail ? Math.PI : Math.PI * 2;
+        let ahead = ((velYaw - pl.heading) * dir) % period;
+        if (ahead < 0) ahead += period;
+        target = dir * Math.min(max, ahead / Math.max(tLand, 0.12));
+        resp = 5;
+      }
+    }
+    pl.spinRate += (target - pl.spinRate) * (1 - Math.exp(-resp * dt));
     pl.heading += pl.spinRate * dt;
     if (this.takeoff) this.takeoff.spin += pl.spinRate * dt;
     const grabbing = ctrl.active && ctrl.tuck > 0.5 && pl.airTime > 0.12;
     pl.grab += ((grabbing ? 1 : 0) - pl.grab) * (1 - Math.exp(-(grabbing ? 12 : 8) * dt));
-    if (this.takeoff && pl.grab > 0.7) { this.takeoff.grabT += dt; this.takeoff.grab ||= this.grabName(); }
+    if (this.takeoff && pl.grab > 0.7) { this.takeoff.grabT += dt; this.takeoff.grab ||= this.grabName(); pl.grabName = this.takeoff.grab; }
+    if (!grabbing && pl.grab < 0.3) pl.grabName = null;
+    // Landing assist (SSX-style): stick released just before touchdown → settle onto the nearest
+    // rideable end if it's within a few degrees.
+    if (ctrl.active && Math.abs(ctrl.steer) < 0.2 && pl.airTime > 0.2) {
+      if (tLand < P.landAssistTime) {
+        const velYaw = Math.atan2(-pl.velocity.x, -pl.velocity.z);
+        let d = angleDiff(pl.heading, velYaw);
+        if (this.tailLandings() && Math.abs(d) > Math.PI / 2) d = angleDiff(pl.heading, velYaw + Math.PI);
+        if (Math.abs(d) < P.landAssistAngle * DEG) {
+          pl.heading += d * (1 - Math.exp(-14 * dt));
+          pl.spinRate *= Math.exp(-12 * dt);
+        }
+      }
+    }
     pl.turnVelocity = pl.spinRate;
     this.edge *= Math.exp(-4 * dt);
     pl.edgeAngle = this.edge;
@@ -276,7 +319,18 @@ export class EdgePhysics {
     this.stop = 0;
   }
 
+  /** Predicted seconds until touchdown (ballistic, flat ground under the rider). */
+  timeToLand() {
+    const pl = this.pl;
+    if (!pl.terrain) return 0.6;
+    const h = Math.max(0, pl.position.y - pl.terrain.getHeight(pl.position.x, pl.position.z));
+    const vy = pl.velocity.y, g = P.gravity;
+    return (vy + Math.sqrt(Math.max(0, vy * vy + 2 * g * h))) / g;
+  }
+
   grabName() { return 'Grab'; }
+  /** Can this gear land tail-first? (boards always, skis only twin tips) */
+  tailLandings() { return true; }
 
   /**
    * Landing evaluation. `devNose` = |yaw between the nose and the path| (0..π).

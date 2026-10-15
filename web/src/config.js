@@ -27,6 +27,9 @@ export const PHYSICS = {
   brakeDecel: 9.0,
   holdStillSlope: 0.006,
   takeoffGap: 0.3,
+  landAssistTime: 0.25,       // s before touchdown when a released stick lets the gear settle onto its path …
+  landAssistAngle: 14,
+  spinCheckAngle: 40,         // deg: stick released just past an alignment → check the spin back onto it        // … if it's within this many degrees (SSX-style auto-righting)
   lipPopBonus: 1.7,           // pop multiplier when popping on a kicker / roller (vs an ollie on the flat)
   terrainImpactLoss: 0.5,     // share of an abrupt impact into the terrain (beyond smoothFollow) lost as speed
   smoothFollow: 0.25,         // m/s per step of normal velocity absorbed loss-free (smooth rolls and dips)
@@ -101,6 +104,7 @@ export const PHYSICS = {
     // Air
     popMin: 1.9, popMax: 3.5, chargeTime: 0.4,    // m/s vertical pop (tap → full charge)
     spinRateMax: 6.4, spinResponse: 7, prewind: 0.45,
+    windupSpin: 2.6,          // rad/s of spin added at take-off by a full wind-up (steer while charging)
     landClean: 15, landStumble: 30, landCrash: 38, // deg yaw between ski and path
     switchLand: 30,           // deg — backwards landings within this are "switch" (twin tips clean)
   },
@@ -129,7 +133,7 @@ export const PHYSICS = {
     butterRate: 3.4, butterMaxSpeed: 13, butterDrag: 0.8,
     // Air
     popMin: 2.2, popMax: 4.0, nollie: 0.88, chargeTime: 0.45,
-    spinRateMax: 7.6, spinResponse: 7.5, prewind: 0.55,
+    spinRateMax: 7.6, spinResponse: 7.5, prewind: 0.55, windupSpin: 3.2,
     landClean: 15, landStumble: 45, landSlide: 75, // deg yaw from the nearest board end to the path
   },
 };

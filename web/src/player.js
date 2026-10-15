@@ -59,7 +59,7 @@ export class Player {
     this.gearLatAccel = 0;            // m/s² contact force across the gear, nose frame (+ = toward the nose's right)
     this.carveQuality = 1;            // 1 = clean carve, → 0 washing out / skidding
     this.plow = 0; this.stop = 0; this.stopSide = 1; this.stopToe = false;
-    this.press = 0; this.butter = 0; this.grab = 0;
+    this.press = 0; this.butter = 0; this.grab = 0; this.windup = 0; this.grabName = null;
     this._ctrl = { steer: 0, brake: 0, up: 0, jump: false, tuck: 0, active: false };
     this.setEquipment('ski');
   }

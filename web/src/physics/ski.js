@@ -64,6 +64,8 @@ export class SkiPhysics extends EdgePhysics {
 
   stopMu() { return this.C.stopMu; }
 
+  tailLandings() { return this.H.twin; }
+
   grabName() { return this.pl.turnInput > 0.2 ? 'Japan' : this.pl.turnInput < -0.2 ? 'Mute' : 'Safety'; }
 
   /** Skis: only the tips may lead; backwards landings work on twin tips (switch), else stumble/crash. */

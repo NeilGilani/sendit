@@ -218,7 +218,13 @@ export class Rider {
     p.toe += ((board ? Math.abs(p.lean) / ANIM.maxLean * edgeSideToe : 0) - p.toe) * k(8);
     p.heel += ((board ? Math.abs(p.lean) / ANIM.maxLean * (1 - edgeSideToe) : 0) - p.heel) * k(8);
     // Upper body leads the turn (rotation-led on a board, anticipation on skis).
-    p.lead += ((ground ? -pl.turnInput : air ? THREE.MathUtils.clamp(pl.spinRate * 0.12, -0.6, 0.6) : 0) - p.lead) * k(6);
+    // Wind-up: while loading a pop and steering, the shoulders counter-rotate against the coming spin.
+    const leadGround = pl.squat > 0.05 && Math.abs(pl.windup || 0) > 0.05 ? (pl.windup || 0) * 1.4 : -pl.turnInput;
+    p.lead += ((ground ? leadGround : air ? THREE.MathUtils.clamp(pl.spinRate * 0.12, -0.6, 0.6) : 0) - p.lead) * k(6);
+    // Double-pole push on skis (W when slow): a looping reach-plant-push cycle.
+    const pushing = ground && !board && pl._ctrl?.up > 0.3 && pl.speed < (pl.dyn?.C.pushMaxSpeed ?? 8) && pl.tuck < 0.6;
+    p.push = (p.push || 0) + ((pushing ? 1 : 0) - (p.push || 0)) * k(6);
+    if (pushing || p.push > 0.02) p.pushPhase = ((p.pushPhase || 0) + dt * 1.6) % 1;
 
     p.crashRoll += ((crashed ? Math.PI * 0.5 : 0) - p.crashRoll) * k(crashed ? 4 : 8);
     // Mid-air hip lean toward the travel direction (pitch with vertical speed) + twist to look ahead.
@@ -558,11 +564,18 @@ export class Rider {
     const upS = V(side * 0.32, -0.8, 0.42 + reach + sway + plant * 0.25), loS = V(side * 0.12, -0.15 - plant * 0.25, 1.0);
     const upT = V(side * 0.18, -0.55, 0.7), loT = V(-side * 0.15, 0.05, 1.0);
     const upA = V(side, 0.15 + Math.sin(p.t * 3.1 + side) * 0.12, 0.2), loA = V(side, 0.35, 0.25);
-    // Grab: left hand reaches down to the ski.
-    const upG = V(side * 0.3, -0.9, 0.3), loG = V(side * 0.1, -0.9, 0.3);
-    const g = side > 0 ? p.grab : 0;
-    let u = upS.lerp(upT, p.tuck).lerp(upA, p.air * (1 - g)).lerp(upG, g);
-    let l = loS.lerp(loT, p.tuck).lerp(loA, p.air * (1 - g)).lerp(loG, g);
+    // Grab: Safety = left hand to the left ski; Mute = right hand across to the left ski; Japan = left
+    // hand behind to the front of the crossed skis.
+    const name = pl.grabName || 'Safety';
+    const grabHand = name === 'Mute' ? -1 : 1;
+    const upG = name === 'Mute' ? V(0.2, -0.9, 0.35) : name === 'Japan' ? V(side * 0.15, -0.95, 0.15) : V(side * 0.3, -0.9, 0.3);
+    const loG = name === 'Mute' ? V(0.35, -0.85, 0.3) : name === 'Japan' ? V(-side * 0.1, -0.9, 0.35) : V(side * 0.1, -0.9, 0.3);
+    const g = side === grabHand ? p.grab : 0;
+    // Double-pole push: reach forward and up, then plant and drive the hands back past the hips.
+    const ph = p.pushPhase || 0, reachF = ph < 0.4 ? ph / 0.4 : 1 - (ph - 0.4) / 0.6;
+    const upP = V(side * 0.3, -0.75 + reachF * 0.45, -0.25 + reachF * 1.0), loP = V(side * 0.1, -0.5 + reachF * 0.3, 0.2 + reachF * 0.7);
+    let u = upS.lerp(upP, p.push).lerp(upT, p.tuck).lerp(upA, p.air * (1 - g)).lerp(upG, g);
+    let l = loS.lerp(loP, p.push).lerp(loT, p.tuck).lerp(loA, p.air * (1 - g)).lerp(loG, g);
     [u, l] = this.armOverlays(side, u, l);
     this.armAim(side, u, l);
   }
@@ -585,11 +598,16 @@ export class Rider {
     const sw = Math.sin(p.t * 3.1 + side) * 0.1;
     u.lerp(V(fx * 0.9, 0.05 + sw, 0.25), p.air * 0.8);
     l.lerp(V(fx * 0.8, 0.2, 0.35), p.air * 0.8);
-    if (!front && p.grab > 0.01) {
+    // Grabs: Indy = rear hand, toe edge between the feet; Melon = front hand, heel edge; Nose / Tail.
+    const name = pl.grabName || 'Indy';
+    const grabFront = name === 'Melon' || name === 'Nose grab';
+    if (front === grabFront && p.grab > 0.01) {
       const B = this.bones, s = side > 0 ? '_l' : '_r';
       this.inherit(B['clavicle' + s]); this.inherit(B['upperarm' + s]);
       const sh = pos(this.g(B['upperarm' + s]));
-      const target = V(0, this.ankleH + p.air * BA.airTuck + p.grab * BA.grabTuck + 0.05, 0.14);
+      const gy = this.ankleH + p.air * BA.airTuck + p.grab * BA.grabTuck + 0.05;
+      const half = this.equip.spec.length * 0.42;
+      const target = name === 'Melon' ? V(0, gy, -0.14) : name === 'Nose grab' ? V(nx * half, gy, 0) : name === 'Tail grab' ? V(-nx * half, gy, 0) : V(0, gy, 0.14);
       const d = target.sub(sh).normalize();
       u.lerp(d.clone().add(V(0, 0, 0.15)), p.grab);
       l.lerp(d, p.grab);
@@ -610,6 +628,7 @@ export class Rider {
       this.visual.worldToLocal(hand);
       const plant = p.plant[i];
       dir.set(sx * 0.16, -1, 0.42 - plant * 0.9).normalize();
+      if (p.push > 0.01) { const ph = p.pushPhase || 0; dir.lerp(new THREE.Vector3(sx * 0.1, -1, ph < 0.4 ? 0.1 : 0.55 + (ph - 0.4)), p.push).normalize(); }
       dir.lerp(new THREE.Vector3(sx * 0.08, -0.3, 1).normalize(), p.tuck).normalize();
       dir.lerp(new THREE.Vector3(sx * 0.6, -0.4, 0.3).normalize(), p.air * 0.5).normalize();
       this.poles[i].position.copy(hand);
