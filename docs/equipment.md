@@ -288,13 +288,13 @@ At runtime, `registerVariant(type, spec)` adds a model (for DLC or user presets)
 - **fx.js:** it stamps two ski grooves (`FX.skiSpacing`) for both types. For the board, one wide groove (about the waist width, 0.25 m) from the waist contact point would be right. Spray could be driven by `rider.getContactPoints()` (load × speed × `skid`, and `edgeAngle` for direction).
 - **ui.js:** the controls hint still reads like the ski controls. The board could add "W+Space nollie · steer while holding Space to butter · Shift in air to grab". A HUD equipment badge could read `player.equipment.spec.name`.
 - **input.js:** a dedicated grab button on the gamepad (RB is tuck today, which also grabs in the air) and a stance toggle would help. The debug toggle reads the raw `input.pressed` set for `KeyE`.
-- **Lobby** (checked against the lobby branch's  and ):
-  - It calls  and  with . Both are accepted ( maps /), so the bridge reports  and the placeholder board is never needed.
-  - Its preview  never steps physics. The rider notices this ( is unset) and leans from , so the lobby's idle sway still shows.
-  - Gear events carry , so lobby swaps don't re-gear the in-game rider.
-  - Variant pickers can use  and , and stance via .
-- **main.js merge:** the lobby branch calls  after . To keep // working, apply them after that call (URL overrides the profile). Both branches add  to ; keep one.
-- **config.js merge:** the lobby branch changed  to 0.002. This branch already carries the same value and comment.
+- **Lobby** (checked against the lobby branch's `lobby/equipmentBridge.js` and `lobby/stage.js`):
+  - It calls `player.setEquipment(type)` and `rider.setEquipment(type)` with `'skis' | 'snowboard'`. Both are accepted (`normalizeType` maps `'skis'`/`'board'`), so the bridge reports `'native'` and the placeholder board is never needed.
+  - Its preview `Player` never steps physics. The rider notices this (`player.simulated` is unset) and leans from `turnInput`, so the lobby's idle sway still shows.
+  - Gear events carry `player`, so lobby swaps don't re-gear the in-game rider.
+  - Variant pickers can use `listVariants()` and `createEquipmentModel()`, and stance via `player.setStance()`.
+- **main.js merge:** the lobby branch calls `applyGameEquipment(profileStore.equipment)` after `rider.load()`. To keep `?equip=`/`?variant=`/`?stance=` working, apply them after that call (URL overrides the profile). Both branches add `rider` to `window.__sendit`; keep one.
+- **config.js merge:** the lobby branch changed `holdStillSlope` to 0.002. This branch already carries the same value and comment.
 
 ## Known issues
 
