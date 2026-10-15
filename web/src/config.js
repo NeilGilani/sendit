@@ -61,6 +61,7 @@ export const PHYSICS = {
     edgeSwitchTime: 0.3,      // s full edge → full edge (short turns 0.25)
     edgeResponse: 14,         // 1/s first-order lean response on top of the rate limit
     engage: [3, 22],          // deg — edge angle range over which the gear decambers into its sidecut arc
+    angulation: 26,           // deg the knees / hips add beyond the body's lean: max edge ≈ lean + this (slow = low edge)
     latG: 1.8,                // sustained lateral g before the edges let go
     speedRadius: 0.6, speedRadiusV: [8, 18],  // effective sidecut ×(1+0.6) from 8 → 18 m/s (long arcs at speed)
     carveAssist: 0.85,        // share of over-demand (beyond grip) that just widens the arc instead of skidding
@@ -106,6 +107,7 @@ export const PHYSICS = {
     edgeSwitchTime: 0.42, heelToToe: 0.3, toeToHeel: 0.4,   // s full edge to full edge (rate limit; with the lean response ≈0.38 / 0.46 s)
     edgeResponse: 9,
     engage: [3, 24],
+    angulation: 24,           // deg beyond the lean (ankles / knees); slow riders can't get high on edge
     latGToe: 1.6, latGHeel: 1.45,
     sidecutToe: 1.0, sidecutHeel: 0.95,     // × spec sidecut (heel side bends a touch tighter)
     speedRadius: 1.5, speedRadiusV: [6, 16],

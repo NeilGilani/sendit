@@ -179,7 +179,9 @@ export class EdgePhysics {
     // --- 1. target edge angle: the rider rolls toward steer · maxEdge at the edge-switch rate
     const s = this.steer = clamp(pl.turnInput, -1, 1) * (pl.stumbleT > 0 ? P.stumbleHandling : 1);
     const side = Math.sign(s) || Math.sign(this.edge) || 1;
-    const thMax = this.maxEdge(side) * (1 - 0.4 * pl.tuck);
+    // Edge angle ≈ body inclination + angulation, and inclination needs a turn force to lean against
+    // (tan φ = a_lat / g): slow riders can't tip onto a high edge, so slow turns are skidded pivots.
+    const thMax = Math.min(this.maxEdge(side) * (1 - 0.4 * pl.tuck), this.speedEdgeLimit(speed, side, surfGrip));
     let edgeT = s * thMax;
     const mode = this.modes(dt, ctx) || {};
     if (mode.edge !== undefined) edgeT = mode.edge;
@@ -294,6 +296,22 @@ export class EdgePhysics {
   }
 
   stopMu() { return this.C.stopMu ?? this.C.skidMu; }
+
+  /**
+   * Largest edge angle θ the rider can hold at `speed`: θ ≤ φ(θ) + angulation, where φ = atan(a/g)
+   * is the lean supported by the carve at θ (a = v² / (R_eff·cos θ), capped by grip). Bisection.
+   */
+  speedEdgeLimit(speed, side, surfGrip) {
+    const C = this.C, g = P.gravity;
+    const ang = (C.angulation ?? 25) * DEG, top = this.maxEdge(side);
+    const rEff = this.sidecut(side) * (1 + C.speedRadius * smoothstep(C.speedRadiusV[0], C.speedRadiusV[1], speed));
+    const aCap = this.latG(side) * g * surfGrip * this.H.grip;
+    const ok = (th) => th <= Math.atan(Math.min(speed * speed / (rEff * Math.cos(th)), aCap) / g) + ang;
+    if (ok(top)) return top;
+    let lo = ang, hi = top;
+    for (let i = 0; i < 10; i++) { const m = (lo + hi) / 2; if (ok(m)) lo = m; else hi = m; }
+    return lo;
+  }
 
   // ------------------------------------------------------------------ air
   pop() {
