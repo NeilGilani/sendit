@@ -301,6 +301,7 @@ export class Rider {
     if (board) this.placeBoard(gearRoll);
     else this.placeSkis(gearRoll, pl, dt);
     this.pose(pl);
+    if (p.sit > 0.01) this.gearToFeet(p.sit);
     this.placePoles(pl);
     this.root.updateMatrixWorld(true);
     this.updateContacts(pl);
@@ -346,6 +347,24 @@ export class Rider {
     const roll = -gearRoll;
     B.rotation.set(p.pitch, 0, roll, 'ZXY');
     B.position.set(0, lift + Math.abs(Math.sin(roll)) * hw + Math.abs(Math.sin(p.pitch)) * spec.length * 0.38, 0);
+  }
+
+  /** On the chairlift the legs dangle: hang the skis / board from the boots instead of the snow. */
+  gearToFeet(w) {
+    this.root.updateMatrixWorld(true);
+    const fl = this.visual.worldToLocal(this.bones.foot_l.getWorldPosition(new THREE.Vector3()));
+    const fr = this.visual.worldToLocal(this.bones.foot_r.getWorldPosition(new THREE.Vector3()));
+    const drop = 0.1;
+    if (this.skis) {
+      // Armature +X (left foot) is visual −X: left ski under the left boot.
+      for (const [ski, f] of [[this.skis[0], fl], [this.skis[1], fr]]) {
+        ski.position.lerp(new THREE.Vector3(f.x, f.y - drop, f.z - 0.05), w);
+        ski.rotation.x = 0.35 * w;   // tips hang down
+      }
+    } else if (this.board) {
+      const mid = fl.clone().add(fr).multiplyScalar(0.5);
+      this.board.position.lerp(new THREE.Vector3(mid.x, mid.y - drop, mid.z), w);
+    }
   }
 
   /**
