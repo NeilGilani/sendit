@@ -21,7 +21,8 @@ The research behind the numbers is in [equipment-research.md](equipment-research
 | `web/src/camera.js` | Chase camera. It follows the direction of travel (the tail when riding switch) and holds its framing during slide and hockey stops. |
 | `web/src/config.js` | Tunables in `PHYSICS`, `PHYSICS.ski`, `PHYSICS.snowboard`, `ANIM` and `ANIM.board`. |
 | `web/scripts/physics-sim.mjs` | Headless bench that compares the physics against the research targets. |
-| `web/scripts/physics-variants.mjs` | Headless check of trick naming (regular/goofy, switch, nollie) and per-variant handling. |
+| `web/scripts/physics-variants.mjs` | Headless check of trick naming (regular/goofy, switch, nollie), wind-up, landing assist and per-variant handling. |
+| `web/scripts/physics-scenarios.mjs` | Headless player-like scenarios: board stop-then-go, edge traverse vs flat-base drift, held ski turn. |
 
 ## APIs other modules rely on
 
