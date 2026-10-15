@@ -266,26 +266,39 @@ export const SNOW_FRAG_GLSL = /* glsl */`
       vec2 gw = wd * dh * rip * aa * blot;
       Ns = normalize(Ns - vec3(gw.x, 0.0, gw.y));
     }
-    // Groomed corduroy: fine ridges down the fall line in ~5.5 m groomer lanes, worn by traffic.
+    // Groomed corduroy: fine straight ridges down the fall line in ~5.5 m groomer lanes, worn by
+    // traffic. Each 48 m cell grooms in one straight direction (its own fall line, local origin);
+    // the four nearest cells are blended so the lines stay straight (no moiré "fingerprints").
     if (groomed > 0.01 && uDetail > 0.5) {
-      vec2 fl = normalize(N.xz + vec2(1e-4, 0.0));       // downhill (horizontal)
-      vec2 ac = vec2(-fl.y, fl.x);
-      float across = dot(xz, ac);
       float k = 6.2831853 / 0.06;
-      float ph = across * k;
       float aa = 1.0 - smoothstep(0.5, 1.8, tFP * k);
-      float lane = fract(across / 5.5);
-      float seam = smoothstep(0.03, 0.0, lane) + smoothstep(0.97, 1.0, lane);
       float worn = smoothstep(0.45, 0.75, texture2D(noiseTex, xz * 0.05 + 0.3).r + (m3 - 0.5) * 0.4);
       float amp = uSnowShape.w * groomed * (1.0 - worn * 0.85);
-      vec2 gc = ac * (sin(ph) * 0.004 * k * aa + seam * 0.35) * amp;
+      vec2 cg = xz / 48.0 - 0.5;
+      vec2 cb = floor(cg), cf = fract(cg);
+      cf = cf * cf * (3.0 - 2.0 * cf);
+      vec2 gsum = vec2(0.0);
+      float cav = 0.0, laneB = 0.0;
+      vec2 sunXZ = normalize(uSunDir.xz + 1e-4);
+      for (int j = 0; j < 2; j++) for (int i = 0; i < 2; i++) {
+        vec2 cc = (cb + vec2(float(i), float(j)) + 0.5) * 48.0;
+        vec3 nC = macroN(cc);
+        vec2 fl = normalize(nC.xz + vec2(1e-4, 0.0));
+        vec2 ac = vec2(-fl.y, fl.x);
+        float w = (i == 0 ? 1.0 - cf.x : cf.x) * (j == 0 ? 1.0 - cf.y : cf.y);
+        float across = dot(xz - cc, ac) + hash12(cc) * 5.5;
+        float lane = fract(across / 5.5);
+        float seam = smoothstep(0.03, 0.0, lane) + smoothstep(0.97, 1.0, lane);
+        gsum += ac * (sin(across * k) * 0.004 * k * aa + seam * 0.35) * w;
+        cav += abs(dot(sunXZ, ac)) * w;
+        laneB += (hash12(vec2(floor(across / 5.5), hash12(cc) * 17.0)) - 0.5) * w;
+      }
+      vec2 gc = gsum * amp;
       Ns = normalize(Ns - vec3(gc.x, 0.0, gc.y));
       // Unresolved ridges still read: they self-shadow when the sun crosses them, and each groomer
       // pass has its own slight brightness.
-      float across2 = abs(dot(normalize(uSunDir.xz + 1e-4), ac));
-      float laneId = floor(across / 5.5);
-      tCavity *= 1.0 - amp * (1.0 - aa) * (0.05 + 0.1 * across2);
-      tCordLane = (fract(sin(laneId * 12.9898) * 43758.5453) - 0.5) * 0.05 * amp;
+      tCavity *= 1.0 - amp * (1.0 - aa) * (0.05 + 0.1 * cav);
+      tCordLane = laneB * 0.05 * amp;
     }
     // Micro grain: crystals / clumps at a few cm, only up close.
     float near = 1.0 - smoothstep(6.0, 28.0, dist);
