@@ -27,9 +27,10 @@ export class Lobby {
    * @param {Input}       o.input
    * @param {Function}    o.onRide      start a ride
    * @param {object}      [o.ui]        UI helpers: { showCredits() }
+   * @param {Function}    [o.sfx]       play a UI sound: sfx(name, gain, rate)
    */
-  constructor({ root, stage, input, onRide, ui = {} }) {
-    Object.assign(this, { root, stage, input, onRide, ui });
+  constructor({ root, stage, input, onRide, ui = {}, sfx = () => {} }) {
+    Object.assign(this, { root, stage, input, onRide, ui, sfx });
     this.visible = false;
     this.active = null;            // { tab, cleanup, subs }
     this.activeId = storage.get(TAB_KEY) || 'equipment';
@@ -106,7 +107,7 @@ export class Lobby {
       b.dataset.tab = t.id;
       b.id = `lb-tab-${t.id}`;
       b.innerHTML = `${t.icon || ''}<span>${esc(t.label)}</span>${t.status === 'soon' ? '<i class="lb-soon-dot" title="Coming soon"></i>' : ''}`;
-      b.addEventListener('click', () => this.select(t.id));
+      b.addEventListener('click', () => { if (t.id !== this.activeId) this.sfx('ui_click', 0.3, 1.1); this.select(t.id); });
       this.el.tabs.appendChild(b);
     }
     this.markTabs();
@@ -221,6 +222,7 @@ export class Lobby {
     if (!tabs.length) return;
     const i = Math.max(0, tabs.findIndex((t) => t.id === this.activeId));
     const next = tabs[(i + step + tabs.length) % tabs.length];
+    this.sfx('ui_click', 0.3, 1.1);
     this.select(next.id);
     this.el.tabs.querySelector(`[data-tab="${next.id}"]`)?.focus({ preventScroll: true });
   }

@@ -33,8 +33,8 @@ export const STAGE = {
  */
 export const SHOTS = {
   full: { target: 0.95, pitch: 4, frame: 3.0 },
-  gear: { target: 0.75, pitch: 9, frame: 2.75 },
-  portrait: { target: 1.35, pitch: 2, frame: 1.5 },
+  gear: { target: 0.8, pitch: 6, frame: 2.75 },
+  portrait: { target: 1.3, pitch: 2, frame: 2.0 },
   wide: { target: 1.1, pitch: 3, frame: 4.6 },
 };
 

@@ -175,6 +175,7 @@ async function boot() {
     input,
     onRide: () => startRide(),
     ui: { showCredits: () => ui.showCredits() },
+    sfx,
   });
   lobby.setMapInfo({ ...currentMap, description: describeSelection(currentMap.map, currentMap.variant, course) });
   ui.attach({ lobby, input });
@@ -224,9 +225,16 @@ function applyGameEquipment(type) {
 
 // Loadout changes (lobby toggle, other tabs, profile sync) reach the preview and the game rider.
 on('loadout', ({ equipment }) => {
-  if (stage?.ready) stage.setEquipment(equipment);
+  if (stage?.ready) {
+    stage.setEquipment(equipment);
+    sfx('jump_pop', 0.3, 1.15);
+    setTimeout(() => sfx('land_soft', 0.4, 1.1), 650);
+  }
   if (rider) applyGameEquipment(equipment);
 });
+
+/** One-shot UI sound once audio is unlocked (silently ignored before). */
+function sfx(name, gain = 0.4, rate = 1) { if (sound?.ctx) sound.oneShot(name, gain, rate).catch(() => {}); }
 
 // Lobby music/ambience: audio may only start after a user gesture.
 const unlockAudio = () => {
@@ -286,6 +294,7 @@ async function startRide(instant = false) {
   sound.init().then(() => sound.resume()).catch(() => {});
   if (!instant) {
     input.lock();                // needs the click's user gesture, so before any await
+    sfx('whoosh_slow', 0.5, 1);
     await ui.fade(true, 0.35);
     cam.update(0);               // put the world camera on its menu flyover: the intro sweeps from there
   }

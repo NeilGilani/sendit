@@ -22,7 +22,7 @@ export class Input {
     this.canvas = canvas;
     this.pad = { lx: 0, ly: 0, rx: 0, ry: 0, lt: 0, rt: 0, buttons: [] };
     this.prevButtons = [];
-    this.device = 'keyboard';                 // 'keyboard' | 'mouse' | 'gamepad' | 'touch'
+    this.device = matchMedia?.('(pointer: coarse)').matches ? 'touch' : 'keyboard';   // 'keyboard' | 'mouse' | 'gamepad' | 'touch'
     this.menuDir = { dir: null, t: 0 };       // stick / d-pad repeat state
     addEventListener('keydown', (e) => {
       // Gameplay keys must not scroll the page — but menus keep native Space/arrow behaviour.
