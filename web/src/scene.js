@@ -87,7 +87,8 @@ export const ATMOSPHERE = {
   sunIntensity: 20,
   skyScale: 0.33,               // radiance scale into the game's HDR units
   groundAlbedo: [0.78, 0.8, 0.84],
-  horizonWhiten: 0.65,           // milky horizon (multiple scattering stand-in)
+  horizonWhiten: 0.85,           // milky horizon (multiple scattering stand-in)
+  horizonGain: 0.7,              // brighter milky band just above the horizon
   multiScatter: 0.08,
   zenithGain: 4.0,
   zenithSat: 0.25,
@@ -106,8 +107,8 @@ export const ATMOSPHERE = {
   mistBottom: 1350,
   mistDensity: 1 / 900,
   mistMaxOpacity: 0.8,
-  mistDeep: 0.85,                // haze colour multipliers (of the horizon sky)
-  mistLight: 1.0,
+  mistDeep: 1.12,                // haze colour multipliers (of the horizon sky)
+  mistLight: 1.25,
   // Sky dome clouds.
   cloudCover: 0.42,
   cirrus: 0.55,

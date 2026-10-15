@@ -107,7 +107,7 @@ vec3 rockAlbedo(vec2 uv, float far) {
   float streak = texture2D(noiseTex, vec2(uv.x * 0.11, uv.y * 0.007) + 0.4).g;    // water-stain streaks (vertical)
   vec3 c = mix(uRockA, uRockB, smoothstep(0.25, 0.8, b1 * 0.5 + beds * 0.5 + (b2 - 0.5) * 0.5));
   c = mix(c, uRockC, smoothstep(0.66, 0.85, b1 + (beds - 0.5) * 0.3) * 0.5);
-  c *= mix(1.0, 0.62, smoothstep(0.55, 0.8, streak) * 0.8);
+  c *= mix(1.0, 0.62, smoothstep(0.55, 0.8, streak) * 0.8 * (1.0 - far * 0.7));
   c *= 0.82 + 0.3 * b3;
   return c;
 }
@@ -358,6 +358,8 @@ export const FAR_SNOW_FRAG_GLSL = /* glsl */`
   float rock = smoothstep(uRockLook.z - 0.06, uRockLook.z + 0.06, slope + (m2 - 0.5) * 0.22 + (m3 - 0.5) * 0.12);
   // Gullies and couloirs hold snow even on steep faces (cheap: ridged noise down the slope).
   rock *= smoothstep(0.15, 0.45, texture2D(noiseTex, vW.xz * 0.0021 + vW.y * 0.0003).b + slope * 0.3);
+  // The sunken backdrop rim (low, far out) reads as snow; the distant ranges ring keeps its rock.
+  rock *= 1.0 - smoothstep(10500.0, 12500.0, max(abs(vW.x), abs(vW.z))) * (1.0 - smoothstep(1400.0, 1900.0, vW.y));
   float forest = (1.0 - smoothstep(2050.0, 2350.0, vW.y + (m - 0.5) * 300.0)) * (1.0 - rock) * (1.0 - smoothstep(7000.0, 9500.0, max(abs(vW.x), abs(vW.z)))) * smoothstep(0.03, 0.14, slope) * smoothstep(0.35, 0.55, m2 + 0.15);
   vec3 rc = rockAlbedo(abs(N.x) > abs(N.z) ? vW.zy : vW.xy, 1.0);
   vec3 sc = uSnowAlbedo * (0.94 + 0.06 * m2);

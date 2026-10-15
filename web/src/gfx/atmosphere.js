@@ -92,11 +92,11 @@ export function sunTransmitted(sun = sunDir(), h0 = A.viewAltitude) {
 function msApprox(r, el) {
   const L = 0.3 * r[0] + 0.6 * r[1] + 0.1 * r[2];
   const w = Math.pow(Math.max(0, 1 - Math.abs(el) / 0.3), 2) * A.horizonWhiten;
-  const t = [L * 0.9, L * 1.0, L * 1.14];
+  const t = [L * 0.94, L * 1.0, L * 1.1];
   const up = Math.pow(Math.max(0, Math.sin(el)), 0.55);
   const g = 1 + A.zenithGain * up;                   // the upper sky is brighter than single scattering says
   const sat = 1 + A.zenithSat * up;
-  const out = r.map((v, c) => (v + (t[c] - v) * w) * (1 + w * 0.35) + L * A.multiScatter * [0.55, 0.8, 1.2][c]);
+  const out = r.map((v, c) => (v + (t[c] - v) * w) * (1 + w * A.horizonGain) + L * A.multiScatter * [0.55, 0.8, 1.2][c]);
   const L2 = 0.3 * out[0] + 0.6 * out[1] + 0.1 * out[2];
   return out.map((v) => Math.max(0, (L2 + (v - L2) * sat) * g));
 }
@@ -120,12 +120,11 @@ function bake() {
       const d = [Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)];
       let r = skyRadiance(d, sun);
       if (el < 0) {
-        // Below the horizon: haze over the valleys (the terrain covers most of it anyway).
-        const h = skyRadiance([d[0], 0.02, d[2]].map((v, k, a) => v / Math.hypot(...a)), sun);
-        const k = Math.min(1, -el * 6);
-        r = h.map((v, c) => v * (1 - 0.25 * k) + r[c] * 0.0);
-      }
-      r = msApprox(r, el);
+        // Below the horizon: the bright valley haze seen just above the horizon (any gap between the
+        // ranges must read as distant haze, not as a dark band).
+        const e = 0.03;
+        r = msApprox(skyRadiance([Math.cos(e) * Math.cos(az), Math.sin(e), Math.cos(e) * Math.sin(az)], sun), e).map((v) => v * 1.12);
+      } else r = msApprox(r, el);
       const o = (j * LUT_W + i) * 4;
       for (let c = 0; c < 3; c++) data[o + c] = toH(r[c] * S);
       data[o + 3] = toH(1);
