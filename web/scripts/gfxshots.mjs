@@ -18,12 +18,12 @@ page.on('console', (m) => {
 });
 page.on('pageerror', (e) => { errors++; console.log('[pageerror]', e.message); });
 const t0 = Date.now();
+let bootFail = null;
+const failed = new Promise((_, rej) => { bootFail = rej; });
+page.on('pageerror', (e) => bootFail(e));
+page.on('console', (m) => { if (m.type() === 'error' && /TypeError|ReferenceError|SyntaxError|Shader/.test(m.text())) bootFail(new Error(m.text().slice(0, 300))); });
 await page.goto(url);
-await Promise.race([
-  page.waitForFunction(() => window.__sendit, null, { timeout: 400000 }),
-  new Promise((_, rej) => page.on('pageerror', (e) => rej(e))),
-  new Promise((_, rej) => page.on('console', (m) => { if (m.type() === 'error' && /TypeError|ReferenceError|SyntaxError|Shader/.test(m.text())) rej(new Error(m.text().slice(0, 300))); })),
-]);
+await Promise.race([page.waitForFunction(() => window.__sendit, null, { timeout: 400000 }), failed]);
 console.log('booted in', ((Date.now() - t0) / 1000).toFixed(0), 's');
 let held = [];
 for (const v of views) {

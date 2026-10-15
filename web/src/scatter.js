@@ -33,7 +33,8 @@ export class Scatter {
     const rnd = mulberry32(5);
     this.rnd = rnd;
     this.geos = {
-      rock: [boulderGeometry(rnd), boulderGeometry(rnd), boulderGeometry(rnd)],
+      rock: [boulderGeometry(101, 2), boulderGeometry(202, 2), boulderGeometry(303, 2)],
+      rockLo: [boulderGeometry(101, 1), boulderGeometry(202, 1), boulderGeometry(303, 1)],
       ice: [iceGeometry(5, rnd), iceGeometry(6, rnd)],
       post: [postGeometry()],
       rail: [railGeometry()],
@@ -84,7 +85,8 @@ export class Scatter {
       im.computeBoundingSphere();
       im.castShadow = true;
       im.receiveShadow = true;
-      im.userData = { kind: b.kind, center: new THREE.Vector2(b.cx / b.list.length, b.cz / b.list.length) };
+      im.userData = { kind: b.kind, center: new THREE.Vector2(b.cx / b.list.length, b.cz / b.list.length),
+        hi: this.geos[b.kind][b.variant], lo: this.geos[b.kind + 'Lo']?.[b.variant] };
       this.group.add(im);
       this.cells.push(im);
     }
@@ -400,6 +402,11 @@ export class Scatter {
       const d = Math.hypot(c.x - cam.x, c.y - cam.z) - CELL * 0.7;
       const kind = im.userData.kind;
       im.visible = d < (kind === 'rock' ? this.rockDistance : this.rockDistance * 0.7);
+      // Boulder LOD per cell: full detail only for the cell(s) around the camera.
+      if (im.userData.lo) {
+        const g = d < 120 ? im.userData.hi : im.userData.lo;
+        if (im.geometry !== g) im.geometry = g;
+      }
     }
   }
 }
@@ -423,10 +430,11 @@ function valueNoise2D(seed) {
 }
 
 /** Natural boulder: subdivided sphere with multi-octave fractured displacement (smooth shaded). */
-function boulderGeometry(rnd) {
-  const g = new THREE.IcosahedronGeometry(1.3, 2);
+function boulderGeometry(seed, detail) {
+  const rnd = mulberry32(seed);
+  const g = new THREE.IcosahedronGeometry(1.3, detail);
   const pos = g.attributes.position;
-  const seed = rnd() * 100;
+  const phase = rnd() * 100;
   // A few cutting planes give flat fractured faces; octave noise roughens them.
   const planes = Array.from({ length: 5 }, () => {
     const n = new THREE.Vector3(rnd() - 0.5, rnd() - 0.3, rnd() - 0.5).normalize();
@@ -436,7 +444,7 @@ function boulderGeometry(rnd) {
   for (let k = 0; k < pos.count; k++) {
     v.fromBufferAttribute(pos, k);
     const d = v.clone().normalize();
-    let r = 1.3 * (1 + 0.14 * Math.sin(d.x * 3.1 + seed) * Math.cos(d.z * 2.7 + seed) + 0.07 * Math.sin(d.y * 7.3 + seed * 2) + 0.035 * Math.sin(d.x * 13.0 + d.z * 11.0 + seed));
+    let r = 1.3 * (1 + 0.14 * Math.sin(d.x * 3.1 + phase) * Math.cos(d.z * 2.7 + phase) + 0.07 * Math.sin(d.y * 7.3 + phase * 2) + 0.035 * Math.sin(d.x * 13.0 + d.z * 11.0 + phase));
     for (const [n, c] of planes) { const t = d.dot(n); if (t * r > c * 1.3) r = (c * 1.3) / Math.max(t, 1e-3); }
     v.copy(d).multiplyScalar(r);
     v.y *= 0.8;
