@@ -84,7 +84,7 @@ Terrain LOD distances scale as before (0.6 / 1.0 / 1.5).
 
 ## Known issues / not done
 
-- Performance was checked structurally, not timed on a real GPU. The headless browser is software WebGL, and the visible browser pane was not available. High quality is about 2–3 M triangles and about 300 draw calls a frame at the start: terrain about 1.2 M before culling, boulders about 0.45 M, far tree shells about 0.23 M, near trees about 0.3 M. If a laptop struggles, lower `TREES.midRadius`, the boulder distances in `scatter.js`, or play on quality 1.
+- Performance: measured with headless Chromium on the real GPU (Intel Arc 130V integrated laptop GPU, ANGLE/D3D11, 1600×900, uncapped frame rate). Steady-state median frame time was ~1.9 ms on quality 1 (the original toon build was ~1.8 ms) and ~2.5 ms on quality 2 (original ~1.9 ms). Occasional multi-second hitches showed up in **both** builds while other agents saturated the CPU, so they are environmental, not a regression. High quality is about 2–3 M triangles and about 300 draw calls a frame. The mid tree pool and far shells do not cast shadows; only trees within the near radius do. If a weaker GPU struggles, lower `TREES.midRadius` or play on quality 1.
 - Cornices are found procedurally on convex breaks and are visual only (no collision). The hand-built gully has few true crests, so they are sparse there.
 - Rock ledge bands follow world height. Very large faces can still show some banding at mid distance.
 - The rider and lifts still use `toonMaterial` (now HDR-lit). The neon emissive trims stay but read dimmer under the new exposure. The ink outline is off (`OUTLINE.px = 0`).
