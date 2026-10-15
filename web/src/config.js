@@ -146,7 +146,7 @@ export const ANIM = {
   angulation: 0.75,           // share of (edge − lean) the ski rider takes up in the spine (upright upper body)
   polePlantTime: 0.38,        // s a pole touch lasts (triggered on edge changes)
   board: {
-    crouch: 0.16,             // m pelvis drop at rest (riders stand lower than skiers)
+    crouch: 0.12,             // m pelvis drop at rest (riders stand lower than skiers)
     crouchSpeed: 0.08,        // extra drop at speed
     shoulderOpen: 0.42,       // rad shoulders open toward the nose
     hipOpen: 0.16,            // rad hips open toward the nose

@@ -525,7 +525,7 @@ export class Rider {
     const ns = 1 - p.sit;
     const nx = this.equip.stance === 'goofy' ? -1 : 1;   // armature X of the board nose
     const lift = p.air * BA.airTuck + p.grab * BA.grabTuck;
-    const drop = BA.crouch + p.crouch * 0.18 + pl.speedRatio * BA.crouchSpeed * (1 - p.air) + p.grab * 0.08;
+    const drop = BA.crouch + p.crouch * 0.14 + pl.speedRatio * BA.crouchSpeed * (1 - p.air) + p.grab * 0.08;
     const off = new THREE.Vector3(
       nx * p.press * BA.pressShift - nx * 0.02,
       (-drop - p.heel * BA.heelSit * 0.6) * ns - p.crash * 0.5,
