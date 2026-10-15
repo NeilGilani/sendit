@@ -3,6 +3,12 @@
 Godot 4.4.1, Forward+, GDScript. Headless binary for checks lives outside the repo (scratchpad).
 Heavy commands run with `nice -n 19`.
 
+## Overnight additions (branch overnight-improvements)
+- Lobby is the first screen (web/src/lobby, profile, maps, services). Guide: docs/lobby.md. Tests: `node web/scripts/lobbytest.mjs <url>`, `node web/scripts/unittest.mjs`.
+- Skis + snowboard with separate physics (web/src/physics, web/src/equipment). `?equip=ski|snowboard`, `?variant=`, `?stance=goofy`, E swaps gear while riding. Guide: docs/equipment.md, research: docs/equipment-research.md. Benches: web/scripts/physics-*.mjs.
+- Realistic HDR look: snow, rock, trees, sky, spray (web/src/gfx, post stack in gfx/post.js). Guide: docs/graphics.md, research: docs/graphics-research.md. Screens: `GPU=1 node web/scripts/gfxshots.mjs`.
+- Spray is fed by `rider.getContactPoints()`; the lobby stage uses the game's GradeEffect because materials render linear HDR.
+
 ## Web build (web/, Three.js) — the primary target now
 Stylized arcade snowboarding ("vibey anime" cel look). Run: `cd web && npm install && npm run dev` → http://localhost:5173 (`?ride` skip menu, `?quality=0|1|2`, `?kicker=0..2` start before a kicker, `?at=x,z,heading`).
 - web/src/scene.js — THE SCENE FILE: LIGHTING (soft sun + sky fill + exposure curve), SNOW (clean clay-snow optics: scattered sun, blue shade, subsurface glow, satin sheen, trenches), ATMOSPHERE (daylight sky, haze), SNOWFALL, OUTLINE, SPAWN (pines, brown rock outcrops), JUMPS (kickers/rollers/pillows), COURSE (the hand-built gully).
