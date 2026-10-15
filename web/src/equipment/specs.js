@@ -37,6 +37,13 @@ export const SKI_VARIANTS = {
     kick: { nose: 0.07, tail: 0.02 }, flex: 0.85, torsion: 0.9, mass: 4.0, setback: 0.0, twin: false,
     graphic: { base: 0x101010, top: 0xffd23a, top2: 0x161616, accent: 0xff2a2a, edge: 0xffe066, pattern: 'chevron' },
   },
+  gs: {
+    id: 'gs', name: 'Valcrest GS Race 188', blurb: 'Long-radius giant slalom ski: rock-steady at speed, lazy when slow.',
+    length: 1.88, tip: 0.112, waist: 0.068, tail: 0.098, sidecutRadius: 27,
+    profile: { type: 'camber', camber: 0.009, noseRocker: 0.03, tailRocker: 0.0 },
+    kick: { nose: 0.065, tail: 0.02 }, flex: 0.95, torsion: 0.95, mass: 4.6, setback: 0.0, twin: false,
+    graphic: { base: 0x0b0b12, top: 0xf4f4f4, top2: 0xd8242c, accent: 0x111111, edge: 0xff4040, pattern: 'stripe' },
+  },
   powder: {
     id: 'powder', name: 'Driftline Float 186', blurb: 'Wide, rockered powder ski that planes early.',
     length: 1.86, tip: 0.142, waist: 0.112, tail: 0.128, sidecutRadius: 21,
@@ -69,6 +76,14 @@ export const SNOWBOARD_VARIANTS = {
     kick: { nose: 0.07, tail: 0.04 }, flex: 0.82, torsion: 0.85, mass: 3.5, setback: 0.03, twin: false,
     stance: { width: 0.55, front: 21, back: 6 },
     graphic: { base: 0x0d0d0d, top: 0xf2efe6, top2: 0x111111, accent: 0xff7a1a, edge: 0xffb36a, pattern: 'chevron' },
+  },
+  carver: {
+    id: 'carver', name: 'Northwake Edge 163', blurb: 'Stiff, narrow-ish carving deck: deep euro-carves, unforgiving skids.',
+    length: 1.63, tip: 0.282, waist: 0.242, tail: 0.276, sidecutRadius: 10.5,
+    profile: { type: 'camber', camber: 0.009, noseRocker: 0.05, tailRocker: 0.03 },
+    kick: { nose: 0.06, tail: 0.035 }, flex: 0.9, torsion: 0.92, mass: 3.6, setback: 0.025, twin: false,
+    stance: { width: 0.52, front: 30, back: 18 },
+    graphic: { base: 0x0d0d14, top: 0x1b1f3a, top2: 0x4fd1ff, accent: 0xffffff, edge: 0x4fd1ff, pattern: 'chevron' },
   },
   powder: {
     id: 'powder', name: 'Driftline Fish 158', blurb: 'Tapered swallow-tail-ish floater with a big setback.',
