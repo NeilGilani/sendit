@@ -125,7 +125,7 @@ function crownGeometry(kind, lod, seed) {
   const rnd = mulberry32(seed);
   const H = TREES.height;
   const parts = [trunkGeo(H * 0.92, 0.2, 0.03, lod === 0 ? 7 : 5)];
-  const whorls = lod === 0 ? 17 : 9;
+  const whorls = lod === 0 ? 24 : 12;
   const per = lod === 0 ? 6 : 5;
   const segs = 2;
   const wMul = lod === 0 ? 1 : 1.45;
@@ -137,21 +137,22 @@ function crownGeometry(kind, lod, seed) {
     for (let b = 0; b < per; b++) {
       const yaw = (b / per) * Math.PI * 2 + w * 0.9 + rnd() * 0.5;
       const droop = (kind === 0 ? 0.42 : 0.18) * (0.7 + 0.6 * (1 - t)) + rnd() * 0.1;
-      const card = branchGeo(L * (0.85 + rnd() * 0.3), L * 0.62 * wMul, droop, kind === 0 ? 0.12 : 0.05, segs, (w + b) % 2, kind === 0 || lod === 0);
+      const card = branchGeo(L * (0.85 + rnd() * 0.3), L * 0.78 * wMul, droop, kind === 0 ? 0.12 : 0.05, segs, (w + b) % 2, kind === 0 || lod === 0);
       card.rotateX((rnd() - 0.5) * 0.35);
-      card.rotateZ(kind === 0 ? -0.05 : 0.12);
+      // Spruce: lower branches sweep down, the top ones reach up; fir branches stay level.
+      card.rotateZ(kind === 0 ? (t > 0.8 ? 0.25 : -(0.12 + 0.3 * (1 - t))) + (rnd() - 0.5) * 0.15 : 0.06 + (rnd() - 0.5) * 0.12);
       card.rotateY(yaw);
       card.translate(0, y, 0);
       parts.push(card);
     }
   }
-  if (lod === 1) {
-    // Dark inner core so mid-distance trees are not see-through.
-    const core = new THREE.ConeGeometry(kind === 0 ? 1.7 : 2.0, H * 0.86, 7, 1, true);
+  {
+    // Dark inner core (needle mass deep in the crown): hides the trunk, no see-through gaps.
+    const core = new THREE.ConeGeometry((kind === 0 ? 1.7 : 2.0) * (lod === 0 ? 0.8 : 1.0), H * 0.86, lod === 0 ? 9 : 7, 1, true);
     core.translate(0, H * 0.43 + 0.9, 0);
     const n = core.attributes.position.count;
     core.setAttribute('aUnder', new THREE.Float32BufferAttribute(new Float32Array(n).fill(3), 1));   // 3 = core
-    core.setAttribute('aAO', new THREE.Float32BufferAttribute(new Float32Array(n).fill(0.45), 1));
+    core.setAttribute('aAO', new THREE.Float32BufferAttribute(new Float32Array(n).fill(0.3), 1));
     parts.push(core);
   }
   return mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)).map(stripTo));

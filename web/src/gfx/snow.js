@@ -74,7 +74,7 @@ void rockLayer(vec2 uv, float farF, float midF, out vec3 col, out vec2 g, out fl
   float f = fract(uv.y / uRockLook.x + warp * 0.9 + texture2D(noiseTex, uv * vec2(0.01, 0.03)).g * 0.35);
   float tw = 0.1 + 0.3 * texture2D(noiseTex, uv * vec2(0.012, 0.05) + 0.9).g;
   float tread = 1.0 - smoothstep(tw * 0.4, tw, f) * (1.0 - smoothstep(0.93, 1.0, f));
-  tread *= 1.0 - smoothstep(0.025, 0.08, tFP / uRockLook.x);            // fine ledges vanish with distance
+  tread *= 1.0 - smoothstep(0.04, 0.12, tFP / uRockLook.x);            // fine ledges vanish with distance
   // Coarse bands (big ledge systems), irregular and broken.
   float S2 = uRockLook.x * 4.3;
   float f2 = fract(uv.y / S2 + warp * 2.2 + texture2D(noiseTex, uv * vec2(0.006, 0.01) + 0.4).g * 1.2);
@@ -95,7 +95,7 @@ void rockLayer(vec2 uv, float farF, float midF, out vec3 col, out vec2 g, out fl
     float l0 = texture2D(noiseTex, q).g;
     g += vec2(texture2D(noiseTex, q + vec2(0.02, 0.0)).g - l0, texture2D(noiseTex, q + vec2(0.0, 0.02)).g - l0) * 1.1 * (1.0 - midF);
   }
-  col *= (0.86 + 0.22 * tone) * (1.0 - joint * 0.22 * (1.0 - farF));
+  col *= (1.0 + (tone - 0.5) * 0.22 * (1.0 - 0.75 * midF)) * (1.0 - joint * 0.22 * (1.0 - midF));
   seg = smoothstep(0.42, 0.62, texture2D(noiseTex, uv * vec2(0.025, 0.1) + 0.7).r + uRockLook.y);
 }
 // Rock albedo: grey gneiss in blocks, lighter/darker beds, vertical runoff streaks, iron staining.
@@ -318,7 +318,10 @@ export const SNOW_FRAG_GLSL = /* glsl */`
   float sunFace = max(dot(N, uSunDir), 0.0);
   tGlaze = clamp(groomed * 0.6 + exposure * 0.35 * sunFace + tTrack * 0.5, 0.0, 1.0);
   snowCol = mix(snowCol, snowCol * vec3(0.93, 0.94, 0.96), forest * 0.25 + tree * 0.3);   // needle litter / shade
+  // Snow either covers the rock or it does not: sharpen the transition (no grey smudges), but keep
+  // it soft in the distance where it is sub-pixel anyway.
   rock = clamp(rock, 0.0, 1.0);
+  rock = mix(smoothstep(0.25, 0.6, rock + (m3 - 0.5) * 0.1), rock, farF);
   diffuseColor.rgb = mix(snowCol, rockCol, rock);
   tN = normalize(mix(Ns, Nr, rock));
   tRock = rock;
