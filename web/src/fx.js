@@ -232,18 +232,26 @@ class TrackMap {
       depthTest: false, depthWrite: false, transparent: true,
       side: THREE.DoubleSide,   // the world-xz → texture mapping mirrors the quads
       blending: THREE.CustomBlending, blendEquation: THREE.MaxEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
+      // Capsule stamps (a segment with round caps, in metres): consecutive stamps along a curve union
+      // seamlessly under MAX blending, so turns leave smooth trenches instead of ladders / dashes.
       vertexShader: /* glsl */`
-        attribute vec4 iStamp; attribute vec2 iStr; uniform vec3 region; varying vec2 vQ; varying float vS;
+        attribute vec4 iStamp; attribute vec2 iStr; uniform vec3 region; varying vec2 vM; varying float vS; varying float vHalf; varying float vR;
         void main() {
           vec2 f = vec2(-sin(iStamp.z), -cos(iStamp.z));
           vec2 r = vec2(-f.y, f.x);
-          vec2 w = iStamp.xy + r * position.x * iStamp.w * 0.5 + f * position.y * iStr.x * 0.5;
-          vQ = position.xy; vS = iStr.y;
+          vR = iStamp.w * 0.5; vHalf = iStr.x * 0.5;
+          vM = vec2(position.x * vR, position.y * (vHalf + vR));
+          vec2 w = iStamp.xy + r * vM.x + f * vM.y;
+          vS = iStr.y;
           gl_Position = vec4((w - region.xy) / (region.z * 0.5), 0.0, 1.0);
         }`,
       fragmentShader: /* glsl */`
-        varying vec2 vQ; varying float vS;
-        void main() { float a = smoothstep(1.0, 0.4, abs(vQ.x)) * smoothstep(1.0, 0.85, abs(vQ.y)); gl_FragColor = vec4(vec3(a * vS), 1.0); }`,
+        varying vec2 vM; varying float vS; varying float vHalf; varying float vR;
+        void main() {
+          float d = length(vec2(vM.x, max(abs(vM.y) - vHalf, 0.0))) / vR;
+          float a = smoothstep(1.0, 0.3, d);   // rounded trench cross-section
+          gl_FragColor = vec4(vec3(a * vS), 1.0);
+        }`,
     });
     this.stampMesh = new THREE.Mesh(stampGeo, stampMat);
     this.stampMesh.frustumCulled = false;
@@ -278,7 +286,7 @@ class TrackMap {
     this.lastBy = this.lastBy || {};
     const last = this.lastBy[key];
     if (last && last.distanceTo(cur) < 0.12) return;
-    const len = last && last.distanceTo(cur) < 4 ? last.distanceTo(cur) + 0.45 : 0.5;
+    const len = last && last.distanceTo(cur) < 4 ? last.distanceTo(cur) : 0.3;
     const mid = last && last.distanceTo(cur) < 4 ? last.clone().add(cur).multiplyScalar(0.5) : cur;
     // Orient along the path the ski actually travelled (not its heading) so skidded turns stay smooth.
     if (last && last.distanceTo(cur) < 4) heading = Math.atan2(-(cur.x - last.x), -(cur.y - last.y));

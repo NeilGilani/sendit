@@ -218,7 +218,7 @@ export class SprayEmitter {
     this.life[i] = life; this.max[i] = life; this.size0[i] = size; this.kind[i] = kind;
     this.grow[i] = opts.grow ?? (kind === K_MIST ? 2.2 : 0);
     this.drag[i] = opts.drag ?? [1.6, 1.1, 0.35, 1.4][kind];
-    this.grav[i] = opts.grav ?? [0.15, 7.0, 9.0, 2.5][kind];
+    this.grav[i] = opts.grav ?? [0.12, 7.0, 9.0, 2.5][kind];
     this.dens[i] = opts.dens ?? 0.5;
     this.seed[i] = Math.random();
     this.slide[i] = opts.slide ? 1 : 0;
