@@ -358,3 +358,27 @@ Assumptions: rider mass 80 kg, slope 25° unless stated, ρ = 1.0 kg/m³. The ga
 4. If `a_req ≤ a_grip`, the rider carves: yaw follows the path, skid angle β → 0, and only friction and drag apply.
 5. If `a_req > a_grip`, the path radius becomes `v²/a_grip`, skid angle β rises in proportion to the excess, and the rider pays `μ_side·g·sin β` deceleration. Spawn spray particles that scale with β.
 6. Lean the body to `atan(a_lat/g)`. Skis may add up to 15° of angulation on top of that. Lead the shoulders by 10 to 20° yaw about 0.1 s before each edge change.
+
+---
+
+## 6. How the research was applied (and where the game deviates)
+
+The implementation is in `web/src/physics/` (see [equipment.md](equipment.md)). This is how each finding was used:
+
+| Finding | In the game | Deviation and why |
+|---|---|---|
+| `R = R_sc·cos φ`; the ideal carve breaks down above `√(g R_sc)` | `κ = engage(φ)/(R_eff·cos φ)`, capped by `a_max/v²`. `R_eff` grows with speed (`speedRadius`), so carves stay alive at speed. | Follows the "×1.6 at speed" note. `carveAssist` = 0.85 turns most over-demand into a wider arc instead of skid, so keyboard full lock stays fun. |
+| Skid costs `μ_side·g·sin β` | Applied as written. | `μ_side` is 0.34–0.36 for steering skids (softer than 0.55), so linked keyboard turns don't kill speed. Below about 8 m/s it fades further, because slow pivots steer rather than scrape. Stops use the full values. |
+| Lateral g: 1.8 skis / 1.6 board; heel ×0.9 | `latG` 1.8, and 1.6 toe / 1.45 heel. | none |
+| Max edge 70° skis; 66° toe / 56° heel | 68°, and 64° / 55°. | none |
+| Edge switch 0.30 s skis; board 0.38 heel→toe / 0.46 toe→heel | Rate-limited lean. The bench measures 0.30 / 0.38 / 0.42 s. | Key presses from neutral ramp from 65% to full lock over 0.45 s, so taps carve gently. |
+| Hockey stop 6.5 m/s²; heel 5.5 / toe 4.5 | Bench: 6.5 / 5.6 / 4.9 m/s². | none |
+| Snowplough 1.5–2.5 m/s² | 2.4 m/s². | none |
+| Friction μ about 0.04 groomed | Groomed 0.028; "powder" 0.07. Both blend by `powderDepth`. | The whole course is classified as powder, so it is treated as shallow sugar (`powderDepth` 0.35). Deep-powder numbers would bog riders down on the 7–10° sections. |
+| Arcade drag tuned so top speeds are 16 / 20 m/s skis, 15 / 18.5 board | Bench, cruise / tuck: skis 17.0 / 18.7, board 16.4 / 17.5 m/s. | The tuck is a little slower than the target, to keep the game's "normal pace". |
+| Board floats better, bogs later, sinks about half as deep | Per-type sink, bog speed and plough drag, × spec `float` (planform area, rocker, setback). | Scaled by `powderDepth` on this course. |
+| Ollie 0.45 m board / 0.30 m ski hop | 0.84 m and 0.65 m at full charge. | Arcade ×2. On kicker lips the pop gets ×1.7 (`lipPopBonus`), so park jumps feel big. |
+| Spin 6.3–8 rad/s board, 5.5–7 skis; ±30% trim | 7.6 / 6.4 rad/s × the spec spin factor. The stick trims; a released stick carries on or checks to the next landable alignment. | Spin momentum and auto-complete replace a hard stop, which fixes the "unpredictable rotation" complaint about Infinite Air. |
+| Landing yaw: skis clean ≤10°, crash >35°; boards slide out sideways | Skis clean ≤15°, crash >38°. Boards: clean ≤15°, stumble ≤45°, slide ≤82°. Twin tips land switch. | Slightly more forgiving clean window; the auto-righting assist covers 14° in the last 0.25 s. |
+| Wind-up and preload (Steep, Shredders) | Steering while charging winds up a spin (+2.6 / +3.2 rad/s at take-off). | none |
+| Lean `atan(a_lat/g)` plus up to 15° of ski angulation; shoulders lead turns by about 0.1 s | Rider lean comes from the contact force across the gear. Skis angulate with the spine. Shoulders follow the raw input, ahead of the smoothed edge. | The lean is capped at 0.8 rad for readability. |
