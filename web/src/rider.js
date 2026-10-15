@@ -246,6 +246,9 @@ export class Rider {
     const pushing = ground && !board && pl._ctrl?.up > 0.3 && pl.speed < (pl.dyn?.C.pushMaxSpeed ?? 8);
     p.push = (p.push || 0) + ((pushing ? 1 : 0) - (p.push || 0)) * k(6);
     if (pushing || p.push > 0.02) p.pushPhase = ((p.pushPhase || 0) + dt * 1.6) % 1;
+    // Idle when standing still: breathing, glancing around (also brings the lobby stand-in to life).
+    this._stillT = ground && pl.speed < 0.3 ? (this._stillT || 0) + dt : 0;
+    p.idle = (p.idle || 0) + ((this._stillT > 1.2 ? 1 : 0) - (p.idle || 0)) * k(2);
     // One-foot skate on the board (W when slow): rear foot out of its binding, pushing on the toe side.
     const skating = ground && board && pl._ctrl?.up > 0.3 && pl.speed < (pl.dyn?.C.pushMaxSpeed ?? 4.5) && pl.squat < 0.05;
     p.skate = (p.skate || 0) + ((skating ? 1 : 0) - (p.skate || 0)) * k(7);
@@ -442,7 +445,14 @@ export class Rider {
 
   /** Shared: pelvis offset/rotation, spine bend/twist/roll, neck + head. */
   trunk(off, yaw, pitch, spineBend, spineTwist, spineRoll, headYaw, headPitch) {
-    const B = this.bones;
+    const B = this.bones, p = this.p, id = p.idle || 0;
+    if (id > 0.001) {
+      const t = p.t;
+      spineBend += id * 0.025 * Math.sin(t * 1.7);                        // breathing
+      headYaw += id * (0.35 * Math.sin(t * 0.37) + 0.15 * Math.sin(t * 0.91 + 1.3));   // looking around
+      headPitch -= id * (0.12 + 0.06 * Math.sin(t * 0.53));               // eyes up off the snow (− = up)
+      off = off.clone(); off.y += id * 0.008 * Math.sin(t * 1.7);
+    }
     const rp = this.restGlobal.get(B.pelvis);
     const pp = pos(rp).add(off);
     const pq = new THREE.Quaternion().setFromAxisAngle(Y, yaw)
