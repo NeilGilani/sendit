@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toonMaterial, mulberry32 } from '../world.js';
 import { TREES } from '../scene.js';
+import { PERF, perfQ } from './perf.js';
 
 const CELL = 750;
 
@@ -271,28 +272,38 @@ const FRAG = /* glsl */`
   if (under > 1.5) diffuseColor.a = 1.0;   // trunk / core / far shell are solid
   // Snow: sits on the upper side of each branch (and the top of far shells), heavier per tree.
   float load = uSnowLoad * (0.4 + 0.8 * fract(vSeed * 3.71));
-  float n = tvn(vW * 2.3) * 0.65 + tvn(vW * 7.1) * 0.35;
   float snow = 0.0;
+  // (perf: the snow noise is only evaluated where snow can appear; same result as before)
   if (!bark) {
     if (shell) {
+      float n = tvn(vW * 2.3) * 0.65 + tvn(vW * 7.1) * 0.35;
       float sh = smoothstep(0.05, 0.75, vWN.y + (n - 0.5) * 0.6);
       snow = sh * smoothstep(0.15, 0.8, load) * (under < 3.5 ? 0.7 : 0.9);
     } else if (under < 0.5 && gl_FrontFacing) {
       // Along the branch: a ridge of snow over the twig, thinning toward the tips and the edges.
       float across = abs(fract(vTUv.y * 2.0) - 0.5) * 2.0;
       float along = smoothstep(0.0, 0.25, vTUv.x) * (1.0 - smoothstep(0.65, 1.0, vTUv.x));
+      float n = tvn(vW * 2.3) * 0.65 + tvn(vW * 7.1) * 0.35;
       float sv = load * (0.55 + 0.45 * along) * (1.15 - across * 0.6) + (n - 0.5) * 0.55;
       snow = smoothstep(0.42, 0.62, sv);
       // Snow is a solid pillow on the twig, not needle-shaped: it keeps its own soft outline.
       diffuseColor.a = max(diffuseColor.a, smoothstep(0.6, 0.66, sv));
+      #ifdef USE_ALPHATEST
+      if (diffuseColor.a < alphaTest) discard;   // perf: the alpha test would discard it anyway
+      #endif
       // Pillow normal: domed across the branch, lumpy (lit tops, shaded flanks).
-      vec3 e = vec3(0.09, 0.0, 0.0);
-      float c0 = tvn(vW * 6.0);
-      vec3 gN = vec3(tvn(vW * 6.0 + e.xyz) - c0, tvn(vW * 6.0 + e.yxz) - c0, tvn(vW * 6.0 + e.yzx) - c0) / 0.09;
-      tTreeN = normalize(vec3(0.0, 1.0, 0.0) + normalize(vWN) * (0.35 + across * 0.8) - gN * 0.18);
-      tTreeNW = snow;
+      if (snow > 0.0) {
+        vec3 e = vec3(0.09, 0.0, 0.0);
+        float c0 = tvn(vW * 6.0);
+        vec3 gN = vec3(tvn(vW * 6.0 + e.xyz) - c0, tvn(vW * 6.0 + e.yxz) - c0, tvn(vW * 6.0 + e.yzx) - c0) / 0.09;
+        tTreeN = normalize(vec3(0.0, 1.0, 0.0) + normalize(vWN) * (0.35 + across * 0.8) - gN * 0.18);
+        tTreeNW = snow;
+      }
     }
   }
+  #ifdef USE_ALPHATEST
+  if (diffuseColor.a < alphaTest) discard;
+  #endif
   tNeedle = (!bark && !shell) ? (1.0 - snow) : 0.0;
   // Inner needle mass: not a flat dark cone — break it up into lighter / darker clumps.
   if (under > 2.5 && under < 3.5) col *= 0.55 + 0.9 * tvn(vW * 1.7) * tvn(vW * 4.3 + 3.0);
@@ -387,6 +398,7 @@ export class TreeSystem {
       im.frustumCulled = false;
       // Only the near pool (which covers the rider's shadow box) casts shadows.
       im.castShadow = lod === 'lod0'; im.receiveShadow = true;
+      im.renderOrder = PERF.treesFirst ? -1 : 0;   // perf: trees before the terrain, so its heavy shader skips pixels they cover
       im.name = `Trees_${lod}_${kind}`;
       this.group.add(im);
       this.pools.push({ im, lod, kind, cap });
@@ -394,9 +406,10 @@ export class TreeSystem {
   }
 
   setQuality(q) {
-    this.near = TREES.nearRadius * [0.6, 0.85, 1][q];
-    this.mid = TREES.midRadius * [0.45, 0.62, 1][q];
-    this.far = [1800, 3000, 4500][q];
+    const P = PERF.trees[perfQ(q)];   // perf tiers: gfx/perf.js
+    this.near = TREES.nearRadius * P.near;
+    this.mid = TREES.midRadius * P.mid;
+    this.far = P.far;
     this.last.set(1e9, 0, 0);
   }
 
@@ -410,9 +423,20 @@ export class TreeSystem {
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
     for (const pool of this.pools) pool.im.count = 0;
     const n2 = this.near * this.near, m2 = this.mid * this.mid;
+    // Front-to-back instance order (perf): alpha-tested fronds can't write depth early, but they are
+    // still depth-tested early, so near trees drawn first hide the layers of the ones behind them.
+    const near = this._near || (this._near = []);
+    near.length = 0;
     for (const t of this.trees) {
       const dx = t[0] - cam.x, dz = t[2] - cam.z, d2 = dx * dx + dz * dz;
-      if (d2 > m2) continue;
+      if (d2 <= m2) near.push(d2, t);
+    }
+    const order = this._order || (this._order = []);
+    order.length = near.length / 2;
+    for (let i = 0; i < order.length; i++) order[i] = i;
+    order.sort((a, b) => near[a * 2] - near[b * 2]);
+    for (const oi of order) {
+      const d2 = near[oi * 2], t = near[oi * 2 + 1];
       const pool = this.pools[(d2 < n2 ? 0 : 2) + t[7]];
       if (pool.im.count >= pool.cap) continue;
       pool.im.setMatrixAt(pool.im.count++, m.compose(p.set(t[0], t[1], t[2]), q.setFromAxisAngle(up, t[3]), s.set(t[4], t[5], t[6])));

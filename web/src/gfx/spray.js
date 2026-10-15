@@ -21,6 +21,7 @@
 // Tunables: SPRAY in scene.js. Quality: setQuality(0|1|2) scales particle budget and the mist.
 import * as THREE from 'three';
 import { SPRAY } from '../scene.js';
+import { PERF, perfQ } from './perf.js';
 import { globals, SUN_COLOR } from '../world.js';
 import { skyIrradiance, groundIrradiance } from './atmosphere.js';
 
@@ -195,7 +196,6 @@ export class SprayEmitter {
           gl_FragColor = packDepthToRGBA(gl_FragCoord.z);
         }`,
     });
-    this.mesh.castShadow = quality >= 1;
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 6;
     this.mesh.name = 'SnowSpray';
@@ -204,9 +204,10 @@ export class SprayEmitter {
   }
 
   setQuality(q) {
-    if (this.mesh) this.mesh.castShadow = q >= 1;
-    this.budget = [0.35, 0.65, 1.0][q] ?? 1;
-    this.mistScale = [0.6, 0.85, 1.0][q] ?? 1;
+    const P = PERF.spray[perfQ(q)];   // perf tiers: gfx/perf.js
+    if (this.mesh) this.mesh.castShadow = P.shadows;
+    this.budget = P.budget;
+    this.mistScale = P.mist;
   }
 
   spawn(kind, p, v, size, life, opts = {}) {

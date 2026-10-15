@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { globals, toonMaterial, SUN_DIR } from './world.js';
 import { RING, CLIFFS } from './scene.js';
+import { PERF, perfQ } from './gfx/perf.js';
 import { snowUniforms, SNOW_COMMON_PARS, SNOW_PARS_GLSL, SNOW_FRAG_GLSL, SNOW_BAND_GLSL, FAR_SNOW_FRAG_GLSL } from './gfx/snow.js';
 
 const CHUNK = 128;
@@ -411,14 +412,15 @@ export class Terrain {
   }
 
   setQuality(q) {
-    const s = [0.6, 1.0, 1.5][q];
+    const T = PERF.terrain[perfQ(q)];   // perf tiers: gfx/perf.js
+    const s = T.lod;
     this.lodDistances = [280 * s, 600 * s, 1200 * s, 2400 * s];
     if (this.material) {
       // Quality tiers: low = no glints / plain normal-mapped tracks / no fine wind detail;
-      // medium = everything but parallax tracks; high = parallax trenches.
-      const d = { SNOW_TRACKS: q === 2 ? 2 : 1, SNOW_TREEMASK: 1 };
-      if (q === 0) d.ROCK_LITE = 1;
-      if (q > 0) d.SNOW_SPARKLE = 1;
+      // medium = glints, cheaper rock; high = parallax trenches, full rock.
+      const d = { SNOW_TRACKS: T.tracks, SNOW_TREEMASK: 1 };
+      if (T.rockLite) d.ROCK_LITE = 1;
+      if (T.sparkle) d.SNOW_SPARKLE = 1;
       this.material.defines = d;
       this.material.needsUpdate = true;
       this.terrainUniforms.uDetail.value = q;

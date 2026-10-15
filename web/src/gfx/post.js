@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { EffectComposer, RenderPass, EffectPass, BloomEffect, SMAAEffect, SMAAPreset, Effect, EffectAttribute, BlendFunction } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
 import { SUN_DIR } from '../world.js';
+import { PERF, perfQ } from './perf.js';
 
 export const POST = {
   exposure: 0.62,             // linear multiplier before the tone curve (sunlit snow ≈ 0.9 display)
@@ -217,14 +218,15 @@ export class PostStack {
   }
 
   setQuality(q) {
-    // AO is the single most expensive pass on integrated GPUs: always half resolution (it is a soft,
-    // low-frequency term anyway), Medium sampling on high quality, Low on medium.
-    this.ao.enabled = q > 0;
-    if (q > 0) { this.ao.setQualityMode(q === 2 ? 'Medium' : 'Low'); this.ao.configuration.halfRes = true; }
-    this.bloom.intensity = POST.bloom.intensity * (q === 0 ? 0.7 : 1);
-    this.smaaEffect.applyPreset([SMAAPreset.LOW, SMAAPreset.MEDIUM, SMAAPreset.HIGH][q]);
-    this.grade.uniforms.get('glare').value = q === 0 ? 0 : POST.glare;
-    this.grade.uniforms.get('flare').value = q === 2 ? POST.flare : 0;
+    // Per-tier costs live in gfx/perf.js (PERF).
+    q = perfQ(q);
+    const ao = PERF.ao[q];
+    this.ao.enabled = !!ao;
+    if (ao) { this.ao.setQualityMode(ao.mode); this.ao.configuration.halfRes = !!ao.halfRes; }
+    this.bloom.intensity = POST.bloom.intensity * PERF.bloomScale[q];
+    this.smaaEffect.applyPreset(SMAAPreset[PERF.smaa[q]]);
+    this.grade.uniforms.get('glare').value = PERF.glare[q] ? POST.glare : 0;
+    this.grade.uniforms.get('flare').value = PERF.flare[q] ? POST.flare : 0;
   }
 
   setSize(w, h) { this.composer.setSize(w, h); }

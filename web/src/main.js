@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PostStack } from './gfx/post.js';
+import { PERF } from './gfx/perf.js';
 import { patchShaderChunks, globals, makeNoiseTexture } from './world.js';
 import { HUD } from './config.js';
 import { ATMOSPHERE, col, createSnowfall } from './scene.js';
@@ -212,9 +213,9 @@ function setupPost() {
 
 function applyQuality() {
   const q = settings.quality;
-  const dpr = Math.min(devicePixelRatio || 1, 2);
-  renderer.setPixelRatio([Math.min(dpr, 1) * 0.75, Math.min(dpr, 1.5), dpr][q]);
-  sky.setShadowBox([40, 60, 85][q], [1024, 2048, 3072][q]);
+  const pr = PERF.pixelRatio[q], sh = PERF.shadow[q];   // perf tiers: gfx/perf.js
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, pr.cap) * pr.scale);
+  sky.setShadowBox(sh.box, sh.map);
   post.setQuality(q);
   terrain.setQuality(q);
   scatter.setQuality(q);

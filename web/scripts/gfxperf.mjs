@@ -1,73 +1,70 @@
-// Frame-time probe: boots the game in headless Chromium on the real GPU (ANGLE D3D11, vsync and
-// frame-rate limit off), rides down while carving left/right so spray, tracks and tree pools are
-// live, and prints median / p95 frame times plus draw calls and triangles per quality level.
-// Usage: node scripts/gfxperf.mjs [baseUrl] [W H]   e.g. node scripts/gfxperf.mjs http://localhost:5184 1600 900
+// Frame-cost benchmark per quality level (headless Chromium on the real GPU, ANGLE D3D11).
+// The rider runs downhill, carving left / right, then for each quality we report:
+//   GPU   — GPU time per frame from EXT_disjoint_timer_query_webgl2 around the whole frame render
+//           (shadow map, scene, every post pass). This is what limits the frame rate on a GPU-bound game.
+//   CPU   — main-thread time per frame: the duration of every requestAnimationFrame callback
+//           (physics, game logic, scene traversal, draw submission).
+//   frame — max(GPU, CPU): the steady frame time with normal pipelining → fps.
+//   sync  — render + 1-pixel readPixels (no pipelining: CPU submit + GPU + a pipeline drain). This is
+//           the older, pessimistic metric, kept for comparison with earlier notes.
+// Headless rAF timing is NOT used for frame time (Chromium drops / batches frames without a display).
+// Usage: node scripts/gfxperf.mjs [baseUrl] [W H] [qualities] [frames]   e.g. … http://localhost:5184 1600 900 0,1,2 150
+// DPR=1.5 emulates a 150 % laptop screen (W H stay CSS pixels).
 import { chromium } from '@playwright/test';
-const [base = 'http://localhost:5174', W = '1600', H = '900'] = process.argv.slice(2);
-const browser = await chromium.launch({
-  args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit'],
-});
-for (const q of [0, 1, 2]) {
-  const page = await browser.newPage({ viewport: { width: Number(W), height: Number(H) } });
+const [base = 'http://localhost:5174', W = '1600', H = '900', qs = '0,1,2', N = '150'] = process.argv.slice(2);
+const browser = await chromium.launch({ args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
+for (const q of qs.split(',').map(Number)) {
+  const page = await browser.newPage({ viewport: { width: Number(W), height: Number(H) }, deviceScaleFactor: Number(process.env.DPR || 1) });
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text().slice(0, 200)); });
+  // Time every rAF callback (CPU per frame).
+  await page.addInitScript(() => {
+    const raf = window.requestAnimationFrame.bind(window);
+    window.__cpu = [];
+    window.requestAnimationFrame = (cb) => raf((t) => { const a = performance.now(); cb(t); if (window.__cpuOn) window.__cpu.push(performance.now() - a); });
+  });
   await page.goto(`${base}/?ride&quality=${q}`);
-  await page.waitForFunction(() => window.__sendit, null, { timeout: 300000 });
-  await page.waitForTimeout(3000);
+  await page.waitForFunction(() => window.__sendit && window.__post, null, { timeout: 300000 });
   await page.keyboard.down('ArrowUp');
-  if (false) await page.evaluate(() => {
-    window.__ft = []; window.__fp = [];
-    let last = performance.now();
-    const R = window.__sendit.renderer;
-    const tick = () => { const t = performance.now(); window.__ft.push(t - last); window.__fp.push(R.info.programs.length); last = t; if (window.__ft.length < 100000) requestAnimationFrame(tick); };
-    requestAnimationFrame(tick);
-  });
-  // No input events while measuring (headless Chromium stalls frames around synthetic input with the
-  // frame-rate limit off). Spray load comes from a page-side emitter beside the rider instead.
-  await page.evaluate(() => {
-    const s = window.__sendit, sp = s.fx.spray, V3 = s.camera.position.constructor;
-    const c = [0, 1].map((i) => ({ id: 'perf' + i, position: new V3(), direction: new V3(), edgeAngle: 0.9, load: 0.7, speed: 15 }));
-    const n = new V3(0, 1, 0);
-    let a = 0;
-    const step = () => {
-      a += 0.03;
-      const p = s.player.renderPos;
-      c.forEach((k, i) => { k.position.set(p.x + 3 + Math.cos(a) * 6 + i * 0.25, 0, p.z - 6 + Math.sin(a) * 6); k.position.y = s.terrain.getHeight(k.position.x, k.position.z); k.direction.set(-Math.sin(a), 0, Math.cos(a)); });
-      sp.emit(c, 1 / 60, { powder: 0.8, normal: n });
-      if (performance.now() - t0 < 9000) requestAnimationFrame(step);
+  await page.waitForTimeout(5000);
+  // Carve while measuring (spray, tracks and tree-pool rebuilds are live).
+  const carving = (async () => { for (let i = 0; i < 6; i++) { const k = i % 2 ? 'a' : 'd'; await page.keyboard.down(k); await page.waitForTimeout(900); await page.keyboard.up(k); } })();
+  const r = await page.evaluate(async (N) => {
+    const s = window.__sendit, R = s.renderer, gl = R.getContext(), P = window.__post;
+    const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+    const gpu = [], pending = [];
+    const orig = P.composer.render.bind(P.composer);
+    let on = true;
+    P.composer.render = (dt) => {
+      const qq = on && ext ? gl.createQuery() : null;
+      if (qq) gl.beginQuery(ext.TIME_ELAPSED_EXT, qq);
+      orig(dt);
+      if (qq) { gl.endQuery(ext.TIME_ELAPSED_EXT); pending.push(qq); }
+      for (let i = pending.length - 1; i >= 0; i--) {
+        if (!gl.getQueryParameter(pending[i], gl.QUERY_RESULT_AVAILABLE)) continue;
+        gpu.push(gl.getQueryParameter(pending[i], gl.QUERY_RESULT) / 1e6);
+        gl.deleteQuery(pending[i]); pending.splice(i, 1);
+      }
     };
-    const t0 = performance.now();
-    requestAnimationFrame(step);
-  });
-  await page.waitForTimeout(6000);
-  // Synchronous render benchmark: render the current view N times through the full post stack, forcing
-  // a GPU sync (1-pixel readPixels) each time. Independent of rAF scheduling, which is erratic headless.
-  const r = await page.evaluate(() => {
-    const s = window.__sendit, R = s.renderer, gl = R.getContext(), px = new Uint8Array(4);
-    const comp = window.__post.composer;
-    R.info.autoReset = false;
-    const times = [];
-    for (let i = 0; i < 160; i++) {
-      R.info.reset();
-      const t = performance.now();
-      s.fx.spray.update(1 / 60);
-      comp.render(1 / 60);
-      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-      times.push(performance.now() - t);
-    }
+    window.__cpu.length = 0; window.__cpuOn = true;
+    await new Promise((res) => { const chk = () => (gpu.length >= N ? res() : setTimeout(chk, 50)); chk(); });
+    window.__cpuOn = false; on = false;
+    const disjoint = ext ? gl.getParameter(ext.GPU_DISJOINT_EXT) : null;
+    P.composer.render = orig;
+    // Unpipelined render + sync (older metric).
+    const px = new Uint8Array(4), sync = [];
+    for (let i = 0; i < 40; i++) { const a = performance.now(); orig(1 / 60); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); sync.push(performance.now() - a); }
+    const med = (a) => { a = a.slice().sort((x, y) => x - y); return a[a.length >> 1]; };
+    const p95 = (a) => { a = a.slice().sort((x, y) => x - y); return a[Math.floor(a.length * 0.95)]; };
     const info = R.info.render;
-    R.info.autoReset = true;
-    const f = times.slice(10).sort((x, y) => x - y);
-    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-    const gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : '?';
-    const t1 = performance.now();
-    for (let i = 0; i < 50; i++) { gl.clear(gl.COLOR_BUFFER_BIT); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); }
-    const sync = (performance.now() - t1) / 50;
-    return { gpu, sync, n: f.length, med: f[f.length >> 1], p95: f[Math.floor(f.length * 0.95)], max: f[f.length - 1], calls: info.calls, tris: info.triangles, spray: s.fx.spray.alive };
-  });
-  console.log(`quality ${q}: render+sync median ${r.med.toFixed(2)} ms, p95 ${r.p95.toFixed(2)} ms, max ${r.max.toFixed(1)} ms, draw calls ${r.calls}, triangles ${(r.tris / 1e6).toFixed(2)} M, spray particles ${r.spray}, errors ${errs.length}; empty clear+sync ${r.sync.toFixed(2)} ms; ${r.gpu}`);
-  for (const e of errs.slice(0, 5)) console.log('  ', e);
+    return { gpu: med(gpu), gpu95: p95(gpu), cpu: med(window.__cpu), cpu95: p95(window.__cpu), sync: med(sync.slice(5)), disjoint,
+      px: `${gl.drawingBufferWidth}x${gl.drawingBufferHeight}`, calls: info.calls, tris: info.triangles, n: gpu.length };
+  }, Number(N));
+  await carving;
+  const frame = Math.max(r.gpu, r.cpu);
+  console.log(`quality ${q} @ ${r.px}: GPU ${r.gpu.toFixed(1)} ms (p95 ${r.gpu95.toFixed(1)}), CPU ${r.cpu.toFixed(1)} ms (p95 ${r.cpu95.toFixed(1)}) → frame ${frame.toFixed(1)} ms ≈ ${(1000 / frame).toFixed(0)} fps; sync ${r.sync.toFixed(1)} ms; ${r.n} frames${r.disjoint ? ' (GPU disjoint!)' : ''}; errors ${errs.length}`);
+  for (const e of errs.slice(0, 3)) console.log('   ', e);
   await page.close();
 }
 await browser.close();

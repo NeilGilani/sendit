@@ -5,6 +5,7 @@
 // The data set (OSM-derived trees/rocks) is topped up around the opening run with dense clusters
 // driven by the SPAWN parameters in scene.js. Also an obstacle hash for collisions and close shaves.
 import * as THREE from 'three';
+import { PERF, perfQ } from './gfx/perf.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toonMaterial, outlineMaterial, mulberry32 } from './world.js';
 import { SPAWN, TREES, col } from './scene.js';
@@ -391,8 +392,8 @@ export class Scatter {
 
   setQuality(q) {
     this.trees.setQuality(q);
-    this.treeDistance = [1800, 3000, 4500][q];
-    this.rockDistance = [500, 900, 1400][q];
+    this.treeDistance = PERF.treeDistance[perfQ(q)];   // perf tiers: gfx/perf.js
+    this.rockDistance = PERF.rockDistance[perfQ(q)];
   }
 
   update(cam) {
