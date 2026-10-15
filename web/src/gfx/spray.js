@@ -9,6 +9,7 @@
 //     load:      number          share of the rider's weight on this contact (≈ 0..1, > 1 under g-load)
 //     speed:     number          m/s of the contact over the snow
 //     id?:       any             stable key per contact (defaults to its index) — used to measure slip
+//     depth?:    number          metres the edge is sunk below the powder surface (spray starts above it)
 //   }>
 //   ctx (optional): { powder: 0..1 snow softness, normal: THREE.Vector3 ground normal, wind: THREE.Vector2 m/s }
 // The emitter measures each contact's real motion between frames, so skidding (moving sideways
@@ -44,7 +45,9 @@ export class SprayEmitter {
     this.dens = new Float32Array(n);
     this.seed = new Float32Array(n);
     this.slide = new Uint8Array(n);   // 1 = sluff: slides down the slope on the snow surface
+    this.amul = new Float32Array(n);  // per-particle alpha multiplier
     this._n = new THREE.Vector3();
+    this._surf = new THREE.Vector3();
     this.alive = 0;
     this.next = 0;
     this.acc = new Map();
@@ -141,8 +144,10 @@ export class SprayEmitter {
             // Sheet: fine powder streak — a noisy puff stretched along its motion.
             vec2 cell = vec2(step(0.5, fract(vSeed * 5.0)), step(0.5, fract(vSeed * 11.0)));
             float t = texture2D(puff, (vQ * 0.5 + 0.5) * 0.5 + cell * 0.5).r;
-            a = t * smoothstep(1.0, 0.4, r) * vA;
-            col = vLit * (0.85 + 0.25 * t) + vAmb;
+            // Granular: the streak is a spray of grains, not a smooth smear.
+            float grain = texture2D(puff, vQ * vec2(0.35, 0.9) + vSeed * 13.0).g;
+            a = t * smoothstep(1.0, 0.4, r) * vA * (0.35 + 1.25 * grain);
+            col = vLit * (0.8 + 0.3 * t) + vAmb;
           } else if (vKind < 2.5) {
             // Chunk: lumpy lit ball.
             float th = atan(vQ.y, vQ.x);
@@ -164,12 +169,41 @@ export class SprayEmitter {
     this.mesh = new THREE.Mesh(geo, this.material);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 6;
+    // Shadows: spray and lingering powder clouds darken the snow under them (a big part of how real
+    // spray reads over sunlit snow). Billboards face the light in the shadow pass; coverage is dithered
+    // by alpha and softened by the PCF filter.
+    const dm = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+    dm.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', `#include <common>
+attribute vec4 iPos; attribute vec4 iVel; attribute vec4 iData;
+varying vec2 vQ2; varying float vA2;`)
+        .replace('#include <project_vertex>', `
+          float size = iPos.w; float kind = iVel.w;
+          vec4 mvPosition = viewMatrix * vec4(iPos.xyz, 1.0);
+          vec3 vv = (viewMatrix * vec4(iVel.xyz, 0.0)).xyz;
+          float sp = length(vv.xy);
+          vec2 dir = sp > 1e-3 ? vv.xy / sp : vec2(0.0, 1.0);
+          float stretchF = 1.0 + step(0.5, kind) * step(kind, 1.5) * min(sp * 0.07, 2.2);
+          mvPosition.xy += dir * (position.y * size * stretchF) + vec2(dir.y, -dir.x) * (position.x * size);
+          gl_Position = projectionMatrix * mvPosition;
+          vQ2 = position.xy;
+          vA2 = iData.x * (kind < 0.5 ? 0.6 + 1.2 * iData.y : 1.0) * step(kind, 2.5);`);
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', `#include <common>
+varying vec2 vQ2; varying float vA2;`)
+        .replace('void main() {', `void main() {
+          float cov = vA2 * smoothstep(1.0, 0.25, length(vQ2)) * 1.5;
+          if (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) > cov) discard;`);
+    };
+    this.mesh.customDepthMaterial = dm;
     this.mesh.name = 'SnowSpray';
     scene.add(this.mesh);
     this.setQuality(quality);
   }
 
   setQuality(q) {
+    this.mesh.castShadow = q >= 1;
     this.budget = [0.35, 0.65, 1.0][q] ?? 1;
     this.mistScale = [0.6, 0.85, 1.0][q] ?? 1;
   }
@@ -187,6 +221,7 @@ export class SprayEmitter {
     this.dens[i] = opts.dens ?? 0.5;
     this.seed[i] = Math.random();
     this.slide[i] = opts.slide ? 1 : 0;
+    this.amul[i] = opts.alpha ?? 1;
   }
 
   /** Accumulate fractional emission per key; returns the whole number of particles to spawn now. */
@@ -231,7 +266,10 @@ export class SprayEmitter {
         t.x += (Math.random() - 0.5) * 1.2; t.y += (Math.random() - 0.5) * 0.8; t.z += (Math.random() - 0.5) * 1.2;
         return t;
       };
-      const at = (spread) => new THREE.Vector3().copy(c.position)
+      // Contacts sunk into powder report their depth below the surface: spray leaves at the surface.
+      const surf = this._surf.copy(c.position);
+      surf.y += Math.max(0, c.depth || 0);
+      const at = (spread) => new THREE.Vector3().copy(surf)
         .addScaledVector(dir, (Math.random() - 0.5) * spread).addScaledVector(out, 0.05 + Math.random() * 0.12).addScaledVector(nrm, 0.04);
       const intensity = load * (carve * (0.6 + 0.4 * soft) + skid * 1.6) * Math.min(1.6, speed / 10);
       // Rooster-tail sheet off the edge on hard carves / skids.
@@ -239,13 +277,21 @@ export class SprayEmitter {
       for (let i = 0; i < n; i++) {
         const k = speed * (0.18 + Math.random() * 0.22) * (0.6 + carve * 0.7 + skid * 0.6);
         const up = speed * (0.12 + Math.random() * 0.2) * (0.5 + carve) + 0.8;
-        this.spawn(K_SHEET, at(0.9), throwV(k, up, speed * 0.1), (0.1 + Math.random() * 0.14) * (0.7 + soft * 0.6), S.sheetLife * (0.6 + Math.random() * 0.6), { dens: 0.6 });
+        this.spawn(K_SHEET, at(0.9), throwV(k, up, speed * 0.1), (0.12 + Math.random() * 0.18) * (0.7 + soft * 0.6), S.sheetLife * (0.6 + Math.random() * 0.6), { dens: 0.6 });
+      }
+      // Curtain: the dense breaking wave right at the edge on hard carves and skids — big, short-lived
+      // streaks that give the rooster tail a defined shape before it frays into sheet and mist.
+      n = this.count(`${id}w`, S.curtainRate * Math.max(0, intensity - 0.2) * soft, dt);
+      for (let i = 0; i < n; i++) {
+        const k = speed * (0.14 + Math.random() * 0.16) * (0.6 + carve * 0.6 + skid * 0.6);
+        const up = speed * (0.1 + Math.random() * 0.14) * (0.5 + carve) + 0.6;
+        this.spawn(K_SHEET, at(0.7), throwV(k, up, speed * 0.08), (0.22 + Math.random() * 0.22) * (0.7 + soft * 0.5), 0.22 + Math.random() * 0.22, { dens: 0.85, alpha: 1.9, grav: 4.5, drag: 2.2 });
       }
       // Clumps / ice chips.
       n = this.count(`${id}c`, S.chunkRate * intensity, dt);
       for (let i = 0; i < n; i++) {
         const k = speed * (0.1 + Math.random() * 0.25) * (0.5 + skid);
-        this.spawn(K_CHUNK, at(0.8), throwV(k, speed * (0.08 + Math.random() * 0.18) + 1.0, speed * 0.05), (0.012 + Math.random() * Math.random() * 0.045) * (0.6 + soft * 0.8), 0.5 + Math.random() * 0.5);
+        this.spawn(K_CHUNK, at(0.8), throwV(k, speed * (0.08 + Math.random() * 0.18) + 1.0, speed * 0.05), (0.015 + Math.random() * Math.random() * 0.06) * (0.6 + soft * 0.8), 0.5 + Math.random() * 0.6);
       }
       // Glittering crystals.
       n = this.count(`${id}g`, S.glintRate * (0.15 + intensity) * Math.min(1, speed / 6), dt);
@@ -271,7 +317,7 @@ export class SprayEmitter {
       const n = this.count('sluff', rate, dt);
       const down = new THREE.Vector3(nrm.x, 0, nrm.z).normalize();
       for (let i = 0; i < n; i++) {
-        const p = new THREE.Vector3().copy(c0.position).add(new THREE.Vector3((Math.random() - 0.5) * 1.6, 0.1, (Math.random() - 0.5) * 1.6));
+        const p = new THREE.Vector3().copy(c0.position).setY(c0.position.y + Math.max(0, c0.depth || 0)).add(new THREE.Vector3((Math.random() - 0.5) * 1.6, 0.1, (Math.random() - 0.5) * 1.6));
         const v = down.clone().multiplyScalar(1.5 + Math.random() * 2.5).addScaledVector(c0.direction, c0.speed * 0.15);
         if (Math.random() < 0.3) this.spawn(K_CHUNK, p, v, 0.03 + Math.random() * 0.05, 2.0 + Math.random() * 1.5, { slide: true, drag: 0.9, grav: 0 });
         else this.spawn(K_MIST, p, v, 0.18 + Math.random() * 0.22, 2.2 + Math.random() * 1.6, { slide: true, drag: 0.9, grav: 0, dens: 0.65, grow: 1.4 });
@@ -371,7 +417,7 @@ export class SprayEmitter {
         alpha = SPRAY.mistAlpha * Math.min(1, t * 8) * (1 - t) * (1 - t * 0.3);
       } else if (kind === K_SHEET) {
         size *= 1 + t * 0.8;
-        alpha = SPRAY.sheetAlpha * Math.min(1, t * 12) * (1 - t * t);
+        alpha = Math.min(0.85, SPRAY.sheetAlpha * this.amul[i]) * Math.min(1, t * 12) * (1 - t * t);
       } else if (kind === K_CHUNK) {
         alpha = Math.min(1, (1 - t) * 4);
       } else {
@@ -415,11 +461,19 @@ function makePuffAtlas(size = 256) {
       a = Math.max(0, Math.min(1, (a * 1.1 - (1 - n) * 0.55) * 1.25));
       a = a * a * (3 - 2 * a);
       const i = ((oy + y) * size + ox + x) * 4;
-      data[i] = data[i + 1] = data[i + 2] = Math.round(a * 255); data[i + 3] = 255;
+      data[i] = data[i + 2] = Math.round(a * 255); data[i + 3] = 255;
     }
+  }
+  // G: tileable fine grain over the whole texture (sheets sample it as a spray of snow grains).
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const u = x / size, w = y / size;
+    let n = vn(g[0], u, w, 16) * 0.5 + vn(g[5], u * 2, w * 2, 16) * 0.3 + vn(g[9], u * 4, w * 4, 16) * 0.2;
+    n = Math.max(0, Math.min(1, (n - 0.5) * 2.2 + 0.5));
+    data[(y * size + x) * 4 + 1] = Math.round(n * 255);
   }
   const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
   tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.generateMipmaps = true;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;   // sheets also tile it as fine grain
   tex.needsUpdate = true;
   return tex;
 }

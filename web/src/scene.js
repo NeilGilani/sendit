@@ -174,12 +174,13 @@ export const SPRAY = {
   maxParticles: 9000,
   sheetRate: 650,                // rooster-tail streaks / s per contact at full intensity
   sheetLife: 0.7,
-  sheetAlpha: 0.32,
-  chunkRate: 140,                // clumps / chips per s
+  sheetAlpha: 0.42,
+  curtainRate: 160,              // big dense wave streaks / s right at the edge on hard carves
+  chunkRate: 220,                // clumps / chips per s
   glintRate: 160,                // glittering crystals per s
   mistRate: 45,                  // powder-cloud puffs per s per contact
   mistLife: 2.6,
-  mistAlpha: 0.17,
+  mistAlpha: 0.2,
   inherit: 0.55,                 // share of the contact's velocity the snow keeps
   sluffRate: 110,                // loose snow released per s on steep powder (slides downhill)
   stopBurst: 170,                // particles in a hard-stop fan
