@@ -88,11 +88,12 @@ spray.emit(contacts, dt, { powder, normal });
 | Snow wind ripples / sastrugi / corduroy | off | on | on |
 | Track trenches | normal-mapped | normal-mapped | steep parallax |
 | Rock detail | one projection, one fracture scale | full | full |
-| Trees: full / mid LOD radius | 35 / 231 m | 49 / 336 m | 58 / 420 m |
+| Trees: full / mid LOD radius | 35 / 189 m | 49 / 260 m | 58 / 420 m |
 | Far tree / boulder distance | 1800 / 500 m | 3000 / 900 m | 4500 / 1400 m |
 | Spray particle budget / mist | 35 % / 60 % | 65 % / 85 % | 100 % |
 | Sun glare / lens ghosts | off / off | on / off | on / on |
 | Spray shadows (dithered, in the sun shadow map) | off | on | on |
+| SMAA preset | Low | Medium | High |
 
 Terrain LOD distances scale as before (0.6 / 1.0 / 1.5).
 
@@ -106,7 +107,7 @@ Terrain LOD distances scale as before (0.6 / 1.0 / 1.5).
 
 ## Known issues / not done
 
-- Performance (second pass, corrected): the earlier ~2 ms figures came from `requestAnimationFrame` deltas in headless Chromium, which don't reflect GPU cost. `web/scripts/gfxperf.mjs` times a synchronous render through the full post stack plus a 1-pixel `readPixels` (that includes about 3–7 ms of sync overhead). On the Intel Arc 130V iGPU at 1600×900 it measured about 30–40 / 55–65 / 60–70 ms on quality 0 / 1 / 2. Before this pass the pre-session build (6b25d66) measured about 30 / 56 / 100 ms. `web/scripts/gfxprofile.mjs` breaks the cost down by interleaving variants. Full-resolution N8AO High was ~45 % of a high-quality frame, and near frond trees ~25 %. AO now runs at half resolution, and the near-tree radius is 58 m. The terrain shader's fine detail is cheap (< 10 %). On this iGPU, high quality is still about 15–20 fps at 1600×900. If needed, the next levers are `TREES.midRadius`, the render scale on quality 1, and skipping the shadow-map update on alternate frames.
+- Performance (second pass, corrected): the earlier ~2 ms figures came from `requestAnimationFrame` deltas in headless Chromium, which don't measure GPU cost. `web/scripts/gfxperf.mjs` times a synchronous render through the full post stack plus a 1-pixel `readPixels`. On the Intel Arc 130V iGPU at 1600×900, with the GPU otherwise idle, the final build measures about **13 / 27 / 29 ms** on quality 0 / 1 / 2, so roughly 75 / 37 / 34 fps of headroom before vsync pipelining. Earlier runs while other sessions shared the GPU read 2–4× higher; compare numbers only within one run. `web/scripts/gfxprofile.mjs` interleaves variants to break the cost down. Full-resolution N8AO High was ~45 % of a high-quality frame and near frond trees ~25 %. AO now runs at half resolution (Low on q1, Medium on q2), the near-tree radius is 58 m, the mid-tree radius scales 0.45 / 0.62 / 1 by quality, and SMAA is Low / Medium / High. The terrain shader's fine detail is cheap (< 10 %). If a weaker GPU still struggles, the next levers are `TREES.midRadius`, the render scale on quality 1, and updating the shadow map on alternate frames.
 - Cornices are found procedurally on convex breaks and are visual only (no collision). The hand-built gully has few true crests, so they are sparse there.
 - Rock ledge bands follow world height. Very large faces can still show some banding at mid distance.
 - The rider and lifts still use `toonMaterial` (now HDR-lit). The neon emissive trims stay but read dimmer under the new exposure. The ink outline is off (`OUTLINE.px = 0`).

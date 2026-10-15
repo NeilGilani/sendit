@@ -395,7 +395,7 @@ export class TreeSystem {
 
   setQuality(q) {
     this.near = TREES.nearRadius * [0.6, 0.85, 1][q];
-    this.mid = TREES.midRadius * [0.55, 0.8, 1][q];
+    this.mid = TREES.midRadius * [0.45, 0.62, 1][q];
     this.far = [1800, 3000, 4500][q];
     this.last.set(1e9, 0, 0);
   }

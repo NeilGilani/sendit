@@ -207,7 +207,8 @@ export class PostStack {
     this.windPass = new EffectPass(camera, this.wind);
     this.windPass.enabled = false;
     composer.addPass(this.windPass);
-    this.smaa = new EffectPass(camera, new SMAAEffect({ preset: SMAAPreset.HIGH }));
+    this.smaaEffect = new SMAAEffect({ preset: SMAAPreset.HIGH });
+    this.smaa = new EffectPass(camera, this.smaaEffect);
     composer.addPass(this.smaa);
     this.composer = composer;
     this.ao = ao;
@@ -221,6 +222,7 @@ export class PostStack {
     this.ao.enabled = q > 0;
     if (q > 0) { this.ao.setQualityMode(q === 2 ? 'Medium' : 'Low'); this.ao.configuration.halfRes = true; }
     this.bloom.intensity = POST.bloom.intensity * (q === 0 ? 0.7 : 1);
+    this.smaaEffect.applyPreset([SMAAPreset.LOW, SMAAPreset.MEDIUM, SMAAPreset.HIGH][q]);
     this.grade.uniforms.get('glare').value = q === 0 ? 0 : POST.glare;
     this.grade.uniforms.get('flare').value = q === 2 ? POST.flare : 0;
   }
