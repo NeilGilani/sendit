@@ -16,6 +16,20 @@ Branch `agent/gfx-snow`. This replaces the cel/"clay" toon look of the web build
 | Trees | `gfx/trees.js`, `scatter.js` | Procedural spruce (narrow, drooping) and fir (rounder) are built from whorls of needle-frond cards: a procedural alpha needle texture with coverage-preserving alpha test, hanging skirts and volumetric normals. Snow ridges sit along the top of each branch, with per-tree load and colour. There is wind sway plus tip flutter. LOD0/LOD1 are dynamic pools around the camera, and LOD2 is cone shells per 750 m cell that hide inside the pool radius. |
 | Spray | `gfx/spray.js`, `fx.js` | Equipment-agnostic `SprayEmitter` (API below): rooster-tail sheets, clumps / ice chips, glittering crystals, lingering backlit powder clouds, sluff (loose snow that pours downhill along the surface on steep powder), hard-stop fans, landing puffs and crash bursts. Particles are lit by the sun with a Henyey-Greenstein forward lobe plus sky and snow bounce, use the baked mountain shadows, and fade softly into the snow. |
 
+### Second pass (branch `claude/gfx-snow-0dfc5c`)
+
+| Area | Where | Summary |
+|---|---|---|
+| Mid-detail terrain | `terrain.js` (`buildMidHeights`, `buildMid`), `MIDTERRAIN` in `scene.js` | A ±6 km ring on a 10 m grid, sampled from the course height function (`course.natural()` on real resorts), with 3 LODs and skirts. It sinks under the playable tile, and the 30 km backdrop sinks under the ring. The valley walls and nearby peaks get real relief instead of the backdrop's 58 m slabs. |
+| Mountain shadows | `terrain.js` (`bakeMask`), `world.js` (`sunMaskAt`) | The sun/sky mask is baked over the mid ring too (2048², about 6 m per texel), and the tile bake now sees occluders outside the tile. `sunMaskAt()` blends the two. Sun moved to 170° / 42° so that, with the new shadows, the start and about 91 % of the course stay sunlit (checked with a CPU ray march over the course centre line). |
+| Valley-side relief | `course.js` (visual only, more than 30 m outside the walls) | Ridged spurs and gullies (`COURSE.sideRibs`) run down the outer valley sides. The riding line is untouched. |
+| Rock | `gfx/snow.js` (`rockLayer`, `rockShade`) | Tri-planar rock. Domain-warped Voronoi slabs along the bedding, vertical joint columns and small fractures each tilt as flat facets. Cracks appear only where a noise field allows (real joint sets, not paving). Weathering inside blocks, and CC0 Poly Haven `rock_face_03` photo detail (rg normal + luminance packed into one 1K JPEG, two scales, the second rotated). Snow sits where the large structure tilts up (facet tops, broken strata bands), not in painted stripes. In shade, rock gets directional sky light and joint occlusion, so its relief still reads. Albedo is about 0.10–0.28 linear. The backdrop uses the same code with an extra 50 m buttress scale (`ROCK_FAR`, high only). |
+| Sluff flutes | `gfx/snow.js` (`flutesCells`, `flutes`) | Runnels and spines down the fall line on steep snow (about 23–50°), two octaves (15 m and 4 m), sharp crests and round troughs, wandering slowly. On the tile, each 64 m cell uses its own smoothed fall line, and the four nearest cells are blended so the lines never cross. The backdrop uses a sharp world-axis bi-planar version. Both fade out below about 5 px per runnel (no speckle). |
+| Snow surface | `gfx/snow.js`, `SNOW` | Wind ripples are weaker and confined to patches (no sand-dune look). |
+| Tracks | `gfx/snow.js`, `fx.js` (`TrackMap` stamp shader) | Stamps have a rounded bell profile. High-quality parallax refines the crossing with a 4-step binary search (no contour layers). Gradient stencils grow with the pixel footprint, because the track map has no mips: no ladders or dashes at distance. |
+| Trees | `gfx/trees.js` | Snow on branches forms solid clumpy pads (it fills between needles), with pillow shading (bright crowns, blue-grey curved edges), a contact shadow on the needles below, and sky-facing lighting whatever the card's tilt. |
+| Spray | `gfx/spray.js`, `SPRAY` | Spray leaves from the snow surface (contacts may report `depth` below the powder surface). A dense short-lived curtain wave forms on hard carves (`curtainRate`). Sheets are granular (a tileable grain channel in the puff atlas), clumps are bigger, and the spray casts dithered shadows on the snow (high only). |
+
 ## Where the tunables live
 
 All new tunables are in `web/src/scene.js` (the scene file). `config.js` is untouched.
@@ -26,7 +40,8 @@ All new tunables are in `web/src/scene.js` (the scene file). `config.js` is unto
 - `ROCK`: colours, ledge spacing, ledge snow, the slope where snow slides off.
 - `SPRAY`: particle budget, emission rates, lifetimes, alphas, velocity inheritance, stop burst, phase function, wind drift.
 - `TREES`: height, colours, snow load, fir share, LOD radii and pool sizes, tree-well radius.
-- `CORNICES`, `RING` (distant ranges), `SNOWFALL`.
+- `CORNICES`, `RING` (distant ranges), `SNOWFALL`, `MIDTERRAIN` (mid-detail ring: extent, spacing, chunk size, LOD distances, mask resolution).
+- `ROCK.blockBig / blockMid / blockSmall / photoTile` (fracture scales and photo repeat), `COURSE.sideRibs` (visual valley-side relief), `SPRAY.curtainRate`.
 - Post: `POST` at the top of `web/src/gfx/post.js` (exposure, tone map, grade, bloom, AO, glare, flare, goggles).
 
 ## Spray contact-point API (for the snowboard)
@@ -42,6 +57,7 @@ spray.emit(contacts, dt, { powder, normal });
 //   load:      number         // share of rider weight on this contact (≈ 0..1, > 1 under g-load)
 //   speed:     number         // m/s of the contact over the snow
 //   id?:       any            // stable key per contact (defaults to the index)
+//   depth?:    number         // metres the edge is sunk below the powder surface (spray starts at the surface)
 // }>
 ```
 
@@ -50,6 +66,7 @@ spray.emit(contacts, dt, { powder, normal });
 - Snow softness comes from `ctx.powder` (0 hardpack … 1 deep powder).
 - One-shots: `spray.landing(pos, impact, powder)`, `spray.stopFan(pos, dir, speed, powder, side)`, `spray.puff(pos, count, powder, speed)` and `spray.crash(pos, powder)`. `fx.js` already calls them from the `jumped`, `landed`, `hardBrake` and `crashed` events.
 - **Skis today:** `contactsFromSkis(player)` in `fx.js` derives two contacts from `PlayerPhysics`. Edge angle is the lean that balances the turn (`atan(v·ω/g)`). Skid and brake swing the skis across the travel direction, with a snowplough wedge, and the outside ski carries more load.
+- **Integrated:** `main.js` already calls `fx.setContactSource(() => rider.getContactPoints())`, so skis and board both feed the emitter. The text below is kept for reference.
 - **Snowboard at merge time:** one line after `fx` is created in `main.js`:
 
   ```js
@@ -73,6 +90,9 @@ spray.emit(contacts, dt, { powder, normal });
 | Far tree / boulder distance | 1800 / 500 m | 3000 / 900 m | 4500 / 1400 m |
 | Spray particle budget / mist | 35 % / 60 % | 65 % / 85 % | 100 % |
 | Sun glare / lens ghosts | off / off | on / off | on / on |
+| Sluff flutes (tile) | off | off | on |
+| Backdrop + mid ring rock / flutes | plain tone | plain tone | faceted rock + flutes |
+| Spray shadows | off | off | on |
 
 Terrain LOD distances scale as before (0.6 / 1.0 / 1.5).
 
@@ -84,6 +104,18 @@ Terrain LOD distances scale as before (0.6 / 1.0 / 1.5).
 - `window.__gfxCam = [px,py,pz, tx,ty,tz, fov?]` or a function returning that array overrides the camera (honoured in `sky.js`). This is for screenshots.
 - `node web/scripts/gfxshots.mjs <url> <outDir> <views.json>` boots once in headless Chromium and captures many views (`cam`, `side` rider-relative camera, `keys`, `eval`, `wait`). Set `SUF=_x` to suffix the file names. `GPU=1` renders on the real GPU through ANGLE/D3D11, which is much faster than SwiftShader on this machine; `clip` captures a sub-rectangle.
 
+## Performance (second pass)
+
+Measured with the perf branch's `web/scripts/gfxperf.mjs` (rides and carves, real GPU through ANGLE/D3D11, vsync off, 1600×900, Intel Arc 130V integrated GPU). Median render + sync per frame:
+
+| | original (6b25d66) | this branch |
+|---|---|---|
+| quality 0 | 24.7 ms | 21.9 ms |
+| quality 1 | 58.0 ms | 29.6 ms |
+| quality 2 | ~100 ms | ~105 ms (within run-to-run noise) |
+
+The first version of this pass doubled quality 0, because the faceted rock and flutes ran on the backdrop and mid ring, which cover much of the screen. Those now run on high only. `web/scripts/gfxperf-ride.mjs` is a simpler throttle-only probe (CPU frame intervals plus hitch log). Its numbers are unreliable on this machine and it is kept only for hitch logging. Multi-second hitches appear in both builds and are environmental.
+
 ## Known issues / not done
 
 - Performance: measured with headless Chromium on the real GPU (Intel Arc 130V integrated laptop GPU, ANGLE/D3D11, 1600×900, uncapped frame rate). Steady-state median frame time was ~1.9 ms on quality 1 (the original toon build was ~1.8 ms) and ~2.5 ms on quality 2 (original ~1.9 ms). Occasional multi-second hitches showed up in **both** builds while other agents saturated the CPU, so they are environmental, not a regression. High quality is about 2–3 M triangles and about 300 draw calls a frame. The mid tree pool and far shells do not cast shadows; only trees within the near radius do. If a weaker GPU struggles, lower `TREES.midRadius` or play on quality 1.
@@ -91,4 +123,8 @@ Terrain LOD distances scale as before (0.6 / 1.0 / 1.5).
 - Rock ledge bands follow world height. Very large faces can still show some banding at mid distance.
 - The rider and lifts still use `toonMaterial` (now HDR-lit). The neon emissive trims stay but read dimmer under the new exposure. The ink outline is off (`OUTLINE.px = 0`).
 - The crowd billboards and flags keep their stylized textures.
+- Mid ring: the backdrop beyond ±6 km is still the coarse 58 m grid (far enough that aerial perspective hides it). The ring adds about 50 draw calls.
+- Flutes on diagonal faces of the backdrop switch projection along a narrow seam. The 4-cell blend on the tile can fade the flutes where neighbouring cells disagree.
+- The hard-stop fan is small at chase-camera distance, so it could be bigger and denser. Powder clouds over sunlit snow are subtle (white on white), and on medium/low they have no shadow to separate them.
+- Ski poles, rider and lifts are untouched (owned by other sessions).
 - Real resorts (`?resort=`) use the same shaders. Corduroy appears where OSM marks groomed pistes. The distant ranges ring is fictional there as well.
