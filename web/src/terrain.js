@@ -245,7 +245,7 @@ export class Terrain {
   buildFar() {
     const m = this.meta;
     const fres = m.far_res, fsize = m.far_size_m;
-    const n = 256;
+    const n = 400;
     const step = fsize / n;
     const pos = new Float32Array((n + 1) * (n + 1) * 3);
     const H = (x, z) => {

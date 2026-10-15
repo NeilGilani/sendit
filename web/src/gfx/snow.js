@@ -77,9 +77,9 @@ void rockLayer(vec2 uv, float farF, float midF, out vec3 col, out vec2 g, out fl
   tread *= 1.0 - smoothstep(0.06, 0.2, tFP / uRockLook.x);            // fine ledges vanish with distance
   // Coarse bands (big ledge systems), irregular and broken.
   float S2 = uRockLook.x * 4.3;
-  float f2 = fract(uv.y / S2 + warp * 1.6 + texture2D(noiseTex, uv * vec2(0.003, 0.008) + 0.4).g * 0.6);
+  float f2 = fract(uv.y / S2 + warp * 2.2 + texture2D(noiseTex, uv * vec2(0.006, 0.01) + 0.4).g * 1.2);
   float tread2 = 1.0 - smoothstep(0.06, 0.16, f2) * (1.0 - smoothstep(0.9, 1.0, f2));
-  tread2 *= smoothstep(0.45, 0.6, texture2D(noiseTex, uv * vec2(0.004, 0.012) + 0.33).r);
+  tread2 *= smoothstep(0.5, 0.62, texture2D(noiseTex, uv * vec2(0.017, 0.03) + 0.33).r);
   tread2 *= 1.0 - smoothstep(0.06, 0.2, tFP / S2);
   riser = 1.0 - max(tread, tread2);
   // Fractured blocks: Voronoi cells, each a tilted facet; dark joints between them.
@@ -199,7 +199,8 @@ export const SNOW_FRAG_GLSL = /* glsl */`
     Nr = normalize(N + fB * (0.75 - rr) * 0.7 + pert);
     // Snow on treads + anywhere the detailed rock turns up toward the sky.
     float ledge = (1.0 - riser) * seg;
-    ledge = max(ledge, smoothstep(0.78, 0.95, Nr.y + (m3 - 0.5) * 0.15) * seg);
+    vec3 NrL = normalize(N + fB * (0.75 - rr) * 0.7);           // ledge structure only (no facet tilt)
+    ledge = max(ledge, smoothstep(0.8, 0.95, NrL.y + (m3 - 0.5) * 0.15) * seg);
     ledge *= 1.0 - smoothstep(0.55, 0.8, slope) * 0.6;
     rock *= 1.0 - ledge * mix(0.9, 0.55, farF);
   }
@@ -337,11 +338,11 @@ export const FAR_SNOW_FRAG_GLSL = /* glsl */`
   // Relief the 58 m backdrop grid cannot hold: ridges, gullies and spurs from noise gradients.
   {
     vec2 q1 = vW.xz * 0.0011, q2 = vW.xz * 0.0047 + 0.3;
-    float a1 = texture2D(noiseTex, q1).b, a2 = texture2D(noiseTex, q2).r;
-    vec2 g1 = vec2(texture2D(noiseTex, q1 + vec2(0.002, 0.0)).b - a1, texture2D(noiseTex, q1 + vec2(0.0, 0.002)).b - a1) / 0.002 * 0.0011;
+    float a1 = texture2D(noiseTex, q1).r, a2 = texture2D(noiseTex, q2).r;
+    vec2 g1 = vec2(texture2D(noiseTex, q1 + vec2(0.002, 0.0)).r - a1, texture2D(noiseTex, q1 + vec2(0.0, 0.002)).r - a1) / 0.002 * 0.0011;
     vec2 g2 = vec2(texture2D(noiseTex, q2 + vec2(0.003, 0.0)).r - a2, texture2D(noiseTex, q2 + vec2(0.0, 0.003)).r - a2) / 0.003 * 0.0047;
-    float steep = smoothstep(0.03, 0.25, 1.0 - N.y);
-    N = normalize(N - vec3(g1.x, 0.0, g1.y) * 170.0 * steep - vec3(g2.x, 0.0, g2.y) * 60.0 * steep);
+    float steep = smoothstep(0.03, 0.25, 1.0 - N.y) * (0.45 + 0.55 * smoothstep(800.0, 4000.0, dist));
+    N = normalize(N - vec3(g1.x, 0.0, g1.y) * 150.0 * steep - vec3(g2.x, 0.0, g2.y) * 60.0 * steep);
   }
   tN = N;
   float m = texture2D(noiseTex, vW.xz * 0.0004).r;

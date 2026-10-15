@@ -4,7 +4,7 @@
 //   goggle tint, sun glare) → speed wind (only when moving fast) → SMAA.
 // Tunables: POST below. Quality tiers: setQuality(q).
 import * as THREE from 'three';
-import { EffectComposer, RenderPass, EffectPass, BloomEffect, SMAAEffect, SMAAPreset, Effect, BlendFunction } from 'postprocessing';
+import { EffectComposer, RenderPass, EffectPass, BloomEffect, SMAAEffect, SMAAPreset, Effect, EffectAttribute, BlendFunction } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
 import { SUN_DIR } from '../world.js';
 
@@ -18,7 +18,8 @@ export const POST = {
   vignette: 0.22,
   bloom: { intensity: 0.32, threshold: 2.1, smoothing: 0.6, radius: 0.7 },
   ao: { radius: 2.0, distanceFalloff: 1.0, intensity: 1.15, color: '#33415c' },
-  glare: 0.12,                 // soft veiling glare when looking toward the sun
+  glare: 0.12,                 // soft veiling glare when looking toward the sun (occlusion-aware)
+  flare: 0.035,                // faint lens ghosts when the sun is in view (0 = off)
   goggles: 0.0,                // 0 = off; 1 = full amber goggle-lens tint (set with ?goggles=1)
 };
 
@@ -29,7 +30,19 @@ class GradeEffect extends Effect {
       uniform float exposure; uniform float contrast; uniform float saturation; uniform float vignette;
       uniform vec3 shadowTint; uniform vec3 highlightTint; uniform float goggles;
       uniform vec3 sunScreen;      // xy = sun position in uv, z = facing (0..1)
-      uniform float glare;
+      uniform float glare; uniform float flare;
+      // How much of the sun disk is actually visible (mountains / trees / rider can hide it).
+      float sunVisible() {
+        if (sunScreen.z <= 0.0 || sunScreen.x < -0.05 || sunScreen.x > 1.05 || sunScreen.y < -0.05 || sunScreen.y > 1.05) return 0.0;
+        float v = 0.0;
+        vec2 px = vec2(0.0035 / aspect, 0.0035);
+        for (int i = 0; i < 5; i++) {
+          vec2 o = i == 0 ? vec2(0.0) : vec2(i == 1 ? 1.0 : (i == 2 ? -1.0 : 0.0), i == 3 ? 1.0 : (i == 4 ? -1.0 : 0.0));
+          vec3 c = texture2D(inputBuffer, clamp(sunScreen.xy + o * px, 0.001, 0.999)).rgb;
+          v += smoothstep(6.0, 30.0, dot(c, vec3(0.3, 0.6, 0.1)));
+        }
+        return v / 5.0;
+      }
       vec3 gfxNeutral(vec3 color) {
         const float startCompression = 0.8 - 0.04;
         const float desaturation = 0.15;
@@ -63,8 +76,21 @@ class GradeEffect extends Effect {
         vec3 c = inputColor.rgb * exposure;
         // Veiling glare toward the sun (scattering in the eye / lens): lifts and warms the image a touch.
         vec2 sd = (uv - sunScreen.xy) * vec2(aspect, 1.0);
-        float sg = sunScreen.z * glare;
+        float vis = sunVisible();
+        float sg = sunScreen.z * glare * vis;
         c += vec3(1.0, 0.93, 0.82) * sg * (0.35 * exp(-dot(sd, sd) * 6.0) + 0.06 * exp(-length(sd) * 2.0));
+        // Subtle lens ghosts along the line through the centre (goggle / lens feel).
+        if (flare > 0.0 && vis > 0.0) {
+          vec2 axis = vec2(0.5) - sunScreen.xy;
+          for (int i = 0; i < 4; i++) {
+            float k = i == 0 ? 0.55 : (i == 1 ? 0.9 : (i == 2 ? 1.35 : 1.75));
+            float rad = i == 0 ? 0.035 : (i == 1 ? 0.018 : (i == 2 ? 0.06 : 0.025));
+            vec3 tint = i == 0 ? vec3(0.6, 0.8, 1.0) : (i == 1 ? vec3(1.0, 0.75, 0.5) : (i == 2 ? vec3(0.55, 1.0, 0.75) : vec3(0.85, 0.6, 1.0)));
+            vec2 gp = sunScreen.xy + axis * k;
+            float d = length((uv - gp) * vec2(aspect, 1.0));
+            c += tint * flare * vis * sunScreen.z * smoothstep(rad, rad * 0.6, d) * (0.6 + 0.4 * smoothstep(0.0, rad, d));
+          }
+        }
 #ifdef TM_AGX
         c = gfxAgX(c);
 #else
@@ -85,6 +111,7 @@ class GradeEffect extends Effect {
         outputColor = vec4(c, inputColor.a);
       }`, {
       blendFunction: BlendFunction.NORMAL,
+      attributes: EffectAttribute.CONVOLUTION,
       defines: new Map(POST.toneMap === 'agx' ? [['TM_AGX', '1']] : []),
       uniforms: new Map([
         ['exposure', new THREE.Uniform(POST.exposure)], ['contrast', new THREE.Uniform(POST.contrast)],
@@ -93,6 +120,7 @@ class GradeEffect extends Effect {
         ['highlightTint', new THREE.Uniform(new THREE.Vector3(...POST.highlightTint))],
         ['goggles', new THREE.Uniform(POST.goggles)],
         ['sunScreen', new THREE.Uniform(new THREE.Vector3())], ['glare', new THREE.Uniform(POST.glare)],
+        ['flare', new THREE.Uniform(POST.flare)],
       ]),
     });
   }
@@ -188,6 +216,7 @@ export class PostStack {
     if (q > 0) this.ao.setQualityMode(q === 2 ? 'High' : 'Medium');
     this.bloom.intensity = POST.bloom.intensity * (q === 0 ? 0.7 : 1);
     this.grade.uniforms.get('glare').value = q === 0 ? 0 : POST.glare;
+    this.grade.uniforms.get('flare').value = q === 2 ? POST.flare : 0;
   }
 
   setSize(w, h) { this.composer.setSize(w, h); }

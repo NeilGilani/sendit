@@ -19,7 +19,11 @@ page.on('console', (m) => {
 page.on('pageerror', (e) => { errors++; console.log('[pageerror]', e.message); });
 const t0 = Date.now();
 await page.goto(url);
-await page.waitForFunction(() => window.__sendit, null, { timeout: 400000 });
+await Promise.race([
+  page.waitForFunction(() => window.__sendit, null, { timeout: 400000 }),
+  new Promise((_, rej) => page.on('pageerror', (e) => rej(e))),
+  new Promise((_, rej) => page.on('console', (m) => { if (m.type() === 'error' && /TypeError|ReferenceError|SyntaxError|Shader/.test(m.text())) rej(new Error(m.text().slice(0, 300))); })),
+]);
 console.log('booted in', ((Date.now() - t0) / 1000).toFixed(0), 's');
 let held = [];
 for (const v of views) {
@@ -43,7 +47,7 @@ for (const v of views) {
     const s = window.__sendit;
     return { st: s.player.state, v: s.player.speed.toFixed(1), p: s.player.position.toArray().map((x) => x.toFixed(0)).join(','), h: s.player.heading.toFixed(2) };
   });
-  await page.screenshot({ path: `${outDir}/${v.name}.png`, timeout: 300000 });
+  await page.screenshot({ path: `${outDir}/${v.name}${process.env.SUF || ''}.png`, timeout: 300000 });
   console.log(v.name, JSON.stringify(info), ((Date.now() - t0) / 1000).toFixed(0) + 's');
 }
 console.log('errors:', errors);
