@@ -174,6 +174,7 @@ export const ANIM = {
     popSnap: 0.38,            // rad the free end snaps up at an ollie / nollie, settling in ~0.3 s
     airTuck: 0.18,            // m board pulled up toward the hips in the air
     grabTuck: 0.3,            // m extra pull-up while grabbing
+    handDragEdge: [0.72, 0.95],   // rad visual edge angle range over which the inside hand reaches the snow
   },
 };
 

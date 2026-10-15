@@ -249,6 +249,10 @@ export class Rider {
     const edgeSideToe = Math.sign(p.edge) === toeX ? 1 : 0;
     p.toe += ((board ? Math.abs(p.lean) / ANIM.maxLean * edgeSideToe : 0) - p.toe) * k(8);
     p.heel += ((board ? Math.abs(p.lean) / ANIM.maxLean * (1 - edgeSideToe) : 0) - p.heel) * k(8);
+    // Deep, fast carves: the inside hand trails in the snow (board: front hand toe side, rear hand heel side).
+    const dragT = ground && board ? THREE.MathUtils.smoothstep(Math.abs(p.edge), BA.handDragEdge[0], BA.handDragEdge[1])
+      * THREE.MathUtils.smoothstep(pl.speed, 6, 9) * (1 - (pl.stop || 0)) * (1 - (pl.butter || 0)) : 0;
+    p.drag = (p.drag || 0) + (dragT - (p.drag || 0)) * k(6);
     // Upper body leads the turn (rotation-led on a board, anticipation on skis).
     // Wind-up: while loading a pop and steering, the shoulders counter-rotate against the coming spin.
     // The upper body leads edge changes: follow the raw input (ahead of the smoothed edge) by ~0.1 s.
@@ -689,6 +693,21 @@ export class Rider {
     const sw = Math.sin(p.t * 3.1 + side) * 0.1;
     u.lerp(V(fx * 0.9, 0.05 + sw, 0.25), p.air * 0.8);
     l.lerp(V(fx * 0.8, 0.2, 0.35), p.air * 0.8);
+    // Hand drag on deep carves: toe side the front hand reaches down to the snow in front of the toes,
+    // heel side the rear hand trails behind the heels.
+    const drag = p.drag || 0;
+    if (drag > 0.01) {
+      const toeCarve = p.toe >= p.heel;
+      if (front === toeCarve) {
+        const B = this.bones, s = side > 0 ? '_l' : '_r';
+        this.inherit(B['clavicle' + s]); this.inherit(B['upperarm' + s]);
+        const sh = pos(this.g(B['upperarm' + s]));
+        const target = toeCarve ? V(nx * 0.25, this.ankleH + 0.02, 0.65) : V(-nx * 0.35, this.ankleH - 0.15, -0.72);
+        const d = target.sub(sh).normalize();
+        u.lerp(d.clone().add(V(0, 0.25, 0)).normalize(), drag);
+        l.lerp(d, drag);
+      }
+    }
     // Grabs: Indy = rear hand, toe edge between the feet; Melon = front hand, heel edge; Nose / Tail.
     const name = pl.grabName || 'Indy';
     const grabFront = name === 'Melon' || name === 'Nose grab';
