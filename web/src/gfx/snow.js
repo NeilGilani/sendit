@@ -128,6 +128,11 @@ void rockLayer(vec2 uv0, float farF, float midF, out vec3 col, out vec2 g, out f
   seg = smoothstep(0.0, 0.12, segW);
   // Gully snow: streaks running down the flutes, broken by steps (snow runnels below ledges).
   gully *= smoothstep(0.48, 0.66, texture2D(noiseTex, vec2(wx * 0.03, uv.y * 0.008) + 0.13).g + (1.0 - riser) * 0.12) * 0.85;
+  // Spindrift streaks: snow sloughed off each loaded ledge dusts the rock just below it in narrow
+  // fall-line streaks (a few times longer than wide), fading with distance below the ledge.
+  float dust = smoothstep(0.75, 0.93, f) * (1.0 - smoothstep(0.92, 0.95, f)) * segW;
+  dust *= smoothstep(0.55, 0.72, texture2D(noiseTex, vec2(wx * 0.42, uv.y * 0.035) + 0.61).g);
+  gully = max(gully, dust * 0.45 * (1.0 - smoothstep(0.05, 0.15, tFP / uRockLook.x)));
 }
 // Rock albedo: grey gneiss in blocks, lighter/darker beds, vertical runoff streaks, iron staining.
 vec3 rockAlbedo(vec2 uv, float far) {
@@ -373,7 +378,7 @@ export const SNOW_FRAG_GLSL = /* glsl */`
       }
     }
     #endif
-    float e = 0.045, E = 0.28;
+    float e = 0.07, E = 0.28;   // e ≈ 1.5 track-map texels: bilinear gradients never show texel steps
     float t0 = trackAt(tp);
     float tx1 = trackAt(tp + vec2(e, 0.0)), tx0 = trackAt(tp - vec2(e, 0.0));
     float tz1 = trackAt(tp + vec2(0.0, e)), tz0 = trackAt(tp - vec2(0.0, e));
