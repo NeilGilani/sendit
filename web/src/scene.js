@@ -12,11 +12,11 @@ import * as THREE from 'three';
 
 // ------------------------------------------------------------------ LIGHTING (linear HDR)
 export const LIGHTING = {
-  sunElevation: 40,              // degrees — long readable shadows, every lump has a lit and a shaded side
+  sunElevation: 32,              // degrees — long Steep-style shadows (photographers' 15–30° hero sun), lumps lit + shaded
   sunBearing: 163,               // degrees from north — SSE: keeps ~85 % of the gully floor sunlit, light from behind-left
   sunWhiten: 0.45,               // pull the transmitted sun colour toward white
   sunBoost: 1.0,                 // multipliers on the colours derived from the atmosphere model
-  skyBoost: 1.0,                 // single scattering underestimates the sky; artistic lift
+  skyBoost: 0.9,                 // sky fill scale: shaded snow ≈ 1.5–2 stops under sunlit snow
   terrainBounce: 0.3,           // share of the shade light that comes from sunlit slopes around
   groundBoost: 0.85,             // snow bounce light from below
   lightWrap: 0.06,               // non-snow materials: almost plain Lambert
@@ -66,13 +66,18 @@ export const SNOW = {
 
 // ------------------------------------------------------------------ ROCK (gfx/snow.js + scatter boulders)
 export const ROCK = {
-  dark: '#4a4744',               // gneiss / granite (sRGB)
-  light: '#8a8580',
+  dark: '#57524d',               // gneiss / granite (sRGB): ≈ 0.09 … 0.33 linear, mean ≈ 0.18
+  light: '#9c958d',
   rust: '#7a5a3c',               // iron staining streaks
   strataScale: 6.0,              // metres between ledge bands on cliffs
   ledgeSnow: 0.1,                // more → more snow sitting on ledges
   exposeSlope: 0.4,              // 1 − n.y where snow starts to slide off (≈ 53°)
   exposeSoft: 0.08,
+};
+
+// Fluted relief added to the hand-built gully's steep walls (terrain.js sculptCliffs).
+export const CLIFFS = {
+  relief: 10.0,                  // metres: rib-to-gully depth on faces steeper than ~50°
 };
 
 // ------------------------------------------------------------------ ATMOSPHERE (gfx/atmosphere.js)
@@ -156,15 +161,17 @@ export const SNOWFALL = {
 // ------------------------------------------------------------------ SNOW SPRAY (gfx/spray.js)
 export const SPRAY = {
   maxParticles: 9000,
-  sheetRate: 650,                // rooster-tail streaks / s per contact at full intensity
-  sheetLife: 0.7,
-  sheetAlpha: 0.32,
+  sheetRate: 340,                 // rooster-tail streaks / s per contact at full intensity
+  sheetLife: 0.55,
+  sheetAlpha: 0.75,
   chunkRate: 140,                // clumps / chips per s
   glintRate: 160,                // glittering crystals per s
-  mistRate: 45,                  // powder-cloud puffs per s per contact
-  mistLife: 2.6,
-  mistAlpha: 0.17,
-  inherit: 0.55,                 // share of the contact's velocity the snow keeps
+  mistRate: 20,                  // powder-cloud puffs per s per contact
+  mistLife: 4.2,                 // fine powder settles at ~0.2–0.5 m/s: clouds hang for seconds
+  mistAlpha: 0.12,
+  sheetShadow: 1.0,              // shadow coverage per sheet particle (× its alpha; quality ≥ 1)
+  mistShadow: 2.5,               // powder clouds throw faint, soft shadows
+  inherit: 0.4,                  // share of the contact's velocity the snow keeps
   sluffRate: 110,                // loose snow released per s on steep powder (slides downhill)
   stopBurst: 170,                // particles in a hard-stop fan
   forwardG: 0.45,                // Henyey-Greenstein g: backlit spray glows
@@ -180,9 +187,10 @@ export const TREES = {
   needle2: '#34452c',            // olive-ish variation (fir)
   bark: '#4a3b30',
   snow: '#eef3fa',
+  translucency: 0.9,             // backlit glow of needle tips (sun behind the tree)
   snowLoad: 0.85,                // 0 bare … 1 heavily loaded branches (varies per tree)
   firShare: 0.3,                 // share of rounder firs among the spruce
-  nearRadius: 85,                // metres: full frond trees
+  nearRadius: 58,                // metres: full frond trees (the most expensive thing in the frame)
   midRadius: 420,                // metres: simplified fronds; beyond = far cone shells
   nearMax: 900,
   midMax: 9000,

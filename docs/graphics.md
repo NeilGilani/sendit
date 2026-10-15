@@ -16,6 +16,24 @@ Branch `agent/gfx-snow`. This replaces the cel/"clay" toon look of the web build
 | Trees | `gfx/trees.js`, `scatter.js` | Procedural spruce (narrow, drooping) and fir (rounder) are built from whorls of needle-frond cards: a procedural alpha needle texture with coverage-preserving alpha test, hanging skirts and volumetric normals. Snow ridges sit along the top of each branch, with per-tree load and colour. There is wind sway plus tip flutter. LOD0/LOD1 are dynamic pools around the camera, and LOD2 is cone shells per 750 m cell that hide inside the pool radius. |
 | Spray | `gfx/spray.js`, `fx.js` | Equipment-agnostic `SprayEmitter` (API below): rooster-tail sheets, clumps / ice chips, glittering crystals, lingering backlit powder clouds, sluff (loose snow that pours downhill along the surface on steep powder), hard-stop fans, landing puffs and crash bursts. Particles are lit by the sun with a Henyey-Greenstein forward lobe plus sky and snow bounce, use the baked mountain shadows, and fade softly into the snow. |
 
+## Second graphics pass (branch `claude/gfx-snow-668da8`)
+
+Compared screenshots against the round-2 research addendum in `docs/graphics-research.md` and fixed what read as fake:
+
+| Area | Where | Change |
+|---|---|---|
+| Cliff relief | `terrain.js` `sculptCliffs()`, `CLIFFS` in `scene.js` | The hand-built gully walls were smooth ramps. Ribs and gullies (two octaves of ridged noise, each stretched along that cell's own fall line) are now added to the height field on cells steeper than about 45°, outside the riding floor (`CLIFFS.relief`, 10 m). Normals and the rock mask are rebuilt, so silhouettes, cast shadows and the baked sun mask all change, not only the shading. |
+| Rock shading | `gfx/snow.js` `rockLayer()` | Fall-line flutes: rib crests are lighter, gullies are darker and hold snow streaks (on faces steeper than about 60° only). Strata are bounded, undulating beds of uneven thickness, not one fixed spacing. Fracture blocks are elongated along the beds. Ledge snow comes in tapered lenses and is shaded flat. Faint spindrift streaks fall below loaded ledges. Granite is lighter and warmer (`ROCK.dark/light`, mean linear albedo about 0.18). |
+| Steep snow | `gfx/snow.js` | Drop faces and wind lips get their own bi-planar detail (sluff flutes and lumps) instead of xz-projected detail stretched into streaks. Corduroy seams fade before they alias. Wind ripples are weaker and come in patches. |
+| Kickers | `features.js` | Raked sidewalls of about 40° with a soft roll-over (`sideFactor`, shared by physics and mesh) and a shovelled knuckle at about 70°, replacing the vertical slab walls. |
+| Spray | `gfx/spray.js`, `SPRAY` | Sheet particles are procedural snow-grain clusters (a 2×2 atlas of coverage and core thickness), so the plume reads as granular rather than smoke. Every sprite is shaded as a soft ball: lit side and sky-blue shade. Spray casts dithered shadows into the sun shadow map on quality ≥ 1 (`customDepthMaterial`, `SPRAY.sheetShadow/mistShadow`). Powder clouds linger about 4 s and settle slowly. Bloom threshold went from 2.1 to 3.2, so backlit spray no longer blooms into a fog blob. |
+| Tracks | `fx.js` TrackMap | Stamps are round-capped capsules in metres with a rounded cross-section, so successive stamps along a turn merge (MAX blend) into one smooth trench without tread-like ticks. The gradient stencil spans about 1.5 texels. |
+| Trees | `gfx/trees.js`, `TREES` | Needle fronds use a fishbone pattern (needles along side twigs, ragged with gaps). Snow on branches is a solid pillow with its own domed, lumpy normal, not a needle-shaped cut-out. Needle tips glow when backlit (`TREES.translucency`). The inner core is thinner and clumped. |
+| Lighting | `LIGHTING` | Sun elevation 32° (long shadows, as in Steep and photographers' hero sun). `skyBoost` 0.9 (shaded snow sits about 1.5–2 stops under sunlit). |
+| Tooling | `web/scripts/` | `gfxshots.mjs` gains `gcam` (camera height above ground). New `gfxperf.mjs` (GPU / CPU frame cost per quality), `gfxgpu.mjs` (GPU time per pass and draw) and `gfxcpu.mjs` (main-thread profile). |
+
+Spray contact API: unchanged. `main.js` already calls `fx.setContactSource(() => rider.getContactPoints())`. Skis and the board both emit through it (checked with `?equip=snowboard`).
+
 ## Where the tunables live
 
 All new tunables are in `web/src/scene.js` (the scene file). `config.js` is untouched.
@@ -24,10 +42,12 @@ All new tunables are in `web/src/scene.js` (the scene file). `config.js` is unto
 - `ATMOSPHERE`: sky model (Rayleigh/Mie, `skyScale`, `zenithGain`, `horizonWhiten`), aerial perspective (`airExtinction`, `hazeExtinction`, heights), valley mist, cloud cover and cirrus.
 - `SNOW`: albedo, subsurface, wrap, roughness, forward scatter, sparkle (brightness, density, facet cone), wind angle, drift / ripple / sastrugi / corduroy strengths, track depth, lip and darkening.
 - `ROCK`: colours, ledge spacing, ledge snow, the slope where snow slides off.
-- `SPRAY`: particle budget, emission rates, lifetimes, alphas, velocity inheritance, stop burst, phase function, wind drift.
-- `TREES`: height, colours, snow load, fir share, LOD radii and pool sizes, tree-well radius.
+- `SPRAY`: particle budget, emission rates, lifetimes, alphas, shadow coverage, velocity inheritance, stop burst, phase function, wind drift.
+- `TREES`: height, colours, snow load, needle translucency, fir share, LOD radii and pool sizes, tree-well radius.
+- `CLIFFS`: relief depth of the fall-line flutes sculpted into steep walls.
 - `CORNICES`, `RING` (distant ranges), `SNOWFALL`.
 - Post: `POST` at the top of `web/src/gfx/post.js` (exposure, tone map, grade, bloom, AO, glare, flare, goggles).
+- Performance / quality tiers: `PERF` in `web/src/gfx/perf.js` (render scale, shadows, AO, SMAA, terrain shader features, tree radii, spray budget).
 
 ## Spray contact-point API (for the snowboard)
 
@@ -60,21 +80,26 @@ spray.emit(contacts, dt, { powder, normal });
 
 ## Quality tiers (`?quality=0|1|2`)
 
-| | 0 (low) | 1 (medium) | 2 (high) |
+| | 0 (low) | 1 (medium, default) | 2 (high) |
 |---|---|---|---|
-| Render scale | 0.75 × min(dpr,1) | min(dpr,1.5) | dpr (≤2) |
-| Shadow box / map | 40 m / 1024 | 60 m / 2048 | 85 m / 4096 |
-| N8AO | off | Medium | High |
+| Render scale | 0.75 × min(dpr,1) | min(dpr,1) | dpr (≤2) |
+| Shadow box / map | 40 m / 1024 | 60 m / 2048 | 85 m / 3072 |
+| N8AO (half resolution) | off | off | Medium |
 | Snow glints | off | on | on |
 | Snow wind ripples / sastrugi / corduroy | off | on | on |
 | Track trenches | normal-mapped | normal-mapped | steep parallax |
-| Rock detail | one projection, one fracture scale | full | full |
-| Trees: full / mid LOD radius | 51 / 231 m | 72 / 336 m | 85 / 420 m |
+| Rock detail | one projection, one fracture scale | one projection, one fracture scale | full |
+| Trees: full / mid LOD radius | 35 / 126 m | 41 / 260 m | 58 / 420 m |
 | Far tree / boulder distance | 1800 / 500 m | 3000 / 900 m | 4500 / 1400 m |
 | Spray particle budget / mist | 35 % / 60 % | 65 % / 85 % | 100 % |
 | Sun glare / lens ghosts | off / off | on / off | on / on |
+| Spray shadows (dithered, in the sun shadow map) | off | on | on |
+| SMAA preset | Low | Low | High |
 
-Terrain LOD distances scale as before (0.6 / 1.0 / 1.5).
+All of these live in one table: `PERF` in `web/src/gfx/perf.js`. Measurements and reasoning are in
+`docs/graphics-perf.md`.
+
+Terrain LOD distances scale 0.6 / 1.0 / 1.5.
 
 ## Debug and preview helpers
 
@@ -86,7 +111,7 @@ Terrain LOD distances scale as before (0.6 / 1.0 / 1.5).
 
 ## Known issues / not done
 
-- Performance: measured with headless Chromium on the real GPU (Intel Arc 130V integrated laptop GPU, ANGLE/D3D11, 1600×900, uncapped frame rate). Steady-state median frame time was ~1.9 ms on quality 1 (the original toon build was ~1.8 ms) and ~2.5 ms on quality 2 (original ~1.9 ms). Occasional multi-second hitches showed up in **both** builds while other agents saturated the CPU, so they are environmental, not a regression. High quality is about 2–3 M triangles and about 300 draw calls a frame. The mid tree pool and far shells do not cast shadows; only trees within the near radius do. If a weaker GPU struggles, lower `TREES.midRadius` or play on quality 1.
+- Performance: see `docs/graphics-perf.md`. Earlier versions of this file claimed about 2 ms per frame, and later about 13 / 27 / 29 ms. The first came from headless `requestAnimationFrame` deltas, which don't measure GPU cost. The second came from an unpipelined render plus `readPixels`, which overstates the frame time. Measured with GPU timer queries on an Intel Arc 130V iGPU at 1600×900, the game is GPU-bound at about **9 / 14 / 22 ms per frame** on quality 0 / 1 / 2 (about 110 / 72 / 45 fps). The main thread costs about 5 ms.
 - Cornices are found procedurally on convex breaks and are visual only (no collision). The hand-built gully has few true crests, so they are sparse there.
 - Rock ledge bands follow world height. Very large faces can still show some banding at mid distance.
 - The rider and lifts still use `toonMaterial` (now HDR-lit). The neon emissive trims stay but read dimmer under the new exposure. The ink outline is off (`OUTLINE.px = 0`).

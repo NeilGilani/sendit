@@ -45,7 +45,8 @@ float tGlaze = 0.0;         // sun / wind glazed crust: tighter sheen
 float tGlintMask = 1.0;     // where glints may appear
 float tSnowWet = 0.0;
 float tFP = 0.01;
-float tCordLane = 0.0;       // groomer-lane brightness offset           // world metres per pixel (set before any branch)
+float tCordLane = 0.0;      // groomer-lane brightness offset
+float tLedge = 0.0;         // snow sitting on rock ledges / in gullies
 float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 vec3 hash32(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); p3 += dot(p3, p3.yxz + 33.33); return fract((p3.xxy + p3.yzz) * p3.zyx); }
 // Face-aligned frame: T runs across the slope (horizontal), B runs up it. Rock is textured in
@@ -69,13 +70,31 @@ vec3 rockCells(vec2 p) {
   }
   return vec3(sqrt(d1), sqrt(d2) - sqrt(d1), id);
 }
-// One planar projection of the rock: albedo, facet gradient (uv), ledge riser mask, snow segment mask.
+// One planar projection of the rock: albedo, facet gradient (uv), ledge riser mask, snow segment
+// mask, and gully (snow-collecting flutes between ribs).
 vec3 rockAlbedo(vec2 uv, float far);
-void rockLayer(vec2 uv, float farF, float midF, out vec3 col, out vec2 g, out float riser, out float seg) {
+void rockLayer(vec2 uv0, float farF, float midF, out vec3 col, out vec2 g, out float riser, out float seg, out float gully) {
+  // Strata dip slowly across the face: beds and ledges are tilted, never perfectly level.
+  // (bounded: the beds undulate by up to ±25 m over ~100 m, i.e. local dips up to ~25°).
+  float dip = texture2D(noiseTex, uv0 * vec2(0.0024, 0.0016) + 0.61).r - 0.5;
+  vec2 uv = vec2(uv0.x, uv0.y + dip * 30.0);
   col = rockAlbedo(uv, farF);
+  // Ribs and gullies running down the fall line (alpine faces are fluted, not flat): a height field
+  // stretched along the face. Ribs catch the sun on one flank, gullies shade and fill with snow.
+  // (x is warped by height so the flutes wander instead of running as straight stripes)
+  float wx = uv.x + (texture2D(noiseTex, uv * vec2(0.002, 0.004) + 0.27).g - 0.5) * 14.0;
+  vec2 q1 = vec2(wx * 0.0062, uv.y * 0.0011 + wx * 0.0008);
+  float h1 = texture2D(noiseTex, q1).r, h1u = texture2D(noiseTex, q1 + vec2(0.0025, 0.0)).r;
+  vec2 q2 = vec2(wx * 0.024, uv.y * 0.0075) + 0.37;
+  float h2 = texture2D(noiseTex, q2).r, h2u = texture2D(noiseTex, q2 + vec2(0.004, 0.0)).r;
+  float du = (h1u - h1) / (0.0025 / 0.0062) * 22.0 + (h2u - h2) / (0.004 / 0.024) * 2.6 * (1.0 - farF * 0.7);
+  gully = smoothstep(0.42, 0.26, h1 + (h2 - 0.5) * 0.2);
   float warp = texture2D(noiseTex, uv * vec2(0.006, 0.02) + 0.2).r;
-  float f = fract(uv.y / uRockLook.x + warp * 0.9 + texture2D(noiseTex, uv * vec2(0.01, 0.03)).g * 0.35);
-  float tw = 0.1 + 0.3 * texture2D(noiseTex, uv * vec2(0.012, 0.05) + 0.9).g;
+  // Beds of uneven thickness: the layer index is warped in v, so ledges never repeat at one spacing.
+  float f = fract(uv.y / uRockLook.x + warp * 0.9 + texture2D(noiseTex, uv * vec2(0.01, 0.03)).g * 0.35 + texture2D(noiseTex, uv * vec2(0.0035, 0.021) + 0.52).r * 1.7);
+  // Ledge snow sits in lenses: thick in the middle of a ledge, tapering out at its ends.
+  float segW = smoothstep(0.52, 0.8, texture2D(noiseTex, uv * vec2(0.016, 0.07) + 0.7).r + uRockLook.y + gully * 0.25);
+  float tw = (0.06 + 0.42 * texture2D(noiseTex, uv * vec2(0.012, 0.05) + 0.9).g) * (0.2 + 0.8 * segW);
   float tread = 1.0 - smoothstep(tw * 0.4, tw, f) * (1.0 - smoothstep(0.93, 1.0, f));
   tread *= 1.0 - smoothstep(0.04, 0.12, tFP / uRockLook.x);            // fine ledges vanish with distance
   // Coarse bands (big ledge systems), irregular and broken.
@@ -85,11 +104,13 @@ void rockLayer(vec2 uv, float farF, float midF, out vec3 col, out vec2 g, out fl
   tread2 *= smoothstep(0.5, 0.62, texture2D(noiseTex, uv * vec2(0.017, 0.03) + 0.33).r);
   tread2 *= 1.0 - smoothstep(0.06, 0.2, tFP / S2);
   riser = 1.0 - max(tread, tread2);
-  // Fractured blocks: Voronoi cells, each a tilted facet; dark joints between them.
-  vec3 v1 = rockCells(uv * vec2(1.0, 1.6) / 4.2);
-  g = (hash32(v1.z * vec2(7.1, 3.3)).xy - 0.5) * 0.9 * (1.0 - farF);
+  // Fractured blocks: Voronoi cells elongated along the beds, each a slightly tilted facet; dark joints.
+  vec3 v1 = rockCells(uv * vec2(0.7, 1.7) / 4.2);
+  g = vec2(-du, 0.0) * 0.55 + (hash32(v1.z * vec2(7.1, 3.3)).xy - 0.5) * 0.45 * (1.0 - farF);
   float joint = (1.0 - smoothstep(0.02, 0.07, v1.y)) * smoothstep(0.35, 0.6, texture2D(noiseTex, uv * 0.02 + 0.8).r);
-  float tone = hash12(vec2(v1.z, 1.7));
+  float tone = mix(0.5, hash12(vec2(v1.z, 1.7)), 0.55);
+  col *= 0.95 + 0.1 * smoothstep(-0.4, 0.6, -du);       // rib crests weathered lighter, gullies darker / wetter
+  col *= 1.0 - gully * 0.18;
   #ifdef ROCK_LITE
   if (false) {
   #else
@@ -102,8 +123,16 @@ void rockLayer(vec2 uv, float farF, float midF, out vec3 col, out vec2 g, out fl
     float l0 = texture2D(noiseTex, q).g;
     g += vec2(texture2D(noiseTex, q + vec2(0.02, 0.0)).g - l0, texture2D(noiseTex, q + vec2(0.0, 0.02)).g - l0) * 1.1 * (1.0 - midF);
   }
-  col *= (1.0 + (tone - 0.5) * 0.22 * (1.0 - 0.75 * midF)) * (1.0 - joint * 0.22 * (1.0 - midF));
-  seg = smoothstep(0.42, 0.62, texture2D(noiseTex, uv * vec2(0.025, 0.1) + 0.7).r + uRockLook.y);
+  col *= (1.0 + (tone - 0.5) * 0.22 * (1.0 - 0.75 * midF)) * (1.0 - joint * 0.3 * (1.0 - midF));
+  // Ledge snow comes in broken pieces of varying length; more of it in the gullies.
+  seg = smoothstep(0.0, 0.12, segW);
+  // Gully snow: streaks running down the flutes, broken by steps (snow runnels below ledges).
+  gully *= smoothstep(0.48, 0.66, texture2D(noiseTex, vec2(wx * 0.03, uv.y * 0.008) + 0.13).g + (1.0 - riser) * 0.12) * 0.85;
+  // Spindrift streaks: snow sloughed off each loaded ledge dusts the rock just below it in narrow
+  // fall-line streaks (a few times longer than wide), fading with distance below the ledge.
+  float dust = smoothstep(0.75, 0.93, f) * (1.0 - smoothstep(0.92, 0.95, f)) * segW;
+  dust *= smoothstep(0.55, 0.72, texture2D(noiseTex, vec2(wx * 0.42, uv.y * 0.035) + 0.61).g);
+  gully = max(gully, dust * 0.45 * (1.0 - smoothstep(0.05, 0.15, tFP / uRockLook.x)));
 }
 // Rock albedo: grey gneiss in blocks, lighter/darker beds, vertical runoff streaks, iron staining.
 vec3 rockAlbedo(vec2 uv, float far) {
@@ -213,25 +242,28 @@ export const SNOW_FRAG_GLSL = /* glsl */`
     vec2 wxz = pow(abs(N.xz) + 1e-4, vec2(4.0));
     wxz /= wxz.x + wxz.y;
     vec3 cA = vec3(0.0), cB = vec3(0.0); vec2 gA = vec2(0.0), gB = vec2(0.0);
-    float rA = 0.0, rB = 0.0, sA = 0.0, sB = 0.0;
+    float rA = 0.0, rB = 0.0, sA = 0.0, sB = 0.0, kA = 0.0, kB = 0.0;
     float sx = N.x < 0.0 ? -1.0 : 1.0, sz = N.z < 0.0 ? -1.0 : 1.0;
     #ifdef ROCK_LITE
     wxz = wxz.x > wxz.y ? vec2(1.0, 0.0) : vec2(0.0, 1.0);   // low quality: one projection
     #endif
-    if (wxz.x > 0.03) rockLayer(vec2(vW.z * sx, vW.y), farF, midF, cA, gA, rA, sA);
-    if (wxz.y > 0.03) rockLayer(vec2(-vW.x * sz, vW.y) + 37.0, farF, midF, cB, gB, rB, sB);
+    if (wxz.x > 0.03) rockLayer(vec2(vW.z * sx, vW.y), farF, midF, cA, gA, rA, sA, kA);
+    if (wxz.y > 0.03) rockLayer(vec2(-vW.x * sz, vW.y) + 37.0, farF, midF, cB, gB, rB, sB, kB);
     rockCol = cA * wxz.x + cB * wxz.y;
     float riser = rA * wxz.x + rB * wxz.y;
     float seg = sA * wxz.x + sB * wxz.y;
+    float gul = (kA * wxz.x + kB * wxz.y) * smoothstep(0.45, 0.65, slope);
     float rr = mix(riser, 0.5, farF);
     vec3 pert = wxz.x * vec3(0.0, gA.y, gA.x * sx) + wxz.y * vec3(-gB.x * sz, gB.y, 0.0);
     Nr = normalize(N + fB * (0.75 - rr) * 0.7 + pert);
-    // Snow on treads + anywhere the detailed rock turns up toward the sky.
+    // Snow on treads + anywhere the detailed rock turns up toward the sky + streaks down the gullies.
     float ledge = (1.0 - riser) * seg;
     vec3 NrL = normalize(N + fB * (0.75 - rr) * 0.7);           // ledge structure only (no facet tilt)
     ledge = max(ledge, smoothstep(0.8, 0.95, NrL.y + (m3 - 0.5) * 0.15) * seg);
     ledge *= 1.0 - smoothstep(0.55, 0.8, slope) * 0.6;
-    rock *= 1.0 - ledge * mix(0.9, 0.55, farF);
+    ledge = max(ledge, gul * (1.0 - smoothstep(0.5, 0.85, slope) * 0.7));
+    rock *= 1.0 - ledge * mix(0.9, 0.6, farF);
+    tLedge = ledge;
   }
 
   // ---- snow normal: drifts → sastrugi → ripples → corduroy → grain
@@ -254,14 +286,14 @@ export const SNOW_FRAG_GLSL = /* glsl */`
       Ns = normalize(Ns - vec3(gw.x, 0.0, gw.y));
     }
     // Wind ripples: asymmetric ripples across the wind (gentle stoss, steep lee), warped.
-    float rip = uSnowShape.y * 0.4 * (0.3 + 0.7 * exposure) * (1.0 - groomed) * (1.0 - forest * 0.6);
+    float rip = uSnowShape.y * 0.22 * (0.2 + 0.8 * exposure) * (1.0 - groomed) * (1.0 - forest * 0.6);
     if (rip > 0.01 && uDetail > 0.5) {
-      float warp = (texture2D(noiseTex, xz * 0.011).r - 0.5) * 7.0 + (texture2D(noiseTex, xz * 0.045 + 0.2).r - 0.5) * 0.9;
+      float warp = (texture2D(noiseTex, xz * 0.011).r - 0.5) * 3.5 + (texture2D(noiseTex, xz * 0.045 + 0.2).r - 0.5) * 0.9;
       float k = 6.2831853 / 0.32;
       float ph = (sAl + warp) * k;
       float fw = tFP * k;
       float aa = 1.0 - smoothstep(0.6, 2.2, fw);
-      float blot = smoothstep(0.3, 0.75, texture2D(noiseTex, xz * 0.031 + 0.17).r + exposure * 0.2);
+      float blot = smoothstep(0.45, 0.8, texture2D(noiseTex, xz * 0.031 + 0.17).r + exposure * 0.2);   // ripple fields come in patches
       float dh = (cos(ph) + 0.45 * cos(2.0 * ph + 0.6)) * 0.022 * k;
       vec2 gw = wd * dh * rip * aa * blot;
       Ns = normalize(Ns - vec3(gw.x, 0.0, gw.y));
@@ -280,6 +312,7 @@ export const SNOW_FRAG_GLSL = /* glsl */`
       vec2 gsum = vec2(0.0);
       float cav = 0.0, laneB = 0.0;
       vec2 sunXZ = normalize(uSunDir.xz + 1e-4);
+      float seamAA = 1.0 - smoothstep(0.06, 0.25, tFP);   // seams are ~15 cm: fade before they alias
       for (int j = 0; j < 2; j++) for (int i = 0; i < 2; i++) {
         vec2 cc = (cb + vec2(float(i), float(j)) + 0.5) * 48.0;
         vec3 nC = macroN(cc);
@@ -289,7 +322,7 @@ export const SNOW_FRAG_GLSL = /* glsl */`
         float across = dot(xz - cc, ac) + hash12(cc) * 5.5;
         float lane = fract(across / 5.5);
         float seam = smoothstep(0.03, 0.0, lane) + smoothstep(0.97, 1.0, lane);
-        gsum += ac * (sin(across * k) * 0.004 * k * aa + seam * 0.35) * w;
+        gsum += ac * (sin(across * k) * 0.004 * k * aa + seam * 0.35 * seamAA) * w;
         cav += abs(dot(sunXZ, ac)) * w;
         laneB += (hash12(vec2(floor(across / 5.5), hash12(cc) * 17.0)) - 0.5) * w;
       }
@@ -308,6 +341,23 @@ export const SNOW_FRAG_GLSL = /* glsl */`
     }
     Ns = normalize(mix(N, Ns, detailFade));
   }
+
+  // Steep snow (drop faces, wall feet, wind lips): xz-projected detail would stretch into streaks,
+  // so these faces get their own bi-planar detail: sluff flutes running down the face + soft lumps.
+  float steepSnow = (1.0 - smoothstep(0.45, 0.8, N.y)) * (1.0 - midF) * (1.0 - rock);
+  if (steepSnow > 0.01) {
+    vec2 wq = pow(abs(N.xz) + 1e-4, vec2(4.0));
+    wq /= wq.x + wq.y;
+    vec2 pA = vec2(vW.z, vW.y), pB = vec2(vW.x, vW.y);
+    vec2 gA = noiseGrad(vec2(pA.x, pA.y * 0.3), 0.23, 0.25, 0) * 0.32 + noiseGrad(pA, 0.9, 0.06, 1) * 0.05;
+    vec2 gB = noiseGrad(vec2(pB.x, pB.y * 0.3) + 17.0, 0.23, 0.25, 0) * 0.32 + noiseGrad(pB + 17.0, 0.9, 0.06, 1) * 0.05;
+    vec3 pert = wq.x * vec3(0.0, gA.y, gA.x) + wq.y * vec3(gB.x, gB.y, 0.0);
+    Ns = normalize(Ns - pert * steepSnow);
+    tCavity *= 1.0 - 0.12 * steepSnow * smoothstep(0.3, 0.7, texture2D(noiseTex, vec2(pA.x * wq.x + pB.x * wq.y, vW.y * 0.3) * 0.23).r);
+  }
+
+  // Snow lying on ledges and in gullies sits flat-ish, whatever the face does underneath.
+  Ns = normalize(mix(Ns, normalize(N * 0.45 + vec3(0.0, 1.0, 0.0)), tLedge * (1.0 - farF * 0.5)));
 
   // ---- carved tracks: deep soft trenches with pushed-up lips (parallax on high quality)
   vec2 tp = xz;
@@ -328,7 +378,7 @@ export const SNOW_FRAG_GLSL = /* glsl */`
       }
     }
     #endif
-    float e = 0.045, E = 0.28;
+    float e = 0.07, E = 0.28;   // e ≈ 1.5 track-map texels: bilinear gradients never show texel steps
     float t0 = trackAt(tp);
     float tx1 = trackAt(tp + vec2(e, 0.0)), tx0 = trackAt(tp - vec2(e, 0.0));
     float tz1 = trackAt(tp + vec2(0.0, e)), tz0 = trackAt(tp - vec2(0.0, e));

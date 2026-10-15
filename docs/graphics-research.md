@@ -392,3 +392,273 @@ Values are starting points in **linear** space unless noted. Tune against refere
     optional rose or copper goggle filter (+contrast, warm highlights, about 10-15% tint) for flat-light
     weather. In overcast or flat light, **remove the sun term and kill shadow contrast** so terrain
     readability drops, as in real flat light. Sparkle off, sky near-white.
+
+---
+
+## Round 2 addendum (second graphics pass)
+
+Gap-filling pass on top of `docs/graphics-research.md`. All text is paraphrased. **[GK]** marks values from general
+graphics or physics knowledge that no fetched source confirmed; treat them as starting points to tune by eye.
+Round 1 already covers slope thresholds, ledge snow, wind asymmetry, snow ghosts, tree wells, sky colour,
+tone mappers and the EV16 snow exposure, so this pass only adds to those.
+
+---
+
+### 1. Alpine rock faces and cliff bands in winter
+
+**Rock albedo (hard numbers are scarce)**
+- Generic bare ground sits at about **0.10-0.20** broadband albedo, against 0.80-0.85 for snow and ice.
+  https://glossary.ametsoc.org/wiki/surface-albedo/ , https://mosaic.colorado.edu/node/5955 (bare soil 0.17)
+- A glacier-margin field survey reports **proglacial bedrock at about 0.2**, with debris-covered ice down to
+  0.10. Albedo swung from 0.10 to 0.39 within a few metres, driven by debris, algae and wetness.
+  https://meetingorganizer.copernicus.org/EGU2015/EGU2015-2643.pdf?pdf
+- Igneous rock slabs straddle **0.1 reflectance at 500 nm**: darker slabs fall below it, lighter ones above.
+  Rough natural surfaces reflect more than polished ones. https://karmaka.de/?p=31520 ,
+  https://ntrs.nasa.gov/api/citations/19700029568/downloads/19700029568.pdf
+- Limestone measured more reflective than dolomite from 380 to 1550 nm (NASA 1970 report above). The
+  Dolomites are called the
+  "Pale Mountains": ivory, light grey and yellowish carbonate. https://www.sudtirol.com/en/dolomites-unesco.htm ,
+  https://uol.de/en/icbm/geooekologie/lehre/gesteinsgalerie/dolomitstein
+- Gneiss shows **centimetre-scale banding**: light quartz/feldspar layers alternate with dark mafic layers.
+  Overall it is grey to brownish, and lighter on fresh breaks. https://sandatlas.org/gneiss/ ,
+  https://nationalpark.ch/en/flora-and-fauna/gneiss/
+- Mont Blanc granite is **light grey when freshly exposed** (rockfall scars) and **weathers orange** with
+  long exposure. Researchers use a 770/530 nm reflectance ratio to date scars.
+  https://hal.univ-grenoble-alpes.fr/hal-03164883v1 (search snippet; page was bot-blocked). Lichen cover
+  changes granite's photometry noticeably. https://pubs.usgs.gov/publication/70010345
+- Working linear albedo **[GK, consistent with the above]**: weathered gneiss/granite 0.12-0.20, fresh granite
+  scar 0.25-0.35, limestone/dolomite 0.30-0.45, wet rock or dark streaks 0.05-0.08. Rock with a 0.15 albedo next
+  to snow at 0.85 gives roughly a **5.5x contrast**, about 2.5 stops.
+
+**How snow sits on rock**
+- **Rime**: about 12 h of freezing cloud blown onto a crag builds **about 2 cm of rime on every surface** and
+  turns it totally white. Wind or a few hours of sun strip it, so a face goes "white one day, black the next".
+  Windward faces near ridges at cloud level are the candidates.
+  https://www.abacusmountainguides.com/blog/category/winter-climbing
+- When it is not rimed, snow survives only on **small ledges and in cracks**. Steeper surfaces shed and stay
+  dark. https://www.mountainproject.com/v/110936113
+- **Couloirs** are the brightest vertical stripes on a dark face and keep snow longest. Loose snow funnels into
+  the central, concave parts of a wall. https://mountainproject.com/route/105756508/north-face-couloirs ,
+  https://www.summitpost.org/north-face-couloir/158522
+- **Spines and flutes** (very steep faces in AK and BC): sluffed snow builds up on rock ribs, or where the
+  terrain funnels into a V, and leaves parallel ridges separated by sluff runnels. A sluff starts at a point
+  and widens downhill, so its track is an **inverted V**.
+  https://www.foxnews.com/sports/how-to-ski-a-spine-with-seth-morrison ,
+  https://www.avalanche-center.org/Education/glossary/loose-snow-avalanches.php
+- **Tintenstriche ("ink stripes")**: black cyanobacteria biofilms along water runoff paths. They are most
+  striking on pale limestone and dolomite, and they leave the 3D surface unchanged, so they belong in albedo
+  only. https://www.biorxiv.org/content/10.1101/2024.04.30.591805.full.pdf ,
+  https://www.eawag.ch/en/department/uchem/projects/cyanolichen
+- From photographs and general knowledge **[GK]**:
+  - Below each ledge band a lighter **spindrift streak** runs down the fall line, roughly 1-3x the ledge
+    width and a few times longer than wide.
+  - Talus or scree cones sit at the cliff foot with snow on top, smoother and brighter than the wall.
+
+**Why procedural cliffs look fake**
+- MSFS 2024 players praised the new **procedural cliffs and rock displacement** close up. They complained
+  about a **razor-sharp, altitude-only snow line**: snow on peaks first, and valleys either all white or all
+  brown. Lesson: the snow line must depend on slope, aspect and curvature, not altitude alone.
+  https://forums.flightsimulator.com/t/msfs-2024-ability-to-control-snow-coverage/667228 ,
+  https://forums.flightsimulator.com/t/bring-back-realistic-colours-and-look-from-2020/679961/60 ,
+  https://stormbirds.blog/2024/12/22/flight-journal-a-trip-through-the-snow-covered-alps-in-msfs-2024/
+- Far Cry 5 (GDC 2018, Carrier and Moore): cliffs were **generated procedurally in Houdini** as rock meshes
+  plus terrain displacement driven by the terrain system, not painted heightfield alone. No shading details
+  are public. https://gdcvault.com/play/1025557/Procedural-World-Generation-of-Far ,
+  https://gdcvault.com/play/1025480/Terrain-Rendering-in-Far-Cry
+- Common giveaways **[GK, partly echoed by forum posts]**:
+  - Visible texture tiling.
+  - Uniform blobby fBm with no strata or drainage.
+  - Triplanar stretching or blur on near-vertical faces.
+  - A single slope cutoff, which gives a crisp, uniform snow line.
+  - No scree at the cliff foot.
+  - Rock with the same value as the shadowed snow next to it.
+  https://unity.com/blog/engine-platform/procedural-stochastic-texturing-in-unity
+- Anti-tiling: **Mikkelsen's Practical Real-Time Hex-Tiling** (JCGT 2022) samples three hex tiles with random
+  offsets and blends them with a cheap contrast ramp. It replaces Heitz-Neyret histogram preservation, and
+  handles normal maps too. https://jcgt.org/published/0011/03/05/paper.pdf ,
+  https://www.jcgt.org/published/0008/04/02/paper.pdf , https://godotshaders.com/?p=15102
+- Snow-on-rock height blend:
+  - Base mask: world-up dot world normal (use the **detail normal**, not the vertex normal), sharpened with
+    a remap.
+  - Combine the mask with the rock heightmap so snow fills cracks first (heightlerp).
+  - The transition contrast needs empirical tuning, or it pixelates.
+  https://80.lv/articles/shader-guide-for-ue4 , https://andreariccardi.artstation.com/blog
+
+**Erosion-noise shader techniques** (the Clay John 2018 → Fewes 2023 → runevision 2026 lineage)
+https://blog.runevision.com/2026/03/ , https://docs.rs/bevy_erosion_filter ,
+https://forum.world-machine.com/t/erosion-noise-a-device-generating-noise-that-looks-like-eroded-terrain/8275
+- Erosion works as a **per-point filter on any height function**, with no simulation. Take the base height
+  and its gradient from fBm, then add **stripes aligned with the gradient** (downhill direction). The stripes
+  form alternating gullies and ridges.
+- Stripes live in **Worley-like grid cells with random pivots**, blended across neighbouring cells. Height
+  uses cos and slope uses sin. If cells are too large the stripes distort; if too small the result is grainy.
+- **Octaves**: each one is about **half the size** of the previous one (lacunarity 2) and follows the slopes
+  left by earlier octaves, which gives dendritic branching.
+- Peaks and valleys have no gradient, so they fold. Fix: fade toward a target that runs from -1 in valleys
+  to +1 on peaks, e.g. `invLerp(valleyAlt, peakAlt, h)*2-1`. Use ease-out `1-(1-t)^2` instead of sqrt.
+- Refinements:
+  - Stacked per-octave masks with a detail exponent (0.7 / 1.5 / 3.0 tried) keep fine gullies on steep slopes.
+  - Use sign(sin) for straight gullies.
+  - For pointy peaks, set gully weight to about 0.5 and erosion strength to about 2.0.
+- A **ridge map** at gully bottoms gives drainage lines. Use it as the mask for couloir snow and dark
+  water streaks.
+- Classic background: Musgrave, Kolb and Mace (1989), hydraulic plus thermal erosion with talus slopes.
+  https://history.siggraph.org/?p=119354
+
+### 2. Carving spray
+
+- Plumes are mostly a **skid** product. Pure carving ejects little. Plumes come from braking and skidding,
+  where the base "ploughs" into the snow. In soft or fresh snow, compaction and ploughing dominate friction;
+  on hardpack, edge interaction dominates, so spray is little and fine. https://arxiv.org/pdf/1812.02539 ,
+  https://eprints.whiterose.ac.uk/168379/1/carving.pdf ,
+  https://www.real-world-physics-problems.com/physics-of-skiing.html
+- Coaching sources: plume size scales with **entry speed and the length and force of the skid**. The heelside
+  powder turn is the classic plume-thrower. https://whitelines.com/trick-tips/backcountry-basics/heelside-powder-turn-whitelines-basics.html/2
+- Ice is described as **hard, bright edge chatter**, "like scraping a windshield". Powder is a muffled
+  "woomph". Visually, ice gives a thin, low, short-lived scrape of fine crystals.
+  https://digital.theskijournal.com/volume-14-issue-4/page-24 ,
+  https://morphic.com/resources/sounds/skiing-sound-effects
+- Settling speeds:
+  - Powder and dendritic snow settle at about **0.5 m/s** whatever their size. Field values run 0.5 to
+    more than 3 m/s for denser grains.
+  - Turbulence can make settling **up to 5x slower** than terminal speed. That is why fine powder clouds
+    hang for seconds while clumps arc out ballistically.
+  https://arxiv.org/html/2406.08737v1 , https://par.nsf.gov/biblio/10340694
+- Implied lifetimes **[GK]**: fine dust (0.1-0.5 mm) lofted 2-4 m and settling at 0.2-0.5 m/s hangs for
+  **4-10 s** in calm air. Clumps (1-5 cm) land within 0.5-1 s.
+- Lighting and photography:
+  - Backlit spray glows and the rider goes dark and rim-lit. Shooters wait for **low sun** behind the rider.
+  - Sidelit or frontlit spray reads as flat grey-white texture.
+  - Spray must be frozen at **≥1/1000 s**, so no motion blur on the spray.
+  https://www.adorama.com/alc/winter-sports-action-photography-tips/ ,
+  https://www.snowmagazine.com/features/1230-skills/6-expert-tips-for-great-ski-photography ,
+  https://www.nikonusa.com/en/learn-and-explore/a/tips-and-techniques/ski-photography-101.html
+- **SSX (2012)**: the existing spray system was extended to **spawn physics particles when carving**, with more
+  spawning on steep, unstable slopes and fading on flat, stable ground (tied to avalanches).
+  https://www.gamerevolution.com/?p=320 , https://www.engadget.com/2011-04-13-ssx-to-descend-in-january-2012.html
+- No public spray breakdowns exist for Steep, Riders Republic, Shredders or Alto (searched again; nothing).
+
+### 3. Terrain-park kicker shape
+
+- X Games course design: final **launch angle 32-35 degrees** on big-air and slopestyle jumps. The landing
+  sweet spot is **34-37 degrees**, starts **17-23 m (55-75 ft) past the lip**, and holds that angle for at
+  least **30 m (100 ft)**. https://fivethirtyeight.com/features/how-the-winter-x-games-designs-its-courses/
+- A measured expert kicker (TUM/ASTM): **table 17 m**, transition **20 degrees**, kick height **2.5 m**. A
+  guideline variant used a 16 m table and a 33-degree landing. Impact energies rise sharply when the table is
+  shorter than 15 m. https://portal.fis.tum.de/en/publications/safety-in-big-jumps-relationship-between-landing-shape-and-impact-2/
+- Patent ranges: take-off **32-43 degrees**, table **10-24 m**. https://ipiq.io/patents/381981
+- Size classes: medium **3-9 m** jumps, large **9-27 m**. https://en.wikipedia.org/wiki/Terrain_park
+- How they are built and how that looks:
+  - Cats (Prinoth Bison X, PistenBully 600) push and shape over **12-16 h**.
+  - Crews of about 4 fine-tune daily with digital levels, rakes and shovels. Lips are cut along a
+    **rope line with a chainsaw and relief cuts about every 30 cm**.
+  - Transitions are hand-raked and shovelled from lip to flat bottom, then the cat cleans up.
+  https://www.saminfo.com/archives/2010-2017/2018/item/164966-2018-terrain-park-contest ,
+  https://www.saminfo.com/archives/2020-2029/2025/november-2025/terrain-park-contest-2025 ,
+  https://www.mottolino.com/en/winter/snowpark/snowpark-shapers/
+- Surface look: the **table and approach carry tiller corduroy**. The kicker face and lip show **smooth
+  shovel-planed facets and rake striations along the fall line**, and the lip is a crisp cut edge.
+- Sidewalls: no source gives an angle. **[GK]** Shaped kicker side walls are about **35-45 degrees** (snow
+  angle of repose for cut, wind-packed snow), cat-pushed and shovel-smoothed, with a soft roll-over at the
+  table edge.
+
+### 4. Snow-loaded conifers and distant forest
+
+- White spruce holds snow on dense, interlaced needles and can look **entirely white**. The conical crown,
+  downward-sloping and flexing branches shed loads. Heavy, wet, sticky snow is what breaks branches.
+  https://ourwinterworld.org/snow-and-living-things/plants/
+- Interception is **31-49% of seasonal snowfall** in a Czech spruce stand. Efficiency drops as storm size
+  grows (the canopy saturates), and steeper (smaller-angle) branches catch more per projected area.
+  https://goobi.tib.eu/viewer/fulltext/1067806741/325 , https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6540713/
+- Ground under crowns is shallower: one fir stand had **80 cm under crowns vs 150 cm in gaps and at edges**.
+  https://water-ca.org/?p=6825
+- Forest albedo:
+  - Conifer forest is about **0.12 in summer** and rises to **just above 0.20 in winter**. Snow on the floor
+    can lift sparse forest to about 0.5.
+  - Above about **70% canopy cover**, snow barely changes forest albedo.
+  - So from a distance a dense spruce forest reads as **near-black green with sparse white flecks**, while
+    open larch or sparse stands read grey-white.
+  https://www.geophysica.fi/pdf/geophysica_2018_53_1_009_manninen.pdf , https://dissertationesforestales.fi/pdf/1962
+- At distance, dark objects shift most toward blue. Distant tree lines lose contrast and soften, and the
+  furthest ridges nearly merge with the haze. https://www.britannica.com:443/print/article/7229 ,
+  https://cypaint.com/article/how-to-paint-winter-trees-in-the-distance
+- Visual structure **[GK]**:
+  - Snow sits as **convex pillows on the upper side of each whorl tier**, darker needles hang below, and
+    each tier's underside stays in deep shade.
+  - At 200 m+ the crown reads as stacked white chevrons on a black cone.
+  - At 1 km+ it becomes a **speckled dark-teal texture** whose mean value is about 0.2-0.3 of open snow.
+
+### 5. High-altitude photography look
+
+- Shaded snow is about **1/4 the luminance of sunlit snow (2 stops)** (Ansel Adams rule). Sunlit snow meters
+  about **2 stops above middle grey**, within ±1.5 stops by age and specularity.
+  https://www.photrio.com/forum/threads/incident-meter-snow.119/post-1436 ,
+  https://www.largeformatphotography.info/forum/archive/index.php/t-1654.html
+- Photographers open up **+0.5 to +2 stops** over the meter so snow is white, not grey, and check that the
+  histogram sits **near, not against**, the right edge. Shaded snow at the meter reading reads grey-blue,
+  which is natural. https://cdn.shutterbug.com/node/371047 ,
+  https://www.adorama.com/alc/winter-sports-action-photography-tips/
+- Old slide film had only about **4 stops of latitude**, which forced a choice between sunlit highlights and
+  shaded snow. Ski film looks often protect the highlights and let shaded faces and trees go deep.
+  https://www.largeformatphotography.info/forum/archive/index.php/t-1654.html
+- Sun to sky **[GK]**: the sun disk is about **1.6e9 cd/m²** and the clear zenith a few thousand to about
+  10,000 cd/m², a ratio of about **10^5**. At 3000 m the zenith is darker and more saturated, with lower
+  turbidity. https://eta-publications.lbl.gov/bibcite/reference/24511
+
+---
+
+### Concrete targets
+
+1. **Rock linear albedo**: weathered gneiss/granite **0.12-0.20** (default 0.15); fresh rockfall scars
+   0.25-0.35 and slightly warmer/lighter; limestone or dolomite bands 0.30-0.45; wet rock or water streaks
+   0.05-0.08. Sunlit snow should be about **4-6x** sunlit rock.
+2. **Granite hue drift**: weathered faces tinted warm (sRGB around 140/120/100 at 0.15 linear); fresh scars
+   neutral light grey. Add 10-20% low-frequency hue variation per 50-200 m patch.
+3. **Gneiss banding**: light/dark alternation at **1-10 cm** (micro normal or albedo) inside larger **1-5 m
+   strata**, dipping at a consistent 10-40 degrees per massif, not always horizontal.
+4. **Erosion noise on cliffs and slopes**: 4-6 octaves, lacunarity 2, a gully cell size around **1/8-1/4 of
+   the feature size**, gully weight 0.5, strength 2.0, fade target from altitude. Feed its ridge map to the
+   couloir snow mask and the dark-streak mask.
+5. **Couloirs**: concave gullies steeper than 45 degrees keep continuous snow ribbons **3-20 m wide**,
+   brightest stripes on the face; the ribs between them stay dark.
+6. **Ledge streaks**: below each snow-covered ledge, a spindrift streak about 1-3x the ledge width that fades
+   over **5-15 m** down the fall line (mask = ledge mask smeared along -gradient).
+7. **Rime state**: an optional global "rimed" factor (0-1) that whitens all rock above about 2500 m on the
+   windward side (about 2 cm coat: albedo toward 0.7). Default 0 on sunny days, 0.6-1 after storms.
+8. **Snow line**: drive it by slope + aspect + curvature + noise, never altitude alone. No flat-sharp
+   altitude band. Valley floors should not flip all-white or all-bare.
+9. **Anti-tiling**: hex-tiling (3 taps, random offsets and rotation, contrast-ramp blend) on rock and snow
+   detail textures, including normals.
+10. **Cliff foot**: scree or talus cones at **30-35 degrees** under every cliff band longer than about 20 m,
+    snow-covered, smoother and brighter than the wall above.
+11. **Tintenstriche**: on pale carbonate bands, vertical black streaks 0.3-3 m wide below overhangs and
+    drainage lines, albedo-only (no normal change), 30-60% darkening.
+12. **Spray by surface**: powder = 100% emission; groomed/packed = 30-50% (finer, lower arc, shorter);
+    ice = 5-10%, only tiny fast crystals and lifetime under 0.4 s. Scale emission with **skid angle**
+    (sideslip), not edge angle alone; pure carving gives a thin sheet.
+13. **Spray lifetimes**: clumps 0.5-1 s ballistic; fine powder mist hangs **4-8 s**, settles at **0.2-0.5
+    m/s** with turbulence jitter, drifts with the wind. A backlit powder cloud reads as the brightest
+    non-sun object.
+14. **Spray shape**: a fan sheet off the downhill side and tail, about 60-120 degrees wide, reaching
+    1-2.5 m high at 10-15 m/s in powder, and longest at turn exit **[GK]**. No motion blur on particles.
+15. **Kicker geometry**: lip/takeoff **25-35 degrees** (small park 20-25), table **6-17 m** scaled by jump
+    size, knuckle rolling into a **33-37 degree** landing that holds for at least 30 m on big jumps.
+    Lip height 1-2.5 m.
+16. **Kicker surfacing**: sidewalls **35-45 degrees** with a soft 0.3-0.5 m roll-over; corduroy on approach
+    and table; smooth planed face with faint fall-line rake striations (2-5 cm pitch) on the kicker face; a
+    crisp lip edge.
+17. **Spruce snow load**: pillows on top of every whorl tier (N.y > 0.6 masks), tier undersides near-black
+    (albedo about 0.03-0.05 and shadowed). Mix 40-70% loaded trees after storms, and 20-40% on sunny days
+    after wind or sun shedding.
+18. **Under-canopy snow**: ground snow under crowns about 50% of the depth in gaps, slightly darker and
+    bluer (shade plus needle litter).
+19. **Distant forest**: dense stands render at an effective albedo of **0.15-0.25 of open snow** (a dark
+    teal-black speckle), and sparse stands about 0.4-0.5. Aerial perspective must lift forest more than snow.
+20. **Sun/shade snow ratio**: sunlit to shaded snow luminance **4:1 (2 stops)**. Shadowed snow should land
+    around **0.20-0.25 display** when sunlit snow is about 0.80.
+21. **Exposure placement**: sunlit snow about +2 stops over middle grey, and **just under clipping** (0.80-0.88
+    display); sparkles and backlit spray are the only things allowed to clip.
+22. **Sun disk vs sky**: sun about 10^5 x zenith luminance. At 3000 m the zenith is about 20-30% darker and
+    more saturated than the sea-level preset **[GK]**.
+23. **Low-sun preference**: the default "hero" sun elevation is **15-30 degrees**, so spray backlights and
+    cast shadows stretch to 2-4x object height (Steep-style long shadows).

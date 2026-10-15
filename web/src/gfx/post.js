@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { EffectComposer, RenderPass, EffectPass, BloomEffect, SMAAEffect, SMAAPreset, Effect, EffectAttribute, BlendFunction } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
 import { SUN_DIR } from '../world.js';
+import { PERF, perfQ } from './perf.js';
 
 export const POST = {
   exposure: 0.62,             // linear multiplier before the tone curve (sunlit snow ≈ 0.9 display)
@@ -16,7 +17,7 @@ export const POST = {
   shadowTint: [0.985, 1.0, 1.03],   // cool lift in the shadows (blue shade on snow)
   highlightTint: [1.01, 1.0, 0.985], // faint warmth in the highlights (high-altitude sun)
   vignette: 0.22,
-  bloom: { intensity: 0.32, threshold: 2.1, smoothing: 0.6, radius: 0.7 },
+  bloom: { intensity: 0.32, threshold: 3.2, smoothing: 0.8, radius: 0.7 },   // HDR: sun, glints, hot backlit mist
   ao: { radius: 2.0, distanceFalloff: 1.0, intensity: 1.15, color: '#33415c' },
   glare: 0.12,                 // soft veiling glare when looking toward the sun (occlusion-aware)
   flare: 0.035,                // faint lens ghosts when the sun is in view (0 = off)
@@ -207,7 +208,8 @@ export class PostStack {
     this.windPass = new EffectPass(camera, this.wind);
     this.windPass.enabled = false;
     composer.addPass(this.windPass);
-    this.smaa = new EffectPass(camera, new SMAAEffect({ preset: SMAAPreset.HIGH }));
+    this.smaaEffect = new SMAAEffect({ preset: SMAAPreset.HIGH });
+    this.smaa = new EffectPass(camera, this.smaaEffect);
     composer.addPass(this.smaa);
     this.composer = composer;
     this.ao = ao;
@@ -216,11 +218,15 @@ export class PostStack {
   }
 
   setQuality(q) {
-    this.ao.enabled = q > 0;
-    if (q > 0) this.ao.setQualityMode(q === 2 ? 'High' : 'Medium');
-    this.bloom.intensity = POST.bloom.intensity * (q === 0 ? 0.7 : 1);
-    this.grade.uniforms.get('glare').value = q === 0 ? 0 : POST.glare;
-    this.grade.uniforms.get('flare').value = q === 2 ? POST.flare : 0;
+    // Per-tier costs live in gfx/perf.js (PERF).
+    q = perfQ(q);
+    const ao = PERF.ao[q];
+    this.ao.enabled = !!ao;
+    if (ao) { this.ao.setQualityMode(ao.mode); this.ao.configuration.halfRes = !!ao.halfRes; }
+    this.bloom.intensity = POST.bloom.intensity * PERF.bloomScale[q];
+    this.smaaEffect.applyPreset(SMAAPreset[PERF.smaa[q]]);
+    this.grade.uniforms.get('glare').value = PERF.glare[q] ? POST.glare : 0;
+    this.grade.uniforms.get('flare').value = PERF.flare[q] ? POST.flare : 0;
   }
 
   setSize(w, h) { this.composer.setSize(w, h); }
