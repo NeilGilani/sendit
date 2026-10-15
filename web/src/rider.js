@@ -335,9 +335,8 @@ export class Rider {
     // Roll about the edge that's in the snow, pitch about the end that's pressed.
     const hw = spec.waist * 0.5;
     const roll = -gearRoll;
-    const s = Math.sign(roll) || 1;
     B.rotation.set(p.pitch, 0, roll, 'ZXY');
-    B.position.set(-s * hw * (1 - Math.cos(roll)) * 0 + 0, lift + Math.abs(Math.sin(roll)) * hw + Math.abs(Math.sin(p.pitch)) * spec.length * 0.38, 0);
+    B.position.set(0, lift + Math.abs(Math.sin(roll)) * hw + Math.abs(Math.sin(p.pitch)) * spec.length * 0.38, 0);
   }
 
   /**
@@ -475,13 +474,11 @@ export class Rider {
     this.trunk(off, twist * 0.45 + counter * 0.3, hipPitch * 0.55 + p.hip * 0.5, bend + p.hip * 0.6, twist * 0.55 + counter * 0.7, -angul * 1.3 + wob,
       -counter * 0.6, -(hipPitch * 0.55 + bend) * 0.95);
     for (const side of [1, -1]) {
-      const s = side > 0 ? 0 : 1;   // armature +X = rider's left = ski index 0
       // Armature +X is the rider's left (visual −X): match the ski's lift so the boots stay clipped in.
       const lx = -side * (ANIM.skiStance + p.plow * 0.1);
       const ankle = new THREE.Vector3(side * (ANIM.skiStance + p.plow * 0.1), this.ankleH + p.air * 0.12 + p.grab * 0.1 + lx * Math.tan(p.lean), 0.0);
       // Feet point down the skis; tips pinch together in a snowplough.
       this.leg(side, ankle, new THREE.Vector3(side * 0.12, 0, 1), -side * p.plow * 0.28);
-      void s;
       this.armSki(side, pl);
     }
   }
@@ -513,13 +510,13 @@ export class Rider {
     const w = st.width / 2;
     const feet = [[nx, st.front], [-nx, st.back]];   // [armature x sign, binding angle]
     for (const [sx, ang] of feet) {
-      const side = sx * nx > 0 ? nx : -nx;   // which leg: +1 = left (armature +X)
-      void side;
       const along = sx * w;
       const legSide = along > 0 ? 1 : -1;    // armature +X → left leg
-      // Board pitch (press) raises one foot.
-      const pitchLift = -Math.sin(p.pitch) * along * nx;
-      const ankle = new THREE.Vector3(along, this.ankleH + 0.02 + lift + Math.max(0, pitchLift), 0);
+      // Board pitch (press / pop snap): the board pivots about the end on the snow (placeBoard), so each
+      // binding rises by sin(pitch)·(distance toward the nose) plus the pivot lift.
+      const sp = Math.sin(p.pitch);
+      const pitchLift = sp * along * nx + Math.abs(sp) * this.equip.spec.length * 0.38;
+      const ankle = new THREE.Vector3(along, this.ankleH + 0.02 + lift + pitchLift, 0);
       ankle.lerp(new THREE.Vector3(legSide * 0.12, this.ankleH + 0.35, 0.42), p.sit);
       const pole = new THREE.Vector3(legSide * 0.25, 0, 1);
       this.leg(legSide, ankle, pole, nx * THREE.MathUtils.degToRad(ang) * ns);
