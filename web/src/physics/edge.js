@@ -68,7 +68,15 @@ export class EdgePhysics {
    */
   control(dt, ctrl, grounded) {
     const pl = this.pl, C = this.C;
-    pl.turnInput += (ctrl.steer - pl.turnInput) * (1 - Math.exp(-(C.steerResponse ?? P.steerResponse) * pl.handling * dt));
+    // Digital steering (keys / full stick) ramps from a partial edge to full lock while held, so taps
+    // carve gently and holding commits; analog input passes straight through.
+    let steer = ctrl.steer;
+    if (Math.abs(steer) > 0.98) {
+      this._holdT = Math.sign(steer) === this._holdSign ? (this._holdT || 0) + dt : 0;
+      this._holdSign = Math.sign(steer);
+      steer = Math.sign(steer) * Math.min(1, P.digitalSteerStart + this._holdT / P.digitalSteerRamp * (1 - P.digitalSteerStart));
+    } else { this._holdT = 0; this._holdSign = 0; }
+    pl.turnInput += (steer - pl.turnInput) * (1 - Math.exp(-(C.steerResponse ?? P.steerResponse) * pl.handling * dt));
     pl.brake += (ctrl.brake - pl.brake) * (1 - Math.exp(-6 * dt));
     const anyDir = Math.abs(ctrl.steer) > 0.1 || ctrl.brake > 0.1;
     this._noInputT = anyDir ? 0 : (this._noInputT || 0) + dt;
@@ -191,7 +199,9 @@ export class EdgePhysics {
     decel += lerp(C.dragUpright, C.dragTuck, pl.tuck) * speed * speed;
     decel += P.softCapDrag * Math.max(0, speed - C.maxVelocity) ** 2;
     const skidMu = this.stop > 0 ? lerp(C.skidMu, this.stopMu(), this.stop) : C.skidMu;
-    decel += skidMu * g * Math.abs(Math.sin(beta)) * (0.35 + 0.65 * edgeGrip) / Math.max(0.7, H.stability) * (mode.skidMul ?? 1);
+    // Slow pivots are steering more than scraping; real scrub builds with speed (stops excepted).
+    const slowSkid = lerp(smoothstep(1.5, 8, speed) * 0.7 + 0.3, 1, this.stop);
+    decel += skidMu * g * Math.abs(Math.sin(beta)) * (0.35 + 0.65 * edgeGrip) / Math.max(0.7, H.stability) * (mode.skidMul ?? 1) * slowSkid;
     decel += this.extraDecel(ctx);
     // Powder: slow skis plough and sink, fast ones plane; floatier gear sinks less and bogs later.
     const float = H.float * C.powderFloat;
@@ -205,7 +215,7 @@ export class EdgePhysics {
     decel += C.powderDrag * pl.sink * speed * P.powderDepth;               // ploughing: a = k · depth · v
     const D = this.dbg;   // per-term breakdown (m/s²) for tuning tools
     D.fric = mu * g * n.y; D.air = lerp(C.dragUpright, C.dragTuck, pl.tuck) * speed * speed;
-    D.skid = skidMu * g * Math.abs(Math.sin(beta)) * (0.35 + 0.65 * edgeGrip) / Math.max(0.7, H.stability) * (mode.skidMul ?? 1);
+    D.skid = skidMu * g * Math.abs(Math.sin(beta)) * (0.35 + 0.65 * edgeGrip) / Math.max(0.7, H.stability) * (mode.skidMul ?? 1) * slowSkid;
     D.extra = this.extraDecel(ctx); D.total = decel; D.beta = beta; D.grav = gTan.length();
     if (speed > 1e-4) v.multiplyScalar(Math.max(0, speed - decel * dt) / speed);
     const holding = pl.controllable() && pl._ctrl.up > 0.3;

@@ -76,7 +76,16 @@ export class Player {
     const handling = deriveHandling(t, spec);
     const prev = this.dyn;
     this.dyn = t === 'snowboard' ? new SnowboardPhysics(this, spec, handling) : new SkiPhysics(this, spec, handling);
-    if (prev) { this.dyn.travel = prev.travel; this.dyn.edge = prev.edge; }
+    if (prev) {
+      this.dyn.edge = prev.edge;
+      // New gear goes on facing the direction of travel (a switch rider swaps to forward-facing gear).
+      if (prev.travel < 0) {
+        this.heading += Math.PI;
+        groundQuat(this.groundNormal, this.heading, this.orient);
+        this.prevOrient.copy(this.orient); this.renderOrient.copy(this.orient);
+        this.travelSign = 1;   // edge angles are relative to travel, so they carry over unchanged
+      }
+    }
     this.equipment = { type: t, variant: spec.id, spec, handling };
     this.plow = 0; this.stop = 0; this.press = 0; this.butter = 0; this.grab = 0;
     emit('equipmentChanged', { type: t, variant: spec.id, spec, stance: this.stance });

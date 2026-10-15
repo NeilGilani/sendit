@@ -15,7 +15,9 @@ export const PHYSICS = {
   dragTuck: 0.0065,
   turnRateSlow: 2.3,          // rad/s carving at low speed
   turnRateFast: 1.5,          // rad/s at max speed — wide fast arcs
-  steerResponse: 5.0,         // how fast steering input eases in (1/s) — snappy & arcade
+  steerResponse: 5.0,         // how fast steering input eases in (1/s) — fallback; see ski/snowboard.steerResponse
+  digitalSteerStart: 0.65,    // keys: share of full lock on press …
+  digitalSteerRamp: 0.45,     // … reaching full lock after this many seconds held
   grip: 5.5,                  // lateral velocity decay (1/s)
   powderGrip: 3.6,
   carveEfficiency: 0.94,      // share of lateral speed redirected forward when carving
