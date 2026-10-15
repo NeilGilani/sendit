@@ -341,6 +341,8 @@ export class EdgePhysics {
     // W / S already held at take-off (tuck, brake, nollie) don't start a flip until pressed again.
     const c = pl._ctrl || {};
     this._flipLock = { up: (c.up || 0) > 0.2, brake: (c.brake || 0) > 0.2 };
+    // Carving over a crest (short, unpopped hop): the held turn doesn't become a spin until re-pressed.
+    this._spinLock = !popped && Math.abs(c.steer || 0) > 0.2 && this.timeToLand() < P.spinLockAir ? Math.sign(c.steer) : 0;
     // Pre-wind: carry part of the ground rotation into the air.
     pl.spinRate = -this.yawRate * this.C.prewind;
     if (popped) pl.spinRate += -(this.windup || 0) * this.C.windupSpin * this.H.spin;
@@ -360,7 +362,8 @@ export class EdgePhysics {
     const max = C.spinRateMax * this.H.spin * (1 - pl.grab * 0.15);
     const tLand = this.timeToLand();
     let target = 0, resp = C.spinResponse;
-    if (ctrl.active && Math.abs(ctrl.steer) > 0.2) target = -ctrl.steer * max;
+    if (this._spinLock && (Math.abs(ctrl.steer) < 0.2 || Math.sign(ctrl.steer) !== this._spinLock)) this._spinLock = 0;
+    if (ctrl.active && Math.abs(ctrl.steer) > 0.2 && !this._spinLock) target = -ctrl.steer * max;
     else if (pl.airTime > 0.1) {
       // Stick released: within spinCheckAngle of a rideable alignment (nose, or tail if allowed, along
       // the path) settle onto it — checking the rotation if it just went past; farther away, momentum
@@ -421,7 +424,9 @@ export class EdgePhysics {
     const L = this._flipLock || (this._flipLock = {});
     if (ctrl.up < 0.2) L.up = false;
     if (ctrl.brake < 0.2) L.brake = false;
-    const input = ctrl.active && !grabbing && pl.airTime > 0.08 ? (L.brake ? 0 : ctrl.brake) - (L.up ? 0 : ctrl.up) : 0;
+    // No flip from a little hop (a tuck tapped over a crest): starting one needs real air ahead.
+    const canStart = Math.abs(pl.flip) > 0.3 || tLand > C.flipMinAir;
+    const input = ctrl.active && !grabbing && pl.airTime > 0.08 && canStart ? (L.brake ? 0 : ctrl.brake) - (L.up ? 0 : ctrl.up) : 0;
     const rem = wrapPi(pl.flip);                       // signed distance from upright
     // A preloaded take-off is committed through its first half turn (then momentum carries it anyway).
     if (Math.abs(pl.flip) >= Math.PI) this._flipCommit = false;

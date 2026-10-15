@@ -27,6 +27,7 @@ export const PHYSICS = {
   airDrag: 0.006,
   landAssistTime: 0.25,       // s before touchdown when a released stick lets the gear settle onto its path …
   landAssistAngle: 14,        // … if it's within this many degrees (SSX-style auto-righting)
+  spinLockAir: 0.6,           // s: an unpopped hop shorter than this ignores the turn held at take-off (no accidental spin)
   spinCheckAngle: 40,         // deg: stick released within this of an alignment → settle (or check back) onto it
   // Landing / crashes (yaw tolerances are per equipment type below)
   stumbleTime: 1.0,
@@ -97,7 +98,7 @@ export const PHYSICS = {
     spinRateMax: 6.4, spinResponse: 7, prewind: 0.45,
     windupSpin: 2.6,          // rad/s of spin added at take-off by a full wind-up (steer while charging)
     // Flips (W = frontflip, S = backflip in the air): rate, response, and the pitch tolerance at touchdown.
-    flipRateMax: 5.6, flipResponse: 5, flipLandClean: 22, flipLandStumble: 42, flipPreload: 4.2,
+    flipRateMax: 5.6, flipResponse: 5, flipLandClean: 22, flipLandStumble: 42, flipPreload: 4.2, flipMinAir: 0.45,
     landClean: 15, landStumble: 30, landCrash: 38, // deg yaw between ski and path
     switchLand: 30,           // deg — backwards landings within this are "switch" (twin tips clean)
   },
@@ -129,7 +130,7 @@ export const PHYSICS = {
     popMin: 2.2, popMax: 4.0, nollie: 0.88, chargeTime: 0.45,
     spinRateMax: 7.6, spinResponse: 7.5, prewind: 0.55, windupSpin: 3.2,
     // Flips (W = tamedog / front, S = wildcat / back, over the toe-heel axis), pitch tolerance at touchdown.
-    flipRateMax: 5.9, flipResponse: 5, flipLandClean: 22, flipLandStumble: 42, flipPreload: 4.4,
+    flipRateMax: 5.9, flipResponse: 5, flipLandClean: 22, flipLandStumble: 42, flipPreload: 4.4, flipMinAir: 0.45,
     landClean: 15, landStumble: 45, landSlide: 82, // deg yaw from the nearest board end to the path (sideways = hard slide)
   },
 };

@@ -18,3 +18,17 @@ console.log('--- B2: board flat-base traverse (no input) across the slope ---');
 { const p = mk('snowboard', 15, Math.PI / 2); p.velocity.set(-6, 0, 0); run(p, 3, () => ({}), L('B2')); }
 console.log('--- A: ski hold right from 12 m/s straight down 15° ---');
 { const p = mk('ski', 15); p.velocity.set(0, 0, -12); run(p, 4, () => ({ steer: 1 }), L('A')); }
+console.log('--- D: carve held over a roller (15°, 1.2 m crest, 14 m/s): no accidental spin on a short natural hop ---');
+{
+  const k = Math.tan(15 * Math.PI / 180);
+  const H = (x, z) => { const a = -z - 40; return z * k + (a > -6 && a < 6 ? 1.2 * Math.cos(a / 6 * Math.PI / 2) ** 2 : 0); };
+  const T = { half: 1e7, getHeight: H, getSurface: (x, z, o = new THREE.Vector4()) => o.set(1, 0, 0, 0), getSpawn: () => ({ position: new THREE.Vector3(), heading: 0 }) };
+  T.getNormal = (x, z, r = 0, o = new THREE.Vector3()) => { const e = Math.max(r, 1); return o.set(H(x - e, z) - H(x + e, z), 2 * e, H(x, z - e) - H(x, z + e)).normalize(); };
+  for (const type of ['ski', 'snowboard']) for (const steer of [0, 0.5, 1]) {
+    const p = new Player(T, null, null, { strength: () => 0, justPressed: () => false }); p.setEquipment(type); p.place(new THREE.Vector3(0, 0, -20), 0); p.velocity.set(0, 0, -14);
+    let air = 0, spin = 0;
+    run(p, 6, (t, pl) => ({ steer: pl.position.z < -37 ? steer : 0 }), (t, pl) => { if (pl.state === State.AIR) { air = Math.max(air, pl.airTime); spin = Math.max(spin, Math.abs(pl.spinRate)); } }, 1 / 60);
+    const L = p.lastLanding || p.lastCrash || {};
+    console.log(`D ${type} steer ${steer}: air ${air.toFixed(2)} s, max spin ${spin.toFixed(2)} rad/s → ${p.state === State.CRASH ? 'CRASH' : L.result}`);
+  }
+}

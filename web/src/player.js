@@ -321,7 +321,13 @@ export class Player {
     const t = this.dyn.takeoff || { switch: false, spin: 0 };
     this.grab = 0;
     this.flip = 0; this.flipRate = 0; this.prevFlip = 0;
-    if (impact > P.crashImpact || ev.result === 'crash') { this.crash('landing'); return; }
+    if (impact > P.crashImpact || ev.result === 'crash') {
+      // Why it went wrong (for UI / tuning): too hard, or yaw / pitch out of line.
+      const reason = impact > P.crashImpact ? 'impact' : fl.result === 'crash' ? 'pitch' : 'yaw';
+      this.lastCrash = { reason, impact, dev: ev.dev, flipDev: fl.dev, air: this.airTime, spins, flips: fl.flips };
+      this.crash('landing');
+      return;
+    }
     this.dyn.travel = ev.switch ? -1 : 1;
     this.travelSign = this.dyn.travel;
     this.state = State.GROUNDED;
