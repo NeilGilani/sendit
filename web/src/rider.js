@@ -440,7 +440,7 @@ export class Rider {
     let bend = THREE.MathUtils.degToRad(10 + p.crouch * 16 + p.tuck * 30) * (1 - p.air * 0.3);
     bend -= THREE.MathUtils.degToRad(12) * p.sit;
     const wob = p.stumble * Math.sin(p.t * 9) * 0.25;
-    this.trunk(off, twist * 0.45 + counter * 0.3, hipPitch * 0.55 + p.hip * 0.5, bend + p.hip * 0.6, twist * 0.55 + counter * 0.7, angul * 1.1 + wob,
+    this.trunk(off, twist * 0.45 + counter * 0.3, hipPitch * 0.55 + p.hip * 0.5, bend + p.hip * 0.6, twist * 0.55 + counter * 0.7, -angul * 1.3 + wob,
       -counter * 0.6, -(hipPitch * 0.55 + bend) * 0.95);
     for (const side of [1, -1]) {
       const s = side > 0 ? 0 : 1;   // armature +X = rider's left = ski index 0
@@ -464,12 +464,14 @@ export class Rider {
       (p.toe * BA.toeDrive - p.heel * BA.heelSit) * ns,
     );
     const hipYaw = nx * BA.hipOpen * ns;
-    const hipPitch = (0.12 + p.crouch * 0.25 + p.toe * 0.22 - p.heel * 0.12 + p.grab * 0.3) * ns;
+    // The whole body already rolls onto the edge (visual lean), so toe side keeps the torso tall
+    // (knees and hips drive forward) and heel side sits down without folding.
+    const hipPitch = (0.12 + p.crouch * 0.25 - p.toe * 0.06 + p.heel * 0.05 + p.grab * 0.3) * ns;
     const wob = p.stumble * Math.sin(p.t * 9) * 0.25;
     // Shoulders open toward the nose, rotation leads the turn; in the air the spin leads.
     const lead = p.lead * BA.turnLead;
     const spineTwist = (nx * (BA.shoulderOpen - BA.hipOpen) + lead) * ns;
-    const bend = (0.1 + p.crouch * 0.2 + p.toe * 0.15 + p.grab * 0.35) * ns;
+    const bend = (0.1 + p.crouch * 0.2 - p.toe * 0.04 + p.heel * 0.12 + p.grab * 0.35) * ns;
     // Head: look down the direction of travel (nose, or over the back shoulder when switch).
     const headYaw = (nx * p.look * BA.headTurn - nx * BA.shoulderOpen - lead) * ns;
     this.trunk(off, hipYaw, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist, wob - p.lean * 0.15, headYaw, -(hipPitch + bend) * 0.6);
@@ -569,8 +571,8 @@ export class Rider {
     // Toe side: hands drop toward the snow in front; heel side: arms reach forward to counter the sit.
     u.lerp(V(fx * 0.4, -0.75, 0.6), p.toe * 0.8);
     l.lerp(V(fx * 0.2, -0.85, 0.5), p.toe * 0.8);
-    u.lerp(V(fx * 0.45, -0.25, 0.85), p.heel);
-    l.lerp(V(fx * 0.2, 0.0, 1.0), p.heel);
+    u.lerp(V(fx * 0.5, -0.6, 0.65), p.heel);
+    l.lerp(V(fx * 0.35, -0.45, 0.85), p.heel);
     // Stops: arms out for balance.
     u.lerp(V(fx * 0.8, -0.35, 0.45), p.stop * 0.6);
     // Air: wide balance arms; grab: rear hand to the toe edge between the feet (Indy).
