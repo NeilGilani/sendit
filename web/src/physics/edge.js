@@ -20,6 +20,11 @@ import * as THREE from 'three';
 import { PHYSICS as P } from '../config.js';
 import { clamp, lerp, smoothstep, angleDiff, lerpAngle, approach, DEG } from './math.js';
 
+const wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const mod2Pi = (a) => ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+/** "", "Double ", "Triple "… for n whole flips. */
+export const flipCount = (n) => (n <= 1 ? '' : n === 2 ? 'Double ' : n === 3 ? 'Triple ' : `${n}x `);
+
 const _f = new THREE.Vector3(), _t = new THREE.Vector3(), _r = new THREE.Vector3(), _v0 = new THREE.Vector3(), _a = new THREE.Vector3();
 
 /** Unit nose direction for `yaw`, projected on the slope plane with normal n. */
@@ -258,7 +263,11 @@ export class EdgePhysics {
   /** Called by Player.enterAir — trick bookkeeping. */
   takeoffInfo(popped) {
     const pl = this.pl;
-    this.takeoff = { switch: this.travel < 0, popped, spin: 0, grabT: 0, grab: null, end: this._popEnd || 'tail' };
+    this.takeoff = { switch: this.travel < 0, popped, spin: 0, flip: 0, grabT: 0, grab: null, end: this._popEnd || 'tail' };
+    pl.flip = 0; pl.flipRate = 0;
+    // W / S already held at take-off (tuck, brake, nollie) don't start a flip until pressed again.
+    const c = pl._ctrl || {};
+    this._flipLock = { up: (c.up || 0) > 0.2, brake: (c.brake || 0) > 0.2 };
     // Pre-wind: carry part of the ground rotation into the air.
     pl.spinRate = -this.yawRate * this.C.prewind;
     if (popped) pl.spinRate += -(this.windup || 0) * this.C.windupSpin * this.H.spin;
@@ -297,6 +306,7 @@ export class EdgePhysics {
     pl.heading += pl.spinRate * dt;
     if (this.takeoff) this.takeoff.spin += pl.spinRate * dt;
     const grabbing = ctrl.active && ctrl.tuck > 0.5 && pl.airTime > 0.12;
+    this.flipStep(dt, ctrl, grabbing, tLand);
     pl.grab += ((grabbing ? 1 : 0) - pl.grab) * (1 - Math.exp(-(grabbing ? 12 : 8) * dt));
     if (this.takeoff && pl.grab > 0.7) { this.takeoff.grabT += dt; this.takeoff.grab ||= this.grabName(); pl.grabName = this.takeoff.grab; }
     if (!grabbing && pl.grab < 0.3) pl.grabName = null;
@@ -319,6 +329,45 @@ export class EdgePhysics {
     pl.latAccel *= Math.exp(-6 * dt);
     pl.gearLatAccel *= Math.exp(-6 * dt);
     this.stop = 0;
+  }
+
+  /**
+   * Flips about the gear's lateral axis (W = front, S = back; + flip = backflip, the leading end up).
+   * A flip is a commitment: let go of the stick far from upright and momentum carries it on to the
+   * next upright, timed to arrive by touchdown when it can; within flipSettle of upright the rider
+   * spots the landing and opens up. Combined with a spin this reads as a cork / rodeo / misty.
+   */
+  flipStep(dt, ctrl, grabbing, tLand) {
+    const pl = this.pl, C = this.C;
+    const max = C.flipRateMax * Math.sqrt(this.H.spin) * (1 - pl.grab * 0.1);
+    const L = this._flipLock || (this._flipLock = {});
+    if (ctrl.up < 0.2) L.up = false;
+    if (ctrl.brake < 0.2) L.brake = false;
+    const input = ctrl.active && !grabbing && pl.airTime > 0.08 ? (L.brake ? 0 : ctrl.brake) - (L.up ? 0 : ctrl.up) : 0;
+    const rem = wrapPi(pl.flip);                       // signed distance from upright
+    let target = 0, resp = C.flipResponse;
+    if (Math.abs(input) > 0.2) target = input * max;
+    else if (Math.abs(rem) < 50 * DEG || Math.abs(pl.flipRate) < 0.6) {
+      target = clamp(-rem / Math.max(tLand, 0.15), -max * 0.7, max * 0.7);
+      resp = 6;
+    } else {
+      const dir = Math.sign(pl.flipRate);
+      const ahead = dir > 0 ? Math.PI * 2 - mod2Pi(pl.flip) : mod2Pi(pl.flip);
+      target = dir * clamp(ahead / Math.max(tLand, 0.15), 1.2, max);
+      resp = 3;
+    }
+    pl.flipRate += (target - pl.flipRate) * (1 - Math.exp(-resp * dt));
+    pl.flip += pl.flipRate * dt;
+    if (this.takeoff) this.takeoff.flip = pl.flip;
+  }
+
+  /** Pitch landing check: { dev (deg from upright), flips (whole rotations), back (bool), result }. */
+  landFlip() {
+    const pl = this.pl, C = this.C;
+    const dev = Math.abs(wrapPi(pl.flip || 0)) / DEG;
+    const flips = Math.round(Math.abs(pl.flip || 0) / (Math.PI * 2));
+    const result = dev <= C.flipLandClean ? 'clean' : dev <= C.flipLandStumble ? 'stumble' : 'crash';
+    return { dev, flips, back: (pl.flip || 0) > 0, result };
   }
 
   /** Predicted seconds until touchdown (ballistic, flat ground under the rider). */

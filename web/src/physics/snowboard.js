@@ -9,7 +9,7 @@
 //   • nose float in powder (setback + rocker), weaker one-foot skate on the flat
 // Tunables: PHYSICS.snowboard in config.js.
 import { PHYSICS as P } from '../config.js';
-import { EdgePhysics } from './edge.js';
+import { EdgePhysics, flipCount } from './edge.js';
 import { clamp, smoothstep, angleDiff, DEG } from './math.js';
 
 export class SnowboardPhysics extends EdgePhysics {
@@ -133,16 +133,23 @@ export class SnowboardPhysics extends EdgePhysics {
     return { result, switch: sw, dev };
   }
 
-  trickLabel(t, spins) {
+  trickLabel(t, spins, flip) {
     const parts = [];
-    if (t.switch) parts.push('Switch');
-    if (t.end === 'nose' && spins < 1) parts.push('Nollie');
-    else if (t.end === 'nose') parts.push('Nollie');
-    if (spins >= 1) {
-      // Frontside: the toe side (chest) swings toward the direction of travel first.
-      const fs = Math.sign(t.spin) === t.toeSide;
-      parts.push(`${fs ? 'FS' : 'BS'} ${spins * 180}`);
-    } else if (t.end === 'tail' && !t.grab) parts.push('Ollie');
+    // Frontside: the toe side (chest) swings toward the direction of travel first.
+    const fs = Math.sign(t.spin) === t.toeSide;
+    // Switch frontside spins are "Cab" (half-cab for a 180), named after Steve Caballero.
+    const cab = t.switch && fs && spins >= 1 && !(flip?.flips >= 1 && spins < 2);
+    if (t.switch && !cab) parts.push('Switch');
+    if (t.end === 'nose') parts.push('Nollie');
+    const side = cab ? (spins === 1 ? 'Half-Cab' : 'Cab') : fs ? 'FS' : 'BS';
+    if (flip?.flips >= 1) {
+      // Wildcat = backflip over the tail, Tamedog = frontflip off the nose (toe-heel axis). With a spin:
+      // a single backflip is a rodeo, more are corks; a frontflip with a spin is a misty.
+      const n = flipCount(flip.flips);
+      if (spins >= 2) parts.push(`${side} ${flip.back ? (flip.flips === 1 ? 'Rodeo' : `${n}Cork`) : `${n}Misty`} ${spins * 180}`);
+      else parts.push(`${n}${flip.back ? 'Wildcat' : 'Tamedog'}`);
+    } else if (spins >= 1) parts.push(side === 'Half-Cab' ? 'Half-Cab' : `${side} ${spins * 180}`);
+    else if (t.end === 'tail' && !t.grab) parts.push('Ollie');
     if (t.grab && t.grabT > 0.25) parts.push(t.grab);
     return parts.join(' ');
   }

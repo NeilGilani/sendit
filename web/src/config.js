@@ -88,6 +88,8 @@ export const PHYSICS = {
     popMin: 1.9, popMax: 3.5, chargeTime: 0.4,    // m/s vertical pop (tap → full charge)
     spinRateMax: 6.4, spinResponse: 7, prewind: 0.45,
     windupSpin: 2.6,          // rad/s of spin added at take-off by a full wind-up (steer while charging)
+    // Flips (W = frontflip, S = backflip in the air): rate, response, and the pitch tolerance at touchdown.
+    flipRateMax: 5.6, flipResponse: 5, flipLandClean: 22, flipLandStumble: 42,
     landClean: 15, landStumble: 30, landCrash: 38, // deg yaw between ski and path
     switchLand: 30,           // deg — backwards landings within this are "switch" (twin tips clean)
   },
@@ -117,6 +119,8 @@ export const PHYSICS = {
     // Air
     popMin: 2.2, popMax: 4.0, nollie: 0.88, chargeTime: 0.45,
     spinRateMax: 7.6, spinResponse: 7.5, prewind: 0.55, windupSpin: 3.2,
+    // Flips (W = tamedog / front, S = wildcat / back, over the toe-heel axis), pitch tolerance at touchdown.
+    flipRateMax: 5.9, flipResponse: 5, flipLandClean: 22, flipLandStumble: 42,
     landClean: 15, landStumble: 45, landSlide: 82, // deg yaw from the nearest board end to the path (sideways = hard slide)
   },
 };
@@ -145,6 +149,8 @@ export const ANIM = {
   maxGearEdge: 1.05,          // rad visual edge angle cap
   angulation: 0.75,           // share of (edge − lean) the ski rider takes up in the spine (upright upper body)
   polePlantTime: 0.38,        // s a pole touch lasts (triggered on edge changes)
+  flipPivot: 0.85,            // m above the feet the rider flips about (centre of mass)
+  gearSinkVisual: 0.15,       // share of the physics powder sink shown (the snow reads as packed, so the gear rides on top)
   board: {
     crouch: 0.12,             // m pelvis drop at rest (riders stand lower than skiers)
     crouchSpeed: 0.08,        // extra drop at speed

@@ -2,7 +2,7 @@
 // sidecut), rotary steering for skidded turns, snowplough below plowSpeed, hockey stop above it,
 // a proper aero tuck and pole pushes on the flat. Tunables: PHYSICS.ski in config.js.
 import { PHYSICS as P } from '../config.js';
-import { EdgePhysics } from './edge.js';
+import { EdgePhysics, flipCount } from './edge.js';
 import { clamp, smoothstep, angleDiff, DEG } from './math.js';
 
 export class SkiPhysics extends EdgePhysics {
@@ -85,10 +85,16 @@ export class SkiPhysics extends EdgePhysics {
     return { result: 'crash', switch: false, dev: dn };
   }
 
-  trickLabel(t, spins) {
+  trickLabel(t, spins, flip) {
     const parts = [];
     if (t.switch) parts.push('Switch');
-    if (spins >= 1) parts.push(`${t.spin > 0 ? 'Left' : 'Right'} ${spins * 180}`);
+    const dir = t.spin > 0 ? 'Left' : 'Right';
+    if (flip?.flips >= 1) {
+      // Off-axis: a backflip with a spin is a cork, a frontflip with a spin a misty.
+      const n = flipCount(flip.flips);
+      if (spins >= 2) parts.push(`${dir} ${n}${flip.back ? 'Cork' : 'Misty'} ${spins * 180}`);
+      else parts.push(`${n}${flip.back ? 'Backflip' : 'Frontflip'}`);
+    } else if (spins >= 1) parts.push(`${dir} ${spins * 180}`);
     if (t.grab && t.grabT > 0.25) parts.push(t.grab);
     return parts.join(' ');
   }

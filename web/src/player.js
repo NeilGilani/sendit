@@ -14,6 +14,7 @@ import { getEquipmentSpec, deriveHandling, normalizeType } from './equipment/reg
 
 export const State = { FROZEN: 0, GROUNDED: 1, AIR: 2, CRASH: 3, LIFT: 4 };
 const UP = new THREE.Vector3(0, 1, 0);
+const _X = new THREE.Vector3(1, 0, 0), _qf = new THREE.Quaternion();
 const _n = new THREE.Vector3(), _v = new THREE.Vector3(), _t1 = new THREE.Vector3(), _t2 = new THREE.Vector3();
 
 export class Player {
@@ -60,6 +61,8 @@ export class Player {
     this.carveQuality = 1;            // 1 = clean carve, → 0 washing out / skidding
     this.plow = 0; this.stop = 0; this.stopSide = 1; this.stopToe = false;
     this.press = 0; this.butter = 0; this.grab = 0; this.windup = 0; this.grabName = null;
+    this.flip = 0; this.flipRate = 0;   // rad about the gear's lateral axis in the air (+ = backflip), rad/s
+    this.prevFlip = 0; this.renderFlip = 0;
     this._ctrl = { steer: 0, brake: 0, up: 0, jump: false, tuck: 0, active: false };
     this.setEquipment('ski');
   }
@@ -116,6 +119,7 @@ export class Player {
     this.airTime = 0; this.squat = 0; this.stumbleT = 0;
     this.dyn.charge = 0; this.dyn.charging = false; this.dyn.travel = 1; this.dyn.edge = 0; this.dyn.stop = 0;
     this.travelSign = 1; this.edgeAngle = 0; this.skidAngle = 0; this.latAccel = 0;
+    this.flip = 0; this.flipRate = 0; this.prevFlip = 0; this.renderFlip = 0;
     this._safe = [[this.position.clone(), yaw]];
     this.snapRender();
   }
@@ -135,7 +139,8 @@ export class Player {
     this.simulated = true;            // riders fall back to pose-only cues for players that never step (lobby previews)
     this.prevPos.copy(this.position);
     this.prevOrient.copy(this.orient);
-    if (this.state === State.FROZEN) return;
+    this.prevFlip = this.flip;
+    if (this.state === State.FROZEN || this.debugFreeze) return;   // debugFreeze: hold a pose for inspection
     this.readInput(dt);
     switch (this.state) {
       case State.GROUNDED: this.groundStep(dt); break;
@@ -152,6 +157,7 @@ export class Player {
   interpolate(alpha) {
     this.renderPos.lerpVectors(this.prevPos, this.position, alpha);
     this.renderOrient.slerpQuaternions(this.prevOrient, this.orient, alpha);
+    this.renderFlip = this.prevFlip + (this.flip - this.prevFlip) * alpha;
   }
 
   readInput(dt) {
@@ -287,8 +293,14 @@ export class Player {
     const spins = Math.round(Math.abs(this._spinTotal) / Math.PI);  // 180s
     const slow = this.velocity.length() < 1.5;
     const ev = slow ? { result: 'clean', switch: this.isSwitch, dev: 0 } : this.dyn.land(devNose);
+    // Pitch: a flip has to come round to (near) upright; the worse of yaw and pitch decides.
+    const fl = this.dyn.landFlip();
+    if (fl.result === 'crash') ev.result = 'crash';
+    else if (fl.result === 'stumble' && ev.result === 'clean') ev.result = 'stumble';
+    ev.flipDev = fl.dev;
     const t = this.dyn.takeoff || { switch: false, spin: 0 };
     this.grab = 0;
+    this.flip = 0; this.flipRate = 0; this.prevFlip = 0;
     if (impact > P.crashImpact || ev.result === 'crash') { this.crash('landing'); return; }
     this.dyn.travel = ev.switch ? -1 : 1;
     this.travelSign = this.dyn.travel;
@@ -301,22 +313,23 @@ export class Player {
       this.velocity.multiplyScalar(ev.result === 'slide' ? 0.62 : 0.82);
       emit('stumble', ev.result);
     }
-    const perfect = ev.dev < 8 && this.airTime > 0.6;
-    const trick = this.dyn.trickLabel(t, spins);
-    this.lastLanding = { ...ev, impact, air: this.airTime, spins, trick };
+    const perfect = ev.dev < 8 && fl.dev < 10 && this.airTime > 0.6;
+    const trick = this.dyn.trickLabel(t, spins, fl);
+    this.lastLanding = { ...ev, impact, air: this.airTime, spins, flips: fl.flips, trick };
     emit('landed', { impact, air: this.airTime, clean, perfect, switch: ev.switch, result: ev.result, trick });
     if (clean && (this.airTime > 0.7 || (trick && this.airTime > 0.35))) {
       let label = trick || `Air ${this.airTime.toFixed(1)}s`;
       if (perfect) label = `Perfect ${label}`;
       game.airTotal += this.airTime;
       const grabPts = t.grab && t.grabT > 0.25 ? 40 + Math.floor(t.grabT * 60) : 0;
-      addScore(label, Math.floor(this.airTime * 80) + spins * 90 + grabPts + (t.switch ? 30 : 0) + (perfect ? 50 : 0));
+      addScore(label, Math.floor(this.airTime * 80) + spins * 90 + fl.flips * 150 + grabPts + (t.switch ? 30 : 0) + (perfect ? 50 : 0));
     }
     this.airTime = 0;
   }
 
   crash(kind) {
     this.state = State.CRASH; this.crashT = 0; this._crashStage = 0;
+    this.flip = 0; this.flipRate = 0;
     emit('crashed', kind);
   }
 
@@ -471,6 +484,8 @@ export class Player {
     if (this.state === State.LIFT) { this.orient.setFromAxisAngle(UP, this.heading); return; }
     const n = this.state === State.AIR ? _v.set(0, 1, 0).lerp(this.groundNormal, 0.3).normalize() : this.groundNormal;
     const target = groundQuat(n, this.heading, new THREE.Quaternion());
+    // Flips rotate about the gear's lateral axis (+X); + flip lifts the leading end (nose, or tail when switch).
+    if (this.flip) target.multiply(_qf.setFromAxisAngle(_X, this.flip * this.travelSign));
     // Fast follow on the ground (stops / butters / spins rotate quickly), smoothing only the terrain.
     const k = this.state === State.GROUNDED ? 22 : 30;
     this.orient.slerp(target, 1 - Math.exp(-k * dt));

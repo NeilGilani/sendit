@@ -21,7 +21,7 @@ import { createEquipmentModel, disposeEquipmentModel, poleGeometry } from './equ
 import { getEquipmentSpec, normalizeType } from './equipment/registry.js';
 
 const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
-const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4();
+const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4(), _v1 = new THREE.Vector3();
 const BA = ANIM.board;
 
 export class Rider {
@@ -200,8 +200,18 @@ export class Rider {
     p.t += dt;
     this.snapT += dt;
     this.root.position.copy(pl.renderPos);
-    this.root.position.y -= pl.sink * (this.fp ? 0.45 : 1);   // deep powder swallows the gear when slow (less in first person)
+    // Deep powder swallows the gear a little when slow (less in first person).
+    this.sinkVis = (pl.sink || 0) * ANIM.gearSinkVisual * (this.fp ? 0.45 : 1);
+    this.root.position.y -= this.sinkVis;
     this.root.quaternion.copy(pl.renderOrient);
+    // Flips turn about the centre of mass (≈ hip height), not the feet.
+    const fl = (pl.renderFlip || 0) * (pl.travelSign || 1);
+    if (fl) {
+      const c = _v1.set(0, ANIM.flipPivot, 0);
+      const full = c.clone().applyQuaternion(pl.renderOrient);
+      const base = c.applyQuaternion(_q.copy(pl.renderOrient).multiply(_q2.setFromAxisAngle(X, -fl)));
+      this.root.position.add(base.sub(full));
+    }
     const st = pl.state;
     const ground = st === State.GROUNDED, air = st === State.AIR, sit = st === State.LIFT, crashed = st === State.CRASH;
     const ratio = pl.speedRatio;
@@ -210,7 +220,7 @@ export class Rider {
 
     // --- layer drivers
     let crouchT = 0.45 + ratio * 0.15 + pl.tuck * 0.45 + pl.squat * 0.55 + pl.brake * 0.15;
-    if (air) crouchT = 0.35 + pl.grab * 0.5;
+    if (air) crouchT = 0.35 + pl.grab * 0.5 + Math.min(1, Math.abs(pl.flipRate || 0) / 3) * 0.4;
     p.crouch += (Math.min(1, crouchT) - p.crouch) * k(10);
     p.tuck += ((ground ? pl.tuck : 0) - p.tuck) * k(ANIM.tuckResponse);
     p.air += ((air ? 1 : 0) - p.air) * k(5);
@@ -396,7 +406,7 @@ export class Rider {
         const hw = this.equip.spec.waist * 0.5;
         ski.localToWorld(tmp.set(eSide * hw, 0, 0));
         c.position.copy(tmp); c.direction.copy(dir); c.normal.copy(n);
-        c.edgeAngle = edge; c.load = ground ? loads[i] : 0; c.speed = pl.speed; c.grounded = ground; c.depth = pl.sink;
+        c.edgeAngle = edge; c.load = ground ? loads[i] : 0; c.speed = pl.speed; c.grounded = ground; c.depth = this.sinkVis;
       });
     } else {
       const spec = this.equip.spec;
@@ -409,7 +419,7 @@ export class Rider {
         const c = this.contacts[i];
         this.board.localToWorld(tmp.set(eSide * hw, 0, z));
         c.position.copy(tmp); c.direction.copy(dir); c.normal.copy(n);
-        c.edgeAngle = edge; c.load = ground ? Math.max(0, loads[i]) : 0; c.speed = pl.speed; c.grounded = ground; c.depth = pl.sink;
+        c.edgeAngle = edge; c.load = ground ? Math.max(0, loads[i]) : 0; c.speed = pl.speed; c.grounded = ground; c.depth = this.sinkVis;
       });
     }
   }
