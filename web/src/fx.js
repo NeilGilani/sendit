@@ -148,7 +148,7 @@ export class FXManager {
 
     // Proximity speed lines: close shaves (and top speed) stream white lines past the camera.
     const near = pl.nearDist !== undefined && pl.nearDist < FX.nearMissRadius ? 1 - pl.nearDist / FX.nearMissRadius : 0;
-    this.acc.lines += (near * 140 + Math.max(0, ratio - 0.85) * 120) * dt;
+    this.acc.lines += near * 90 * dt;   // close shaves only (no top-speed streaks in the realistic look)
     if (camera && this.acc.lines >= 1) {
       const cf = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
       const cr = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
@@ -174,7 +174,7 @@ export class FXManager {
       const o = count * 3;
       ip[o] = this.pos[k3]; ip[o + 1] = this.pos[k3 + 1]; ip[o + 2] = this.pos[k3 + 2];
       iv[o] = this.vel[k3]; iv[o + 1] = this.vel[k3 + 1]; iv[o + 2] = this.vel[k3 + 2];
-      id[o] = this.size0[i]; id[o + 1] = 0.09 * Math.sin(t * Math.PI); id[o + 2] = KIND_LINE;
+      id[o] = this.size0[i]; id[o + 1] = 0.06 * Math.sin(t * Math.PI); id[o + 2] = KIND_LINE;
       count++;
     }
     this.geo.instanceCount = count;

@@ -74,7 +74,7 @@ void rockLayer(vec2 uv, float farF, float midF, out vec3 col, out vec2 g, out fl
   float f = fract(uv.y / uRockLook.x + warp * 0.9 + texture2D(noiseTex, uv * vec2(0.01, 0.03)).g * 0.35);
   float tw = 0.1 + 0.3 * texture2D(noiseTex, uv * vec2(0.012, 0.05) + 0.9).g;
   float tread = 1.0 - smoothstep(tw * 0.4, tw, f) * (1.0 - smoothstep(0.93, 1.0, f));
-  tread *= 1.0 - smoothstep(0.06, 0.2, tFP / uRockLook.x);            // fine ledges vanish with distance
+  tread *= 1.0 - smoothstep(0.025, 0.08, tFP / uRockLook.x);            // fine ledges vanish with distance
   // Coarse bands (big ledge systems), irregular and broken.
   float S2 = uRockLook.x * 4.3;
   float f2 = fract(uv.y / S2 + warp * 2.2 + texture2D(noiseTex, uv * vec2(0.006, 0.01) + 0.4).g * 1.2);
@@ -175,9 +175,9 @@ export const SNOW_FRAG_GLSL = /* glsl */`
   vec3 fT, fB;
   faceFrame(N, fT, fB);
   // Large-scale concavity across the face: gullies / couloirs hold snow, ribs and buttresses are bare.
-  vec3 Na = macroN(xz + fT.xz * 18.0), Nb = macroN(xz - fT.xz * 18.0);
+  vec3 Na = macroN(xz + fT.xz * 30.0), Nb = macroN(xz - fT.xz * 30.0);
   float concav = clamp(-dot(Na - Nb, fT) * 3.0, -1.0, 1.0);
-  float exposeN = slope + (m3 - 0.5) * 0.12 + (m2 - 0.5) * 0.1 - concav * 0.22 + exposure * 0.04;
+  float exposeN = slope + (m3 - 0.5) * 0.12 + (m2 - 0.5) * 0.1 - concav * 0.13 + exposure * 0.04;
   float rock = smoothstep(uRockLook.z - uRockLook.w, uRockLook.z + uRockLook.w, exposeN);
   rock = max(rock, smoothstep(0.35, 0.75, s.g + (m2 - 0.5) * 0.4) * smoothstep(0.1, 0.25, slope) * (1.0 - smoothstep(0.1, 0.4, concav)));
   vec3 rockCol = vec3(0.0);
@@ -221,11 +221,11 @@ export const SNOW_FRAG_GLSL = /* glsl */`
       float r0 = texture2D(noiseTex, q).b, ra = texture2D(noiseTex, q + vec2(0.006, 0.0)).b, rc = texture2D(noiseTex, q + vec2(0.0, 0.006)).b;
       vec2 gr = vec2((ra - r0) / (0.006 / 0.09), (rc - r0) / (0.006 / 0.42));
       float blot = smoothstep(0.35, 0.7, texture2D(noiseTex, xz * 0.021 + 0.5).g);
-      vec2 gw = (wd * gr.x + wp * gr.y) * sas * blot * 0.08;
+      vec2 gw = (wd * gr.x + wp * gr.y) * sas * blot * 0.05;
       Ns = normalize(Ns - vec3(gw.x, 0.0, gw.y));
     }
     // Wind ripples: asymmetric ripples across the wind (gentle stoss, steep lee), warped.
-    float rip = uSnowShape.y * (0.35 + 0.65 * exposure) * (1.0 - groomed) * (1.0 - forest * 0.6);
+    float rip = uSnowShape.y * 0.6 * (0.3 + 0.7 * exposure) * (1.0 - groomed) * (1.0 - forest * 0.6);
     if (rip > 0.01 && uDetail > 0.5) {
       float warp = (texture2D(noiseTex, xz * 0.011).r - 0.5) * 7.0 + (texture2D(noiseTex, xz * 0.045 + 0.2).r - 0.5) * 0.9;
       float k = 6.2831853 / 0.32;
@@ -379,7 +379,9 @@ export const SNOW_BAND_GLSL = /* glsl */`
   float lam = max(ndl, 0.0);
   // Subsurface: light leaking through the snow near the terminator, tinted cyan-blue.
   vec3 sss = uSnowSSS * max(nl - lam, 0.0) * shadow * snow * 2.0;
-  vec3 skyL = sky * tCavity;
+  // Sky light is directional too (brightest from overhead / the sun side): reveals snow relief in shade.
+  float skyDir = clamp(dot(nW, normalize(vec3(uSunDir.x * 0.35, 1.0, uSunDir.z * 0.35))), 0.0, 1.0);
+  vec3 skyL = sky * tCavity * mix(1.0, 0.66 + 0.38 * pow(skyDir, 3.0), snow);
   light = uSunCol * nl * shadow + skyL + sss * uSunCol;
   // Specular: rough GGX sheen (tighter on glazed crust) + forward scattering toward the sun.
   vec3 Vv = normalize(vViewPosition);

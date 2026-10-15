@@ -153,11 +153,11 @@ export const SPRAY = {
   glintRate: 160,                // glittering crystals per s
   mistRate: 45,                  // powder-cloud puffs per s per contact
   mistLife: 2.6,
-  mistAlpha: 0.2,
+  mistAlpha: 0.17,
   inherit: 0.55,                 // share of the contact's velocity the snow keeps
   stopBurst: 260,                // particles in a hard-stop fan
   forwardG: 0.62,                // Henyey-Greenstein g: backlit spray glows
-  forwardMix: 0.55,
+  forwardMix: 0.42,
   albedo: 0.92,
   wind: [0.9, 0.35],             // m/s drift of lingering powder
 };
