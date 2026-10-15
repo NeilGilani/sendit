@@ -12,8 +12,9 @@ import * as THREE from 'three';
 
 // ------------------------------------------------------------------ LIGHTING (linear HDR)
 export const LIGHTING = {
-  sunElevation: 32,              // degrees — long Steep-style shadows (photographers' 15–30° hero sun), lumps lit + shaded
-  sunBearing: 163,               // degrees from north — SSE: keeps ~85 % of the gully floor sunlit, light from behind-left
+  sunElevation: 42,              // degrees — long readable shadows, every lump has a lit and a shaded side
+  sunBearing: 170,               // degrees from north — S by E: with the surrounding peaks (mid ring) casting
+                                 // shadows, ~91 % of the gully floor and the whole start stay sunlit
   sunWhiten: 0.45,               // pull the transmitted sun colour toward white
   sunBoost: 1.0,                 // multipliers on the colours derived from the atmosphere model
   skyBoost: 0.9,                 // sky fill scale: shaded snow ≈ 1.5–2 stops under sunlit snow
@@ -55,7 +56,7 @@ export const SNOW = {
   sparkleCone: 0.45,             // up-bias of the random facet normals (0 = isotropic, larger = flatter)
   windAngle: 0.65,               // radians: prevailing wind direction in xz (ripples / sastrugi)
   drift: 1.0,                    // soft drifts / pillows
-  ripple: 1.0,                   // wind ripples (cm scale)
+  ripple: 0.6,                   // wind ripples (cm scale) — subtle and patchy, never sand dunes
   sastrugi: 1.0,                 // wind-carved ridges on exposed snow
   corduroy: 1.0,                 // groomed pistes
   trackDepth: 0.26,              // metres: deepest powder trench
@@ -66,11 +67,15 @@ export const SNOW = {
 
 // ------------------------------------------------------------------ ROCK (gfx/snow.js + scatter boulders)
 export const ROCK = {
-  dark: '#57524d',               // gneiss / granite (sRGB): ≈ 0.09 … 0.33 linear, mean ≈ 0.18
-  light: '#9c958d',
+  dark: '#5a5754',               // gneiss / granite (sRGB; ≈ 0.10–0.28 linear albedo)
+  light: '#958f88',
   rust: '#7a5a3c',               // iron staining streaks
   strataScale: 6.0,              // metres between ledge bands on cliffs
-  ledgeSnow: 0.1,                // more → more snow sitting on ledges
+  ledgeSnow: 0.0,                // more → more snow sitting on ledges / facet tops
+  blockBig: 16,                  // metres: fracture blocks (tilted facets with dark joints)
+  blockMid: 5,
+  blockSmall: 1.6,
+  photoTile: 3.2,                // metres per repeat of the CC0 rock photo detail
   exposeSlope: 0.4,              // 1 − n.y where snow starts to slide off (≈ 53°)
   exposeSoft: 0.08,
 };
@@ -134,6 +139,17 @@ export const CORNICES = {
 };
 
 // ------------------------------------------------------------------ DISTANT RANGES (terrain.js buildRing)
+// Mid-detail terrain: a 10 m grid from the course height function around the playable tile, so the
+// valley walls and nearby peaks have real relief (the 30 km backdrop is only ~94 m), plus a baked
+// mountain-shadow / sky-visibility mask over the same area.
+export const MIDTERRAIN = {
+  half: 6000,                    // metres from the centre (square)
+  spacing: 10,                   // metres per sample
+  chunkCells: 100,               // cells per chunk side (1 km)
+  lodDist: [1400, 3200],         // metres: 10 m grid → 20 m → 40 m (scaled by quality)
+  maskRes: 2048,                 // baked sun mask texels per side (≈ 6 m)
+};
+
 export const RING = {
   inner: 12000,                  // metres from the centre where the ring starts (beyond the backdrop)
   depth: 23000,
@@ -161,17 +177,18 @@ export const SNOWFALL = {
 // ------------------------------------------------------------------ SNOW SPRAY (gfx/spray.js)
 export const SPRAY = {
   maxParticles: 9000,
-  sheetRate: 340,                 // rooster-tail streaks / s per contact at full intensity
-  sheetLife: 0.55,
-  sheetAlpha: 0.75,
-  chunkRate: 140,                // clumps / chips per s
+  sheetRate: 650,                // rooster-tail streaks / s per contact at full intensity
+  sheetLife: 0.7,
+  sheetAlpha: 0.42,
+  curtainRate: 160,              // big dense wave streaks / s right at the edge on hard carves
+  chunkRate: 220,                // clumps / chips per s
   glintRate: 160,                // glittering crystals per s
-  mistRate: 20,                  // powder-cloud puffs per s per contact
-  mistLife: 4.2,                 // fine powder settles at ~0.2–0.5 m/s: clouds hang for seconds
-  mistAlpha: 0.12,
-  sheetShadow: 1.0,              // shadow coverage per sheet particle (× its alpha; quality ≥ 1)
+  mistRate: 45,                  // powder-cloud puffs per s per contact
+  mistLife: 2.6,
+  mistAlpha: 0.2,
+  sheetShadow: 1.0,              // shadow coverage per sheet particle (× its alpha; spray shadows on high)
   mistShadow: 2.5,               // powder clouds throw faint, soft shadows
-  inherit: 0.4,                  // share of the contact's velocity the snow keeps
+  inherit: 0.55,                 // share of the contact's velocity the snow keeps
   sluffRate: 110,                // loose snow released per s on steep powder (slides downhill)
   stopBurst: 170,                // particles in a hard-stop fan
   forwardG: 0.45,                // Henyey-Greenstein g: backlit spray glows
@@ -295,6 +312,7 @@ export const COURSE = {
   ledges: 9,                     // rock-ledge relief on the walls
   valleySideSlope: 0.4,          // rise per metre beyond the walls
   mountainHeight: 1100,
+  sideRibs: 70,                  // metres of spur / gully relief on the outer valley sides (visual)
   horn: { x: -2300, z: -10600, peak: 4450, slope: 1.12, twist: 0.5 },
 };
 

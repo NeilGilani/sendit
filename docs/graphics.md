@@ -62,6 +62,7 @@ spray.emit(contacts, dt, { powder, normal });
 //   load:      number         // share of rider weight on this contact (≈ 0..1, > 1 under g-load)
 //   speed:     number         // m/s of the contact over the snow
 //   id?:       any            // stable key per contact (defaults to the index)
+//   depth?:    number         // metres the edge is sunk below the powder surface (spray starts at the surface)
 // }>
 ```
 
@@ -70,6 +71,7 @@ spray.emit(contacts, dt, { powder, normal });
 - Snow softness comes from `ctx.powder` (0 hardpack … 1 deep powder).
 - One-shots: `spray.landing(pos, impact, powder)`, `spray.stopFan(pos, dir, speed, powder, side)`, `spray.puff(pos, count, powder, speed)` and `spray.crash(pos, powder)`. `fx.js` already calls them from the `jumped`, `landed`, `hardBrake` and `crashed` events.
 - **Skis today:** `contactsFromSkis(player)` in `fx.js` derives two contacts from `PlayerPhysics`. Edge angle is the lean that balances the turn (`atan(v·ω/g)`). Skid and brake swing the skis across the travel direction, with a snowplough wedge, and the outside ski carries more load.
+- **Integrated:** `main.js` already calls `fx.setContactSource(() => rider.getContactPoints())`, so skis and board both feed the emitter. The text below is kept for reference.
 - **Snowboard at merge time:** one line after `fx` is created in `main.js`:
 
   ```js
@@ -109,6 +111,18 @@ Terrain LOD distances scale 0.6 / 1.0 / 1.5.
 - `window.__gfxCam = [px,py,pz, tx,ty,tz, fov?]` or a function returning that array overrides the camera (honoured in `sky.js`). This is for screenshots.
 - `node web/scripts/gfxshots.mjs <url> <outDir> <views.json>` boots once in headless Chromium and captures many views (`cam`, `side` rider-relative camera, `keys`, `eval`, `wait`). Set `SUF=_x` to suffix the file names. `GPU=1` renders on the real GPU through ANGLE/D3D11, which is much faster than SwiftShader on this machine; `clip` captures a sub-rectangle.
 
+## Performance (second pass)
+
+Measured with the perf branch's `web/scripts/gfxperf.mjs` (rides and carves, real GPU through ANGLE/D3D11, vsync off, 1600×900, Intel Arc 130V integrated GPU). Median render + sync per frame:
+
+| | original (6b25d66) | this branch |
+|---|---|---|
+| quality 0 | 24.7 ms | 21.9 ms |
+| quality 1 | 58.0 ms | 29.6 ms |
+| quality 2 | ~100 ms | ~105 ms (within run-to-run noise) |
+
+The first version of this pass doubled quality 0, because the faceted rock and flutes ran on the backdrop and mid ring, which cover much of the screen. Those now run on high only. `web/scripts/gfxperf-ride.mjs` is a simpler throttle-only probe (CPU frame intervals plus hitch log). Its numbers are unreliable on this machine and it is kept only for hitch logging. Multi-second hitches appear in both builds and are environmental.
+
 ## Known issues / not done
 
 - Performance: see `docs/graphics-perf.md`. Earlier versions of this file claimed about 2 ms per frame, and later about 13 / 27 / 29 ms. The first came from headless `requestAnimationFrame` deltas, which don't measure GPU cost. The second came from an unpipelined render plus `readPixels`, which overstates the frame time. Measured with GPU timer queries on an Intel Arc 130V iGPU at 1600×900, the game is GPU-bound at about **9 / 14 / 22 ms per frame** on quality 0 / 1 / 2 (about 110 / 72 / 45 fps). The main thread costs about 5 ms.
@@ -116,4 +130,8 @@ Terrain LOD distances scale 0.6 / 1.0 / 1.5.
 - Rock ledge bands follow world height. Very large faces can still show some banding at mid distance.
 - The rider and lifts still use `toonMaterial` (now HDR-lit). The neon emissive trims stay but read dimmer under the new exposure. The ink outline is off (`OUTLINE.px = 0`).
 - The crowd billboards and flags keep their stylized textures.
+- Mid ring: the backdrop beyond ±6 km is still the coarse 58 m grid (far enough that aerial perspective hides it). The ring adds about 50 draw calls.
+- Flutes on diagonal faces of the backdrop switch projection along a narrow seam. The 4-cell blend on the tile can fade the flutes where neighbouring cells disagree.
+- The hard-stop fan is small at chase-camera distance, so it could be bigger and denser. Powder clouds over sunlit snow are subtle (white on white), and on medium/low they have no shadow to separate them.
+- Ski poles, rider and lifts are untouched (owned by other sessions).
 - Real resorts (`?resort=`) use the same shaders. Corduroy appears where OSM marks groomed pistes. The distant ranges ring is fictional there as well.

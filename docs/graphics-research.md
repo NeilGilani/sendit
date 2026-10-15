@@ -662,3 +662,37 @@ https://forum.world-machine.com/t/erosion-noise-a-device-generating-noise-that-l
     more saturated than the sea-level preset **[GK]**.
 23. **Low-sun preference**: the default "hero" sun elevation is **15-30 degrees**, so spray backlights and
     cast shadows stretch to 2-4x object height (Steep-style long shadows).
+## Addendum: second-pass targets (branch `claude/gfx-snow-0dfc5c`)
+
+No new sources were fetched for this pass. The items below are **[GK]** observations from general
+knowledge of alpine terrain and photography. Each was turned into a target and compared against
+screenshots of the game.
+
+- **Sluff flutes and spines.** Steep snow faces (about 35–55°) in big mountains are covered in parallel
+  runnels down the fall line: sharp crests (spines), rounded troughs, spacing from a few metres to tens of
+  metres, merging and splitting as they descend. They read from kilometres away as fine vertical
+  hatching on every steep snow face. Target: two octaves (about 15 m and 4 m), always aligned with the
+  local fall line, never crossing each other, fading out below about 5 px per runnel.
+- **Rock structure beats rock texture.** At distance, cliffs read through their structure: slabs along
+  the bedding, vertical joint sets, buttresses and gullies. The grain of the surface hardly shows. Up
+  close a photographic grain helps, but large uniform blotches read as dirt. Target: blocky facets at
+  2–50 m scales, sparse dark joints, albedo about 0.1–0.3 linear (grey, slightly warm), with mild
+  variation between blocks.
+- **Snow on rock.** Snow sits on whatever faces up: ledges, facet tops, broken strata, the backs of
+  blocks. It leaves the risers bare, so a cliff reads as grey rock flecked and banded with white, never
+  with uniform stripes.
+- **Rock in shade.** Shaded cliffs still show relief, because up-facing parts see more open sky and
+  cracks see less. Target: directional sky light plus crack occlusion, a cool blue-grey overall.
+- **Mid-distance relief.** In real valleys the walls 0.5–5 km away carry most of the drama: spurs,
+  gullies, rock ribs and avalanche paths. Smooth slabs at that distance are the biggest "this is a game"
+  tell. Target: about 10 m terrain detail out to ±6 km, with real cast shadows from the surrounding
+  peaks.
+- **Branch snow.** Snow on conifers sits as solid rounded pads and pillows (thick at the trunk, thinner
+  toward the tips). It hides the needles under it and casts a dark contact shadow on the foliage below.
+  It is never a thin white edge along each branch.
+- **Carve spray.** A hard carve throws a dense, short-lived wave right at the edge that frays into
+  granular streaks, clumps and a lingering cloud. Over sunlit snow, white spray is visible mainly through
+  its **shadow** on the snow and its slightly darker, self-shadowed underside, and it is brilliant when
+  backlit. It starts at the snow surface, not at the buried edge.
+- **Track rendering.** Tracks have rounded, soft-walled trenches. Distant tracks are thin continuous
+  grooves, never dashed.
