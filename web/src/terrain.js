@@ -168,7 +168,8 @@ export class Terrain {
     this.farMaterial = toonMaterial({
       name: 'terrainFarSnow', uniforms: { ...farU, noiseTex: { value: tex.noise } },
       fragPars: SNOW_COMMON_PARS + 'vec3 tN;', frag: FAR_SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
-    });    const prevFar = this.farMaterial.onBeforeCompile;
+    });
+    const prevFar = this.farMaterial.onBeforeCompile;
     this.farMaterial.onBeforeCompile = (shader, r) => {
       prevFar(shader, r);
       shader.fragmentShader = shader.fragmentShader
