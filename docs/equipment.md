@@ -259,23 +259,27 @@ At runtime, `registerVariant(type, spec)` adds a model (for DLC or user presets)
 | Metric | Skis | Board | Target (research) |
 |---|---|---|---|
 | Top speed on 25° groomed, cruise / tuck | 17.0 / 18.7 m/s | 16.4 / 17.5 m/s | 16 / 20 and 15 / 18.5 |
-| Full-lock carve at 12 m/s | R 6.9 m, 1.67 g, β 7° | R 6.7 m, 1.59 g, β 8° | 1.8 g / 1.6 g sustained |
+| Full-lock carve at 12 m/s | R 7.0 m, 1.62 g, β 7° | R 6.8 m, 1.58 g, β 8° | 1.8 g / 1.6 g sustained |
 | Half-input carve at 12 m/s | R 15.7 m, 0.72 g, β 3° | R 12.1 m, 0.91 g | 10–16 m |
 | Speed kept in a 1.4 s carve on the flat (straight glide 81%) | 82% | 80% | carving costs little |
 | Edge switch | 0.30 s | heel→toe 0.38 s, toe→heel 0.42 s | 0.30 / 0.38 / 0.46 |
-| Hockey / slide stop from 12 m/s | 6.6 m/s², 11 m | heel 5.6, toe 4.9 m/s² | 6.5 / 5.5 / 4.5 |
+| Hockey / slide stop from 12 m/s | 6.5 m/s², 11 m | heel 5.6, toe 4.9 m/s² | 6.5 / 5.5 / 4.5 |
 | Snowplough | 2.4 m/s² | — | 1.5–2.5 |
 | Pop on the flat, full charge / tap | 0.65 m, 0.70 s / 0.27 m | 0.84 m, 0.80 s / 0.33 m | 0.30 / 0.45 m real; arcade about ×2 |
 | Spin rate | 6.4 rad/s | 7.6 rad/s | 5.5–7 / 6.3–8 |
-| Butter | — | 134° in 0.8 s | about 3 rad/s |
+| Butter (keys, from neutral) | — | 120° in 0.8 s | about 3 rad/s |
+| Slalom on 20°, full lock every 1.2 s | holds 15.0 m/s | holds 13.0 m/s | linked carves keep speed |
+| Wind-up on a flat ollie, no air input | (no 180 on non-twins: settles straight) | BS 180, clean | Steep-style preload |
 | Course powder (21°) steady speed | 15.8 m/s | 15.5 m/s | — |
 
 - **On the real course,** a bot following the gully centre line for 60 s averages about 10 m/s (max about 16). The previous physics gained speed from every turn, a linear lateral-to-forward conversion; it did 0→13.6 m/s in 5 s while weaving on about 18°, which is faster than free fall along the slope allows. Constant full-lock zig-zagging is now about 6 m/s on average, as it should be.
-- **Kicker M** (40 m run-up): 1.2 s of air without a pop, and 2.2 s with a lip pop. The bench lands "Perfect FS 360", "Perfect BS 180" (switch landing), and on skis "Right 360 Japan".
+- **Kicker M** (40 m run-up): 1.2 s of air without a pop, and 2.2 s with a lip pop. The bench lands "Perfect FS 360", "Perfect BS 540 Melon" (switch landing), "Perfect FS 720", and on skis "Perfect Right 360 Japan". A ski 720 off the same kicker is marginal (stumble).
+- **Fuzz test:** 2 minutes per type of random steering, brakes, pops, grabs and mid-ride gear swaps produced no NaNs, no stuck states and no console errors. 48 rapid swaps across every variant and stance kept the shader-program count stable.
+- **Performance:** about 0.07 ms per physics step and 0.2–0.7 ms per rider update.
 - `node web/scripts/physics-variants.mjs` checks the trick names:
   - Regular: left = FS, right = BS. Goofy is mirrored.
   - "Switch FS 180", "Nollie FS 180".
-  - It also prints per-variant handling. For example, the slalom ski grips and pops most, the powder gear sinks least, and the park board butters most (142° vs 82° in 0.6 s).
+  - It also prints per-variant handling. For example, the slalom ski grips and pops most, the powder gear sinks least, and the park board butters most (121° vs 70° for the freeride board in 0.6 s).
 
 ## Integration notes (files this track does not own)
 
