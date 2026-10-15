@@ -114,7 +114,8 @@ export class Sky {
 
   update(camera, focus, time) {
     // Debug / screenshot hook: window.__gfxCam = [px, py, pz, tx, ty, tz, fov?] overrides the camera.
-    const o = typeof window !== 'undefined' ? window.__gfxCam : null;
+    let o = typeof window !== 'undefined' ? window.__gfxCam : null;
+    if (typeof o === 'function') o = o();
     if (o) {
       camera.position.set(o[0], o[1], o[2]);
       camera.up.set(0, 1, 0);

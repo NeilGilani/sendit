@@ -123,7 +123,7 @@ export const SPRAY = {
   maxParticles: 7000,
   sheetRate: 900,                // rooster-tail streaks / s per contact at full intensity
   sheetLife: 0.7,
-  sheetAlpha: 0.75,
+  sheetAlpha: 0.42,
   chunkRate: 140,                // clumps / chips per s
   glintRate: 160,                // glittering crystals per s
   mistRate: 45,                  // powder-cloud puffs per s per contact
@@ -135,6 +135,23 @@ export const SPRAY = {
   forwardMix: 0.55,
   albedo: 0.92,
   wind: [0.9, 0.35],             // m/s drift of lingering powder
+};
+
+// ------------------------------------------------------------------ CONIFERS (gfx/trees.js)
+export const TREES = {
+  height: 11,                    // metres at scale 1
+  needle: '#29402f',             // spruce needles (sRGB; ≈ 0.05 linear albedo)
+  needle2: '#34452c',            // olive-ish variation (fir)
+  bark: '#4a3b30',
+  snow: '#eef3fa',
+  snowLoad: 0.85,                // 0 bare … 1 heavily loaded branches (varies per tree)
+  firShare: 0.3,                 // share of rounder firs among the spruce
+  nearRadius: 85,                // metres: full frond trees
+  midRadius: 420,                // metres: simplified fronds; beyond = far cone shells
+  nearMax: 900,
+  midMax: 9000,
+  rebuildStep: 10,               // metres the camera moves before the near pools are refilled
+  wellRadius: 1.5,               // tree-well radius per unit tree scale
 };
 
 // ------------------------------------------------------------------ CHARACTER OUTLINE
@@ -164,7 +181,7 @@ export const SPAWN = {
   rockMaxSlope: 55,
   rockPerCluster: [3, 8],
   rockScale: [0.6, 2.8],
-  rockColors: ['#6e3f2a', '#8a5236', '#5a3324'],   // warm brown / rust boulders
+  rockColors: ['#5c5853', '#6f6a63', '#4b4844'],   // grey granite boulders
   iceShardsPerCluster: [0, 0],
   iceTint: '#bfe6ff',
   fenceOffset: 16,

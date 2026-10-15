@@ -28,6 +28,12 @@ for (const v of views) {
   await page.evaluate((v) => {
     const s = window.__sendit;
     window.__gfxCam = v.cam || null;
+    if (v.side) {
+      // Chase-side camera: [right, up, back] metres relative to the rider, looking a bit ahead.
+      const [r, u, b] = v.side;
+      window.__gfxCam = () => { const p = s.player.renderPos, h = s.player.heading; const fx = -Math.sin(h), fz = -Math.cos(h);
+        return [p.x - fz * r - fx * b, p.y + u, p.z + fx * r - fz * b, p.x + fx * 2, p.y + 0.6, p.z + fz * 2]; };
+    }
     if (v.place) s.player.place({ x: v.place[0], z: v.place[1] }, v.place[2] || 0);
     if (v.eval) (0, eval)(v.eval);
   }, v);
