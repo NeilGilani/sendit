@@ -200,7 +200,7 @@ export class Rider {
     p.t += dt;
     this.snapT += dt;
     this.root.position.copy(pl.renderPos);
-    this.root.position.y -= pl.sink;   // deep powder swallows the gear when slow
+    this.root.position.y -= pl.sink * (this.fp ? 0.45 : 1);   // deep powder swallows the gear when slow (less in first person)
     this.root.quaternion.copy(pl.renderOrient);
     const st = pl.state;
     const ground = st === State.GROUNDED, air = st === State.AIR, sit = st === State.LIFT, crashed = st === State.CRASH;
@@ -490,6 +490,8 @@ export class Rider {
     this.rotateGlobal(B.neck_01, new THREE.Quaternion().setFromAxisAngle(Y, headYaw * 0.45).multiply(_q.setFromAxisAngle(X, headPitch * 0.5)));
     this.inherit(B.Head);
     this.rotateGlobal(B.Head, new THREE.Quaternion().setFromAxisAngle(Y, headYaw * 0.55).multiply(_q.setFromAxisAngle(X, headPitch * 0.5)));
+    // First person (helmet cam): collapse the head (and helmet) so the camera never sees inside it.
+    if (this.fp) B.Head.scale.setScalar(0.001);
   }
 
   poseSki(pl) {
@@ -631,6 +633,10 @@ export class Rider {
     const sway = Math.sin(p.t * 1.3 + side) * 0.03;
     const upS = V(side * 0.32, -0.8, 0.42 + reach + sway + plant * 0.25), loS = V(side * 0.12, -0.15 - plant * 0.25, 1.0);
     const upT = V(side * 0.18, -0.55, 0.7), loT = V(-side * 0.15, 0.05, 1.0);
+    if (this.fp) {   // first person: hands carried higher and further forward so the gloves + poles frame the view
+      upS.set(side * 0.38, -0.5, 0.78); loS.set(side * 0.08, 0.12, 1.0);
+      upT.set(side * 0.3, -0.45, 0.85); loT.set(-side * 0.1, 0.2, 1.0);
+    }
     const upA = V(side, 0.15 + Math.sin(p.t * 3.1 + side) * 0.12, 0.2), loA = V(side, 0.35, 0.25);
     // Grab: Safety = left hand to the left ski; Mute = right hand across to the left ski; Japan = left
     // hand behind to the front of the crossed skis.
@@ -646,6 +652,8 @@ export class Rider {
     let l = loS.lerp(loP, p.push).lerp(loT, p.tuck).lerp(loA, p.air * (1 - g)).lerp(loG, g);
     [u, l] = this.armOverlays(side, u, l);
     this.armAim(side, u, l);
+    // First person: turn the gloves into a pole grip (palms in, knuckles forward).
+    if (this.fp) this.rotateGlobal(this.bones['hand' + (side > 0 ? '_l' : '_r')], new THREE.Quaternion().setFromAxisAngle(Z, side * 1.35).multiply(new THREE.Quaternion().setFromAxisAngle(X, 0.5)));
   }
 
   armBoard(side, nx, pl) {
@@ -696,6 +704,7 @@ export class Rider {
       this.visual.worldToLocal(hand);
       const plant = p.plant[i];
       dir.set(sx * 0.16, -1, 0.42 - plant * 0.9).normalize();
+      if (this.fp) dir.set(sx * 0.3, -1, -0.12 - plant * 0.5).normalize();   // first person: shafts drop away just outside the gloves
       if (p.push > 0.01) { const ph = p.pushPhase || 0; dir.lerp(new THREE.Vector3(sx * 0.1, -1, ph < 0.4 ? 0.1 : 0.55 + (ph - 0.4)), p.push).normalize(); }
       dir.lerp(new THREE.Vector3(sx * 0.08, -0.3, 1).normalize(), p.tuck).normalize();
       dir.lerp(new THREE.Vector3(sx * 0.6, -0.4, 0.3).normalize(), p.air * 0.5).normalize();

@@ -33,7 +33,7 @@ export class UI {
     });
     on('score', ({ label, points }) => this.note(label, points));
     on('hint', (t) => this.hint(t));
-    on('liftBoarded', (name) => { $('liftlabel').textContent = `${name}  ·  hold W to hurry`; });
+    on('liftBoarded', (name) => { $('liftlabel').textContent = `${name}  ·  hold W / RT to hurry`; });
     on('mode', () => this.refresh());
     on('landed', ({ perfect }) => { if (perfect) this.pop('PERFECT!', 'gold'); });
     on('stumble', () => this.pop('WOBBLE!', 'pink'));

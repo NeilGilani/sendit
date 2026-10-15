@@ -20,7 +20,7 @@ import { FXManager } from './fx.js';
 import { SoundScape } from './audio.js';
 import { UI } from './ui.js';
 import { Input } from './input.js';
-import { game, Mode, setMode, on, settings, resetScore, emit, scoreSnapshot } from './state.js';
+import { game, Mode, setMode, on, settings, setSetting, resetScore, emit, scoreSnapshot } from './state.js';
 import './maps/builtin.js';
 import { resolveMapSelection, loadMap, describeSelection } from './maps/registry.js';
 import { profileStore } from './profile/store.js';
@@ -136,6 +136,7 @@ async function boot() {
   }
 
   cam = new CameraController(camera, player, terrain, input);
+  cam.rider = rider;
   fx = new FXManager(player, renderer, scene);
   fx.setContactSource(() => rider.getContactPoints());   // spray from the real ski / board edges (rider.js)
   sound = new SoundScape(player, terrain);
@@ -290,6 +291,20 @@ document.addEventListener('pointerlockchange', () => {
 });
 canvas.addEventListener('click', () => { if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) input.lock(); });
 
+/** Controller rumble: landings, crashes, close shaves, pops, hard stops and a light buzz while carving. */
+on('landed', ({ impact }) => input.rumble(Math.min(1, impact / 14), 0.45, 90 + impact * 8));
+on('crashed', () => input.rumble(1, 0.8, 380));
+on('nearMiss', () => input.rumble(0, 0.55, 70));
+on('jumped', () => input.rumble(0.15, 0.3, 60));
+on('hardBrake', () => input.rumble(0.3, 0.6, 200));
+let rumbleT = 0;
+function rumbleCarve(dt) {
+  rumbleT -= dt;
+  if (rumbleT > 0 || game.mode !== Mode.RIDING || player.state !== State.GROUNDED) return;
+  const carve = Math.abs(player.turnInput) * player.speedRatio;
+  if (carve > 0.35) { input.rumble(0, 0.12 + carve * 0.18, 120); rumbleT = 0.11; }
+}
+
 /** Crossing the finish: celebrate, then fade back to the top for another lap. */
 let finishing = false;
 function checkFinish() {
@@ -309,8 +324,14 @@ function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   if (!composer) return;
-  input.poll();
+  input.poll(dt);
   if (game.mode === Mode.RIDING && input.pressed.has('KeyE') && rider) profileStore.setEquipment(profileStore.equipment === 'snowboard' ? 'skis' : 'snowboard');   // debug: swap gear while riding (via the profile, so the lobby stays in sync)
+  if (input.justPressed('view') && (game.mode === Mode.RIDING || game.mode === Mode.LIFT)) {
+    setSetting('view', settings.view === 'fp' ? 'tp' : 'fp');
+    ui.pop(settings.view === 'fp' ? 'FIRST PERSON' : 'CHASE CAM', 'cyan', true);
+  }
+  rider.fp = settings.view === 'fp' && game.mode !== Mode.MENU && player.state !== State.CRASH;
+  document.body.classList.toggle('fp', rider.fp && (game.mode === Mode.RIDING || game.mode === Mode.LIFT));
   if (input.justPressed('pause')) {
     if (ui.back()) { /* closed an overlay (settings / credits) */ }
     else if (game.mode === Mode.PAUSED) resume();
@@ -347,6 +368,7 @@ function frame(now) {
   sound.update(dt, camera);
   ui.update(dt, player);
   checkFinish();
+  rumbleCarve(dt);
   // Wind streaks fade in near top speed.
   const riding = game.mode === Mode.RIDING;
   const wantWind = riding ? THREE.MathUtils.smoothstep(player.speedRatio, HUD.windStreakFrom, HUD.windStreakFull) : 0;
