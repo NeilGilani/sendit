@@ -168,12 +168,28 @@ export class Rider {
       mesh.matrixAutoUpdate = false; mesh.matrix.copy(inv.clone().multiply(m)); mesh.castShadow = true; head.add(mesh);
       const o = new THREE.Mesh(mesh.geometry, outlineMaterial(1.5)); mesh.add(o);
     };
-    place(new THREE.Mesh(new THREE.SphereGeometry(0.135, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), toonMaterial({ name: 'helmet', color: 0xff3d7f, rim: 0.8 })),
+    this.helmetMat = toonMaterial({ name: 'helmet', color: 0xff3d7f, rim: 0.8 });
+    place(new THREE.Mesh(new THREE.SphereGeometry(0.135, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), this.helmetMat),
       new THREE.Matrix4().compose(new THREE.Vector3(0, 1.69, -0.006), new THREE.Quaternion(), new THREE.Vector3(0.95, 1.02, 1.1)));
-    const lensMat = toonMaterial({ name: 'lens', color: 0x2ff5d6, rim: 1.0 });
+    const lensMat = this.lensMat = toonMaterial({ name: 'lens', color: 0x2ff5d6, rim: 1.0 });
     lensMat.userData.uniforms.uEmissiveBoost.value = 0;
     place(new THREE.Mesh(new THREE.CapsuleGeometry(0.036, 0.12, 6, 16), lensMat),
       new THREE.Matrix4().compose(new THREE.Vector3(0, 1.703, 0.1), new THREE.Quaternion().setFromAxisAngle(Z, Math.PI / 2), new THREE.Vector3(1, 1, 0.55)));
+  }
+
+  /**
+   * Outfit colours (hex numbers or CSS strings), for clothing customisation. Any subset of:
+   * { jacket, jacket2 (shoulders), pants, gloves (gloves + boots), trim, trim2 (neon), helmet, lens }.
+   */
+  setOutfit(o = {}) {
+    const U = this.suit?.userData.uniforms;
+    const set = (u, v) => { if (u && v !== undefined) u.value.set(v); };
+    if (U) {
+      set(U.uJacket, o.jacket); set(U.uJacket2, o.jacket2); set(U.uPants, o.pants); set(U.uGloves, o.gloves);
+      set(U.uNeon, o.trim); set(U.uNeon2, o.trim2);
+    }
+    if (o.helmet !== undefined) this.helmetMat?.color.set(o.helmet);
+    if (o.lens !== undefined) this.lensMat?.color.set(o.lens);
   }
 
   get isBoard() { return this.equip?.type === 'snowboard'; }
@@ -679,15 +695,15 @@ function suitMaterial(src) {
     name: 'suit', map: src.map, rim: 1.0,
     vertPars: 'attribute vec4 color;\nvarying vec4 vZone;\nvarying vec3 vObj;',
     vert: 'vZone = color; vObj = position;',
-    fragPars: `varying vec4 vZone;\nvarying vec3 vObj;\nuniform vec3 uNeon; uniform vec3 uNeon2;`,
+    fragPars: `varying vec4 vZone;\nvarying vec3 vObj;\nuniform vec3 uNeon; uniform vec3 uNeon2;\nuniform vec3 uJacket; uniform vec3 uJacket2; uniform vec3 uPants; uniform vec3 uGloves;`,
     frag: /* glsl */`
       {
         float tot = max(vZone.r + vZone.g + vZone.b, 0.001);
         float jz = vZone.r / tot, pz = vZone.g / tot;
         // Jacket: bold colour-blocked shell (fictional "Northwake").
-        vec3 jacket = mix(vec3(0.16, 0.12, 0.42), vec3(1.0, 0.35, 0.55), step(1.28, vObj.y));
-        vec3 pants = vec3(0.12, 0.6, 0.66);
-        vec3 dark = vec3(0.08, 0.08, 0.14);
+        vec3 jacket = mix(uJacket, uJacket2, step(1.28, vObj.y));
+        vec3 pants = uPants;
+        vec3 dark = uGloves;
         vec3 cloth = jacket * vZone.r + pants * vZone.g + dark * vZone.b;
         cloth /= tot;
         diffuseColor.rgb = mix(diffuseColor.rgb * vec3(1.05, 0.95, 0.9), cloth, vZone.a);
@@ -698,7 +714,11 @@ function suitMaterial(src) {
         toonEmissive = uNeon * (band + cuff) * 1.4 + uNeon2 * leg * 1.4;
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), clamp(band + cuff + leg, 0.0, 1.0) * 0.6);
       }`,
-    uniforms: { uNeon: { value: new THREE.Color(...ART.neonColor) }, uNeon2: { value: new THREE.Color(...ART.neonColor2) } },
+    uniforms: {
+      uNeon: { value: new THREE.Color(...ART.neonColor) }, uNeon2: { value: new THREE.Color(...ART.neonColor2) },
+      uJacket: { value: new THREE.Color(0.16, 0.12, 0.42) }, uJacket2: { value: new THREE.Color(1.0, 0.35, 0.55) },
+      uPants: { value: new THREE.Color(0.12, 0.6, 0.66) }, uGloves: { value: new THREE.Color(0.08, 0.08, 0.14) },
+    },
   });
   return m;
 }

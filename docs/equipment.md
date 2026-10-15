@@ -61,6 +61,8 @@ createEquipmentModel('ski', { id: 'park', graphic: { top: 0xff3355, pattern: 'st
   - The rider stands in a relaxed stance at `rider.player.renderPos`.
   - Call `rider.setEquipment(type, variant)`, `rider.player.setStance(s)` and `rider.update(dt, camera)` as usual.
   - Its swaps never touch the in-game rider: each rider only follows its own player's `equipmentChanged` events.
+- **Outfit colours** (groundwork for clothing customisation): `rider.setOutfit({ jacket, jacket2, pants, gloves, trim, trim2, helmet, lens })`. Any subset works; values are hex numbers or CSS colours.
+- **Paint options:** `GRAPHIC_PATTERNS` (exported from `equipment/index.js`) lists the topsheet patterns.
 - **URL parameters:**
   - `?equip=ski|snowboard` (skis are the default).
   - `?variant=<id>`.

@@ -17,6 +17,8 @@ import { getEquipmentSpec, normalizeType } from './registry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const PATTERNS = { solid: 0, stripe: 1, fade: 2, chevron: 3, split: 4 };
+/** Topsheet patterns a graphic can use (spec.graphic.pattern) — for paint menus. */
+export const GRAPHIC_PATTERNS = Object.keys(PATTERNS);
 const SKI_SPACING = 0.13;   // boot centre → ski centre line (m)
 
 export function createEquipmentModel(type, variant, opts = {}) {
