@@ -44,6 +44,7 @@ export class EdgePhysics {
     this.charge = 0;          // 0..1 pop charge (squat)
     this.charging = false;
     this.takeoff = null;      // trick bookkeeping for the current air
+    this.dbg = {};            // last step's deceleration terms (m/s²), see ground()
   }
 
   get type() { return 'edge'; }
@@ -141,8 +142,11 @@ export class EdgePhysics {
     const wash = Math.max(0, kGeo - kGrip) * (1 - C.carveAssist);
     const track = 1 - smoothstep(C.trackBeta[0] * DEG, C.trackBeta[1] * DEG, Math.abs(beta));
     let yaw = eSide * Math.abs(vf) * (k * track + wash) * (1 - this.stop);
-    const auth = C.pivotRate * H.pivot * (1 - smoothstep(C.pivotFade[0], C.pivotFade[1], speed) * (1 - C.pivotHigh));
-    let pivot = s * auth * (1 - this.stop) * (mode.pivotMul ?? 1);
+    // Rotary pivot (skidded steering) only fills the gap between what the carve gives and the turn
+    // rate the rider asks for: slow → mostly pivot/skid, mid speed → pure carve, fast → grip-limited
+    // carve plus a little skid when asking for more.
+    const want = Math.abs(s) * lerp(C.pivotRate, C.turnRateFast, smoothstep(C.pivotFade[0], C.pivotFade[1], speed)) * H.pivot;
+    let pivot = Math.sign(s) * Math.max(0, want - Math.abs(yaw) * (Math.sign(yaw) === Math.sign(s) ? 1 : 0)) * (1 - this.stop) * (mode.pivotMul ?? 1);
     // Pivot can't wind the skid angle up forever: fade as β (same direction) approaches betaMax.
     if (pivot * beta > 0) pivot *= Math.max(0, 1 - Math.abs(beta) / (C.betaMax * DEG));
     yaw += pivot + (mode.yaw || 0);
@@ -174,8 +178,14 @@ export class EdgePhysics {
 
     // --- 4. push, friction, drag, skid scrub, powder
     if (pl.controllable() && pl._ctrl.up > 0.3 && speed < C.pushMaxSpeed && this.stop < 0.2) v.addScaledVector(tdir, C.pushAccel * dt);
-    const mu = (P.frictionGroomed * S.x + P.frictionPowder * S.y / Math.sqrt(H.float * C.powderFloat) + P.frictionRock * S.z
-      + P.frictionPowder * S.w / Math.sqrt(H.float * C.powderFloat)) / Math.max(1e-3, S.x + S.y + S.z + S.w);
+    // Clean carves pump a little speed back (edge rebound, pressure timing): carving beats skidding.
+    const quality = clamp(1 - wash / Math.max(k, 1e-3), 0, 1) * track * (1 - smoothstep(4 * DEG, 14 * DEG, Math.abs(beta)));
+    const pump = C.carvePump * Math.abs(speed * this.velYawRate) * quality * smoothstep(3, 6, speed) * (1 - this.stop);
+    v.addScaledVector(tdir, pump * dt);
+    this.dbg.pump = pump;
+    // Powder glide friction scales with how deep the course powder is and how well the gear floats.
+    const muPow = lerp(P.frictionGroomed, P.frictionPowder, P.powderDepth) / Math.sqrt(H.float * C.powderFloat);
+    const mu = (P.frictionGroomed * S.x + muPow * S.y + P.frictionRock * S.z + muPow * S.w) / Math.max(1e-3, S.x + S.y + S.z + S.w);
     speed = v.length();
     let decel = mu * g * n.y;
     decel += lerp(C.dragUpright, C.dragTuck, pl.tuck) * speed * speed;
@@ -191,8 +201,12 @@ export class EdgePhysics {
     const sinkT = pw * lerp(C.sinkSlow, C.sinkFast, plane * plane * (3 - 2 * plane)) / Math.sqrt(float / C.powderFloat);
     pl.sink += (sinkT - pl.sink) * (1 - Math.exp(-4 * dt));
     decel += P.turnScrub * Math.abs(pl.carve) * speed * pw / Math.sqrt(float);
-    decel += C.powderBogDecel * pw * (1 - plane) / H.float;          // bogging down below the planing speed
-    decel += C.powderDrag * pl.sink * speed;                         // ploughing: a = k · depth · v
+    decel += C.powderBogDecel * pw * (1 - plane) / H.float * P.powderDepth;   // bogging down below the planing speed
+    decel += C.powderDrag * pl.sink * speed * P.powderDepth;               // ploughing: a = k · depth · v
+    const D = this.dbg;   // per-term breakdown (m/s²) for tuning tools
+    D.fric = mu * g * n.y; D.air = lerp(C.dragUpright, C.dragTuck, pl.tuck) * speed * speed;
+    D.skid = skidMu * g * Math.abs(Math.sin(beta)) * (0.35 + 0.65 * edgeGrip) / Math.max(0.7, H.stability) * (mode.skidMul ?? 1);
+    D.extra = this.extraDecel(ctx); D.total = decel; D.beta = beta; D.grav = gTan.length();
     if (speed > 1e-4) v.multiplyScalar(Math.max(0, speed - decel * dt) / speed);
     const holding = pl.controllable() && pl._ctrl.up > 0.3;
     if (v.length() < 0.35 && (1 - n.y < P.holdStillSlope || pl.brake > 0.6) && !holding) v.set(0, 0, 0);

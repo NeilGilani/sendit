@@ -144,9 +144,9 @@ function bench(type, variant) {
     const p = rider(type, variant, { deg: 21, surface: [0, 1, 0, 0] });
     run(p, 40, {});
     say('powder 21° (course) steady', `${f(p.speed)} m/s, sink ${f(p.sink, 2)} m`, type === 'ski' ? '11–12 m/s, 0.15 m' : '13–14 m/s, 0.06 m');
-    const q = rider(type, variant, { deg: 8, surface: [0, 1, 0, 0] });
+    const q = rider(type, variant, { deg: 10, surface: [0, 1, 0, 0] });
     run(q, 40, {});
-    say('powder 8° steady speed', `${f(q.speed)} m/s, sink ${f(q.sink, 2)} m`, '');
+    say('powder 10° steady (old ≈7.9)', `${f(q.speed)} m/s, sink ${f(q.sink, 2)} m`, '');
   }
   // 9. Slalom: alternate full steer every 1.2 s down 20°; average speed kept, skid.
   {

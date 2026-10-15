@@ -25,6 +25,8 @@ export const PHYSICS = {
   brakeDecel: 9.0,
   holdStillSlope: 0.006,
   takeoffGap: 0.3,
+  terrainImpactLoss: 0.5,     // share of an abrupt impact into the terrain (beyond smoothFollow) lost as speed
+  smoothFollow: 0.25,         // m/s per step of normal velocity absorbed loss-free (smooth rolls and dips)
   // Jump: hold to squat, release to pop. Impulse scales with squat depth.
   chargeTime: 0.6,
   jumpMin: 3.0,               // legacy (pre-equipment) pop — see PHYSICS.ski / .snowboard popMin/popMax
@@ -48,7 +50,8 @@ export const PHYSICS = {
   // Powder feel: sink in when slow, plane up with speed; turning in deep snow scrubs speed.
   powderSink: 0.24,           // metres the rider sinks into powder when slow
   powderSinkFast: 0.07,       // … and when planing at speed
-  planeSpeed: [3, 12],        // m/s range over which the skis rise to the surface
+  planeSpeed: [3, 12],        // m/s range over which the skis rise to the surface (legacy)
+  powderDepth: 0.35,          // how deep the course powder is (0 = sugar on a groomer, 1 = bottomless): scales bog + plough drag
   turnScrub: 0.16,            // speed lost turning in powder (1/s per unit of carve)
   liftRideSeconds: 45,
   liftBoardSpeed: 8,
@@ -71,12 +74,13 @@ export const PHYSICS = {
     gripRate: 11,             // 1/s lateral velocity decay on an engaged edge
     flatGrip: 0.35,           // share of grip with a flat base (sideslips)
     carveEff: 0.985,          // share of redirected lateral energy kept in a clean carve
-    skidEff: 0.55,            // … in a skid
-    skidMu: 0.55,             // μ_side: skid decel = μ·g·sin β
+    skidEff: 0.8,             // … in a skid
+    skidMu: 0.36,             // μ_side: steering-skid decel = μ·g·sin β (research 0.55; arcade-softened)
+    carvePump: 0.05,          // m/s² gained per m/s² of lateral accel in a clean carve (rewards carving)
     trackBeta: [6, 28],       // deg — skid angle range where the sidecut stops steering the path
-    pivotRate: 2.1,           // rad/s rotary steering at low speed (skidded turns)
-    pivotHigh: 0.22,          // share of the pivot left at speed
-    pivotFade: [3, 13],       // m/s fade range
+    pivotRate: 2.2,           // rad/s turn rate asked for at full input when slow (pivot fills what the carve lacks)
+    turnRateFast: 1.25,       // rad/s … at speed (beyond the grip-limited carve → some skid)
+    pivotFade: [2, 15],       // m/s blend range
     betaMax: 22,              // deg — pivot fades as the skid angle approaches this
     selfAlign: 2.2,           // 1/s skis track their own path when the rider stops steering
     // Braking: snowplough below plowSpeed, hockey stop above.
@@ -109,9 +113,9 @@ export const PHYSICS = {
     speedRadius: 1.5, speedRadiusV: [6, 16],
     carveAssist: 0.85,
     gripRate: 10, flatGrip: 0.25,
-    carveEff: 0.985, skidEff: 0.5, skidMu: 0.5,
+    carveEff: 0.985, skidEff: 0.75, skidMu: 0.34, carvePump: 0.05,
     trackBeta: [7, 30],
-    pivotRate: 2.5, pivotHigh: 0.25, pivotFade: [2.5, 12], betaMax: 26,
+    pivotRate: 2.5, turnRateFast: 1.35, pivotFade: [2, 14], betaMax: 26,
     selfAlign: 2.0,
     // Slide stop: rotate the board ~90° across the path on the heel (or toe) edge.
     stopAngle: 86, stopTurnRate: 6, stopMuHeel: 0.42, stopMuToe: 0.33, stopEdgeHeel: 30, stopEdgeToe: 34,

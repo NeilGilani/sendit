@@ -190,7 +190,10 @@ export class Player {
       const into = this.velocity.dot(n2);
       if (into < 0) {
         const mag = this.velocity.length();
-        this.velocity.addScaledVector(n2, -into).normalize().multiplyScalar(mag * 0.997);
+        // Follow the terrain: rotate the velocity onto the new surface (keeps speed; a dip costs a little).
+        const loss = Math.min(0.03 * mag, Math.max(0, -into - P.smoothFollow) * P.terrainImpactLoss);
+        this.velocity.addScaledVector(n2, -into).normalize().multiplyScalar(mag - loss);
+        this._followLoss = (this._followLoss || 0) + loss;
       }
       this.position.copy(np);
     }
