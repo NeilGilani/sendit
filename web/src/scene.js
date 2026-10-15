@@ -187,6 +187,7 @@ export const TREES = {
   needle2: '#34452c',            // olive-ish variation (fir)
   bark: '#4a3b30',
   snow: '#eef3fa',
+  translucency: 0.9,             // backlit glow of needle tips (sun behind the tree)
   snowLoad: 0.85,                // 0 bare … 1 heavily loaded branches (varies per tree)
   firShare: 0.3,                 // share of rounder firs among the spruce
   nearRadius: 85,                // metres: full frond trees

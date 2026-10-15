@@ -26,24 +26,32 @@ function makeNeedleTexture(size = 256) {
     const y0 = band * size / 2, h = size / 2;
     const cy = y0 + h / 2;
     const width = (u) => Math.sin(Math.min(1, u * 1.15) * Math.PI) * 0.42 * h * (1 - u * 0.35);
-    // side twigs
-    for (let k = 0; k < 9; k++) {
-      const u0 = 0.08 + k * 0.1 + rnd() * 0.04;
+    // Side twigs (fishbone): needles grow along each twig, so the frond is ragged with gaps, not a leaf.
+    const twigs = [];
+    for (let k = 0; k < 16; k++) {
+      const u0 = 0.04 + k * 0.058 + rnd() * 0.03;
       const side = k % 2 ? 1 : -1;
-      const x0 = u0 * size, x1 = x0 + 0.18 * size;
-      const y1 = cy + side * width(u0) * 0.9;
-      g.strokeStyle = 'rgba(60,45,30,1)'; g.lineWidth = 1.2;
-      g.beginPath(); g.moveTo(x0, cy); g.quadraticCurveTo((x0 + x1) / 2, cy + side * width(u0) * 0.3, x1, y1); g.stroke();
+      const reach = width(u0) * (0.75 + rnd() * 0.45);
+      const ang = side * (0.75 + rnd() * 0.35);
+      const tl = reach / Math.sin(Math.abs(ang));
+      const x0 = u0 * size, x1 = x0 + Math.cos(Math.abs(ang)) * tl, y1 = cy + Math.sin(ang) * tl;
+      twigs.push([x0, cy, x1, y1]);
+      g.strokeStyle = 'rgba(60,45,30,1)'; g.lineWidth = 1.1;
+      g.beginPath(); g.moveTo(x0, cy); g.lineTo(x1, y1); g.stroke();
     }
-    // needles
-    for (let n = 0; n < 2600; n++) {
-      const u = rnd();
-      const wv = width(u);
-      if (wv < 2) continue;
-      const off = (rnd() * 2 - 1) * wv;
-      const x = u * size, y = cy + off;
-      const ang = (off > 0 ? 1 : -1) * (0.6 + rnd() * 0.7) + (rnd() - 0.5) * 0.4;
-      const len = 3 + rnd() * 6;
+    // needles: mostly along the twigs, some along the main axis
+    for (let n = 0; n < 3000; n++) {
+      let x, y, dirA;
+      if (rnd() < 0.82) {
+        const t = twigs[Math.floor(rnd() * twigs.length)], f = rnd();
+        x = t[0] + (t[2] - t[0]) * f; y = t[1] + (t[3] - t[1]) * f;
+        dirA = Math.atan2(t[3] - t[1], t[2] - t[0]);
+      } else {
+        const u = rnd(); x = u * size; y = cy + (rnd() - 0.5) * 6; dirA = 0;
+        if (width(u) < 3) continue;
+      }
+      const ang = dirA + (rnd() < 0.5 ? 1 : -1) * (0.5 + rnd() * 0.6);
+      const len = 3 + rnd() * 5;
       const shade = 0.55 + rnd() * 0.45;
       const r = Math.round(26 * shade), gg = Math.round(58 * shade), b = Math.round(36 * shade);
       g.strokeStyle = `rgba(${r},${gg},${b},1)`;
@@ -149,7 +157,7 @@ function crownGeometry(kind, lod, seed) {
   }
   {
     // Dark inner core (needle mass deep in the crown): hides the trunk, no see-through gaps.
-    const core = new THREE.ConeGeometry((kind === 0 ? 1.7 : 2.0) * (lod === 0 ? 0.8 : 1.0), H * 0.86, lod === 0 ? 9 : 7, 1, true);
+    const core = new THREE.ConeGeometry((kind === 0 ? 1.7 : 2.0) * (lod === 0 ? 0.62 : 1.0), H * 0.86, lod === 0 ? 9 : 7, 1, true);
     core.translate(0, H * 0.43 + 0.9, 0);
     const n = core.attributes.position.count;
     core.setAttribute('aUnder', new THREE.Float32BufferAttribute(new Float32Array(n).fill(3), 1));   // 3 = core
@@ -241,6 +249,7 @@ float tvn(vec3 p) {
              mix(mix(th1(n + 113.0), th1(n + 114.0), f.x), mix(th1(n + 170.0), th1(n + 171.0), f.x), f.y), f.z);
 }
 uniform vec3 uNeedle; uniform vec3 uNeedle2; uniform vec3 uBark; uniform vec3 uTreeSnow; uniform float uSnowLoad;
+vec3 tTreeN = vec3(0.0, 1.0, 0.0); float tTreeNW = 0.0; float tNeedle = 0.0;
 `;
 const FRAG = /* glsl */`
 {
@@ -272,9 +281,21 @@ const FRAG = /* glsl */`
       // Along the branch: a ridge of snow over the twig, thinning toward the tips and the edges.
       float across = abs(fract(vTUv.y * 2.0) - 0.5) * 2.0;
       float along = smoothstep(0.0, 0.25, vTUv.x) * (1.0 - smoothstep(0.65, 1.0, vTUv.x));
-      snow = smoothstep(0.42, 0.68, load * (0.55 + 0.45 * along) * (1.15 - across * 0.6) + (n - 0.5) * 0.55);
+      float sv = load * (0.55 + 0.45 * along) * (1.15 - across * 0.6) + (n - 0.5) * 0.55;
+      snow = smoothstep(0.42, 0.62, sv);
+      // Snow is a solid pillow on the twig, not needle-shaped: it keeps its own soft outline.
+      diffuseColor.a = max(diffuseColor.a, smoothstep(0.6, 0.66, sv));
+      // Pillow normal: domed across the branch, lumpy (lit tops, shaded flanks).
+      vec3 e = vec3(0.09, 0.0, 0.0);
+      float c0 = tvn(vW * 6.0);
+      vec3 gN = vec3(tvn(vW * 6.0 + e.xyz) - c0, tvn(vW * 6.0 + e.yxz) - c0, tvn(vW * 6.0 + e.yzx) - c0) / 0.09;
+      tTreeN = normalize(vec3(0.0, 1.0, 0.0) + normalize(vWN) * (0.35 + across * 0.8) - gN * 0.18);
+      tTreeNW = snow;
     }
   }
+  tNeedle = (!bark && !shell) ? (1.0 - snow) : 0.0;
+  // Inner needle mass: not a flat dark cone — break it up into lighter / darker clumps.
+  if (under > 2.5 && under < 3.5) col *= 0.55 + 0.9 * tvn(vW * 1.7) * tvn(vW * 4.3 + 3.0);
   col = mix(col, uTreeSnow, snow);
   col *= mix(vAO, 1.0, snow * 0.6);
   diffuseColor.rgb = col;
@@ -291,7 +312,19 @@ function treeMaterial(opts) {
       uSnowLoad: { value: TREES.snowLoad }, uLodCenter: opts.lodCenter,
     },
     vertPars: VERT_PARS, vertPre: VERT_PRE, fragPars: FRAG_PARS, frag: FRAG,
+    // Backlit needles: thin needle sprays at the branch tips glow when the sun is behind the tree.
+    band: /* glsl */`
+      {
+        float back = pow(max(dot(-normalize(vViewPosition), sunV), 0.0), 5.0);
+        light += uSunCol * vec3(0.7, 0.85, 0.45) * back * tNeedle * pow(vAO, 3.0) * mix(0.35, 1.0, shadow) * ${TREES.translucency.toFixed(2)};
+      }`,
   });
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (shader, r) => {
+    prev(shader, r);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>',
+      '#include <normal_fragment_maps>\n  if (tTreeNW > 0.0) normal = normalize(mix(normal, (viewMatrix * vec4(tTreeN, 0.0)).xyz, tTreeNW));');
+  };
   if (opts.far) m.defines = { FAR_LOD: 1 };
   m.userData.far = !!opts.far;
   return m;

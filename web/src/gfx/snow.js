@@ -81,9 +81,11 @@ void rockLayer(vec2 uv0, float farF, float midF, out vec3 col, out vec2 g, out f
   col = rockAlbedo(uv, farF);
   // Ribs and gullies running down the fall line (alpine faces are fluted, not flat): a height field
   // stretched along the face. Ribs catch the sun on one flank, gullies shade and fill with snow.
-  vec2 q1 = vec2(uv.x * 0.0062, uv.y * 0.0011 + uv.x * 0.0008);
+  // (x is warped by height so the flutes wander instead of running as straight stripes)
+  float wx = uv.x + (texture2D(noiseTex, uv * vec2(0.002, 0.004) + 0.27).g - 0.5) * 14.0;
+  vec2 q1 = vec2(wx * 0.0062, uv.y * 0.0011 + wx * 0.0008);
   float h1 = texture2D(noiseTex, q1).r, h1u = texture2D(noiseTex, q1 + vec2(0.0025, 0.0)).r;
-  vec2 q2 = vec2(uv.x * 0.024, uv.y * 0.0075) + 0.37;
+  vec2 q2 = vec2(wx * 0.024, uv.y * 0.0075) + 0.37;
   float h2 = texture2D(noiseTex, q2).r, h2u = texture2D(noiseTex, q2 + vec2(0.004, 0.0)).r;
   float du = (h1u - h1) / (0.0025 / 0.0062) * 22.0 + (h2u - h2) / (0.004 / 0.024) * 2.6 * (1.0 - farF * 0.7);
   gully = smoothstep(0.42, 0.26, h1 + (h2 - 0.5) * 0.2);
@@ -125,7 +127,7 @@ void rockLayer(vec2 uv0, float farF, float midF, out vec3 col, out vec2 g, out f
   // Ledge snow comes in broken pieces of varying length; more of it in the gullies.
   seg = smoothstep(0.0, 0.12, segW);
   // Gully snow: streaks running down the flutes, broken by steps (snow runnels below ledges).
-  gully *= smoothstep(0.4, 0.62, texture2D(noiseTex, vec2(uv.x * 0.03, uv.y * 0.008) + 0.13).g + (1.0 - riser) * 0.15);
+  gully *= smoothstep(0.48, 0.66, texture2D(noiseTex, vec2(wx * 0.03, uv.y * 0.008) + 0.13).g + (1.0 - riser) * 0.12) * 0.85;
 }
 // Rock albedo: grey gneiss in blocks, lighter/darker beds, vertical runoff streaks, iron staining.
 vec3 rockAlbedo(vec2 uv, float far) {
@@ -245,7 +247,7 @@ export const SNOW_FRAG_GLSL = /* glsl */`
     rockCol = cA * wxz.x + cB * wxz.y;
     float riser = rA * wxz.x + rB * wxz.y;
     float seg = sA * wxz.x + sB * wxz.y;
-    float gul = kA * wxz.x + kB * wxz.y;
+    float gul = (kA * wxz.x + kB * wxz.y) * smoothstep(0.45, 0.65, slope);
     float rr = mix(riser, 0.5, farF);
     vec3 pert = wxz.x * vec3(0.0, gA.y, gA.x * sx) + wxz.y * vec3(-gB.x * sz, gB.y, 0.0);
     Nr = normalize(N + fB * (0.75 - rr) * 0.7 + pert);
