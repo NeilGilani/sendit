@@ -382,3 +382,83 @@ The implementation is in `web/src/physics/` (see [equipment.md](equipment.md)). 
 | Landing yaw: skis clean ≤10°, crash >35°; boards slide out sideways | Skis clean ≤15°, crash >38°. Boards: clean ≤15°, stumble ≤45°, slide ≤82°. Twin tips land switch. | Slightly more forgiving clean window; the auto-righting assist covers 14° in the last 0.25 s. |
 | Wind-up and preload (Steep, Shredders) | Steering while charging winds up a spin (+2.6 / +3.2 rad/s at take-off). | none |
 | Lean `atan(a_lat/g)` plus up to 15° of ski angulation; shoulders lead turns by about 0.1 s | Rider lean comes from the contact force across the gear. Skis angulate with the spine. Shoulders follow the raw input, ahead of the smoothed edge. | The lean is capped at 0.8 rad for readability. |
+
+---
+
+## 7. Round 2: flips, landings, natural air, butters and edge catches
+
+This section supports the second tuning pass: flips and corks, pitch-aware landings, natural air off convex terrain, crest absorption, ski butters, and the flip preload. Estimates are marked as such.
+
+### 7.1 Flip rotation rates
+
+- **Aerials.** The flight phase of a triple-flip aerial lasts about 2.6 s, with three straight-body somersaults ([Yeadon, CPA](https://ojs.ub.uni-konstanz.de/cpa/article/view/3076/2884)). That gives an average of about 7 rad/s, or about 0.87 s per flip. Take-off speed is about 70 km/h off a kicker about 4.1 m tall ([US Ski & Snowboard](https://usskiandsnowboard.org/news/aerial-skiing-101)).
+- **Where the rotation comes from.** It is set on the ramp: leaning forward at the start of the kicker plus ankle torque just before take-off ([Jones, Loughborough](https://dspace.lboro.ac.uk/2134/10784)). Trampoline and kicker models name take-off angular velocity and moment of inertia as the key indicators ([SPONET](https://lida.sport-iat.de/svd/Record/4092443?lng=en)).
+- **Single wildcats.** Motion capture of 46 single wildcats found two tuck strategies ([Bacik et al.](https://johk.pl/?p=5458)).
+- *Estimate:* a tucked single backflip off a 10–15 m kicker takes about 1.0–1.4 s (4.5–6 rad/s). A double cork 1080 needs about 2–2.5 s of air. Billy Morgan's first quad cork 1800 needed 2.8 s ([Red Bull](https://www.redbull.com/us-en/full-story-behind-billy-morgans-quadruple-cork)).
+
+**Targets used:** flip rate of 5.6 rad/s on skis and 5.9 rad/s on the board, about 1.1 s per flip. Doubles need about 2.3 s of air, so they are only possible off the biggest popped kickers.
+
+### 7.2 Landing impact: equivalent fall height (EFH)
+
+- **Definition.** EFH = v⊥² / 2g, the drop onto flat ground that gives the same impact as the velocity change normal to the landing surface ([Petrone, Cognolato, McNeil & Hubbard](https://ar5iv.labs.arxiv.org/html/1611.04448)).
+  - Minetti puts the normal impact a rider's legs can absorb at about 1.5 m EFH, which is about 5.4 m/s.
+  - Landings linked to spinal-cord injuries measured 3–10 m EFH.
+  - The legs need about 0.25 s to absorb a landing.
+- **Safe drop heights.** Minetti's model gives 2.6–3.0 m for athletes ([UNIMI](https://air.unimi.it/handle/2434/19726)).
+- **Jump design.** Straight landing slopes give an EFH that grows linearly with distance. Landings can be designed to cap EFH ([Levy, Hubbard, McNeil & Swedberg](https://paperity.org/p/73758286/a-design-rationale-for-safer-terrain-park-jumps-that-limit-equivalent-fall-height)).
+- **Real tables.** Medium jumps stay under 1.5 m, but deck landings on big tables reach 2.3–3.4 m ([DOAJ](https://doaj.org/article/fe3f699fc039403e95387582f05fcb57)).
+- **Where riders land.** In 704 observed snowboard tabletop jumps, 45% landed on the slope, 35% on the knuckle and 20% on the deck; 21% fell ([SPONET](https://sponet.de/sponet/Record/3042548)).
+
+**Conversion (v⊥ = √(2gh)):** 0.5 m → 3.1 m/s; 1.5 m → 5.4 m/s; 3 m → 7.7 m/s; 10 m → 14 m/s.
+
+**Where the game deviates (deliberately).** The course's kickers are not designed jumps. They land on the natural 15–20° slope, so popped airs hit at 9–11 m/s normal, an EFH of 4–6 m. A realistic rule would crash almost every popped jump, so the game stays arcade:
+- Above 12.5 m/s (`hardLanding`) the rider stumbles.
+- Above 18 m/s (`crashImpact`) the rider crashes.
+- Impact still drives squash, camera shake and sound.
+
+A future "designed landings" feature (landing ramps sized for the kicker) would let these thresholds move toward the real numbers.
+
+### 7.3 Natural air over convex terrain; pre-jump and absorption
+
+- **Physics.** Over a crest of radius R, the normal force reaches zero at v² = g·R·cos θ. Beyond that speed the rider is a projectile ([derivation](https://www.physicsforums.com/threads/at-what-angle-does-a-skier-leave-a-sphere.157008/post-1250060)).
+  - *Estimate:* on a 20° slope, an R = 10 m roller launches above about 9.6 m/s, and an R = 5 m roller above about 6.8 m/s.
+- **Pre-jump.** Lifting the skis just before the crest keeps the rider low, avoiding being "thrown up and out" ([SI ski tip, 1960](https://vault.si.com/vault/1960/01/11/ski-tip)). Downhillers carried more speed with a pre-jump than without ([Ewha thesis](https://dspace.ewha.ac.kr/handle/2015.oak/197414)).
+- **Absorption.** The legs retract over the crest. *Estimate:* the leg stroke is 0.3–0.5 m, which lets a rider stay on the snow up to about 1.3–1.5× the passive lift-off speed.
+
+**Applied:**
+- The player leaves the snow when `v·n′/dt > g·n′.y × liftOffGrip`, with `liftOffGrip` = 1.25 for a little passive absorption.
+- Crouching while charging multiplies that by (1 + 0.8 × charge), up to about 1.8×. Holding Space soaks up a crest, and releasing on it pops off the roller.
+- The hand-built course's natural drops now give about 1 s of air to a rider going straight. Before this change the ground step glued riders to any convex terrain.
+
+### 7.4 Butters and presses
+
+- **Snowboard.** Hips over the nose or tail, base flat, the other end lifted about 10 cm, with the upper body winding the spin ([Snowboard Addiction](https://snowboardaddiction.com/blogs/latest-news/how-to-butter-on-a-snowboard-step-1-basic-buttering-position)). Soft snow makes edge catches more likely ([Red Bull](https://redbull.com/us-en/butter-snowboarding)).
+- **Skis.** Butters are easiest on soft, centre-mounted twin tips with rockered tips ([Blister](https://blisterreview.com/gear-reviews/2014-2015-armada-al-dente)). Butters scrub speed, so riders come in faster than they think they need ([Freeskier, Jossi Wells](https://freeskier.com/stories/trick-tip-tuesday-jossi-wells)).
+
+**Applied:**
+- Skis butter like the board: Space or W+Space plus steer, below 11 m/s.
+- Butter rate is 2.6 rad/s × pivot, against 3.4 for the board. Directional skis get 0.6× that rate.
+- Butter drag is 0.9 m/s².
+
+### 7.5 Catching an edge (not implemented)
+
+- **Mechanics.** A flat or sideslipping board lets the downhill edge dig in. It stops almost instantly while the body keeps going, slamming the rider downhill ([alpinesnowboarder forum](https://forums.alpinesnowboarder.com/topic/26631-riding-the-flats/)).
+- **Injuries.** Backward falls cause 68% of major snowboard head injuries, typically on gentle slopes ([ASTM STP](https://store.astm.org/stp39647s.html)).
+- **In games.** Few games model it. A VR sim advertises bailing on a caught edge ([SideQuest](https://sidequestvr.com/app/41842/realistic-snowboarding)).
+- **Possible rule** if it is ever added: a catch only when the downhill edge is set (under 5°), sideways speed is above 2–3 m/s, and forward speed is under 15 m/s, with a 0.15 s grace period. In this game it would mostly punish keyboard edge changes, so it is left out on purpose.
+
+### 7.6 How games handle flips
+
+| Game | Flip input | Mid-air control | Landing |
+|---|---|---|---|
+| SSX (2012) / Tricky | Left stick in the air; pre-wind by holding jump plus a direction and releasing at the lip ([T3](https://www.t3.com/reviews/ssx-review)) | Free | Riders "automatically right themselves" near the ground ([PopMatters](https://popmatters.com/review/155657-ssx)) |
+| Steep | Hold the trigger to prepare and release at the lip. Stick forward or back flips; holding forward before take-off ruins the jump ([Twinfinite](https://twinfinite.net/?p=237797)) | Stick | Alignment matters |
+| Shredders | Left stick flips. Holding RT, pushing forward, then snapping back at the lip makes you rotate much faster ([Pure Xbox](https://purexbox.com/guides/shredders-how-to-do-a-triple-backflip)) | Limited | Dedicated landing input |
+| Infinite Air | Pre-load about 1 s before take-off ([TGA](https://totalgamingaddicts.com/mark-mcmorris-infinite-air-review/)) | Spin speed adjustable; flips hard to stop | Very narrow window ([TheSixthAxis](https://www.thesixthaxis.com/2016/10/28/mark-mcmorris-infinite-air-review/)) |
+| Amped (2001) | Left stick in the air | Free | Bail if not aligned ([GameSpot](https://www.gamespot.com/articles/hands-onamped-freestyle-snowboarding/1100-2814091/)) |
+
+**Applied:**
+- In the air, W and S flip forward and back. Keys already held at take-off are ignored until pressed again, so a held tuck or nollie never flips by accident. This addresses Steep's "forward before take-off ruins the jump" trap.
+- S held while charging the pop is a **preload**: the take-off already rotates at 4.2–4.4 rad/s and commits to the flip. This mirrors Shredders and Infinite Air, and matches the research: rotation is set on the ramp, and wildcats pop off the tail.
+- With the stick released, a flip carries on to the next upright. Inside 50° of upright the rider spots the landing and settles, which is a subtle SSX-style assist.
+- Pitch tolerance is 22° for clean and 42° for a stumble. The research suggests ±15 / ±35; the game is a little more forgiving because the camera makes pitch harder to read than yaw.
