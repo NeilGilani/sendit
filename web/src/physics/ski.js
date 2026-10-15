@@ -13,6 +13,9 @@ export class SkiPhysics extends EdgePhysics {
 
   get type() { return 'ski'; }
 
+  /** W: double-pole / skate below push speed, tuck above it. */
+  tuckFromUp(ctrl) { return ctrl.up * smoothstep(this.C.pushMaxSpeed - 1.5, this.C.pushMaxSpeed + 0.5, this.pl.speed); }
+
   onControl(dt, ctrl, grounded) {
     const pl = this.pl, C = this.C;
     // Snowplough (pizza) when slow, hockey stop when fast. Hysteresis keeps a stop going until slow.

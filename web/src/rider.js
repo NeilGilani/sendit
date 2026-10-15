@@ -222,7 +222,7 @@ export class Rider {
     const leadGround = pl.squat > 0.05 && Math.abs(pl.windup || 0) > 0.05 ? (pl.windup || 0) * 1.4 : -pl.turnInput;
     p.lead += ((ground ? leadGround : air ? THREE.MathUtils.clamp(pl.spinRate * 0.12, -0.6, 0.6) : 0) - p.lead) * k(6);
     // Double-pole push on skis (W when slow): a looping reach-plant-push cycle.
-    const pushing = ground && !board && pl._ctrl?.up > 0.3 && pl.speed < (pl.dyn?.C.pushMaxSpeed ?? 8) && pl.tuck < 0.6;
+    const pushing = ground && !board && pl._ctrl?.up > 0.3 && pl.speed < (pl.dyn?.C.pushMaxSpeed ?? 8);
     p.push = (p.push || 0) + ((pushing ? 1 : 0) - (p.push || 0)) * k(6);
     if (pushing || p.push > 0.02) p.pushPhase = ((p.pushPhase || 0) + dt * 1.6) % 1;
 
@@ -478,12 +478,12 @@ export class Rider {
     const hipYaw = nx * BA.hipOpen * ns;
     // The whole body already rolls onto the edge (visual lean), so toe side keeps the torso tall
     // (knees and hips drive forward) and heel side sits down without folding.
-    const hipPitch = (0.12 + p.crouch * 0.25 - p.toe * 0.06 + p.heel * 0.05 + p.grab * 0.3) * ns;
+    const hipPitch = (0.12 + p.crouch * 0.25 - p.toe * 0.06 + p.heel * 0.05 + p.grab * 0.22) * ns;
     const wob = p.stumble * Math.sin(p.t * 9) * 0.25;
     // Shoulders open toward the nose, rotation leads the turn; in the air the spin leads.
     const lead = p.lead * BA.turnLead;
     const spineTwist = (nx * (BA.shoulderOpen - BA.hipOpen) + lead) * ns;
-    const bend = (0.1 + p.crouch * 0.2 - p.toe * 0.04 + p.heel * 0.12 + p.grab * 0.35) * ns;
+    const bend = (0.1 + p.crouch * 0.2 - p.toe * 0.04 + p.heel * 0.12 + p.grab * 0.26) * ns;
     // Head: look down the direction of travel (nose, or over the back shoulder when switch).
     const headYaw = (nx * p.look * BA.headTurn - nx * BA.shoulderOpen - lead) * ns;
     this.trunk(off, hipYaw, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist, wob - p.lean * 0.15, headYaw, -(hipPitch + bend) * 0.6);

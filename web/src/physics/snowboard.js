@@ -38,7 +38,8 @@ export class SnowboardPhysics extends EdgePhysics {
     return ((C.maxEdgeToe + C.maxEdgeHeel) * DEG) / t;
   }
 
-  tuckFromUp(ctrl) { return this.charging ? 0 : ctrl.up * 0.7; }
+  /** W: one-foot skate when slow, a low crouch at speed (never while loading a nollie). */
+  tuckFromUp(ctrl) { return this.charging ? 0 : ctrl.up * 0.7 * smoothstep(this.C.pushMaxSpeed - 1, this.C.pushMaxSpeed + 1, this.pl.speed); }
 
   onChargeStart(ctrl) { this._popEnd = ctrl.up > 0.3 ? 'nose' : 'tail'; }
 
