@@ -281,14 +281,14 @@ export const SNOW_FRAG_GLSL = /* glsl */`
       Ns = normalize(Ns - vec3(gw.x, 0.0, gw.y));
     }
     // Wind ripples: asymmetric ripples across the wind (gentle stoss, steep lee), warped.
-    float rip = uSnowShape.y * 0.4 * (0.3 + 0.7 * exposure) * (1.0 - groomed) * (1.0 - forest * 0.6);
+    float rip = uSnowShape.y * 0.22 * (0.2 + 0.8 * exposure) * (1.0 - groomed) * (1.0 - forest * 0.6);
     if (rip > 0.01 && uDetail > 0.5) {
       float warp = (texture2D(noiseTex, xz * 0.011).r - 0.5) * 3.5 + (texture2D(noiseTex, xz * 0.045 + 0.2).r - 0.5) * 0.9;
       float k = 6.2831853 / 0.32;
       float ph = (sAl + warp) * k;
       float fw = tFP * k;
       float aa = 1.0 - smoothstep(0.6, 2.2, fw);
-      float blot = smoothstep(0.3, 0.75, texture2D(noiseTex, xz * 0.031 + 0.17).r + exposure * 0.2);
+      float blot = smoothstep(0.45, 0.8, texture2D(noiseTex, xz * 0.031 + 0.17).r + exposure * 0.2);   // ripple fields come in patches
       float dh = (cos(ph) + 0.45 * cos(2.0 * ph + 0.6)) * 0.022 * k;
       vec2 gw = wd * dh * rip * aa * blot;
       Ns = normalize(Ns - vec3(gw.x, 0.0, gw.y));

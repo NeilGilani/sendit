@@ -31,8 +31,8 @@ export class Terrain {
   /**
    * The hand-built gully's walls are smooth ramps. Real alpine faces are fluted: ribs and gullies
    * running down the fall line. Add that relief (a few metres, steep cells only, so the riding floor
-   * is untouched) to the height field, then refresh normals and the rock mask. The course's walls run
-   * roughly north–south, so the fall line is mostly along x: the noise is stretched along x.
+   * is untouched) to the height field, then refresh normals and the rock mask. The noise is stretched
+   * along each cell's own fall line.
    */
   sculptCliffs() {
     const N = this.res, sp = this.spacing, half = this.half, H = this.heights, nrm = this.normals;
@@ -60,7 +60,11 @@ export class Terrain {
         if (st <= 0) continue;
         const w = st * st * (3 - 2 * st);
         const x = -half + i * sp;
-        const r = ridge(x * 0.0019 + 2.3, z * 0.012 + 5.9) * 0.45 + ridge(x * 0.0045, z * 0.03) * 0.35 + ridge(x * 0.013 + 7.1, z * 0.085 + 3.3) * 0.2;
+        // Stretch the flutes down the local fall line (u) and pack them across it (v).
+        const hl = Math.hypot(nx, nz) || 1, fx = nx / hl, fz = nz / hl;
+        const u = x * fx + z * fz, v = -x * fz + z * fx;
+        // (no octave finer than ~30 m: distant LOD chunks point-sample the grid and would alias it)
+        const r = ridge(u * 0.0019 + 2.3, v * 0.012 + 5.9) * 0.55 + ridge(u * 0.0045, v * 0.03) * 0.45;
         H[k] += A * w * (r - 0.55) * 2;
         touched++;
       }

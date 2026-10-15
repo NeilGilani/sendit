@@ -19,7 +19,7 @@ const out = await page.evaluate(() => {
   const tu = s.terrain.terrainUniforms;
   const V = {
     full: [() => {}, () => {}],
-    noAO: [() => { P.ao.enabled = false; }, () => { P.ao.enabled = true; }],
+    noAO: [() => { P.__ao = P.ao.enabled; P.ao.enabled = false; }, () => { P.ao.enabled = P.__ao; }],
     aoFull: [() => { P.ao.configuration.halfRes = false; }, () => { P.ao.configuration.halfRes = true; }],
     noShadowUpdate: [() => { R.shadowMap.autoUpdate = false; }, () => { R.shadowMap.autoUpdate = true; }],
     noScatter: [() => { scatter.visible = false; }, () => { scatter.visible = true; }],
