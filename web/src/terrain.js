@@ -4,7 +4,7 @@
 // backdrop. Answers height/normal/surface queries; park features add to the height field.
 import * as THREE from 'three';
 import { globals, toonMaterial, SUN_DIR } from './world.js';
-import { RING } from './scene.js';
+import { RING, CLIFFS } from './scene.js';
 import { snowUniforms, SNOW_COMMON_PARS, SNOW_PARS_GLSL, SNOW_FRAG_GLSL, SNOW_BAND_GLSL, FAR_SNOW_FRAG_GLSL } from './gfx/snow.js';
 
 const CHUNK = 128;
@@ -25,6 +25,63 @@ export class Terrain {
     const d = await course.generate(onProgress);
     this.course = course;
     this.ingest(d.meta, d.heights, d.normals, d.splat, d.far);
+    if (course.P?.wallHeight) this.sculptCliffs();
+  }
+
+  /**
+   * The hand-built gully's walls are smooth ramps. Real alpine faces are fluted: ribs and gullies
+   * running down the fall line. Add that relief (a few metres, steep cells only, so the riding floor
+   * is untouched) to the height field, then refresh normals and the rock mask. The course's walls run
+   * roughly north–south, so the fall line is mostly along x: the noise is stretched along x.
+   */
+  sculptCliffs() {
+    const N = this.res, sp = this.spacing, half = this.half, H = this.heights, nrm = this.normals;
+    const hash = (i, j) => { let h = (i * 374761393 + j * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+    const vn = (x, z) => {
+      const i = Math.floor(x), j = Math.floor(z);
+      let tx = x - i, tz = z - j; tx = tx * tx * (3 - 2 * tx); tz = tz * tz * (3 - 2 * tz);
+      const a = hash(i, j), b = hash(i + 1, j), c = hash(i, j + 1), d = hash(i + 1, j + 1);
+      return (a + (b - a) * tx) * (1 - tz) + (c + (d - c) * tx) * tz;
+    };
+    const ridge = (x, z) => 1 - Math.abs(vn(x, z) * 2 - 1);
+    const A = CLIFFS.relief;
+    let touched = 0;
+    const C = this.course;
+    for (let j = 1; j < N - 1; j++) {
+      const z = -half + j * sp;
+      // Leave the riding floor alone (natural drops are steep too): only beyond the floor edge.
+      const t = C.tAt(z), xc = C.at(C.xc, t), floor = C.at(C.w, t) + 6;
+      for (let i = 1; i < N - 1; i++) {
+        if (Math.abs(-half + i * sp - xc) < floor) continue;
+        const k = j * N + i;
+        const nx = nrm[k * 2] / 127.5 - 1, nz = nrm[k * 2 + 1] / 127.5 - 1;
+        const ny = Math.sqrt(Math.max(0, 1 - nx * nx - nz * nz));
+        const st = Math.min(1, Math.max(0, (0.76 - ny) / 0.2));
+        if (st <= 0) continue;
+        const w = st * st * (3 - 2 * st);
+        const x = -half + i * sp;
+        const r = ridge(x * 0.0019 + 2.3, z * 0.012 + 5.9) * 0.45 + ridge(x * 0.0045, z * 0.03) * 0.35 + ridge(x * 0.013 + 7.1, z * 0.085 + 3.3) * 0.2;
+        H[k] += A * w * (r - 0.55) * 2;
+        touched++;
+      }
+    }
+    // Refresh normals + rock mask (same conventions as course.js).
+    const hAt = (i, j) => H[Math.min(N - 1, Math.max(0, j)) * N + Math.min(N - 1, Math.max(0, i))];
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const nx = hAt(i - 1, j) - hAt(i + 1, j), ny = 2 * sp, nz = hAt(i, j - 1) - hAt(i, j + 1);
+      const l = Math.hypot(nx, ny, nz), k = j * N + i;
+      nrm[k * 2] = Math.round((nx / l) * 127.5 + 127.5);
+      nrm[k * 2 + 1] = Math.round((nz / l) * 127.5 + 127.5);
+      const t = Math.min(1, Math.max(0, (0.68 - ny / l) / 0.16));
+      this.splat[k * 3 + 1] = Math.round(t * t * (3 - 2 * t) * 255);
+    }
+    this.normalTex.needsUpdate = true;
+    this.heightTex.needsUpdate = true;
+    // splat texture is rebuilt from this.splat in ingest(); refresh its RGBA copy.
+    const s4 = this.splatTex.image.data;
+    for (let k = 0; k < N * N; k++) s4[k * 4 + 1] = this.splat[k * 3 + 1];
+    this.splatTex.needsUpdate = true;
+    console.log('[gfx] cliffs sculpted', touched);
   }
 
   /** Real-world data files (kept for reference builds). */

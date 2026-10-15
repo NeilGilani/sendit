@@ -75,6 +75,11 @@ export const ROCK = {
   exposeSoft: 0.08,
 };
 
+// Fluted relief added to the hand-built gully's steep walls (terrain.js sculptCliffs).
+export const CLIFFS = {
+  relief: 10.0,                  // metres: rib-to-gully depth on faces steeper than ~50°
+};
+
 // ------------------------------------------------------------------ ATMOSPHERE (gfx/atmosphere.js)
 export const ATMOSPHERE = {
   // Single-scattering sky model (seen from the resort's altitude).

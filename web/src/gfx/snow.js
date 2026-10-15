@@ -77,7 +77,7 @@ void rockLayer(vec2 uv0, float farF, float midF, out vec3 col, out vec2 g, out f
   // Strata dip slowly across the face: beds and ledges are tilted, never perfectly level.
   // (bounded: the beds undulate by up to ±25 m over ~100 m, i.e. local dips up to ~25°).
   float dip = texture2D(noiseTex, uv0 * vec2(0.0024, 0.0016) + 0.61).r - 0.5;
-  vec2 uv = vec2(uv0.x, uv0.y + dip * 50.0);
+  vec2 uv = vec2(uv0.x, uv0.y + dip * 30.0);
   col = rockAlbedo(uv, farF);
   // Ribs and gullies running down the fall line (alpine faces are fluted, not flat): a height field
   // stretched along the face. Ribs catch the sun on one flank, gullies shade and fill with snow.
@@ -88,9 +88,10 @@ void rockLayer(vec2 uv0, float farF, float midF, out vec3 col, out vec2 g, out f
   float du = (h1u - h1) / (0.0025 / 0.0062) * 22.0 + (h2u - h2) / (0.004 / 0.024) * 2.6 * (1.0 - farF * 0.7);
   gully = smoothstep(0.42, 0.26, h1 + (h2 - 0.5) * 0.2);
   float warp = texture2D(noiseTex, uv * vec2(0.006, 0.02) + 0.2).r;
-  float f = fract(uv.y / uRockLook.x + warp * 0.9 + texture2D(noiseTex, uv * vec2(0.01, 0.03)).g * 0.35);
+  // Beds of uneven thickness: the layer index is warped in v, so ledges never repeat at one spacing.
+  float f = fract(uv.y / uRockLook.x + warp * 0.9 + texture2D(noiseTex, uv * vec2(0.01, 0.03)).g * 0.35 + texture2D(noiseTex, uv * vec2(0.0035, 0.021) + 0.52).r * 1.7);
   // Ledge snow sits in lenses: thick in the middle of a ledge, tapering out at its ends.
-  float segW = smoothstep(0.45, 0.75, texture2D(noiseTex, uv * vec2(0.016, 0.07) + 0.7).r + uRockLook.y + gully * 0.25);
+  float segW = smoothstep(0.52, 0.8, texture2D(noiseTex, uv * vec2(0.016, 0.07) + 0.7).r + uRockLook.y + gully * 0.25);
   float tw = (0.06 + 0.42 * texture2D(noiseTex, uv * vec2(0.012, 0.05) + 0.9).g) * (0.2 + 0.8 * segW);
   float tread = 1.0 - smoothstep(tw * 0.4, tw, f) * (1.0 - smoothstep(0.93, 1.0, f));
   tread *= 1.0 - smoothstep(0.04, 0.12, tFP / uRockLook.x);            // fine ledges vanish with distance
