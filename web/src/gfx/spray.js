@@ -121,6 +121,7 @@ export class SprayEmitter {
           // Soft particles: fade where the quad sinks into the snow.
           float hag = iPos.y - groundAt(iPos.xz);
           vA = alpha * clamp((hag + size * 0.35) / max(size * 0.7, 0.05), 0.0, 1.0);
+          vA *= smoothstep(0.6, 2.2, -c.z);   // never smear a puff across the lens
         }`,
       fragmentShader: /* glsl */`
         uniform sampler2D puff; uniform float uTime;

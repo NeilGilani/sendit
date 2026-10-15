@@ -27,6 +27,7 @@ export function snowUniforms() {
     uRockLook: { value: new THREE.Vector4(ROCK.strataScale, ROCK.ledgeSnow, ROCK.exposeSlope, ROCK.exposeSoft) },
     uForestCol: { value: lin(SNOW.forest) },
     uTreeMask: { value: null },
+    uFarForest: { value: new THREE.Vector3(2350, 300, 9500) },
   };
 }
 
@@ -36,13 +37,15 @@ uniform vec3 uSnowAlbedo; uniform vec3 uSnowOld; uniform vec3 uSnowSSS; uniform 
 uniform vec2 uWindDir; uniform float uDetail; uniform vec4 uSnowShape; uniform vec3 uTrackLook;
 uniform vec3 uRockA; uniform vec3 uRockB; uniform vec3 uRockC; uniform vec4 uRockLook; uniform vec3 uForestCol;
 uniform sampler2D noiseTex;
+uniform vec3 uFarForest;    // x treeline (m), y fade width (m), z max box distance from centre (m)
 float tRock = 0.0;          // rock / forest / water coverage (no snow optics there)
 float tTrack = 0.0;         // carved trench depth (0..1)
 float tCavity = 1.0;        // small-scale occlusion (trench bottoms, tree wells)
 float tGlaze = 0.0;         // sun / wind glazed crust: tighter sheen
 float tGlintMask = 1.0;     // where glints may appear
 float tSnowWet = 0.0;
-float tFP = 0.01;           // world metres per pixel (set before any branch)
+float tFP = 0.01;
+float tCordLane = 0.0;       // groomer-lane brightness offset           // world metres per pixel (set before any branch)
 float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 vec3 hash32(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); p3 += dot(p3, p3.yxz + 33.33); return fract((p3.xxy + p3.yzz) * p3.zyx); }
 // Face-aligned frame: T runs across the slope (horizontal), B runs up it. Rock is textured in
@@ -87,7 +90,11 @@ void rockLayer(vec2 uv, float farF, float midF, out vec3 col, out vec2 g, out fl
   g = (hash32(v1.z * vec2(7.1, 3.3)).xy - 0.5) * 0.9 * (1.0 - farF);
   float joint = (1.0 - smoothstep(0.02, 0.07, v1.y)) * smoothstep(0.35, 0.6, texture2D(noiseTex, uv * 0.02 + 0.8).r);
   float tone = hash12(vec2(v1.z, 1.7));
+  #ifdef ROCK_LITE
+  if (false) {
+  #else
   if (midF < 1.0) {
+  #endif
     vec3 v2 = rockCells(uv / 1.1 + 3.7);
     g += (hash32(v2.z * vec2(2.3, 5.9)).xy - 0.5) * 0.55 * (1.0 - midF);
     joint = max(joint, (1.0 - smoothstep(0.03, 0.1, v2.y)) * 0.6 * (1.0 - midF));
@@ -192,6 +199,9 @@ export const SNOW_FRAG_GLSL = /* glsl */`
     vec3 cA = vec3(0.0), cB = vec3(0.0); vec2 gA = vec2(0.0), gB = vec2(0.0);
     float rA = 0.0, rB = 0.0, sA = 0.0, sB = 0.0;
     float sx = N.x < 0.0 ? -1.0 : 1.0, sz = N.z < 0.0 ? -1.0 : 1.0;
+    #ifdef ROCK_LITE
+    wxz = wxz.x > wxz.y ? vec2(1.0, 0.0) : vec2(0.0, 1.0);   // low quality: one projection
+    #endif
     if (wxz.x > 0.03) rockLayer(vec2(vW.z * sx, vW.y), farF, midF, cA, gA, rA, sA);
     if (wxz.y > 0.03) rockLayer(vec2(-vW.x * sz, vW.y) + 37.0, farF, midF, cB, gB, rB, sB);
     rockCol = cA * wxz.x + cB * wxz.y;
@@ -254,6 +264,12 @@ export const SNOW_FRAG_GLSL = /* glsl */`
       float amp = uSnowShape.w * groomed * (1.0 - worn * 0.85);
       vec2 gc = ac * (sin(ph) * 0.004 * k * aa + seam * 0.35) * amp;
       Ns = normalize(Ns - vec3(gc.x, 0.0, gc.y));
+      // Unresolved ridges still read: they self-shadow when the sun crosses them, and each groomer
+      // pass has its own slight brightness.
+      float across2 = abs(dot(normalize(uSunDir.xz + 1e-4), ac));
+      float laneId = floor(across / 5.5);
+      tCavity *= 1.0 - amp * (1.0 - aa) * (0.05 + 0.1 * across2);
+      tCordLane = (fract(sin(laneId * 12.9898) * 43758.5453) - 0.5) * 0.05 * amp;
     }
     // Micro grain: crystals / clumps at a few cm, only up close.
     float near = 1.0 - smoothstep(6.0, 28.0, dist);
@@ -314,7 +330,7 @@ export const SNOW_FRAG_GLSL = /* glsl */`
 
   // ---- albedo: fresh powder vs wind-packed / groomed / sun-glazed; subtle large-scale variation
   vec3 snowCol = mix(uSnowAlbedo, uSnowOld, clamp(groomed * 0.8 + exposure * 0.25 + tTrack * 0.4, 0.0, 1.0));
-  snowCol *= 0.97 + 0.05 * m2 + 0.02 * (m3 - 0.5);
+  snowCol *= 0.97 + 0.05 * m2 + 0.02 * (m3 - 0.5) + tCordLane;
   float sunFace = max(dot(N, uSunDir), 0.0);
   tGlaze = clamp(groomed * 0.6 + exposure * 0.35 * sunFace + tTrack * 0.5, 0.0, 1.0);
   snowCol = mix(snowCol, snowCol * vec3(0.93, 0.94, 0.96), forest * 0.25 + tree * 0.3);   // needle litter / shade
@@ -360,7 +376,7 @@ export const FAR_SNOW_FRAG_GLSL = /* glsl */`
   rock *= smoothstep(0.15, 0.45, texture2D(noiseTex, vW.xz * 0.0021 + vW.y * 0.0003).b + slope * 0.3);
   // The sunken backdrop rim (low, far out) reads as snow; the distant ranges ring keeps its rock.
   rock *= 1.0 - smoothstep(10500.0, 12500.0, max(abs(vW.x), abs(vW.z))) * (1.0 - smoothstep(1400.0, 1900.0, vW.y));
-  float forest = (1.0 - smoothstep(2050.0, 2350.0, vW.y + (m - 0.5) * 300.0)) * (1.0 - rock) * (1.0 - smoothstep(7000.0, 9500.0, max(abs(vW.x), abs(vW.z)))) * smoothstep(0.03, 0.14, slope) * smoothstep(0.35, 0.55, m2 + 0.15);
+  float forest = (1.0 - smoothstep(uFarForest.x - uFarForest.y, uFarForest.x, vW.y + (m - 0.5) * 300.0)) * (1.0 - rock) * (1.0 - smoothstep(uFarForest.z - 2500.0, uFarForest.z, max(abs(vW.x), abs(vW.z)))) * smoothstep(0.03, 0.14, slope) * smoothstep(0.35, 0.55, m2 + 0.15);
   vec3 rc = rockAlbedo(abs(N.x) > abs(N.z) ? vW.zy : vW.xy, 1.0);
   vec3 sc = uSnowAlbedo * (0.94 + 0.06 * m2);
   diffuseColor.rgb = mix(mix(sc, uForestCol, forest * 0.9), rc, rock);

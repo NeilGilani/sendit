@@ -9,7 +9,7 @@ import { N8AOPostPass } from 'n8ao';
 import { SUN_DIR } from '../world.js';
 
 export const POST = {
-  exposure: 0.7,              // linear multiplier before the tone curve (sunlit snow ≈ 0.9 display)
+  exposure: 0.62,             // linear multiplier before the tone curve (sunlit snow ≈ 0.9 display)
   toneMap: 'neutral',          // 'neutral' (Khronos PBR Neutral: clean whites) | 'agx' (filmic, softer)
   contrast: 1.06,              // gentle S-curve around mid grey after the tone curve
   saturation: 1.04,

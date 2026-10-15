@@ -162,8 +162,11 @@ export class Terrain {
     };
     this.material.defines = { SNOW_TRACKS: 2, SNOW_SPARKLE: 1, SNOW_TREEMASK: 1 };
 
+    // Far forest band: real mountains use their own treeline and keep forest to the horizon.
+    const farU = snowUniforms();
+    if (this.course?.treeline) farU.uFarForest.value.set(this.course.treeline, 350, 1e6);
     this.farMaterial = toonMaterial({
-      name: 'terrainFarSnow', uniforms: { ...snowUniforms(), noiseTex: { value: tex.noise } },
+      name: 'terrainFarSnow', uniforms: { ...farU, noiseTex: { value: tex.noise } },
       fragPars: SNOW_COMMON_PARS + 'vec3 tN;', frag: FAR_SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
     });    const prevFar = this.farMaterial.onBeforeCompile;
     this.farMaterial.onBeforeCompile = (shader, r) => {
@@ -352,6 +355,7 @@ export class Terrain {
       // Quality tiers: low = no glints / plain normal-mapped tracks / no fine wind detail;
       // medium = everything but parallax tracks; high = parallax trenches.
       const d = { SNOW_TRACKS: q === 2 ? 2 : 1, SNOW_TREEMASK: 1 };
+      if (q === 0) d.ROCK_LITE = 1;
       if (q > 0) d.SNOW_SPARKLE = 1;
       this.material.defines = d;
       this.material.needsUpdate = true;
