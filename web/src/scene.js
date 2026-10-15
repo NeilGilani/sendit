@@ -56,7 +56,7 @@ export const SNOW = {
   sparkleCone: 0.45,             // up-bias of the random facet normals (0 = isotropic, larger = flatter)
   windAngle: 0.65,               // radians: prevailing wind direction in xz (ripples / sastrugi)
   drift: 1.0,                    // soft drifts / pillows
-  ripple: 1.0,                   // wind ripples (cm scale)
+  ripple: 0.6,                   // wind ripples (cm scale) — subtle and patchy, never sand dunes
   sastrugi: 1.0,                 // wind-carved ridges on exposed snow
   corduroy: 1.0,                 // groomed pistes
   trackDepth: 0.26,              // metres: deepest powder trench

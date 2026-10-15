@@ -81,6 +81,33 @@ void faceFrame(vec3 n, out vec3 T, out vec3 B) {
   T = l > 0.05 ? t / l : vec3(1.0, 0.0, 0.0);
   B = normalize(cross(n, T));
 }
+// Sluff flutes / spines on steep snow: parallel runnels down the fall line that wander and merge
+// (sharp crests, rounded troughs). S = spacing (m). Returns the tilted normal; tFlute = trough depth.
+float tFlute = 0.0;
+// One projection: runnels are vertical lines in the (u, height) plane, wandering slowly.
+float fluteD(float u, float y, float S, out float trough) {
+  float f = u / S + (texture2D(noiseTex, vec2(u / (S * 40.0), y / 260.0) + 0.31).r - 0.5) * 5.0
+          + (texture2D(noiseTex, vec2(u / (S * 14.0), y / 90.0) + 0.6).r - 0.5) * 1.5;
+  float k = fract(f) * 2.0 - 1.0;                 // 0 on a crest, ±1 in the troughs
+  float w = 1.0 - abs(k);
+  trough = 1.0 - w * w;
+  return -2.0 * w * sign(k) * 2.0;                // dh/du per unit amp (sharp crests, round troughs)
+}
+// World-axis bi-planar (like the rock), so the pattern never depends on the per-pixel normal.
+vec3 flutes(vec3 p, vec3 N, float fp, float S, float amp) {
+  float slope = 1.0 - N.y;
+  float on = smoothstep(0.2, 0.36, slope) * (1.0 - smoothstep(0.62, 0.8, slope));
+  on *= smoothstep(0.35, 0.6, texture2D(noiseTex, p.xz * 0.0031 + 0.27).r);
+  on *= 1.0 - smoothstep(0.07, 0.2, fp / S);           // ≥ 5 px per runnel or nothing (no speckle)
+  if (on <= 0.0) return N;
+  vec2 w = pow(abs(N.xz) + 1e-4, vec2(4.0));
+  w /= w.x + w.y;
+  float tA = 0.0, tB = 0.0;
+  float dA = w.x > 0.02 ? fluteD(p.z, p.y, S, tA) : 0.0;   // x-facing: runnels across z
+  float dB = w.y > 0.02 ? fluteD(p.x + 53.0, p.y, S, tB) : 0.0;
+  tFlute = (tA * w.x + tB * w.y) * on;
+  return normalize(N - vec3(dB * w.y, 0.0, dA * w.x) * amp * on);
+}
 // 2D Voronoi: x = F1, y = F2 - F1 (joint distance), z = cell id.
 vec3 rockCells(vec2 p) {
   vec2 i = floor(p), f = fract(p);
@@ -326,7 +353,7 @@ export const SNOW_FRAG_GLSL = /* glsl */`
       float ph = (sAl + warp) * k;
       float fw = tFP * k;
       float aa = 1.0 - smoothstep(0.6, 2.2, fw);
-      float blot = smoothstep(0.3, 0.75, texture2D(noiseTex, xz * 0.031 + 0.17).r + exposure * 0.2);
+      float blot = smoothstep(0.45, 0.8, texture2D(noiseTex, xz * 0.031 + 0.17).r + exposure * 0.25) * smoothstep(0.3, 0.6, texture2D(noiseTex, xz * 0.0077 + 0.4).g);
       float dh = (cos(ph) + 0.45 * cos(2.0 * ph + 0.6)) * 0.022 * k;
       vec2 gw = wd * dh * rip * aa * blot;
       Ns = normalize(Ns - vec3(gw.x, 0.0, gw.y));
@@ -373,6 +400,12 @@ export const SNOW_FRAG_GLSL = /* glsl */`
     }
     Ns = normalize(mix(N, Ns, detailFade));
   }
+
+  // ---- sluff flutes on steep snow (walls, valley sides)
+  Ns = flutes(vW, Ns, tFP, 15.0, 0.14);
+  float fl1 = tFlute;
+  Ns = flutes(vW + 7.3, Ns, tFP, 4.0, 0.14);
+  tCavity *= 1.0 - 0.1 * max(tFlute, fl1);
 
   // ---- carved tracks: deep soft trenches with pushed-up lips (parallax on high quality)
   vec2 tp = xz;
@@ -471,6 +504,8 @@ export const FAR_SNOW_FRAG_GLSL = /* glsl */`
     float steep = smoothstep(0.03, 0.25, 1.0 - N.y) * (0.2 + 0.8 * smoothstep(2500.0, 7000.0, dist));
     N = normalize(N - vec3(g1.x, 0.0, g1.y) * 150.0 * steep - vec3(g2.x, 0.0, g2.y) * 60.0 * steep);
   }
+  N = flutes(vW, N, length(fwidth(vW)), 15.0, 0.14);
+  N = flutes(vW * 0.37, N, length(fwidth(vW)) * 0.37, 15.0, 0.14);   // 40 m spines far away
   tN = N;
   float m = texture2D(noiseTex, vW.xz * 0.0004).r;
   float m2 = texture2D(noiseTex, vW.xz * 0.003 + 0.5).r;
