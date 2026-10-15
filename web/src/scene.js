@@ -66,8 +66,8 @@ export const SNOW = {
 
 // ------------------------------------------------------------------ ROCK (gfx/snow.js + scatter boulders)
 export const ROCK = {
-  dark: '#4a4744',               // gneiss / granite (sRGB)
-  light: '#8a8580',
+  dark: '#57524d',               // gneiss / granite (sRGB): ≈ 0.09 … 0.33 linear, mean ≈ 0.18
+  light: '#9c958d',
   rust: '#7a5a3c',               // iron staining streaks
   strataScale: 6.0,              // metres between ledge bands on cliffs
   ledgeSnow: 0.1,                // more → more snow sitting on ledges

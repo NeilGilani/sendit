@@ -16,6 +16,9 @@ const KICKERS = [
 ];
 
 const smooth01 = (t) => { const x = Math.min(1, Math.max(0, t)); return x * x * (3 - 2 * x); };
+// Shaped sidewalls: real kickers are cut with ~40° raked walls, rounded into the table and the ground.
+const sideRun = (k) => Math.max(1.0, k.H * 1.1);
+const sideFactor = (k, b) => { const hw = k.W / 2; return b <= hw ? 1 : 1 - smooth01((b - hw) / sideRun(k)); };
 
 export class Features {
   constructor(terrain) {
@@ -105,8 +108,9 @@ export class Features {
     const r = new THREE.Vector2(-dir.y, dir.x);
     const o = p.clone().addScaledVector(r, lateral);
     const kick = { o, f: dir.clone(), r, L: k.L, H: k.H, W: k.W, name: k.name, signature };
-    kick.box = [Math.min(o.x, o.x + dir.x * k.L) - k.W - 2, Math.max(o.x, o.x + dir.x * k.L) + k.W + 2,
-      Math.min(o.y, o.y + dir.y * k.L) - k.W - 2, Math.max(o.y, o.y + dir.y * k.L) + k.W + 2];
+    const m = k.W / 2 + sideRun(k) + 2;
+    kick.box = [Math.min(o.x, o.x + dir.x * k.L) - m, Math.max(o.x, o.x + dir.x * k.L) + m,
+      Math.min(o.y, o.y + dir.y * k.L) - m, Math.max(o.y, o.y + dir.y * k.L) + m];
     this.kickers.push(kick);
   }
 
@@ -181,7 +185,7 @@ export class Features {
       mesh.receiveShadow = true;
       this.group.add(mesh);
       for (const side of [-1, 1]) {
-        const c = kick.o.clone().addScaledVector(kick.f, kick.L).addScaledVector(kick.r, side * (kick.W / 2 + 1.2));
+        const c = kick.o.clone().addScaledVector(kick.f, kick.L).addScaledVector(kick.r, side * (kick.W / 2 + sideRun(kick) + 0.6));
         this.addFlag(c.x, c.y, side > 0 ? 0 : 1);
         if (kick.signature && kick.name !== 'S') this.addCrowd(kick.o.clone().addScaledVector(kick.f, kick.L + 10), kick.f, kick.r, side, kick.name === 'L' ? 14 : 8);
       }
@@ -203,9 +207,8 @@ export class Features {
       const a = dx * k.f.x + dz * k.f.y;
       if (a < 0 || a > k.L) continue;
       const b = Math.abs(dx * k.r.x + dz * k.r.y);
-      const hw = k.W / 2;
-      if (b > hw + 0.8) continue;
-      const side = b <= hw ? 1 : 1 - (b - hw) / 0.8;
+      if (b > k.W / 2 + sideRun(k)) continue;
+      const side = sideFactor(k, b);
       const shape = k.H * Math.pow(a / k.L, 1.7) * side;
       const g = this.terrain.baseHeight(k.o.x + k.f.x * a, k.o.y + k.f.y * a);
       return Math.max(base, g + shape);
@@ -215,30 +218,35 @@ export class Features {
 
   kickerGeometry(k) {
     const T = this.terrain;
-    const nA = 16, nB = 8;
+    const nA = 16, nB = 20;
     const pos = [], col = [], idx = [];
-    const vert = (a, b, lift) => {
-      const x = k.o.x + k.f.x * a + k.r.x * b, z = k.o.y + k.f.y * a + k.r.y * b;
-      const hw = k.W / 2;
-      const ab = Math.abs(b);
-      const side = ab <= hw ? 1 : Math.max(0, 1 - (ab - hw) / 0.8);
+    const hw = k.W / 2, sr = sideRun(k);
+    // Across-ramp samples: denser on the rounded sidewalls.
+    const across = (j) => {
+      const t = j / nB * 2 - 1, s = Math.sign(t), u = Math.abs(t);
+      return s * (u < 0.4 ? (u / 0.4) * hw : hw + ((u - 0.4) / 0.6) * (sr + 0.1));
+    };
+    const vert = (a, b, lift, aG = a) => {
+      const x = k.o.x + k.f.x * aG + k.r.x * b, z = k.o.y + k.f.y * aG + k.r.y * b;
+      const side = Math.max(0, sideFactor(k, Math.abs(b)));
       const g = T.baseHeight(k.o.x + k.f.x * a, k.o.y + k.f.y * a);
       const y = (lift ? g + k.H * Math.pow(a / k.L, 1.7) * side : T.baseHeight(x, z) - 0.3) + 0.03;
       pos.push(x, y, z);
       const lip = a > k.L - 0.35 && lift ? 1 : 0;
       col.push(lip ? 0.86 : 1.0, lip ? 0.92 : 1.0, lip ? 1.0 : 1.0);   // icy, blue-ish lip
     };
-    for (let i = 0; i <= nA; i++) for (let j = 0; j <= nB; j++) vert((i / nA) * k.L, (j / nB - 0.5) * (k.W + 1.6), true);
+    for (let i = 0; i <= nA; i++) for (let j = 0; j <= nB; j++) vert((i / nA) * k.L, across(j), true);
     for (let i = 0; i < nA; i++) for (let j = 0; j < nB; j++) {
       const a = i * (nB + 1) + j;
       idx.push(a, a + 1, a + nB + 1, a + 1, a + nB + 2, a + nB + 1);
     }
     // Front wall under the lip.
     const base = pos.length / 3;
+    // Knuckle face under the lip: steep but not vertical (shovelled back at ~70°).
     for (let j = 0; j <= nB; j++) {
-      const b = (j / nB - 0.5) * (k.W + 1.6);
+      const b = across(j);
       vert(k.L, b, true);
-      vert(k.L, b, false);
+      vert(k.L, b, false, k.L + k.H * 0.35);
     }
     for (let j = 0; j < nB; j++) {
       const a = base + j * 2;

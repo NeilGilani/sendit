@@ -2,6 +2,7 @@
 // views. Usage: node scripts/gfxshots.mjs <url> <outDir> <views.json | inline JSON> [W H]
 // Each view: { name, wait (s), keys: "d,ArrowUp", place: [x, z, heading],
 //              cam: [px,py,pz, tx,ty,tz, fov?] (absolute world camera, honoured by sky.js via window.__gfxCam),
+//              gcam: same but y values are metres above the ground,
 //              eval: "js run in the page" }
 import { chromium } from '@playwright/test';
 import fs from 'node:fs';
@@ -34,6 +35,11 @@ for (const v of views) {
   await page.evaluate((v) => {
     const s = window.__sendit;
     window.__gfxCam = v.cam || null;
+    if (v.gcam) {
+      // Ground-relative camera: [px, metres above ground, pz, tx, metres above ground, tz, fov?].
+      const g = v.gcam, H = (x, z) => s.terrain.getHeight(x, z);
+      window.__gfxCam = [g[0], H(g[0], g[2]) + g[1], g[2], g[3], H(g[3], g[5]) + g[4], g[5], g[6]];
+    }
     if (v.side) {
       // Chase-side camera: [right, up, back] metres relative to the rider, looking a bit ahead.
       const [r, u, b] = v.side;
