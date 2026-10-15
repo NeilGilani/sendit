@@ -70,6 +70,7 @@ float tGlaze = 0.0;         // sun / wind glazed crust: tighter sheen
 float tGlintMask = 1.0;     // where glints may appear
 float tSnowWet = 0.0;
 float tFP = 0.01;
+float tRockJoint = 0.0;     // joint / crack cavity of the last rockShade() call (sky occlusion)
 float tCordLane = 0.0;       // groomer-lane brightness offset           // world metres per pixel (set before any branch)
 float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 vec3 hash32(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); p3 += dot(p3, p3.yxz + 33.33); return fract((p3.xxy + p3.yzz) * p3.zyx); }
@@ -86,8 +87,9 @@ void faceFrame(vec3 n, out vec3 T, out vec3 B) {
 float tFlute = 0.0;
 // One projection: runnels are vertical lines in the (u, height) plane, wandering slowly.
 float fluteD(float u, float y, float S, out float trough) {
-  float f = u / S + (texture2D(noiseTex, vec2(u / (S * 40.0), y / 260.0) + 0.31).r - 0.5) * 5.0
-          + (texture2D(noiseTex, vec2(u / (S * 14.0), y / 90.0) + 0.6).r - 0.5) * 1.5;
+  // Explicit LOD (called from loops); these frequencies never alias.
+  float f = u / S + (textureLod(noiseTex, vec2(u / (S * 40.0), y / 260.0) + 0.31, 0.0).r - 0.5) * 5.0
+          + (textureLod(noiseTex, vec2(u / (S * 14.0), y / 140.0) + 0.6, 0.0).r - 0.5) * 0.8;
   float k = fract(f) * 2.0 - 1.0;                 // 0 on a crest, ±1 in the troughs
   float w = 1.0 - abs(k);
   trough = 1.0 - w * w;
@@ -100,7 +102,7 @@ vec3 flutes(vec3 p, vec3 N, float fp, float S, float amp) {
   on *= smoothstep(0.35, 0.6, texture2D(noiseTex, p.xz * 0.0031 + 0.27).r);
   on *= 1.0 - smoothstep(0.07, 0.2, fp / S);           // ≥ 5 px per runnel or nothing (no speckle)
   if (on <= 0.0) return N;
-  vec2 w = pow(abs(N.xz) + 1e-4, vec2(4.0));
+  vec2 w = pow(abs(N.xz) + 1e-4, vec2(12.0));      // narrow hand-over: no crossing runnels
   w /= w.x + w.y;
   float tA = 0.0, tB = 0.0;
   float dA = w.x > 0.02 ? fluteD(p.z, p.y, S, tA) : 0.0;   // x-facing: runnels across z
@@ -177,7 +179,7 @@ void rockLayer(vec2 uv, float fp, out vec3 col, out vec2 g, out vec2 gh, out flo
   col = rockAlbedo(uv, smoothstep(2.0, 8.0, fp));
   // Weathering inside each block (lighter faces, darker lichen / wet patches) so no facet is flat.
   float wx = texture2D(noiseTex, uv * 0.11 + 0.23).g * 0.6 + texture2D(noiseTex, uv * 0.37 + 0.71).r * 0.4;
-  col *= (0.86 + 0.24 * tone) * (0.75 + 0.5 * wx) * lum * (1.0 - joint * 0.6);
+  col *= (0.86 + 0.24 * tone) * (0.86 + 0.28 * wx) * lum * (1.0 - joint * 0.6);
   // Big ledge systems: broken bands along the strata, only on cells that tilt up.
   float warp = texture2D(noiseTex, uv * vec2(0.006, 0.02) + 0.2).r;
   float f2 = fract(uv.y / (uRockLook.x * 4.3) + warp * 2.2);
@@ -191,8 +193,8 @@ vec3 rockAlbedo(vec2 uv, float far) {
   float beds = texture2D(noiseTex, vec2(uv.x * 0.004, uv.y * 0.045) + 0.1).r;      // layering along the face
   float streak = texture2D(noiseTex, vec2(uv.x * 0.07, uv.y * 0.005) + 0.4).g;    // water-stain streaks (vertical)
   vec3 c = mix(uRockA, uRockB, smoothstep(0.2, 0.85, b1 * 0.55 + beds * 0.3 + (b2 - 0.5) * 0.5 + 0.08));
-  c = mix(c, uRockC, smoothstep(0.72, 0.9, b1 + (beds - 0.5) * 0.3) * 0.25);
-  c *= mix(1.0, 0.7, smoothstep(0.6, 0.85, streak) * 0.7 * (1.0 - far * 0.7));
+  c = mix(c, uRockC, smoothstep(0.75, 0.92, b1 + (beds - 0.5) * 0.3) * 0.18);
+  c *= mix(1.0, 0.8, smoothstep(0.6, 0.85, streak) * 0.7 * (1.0 - far * 0.7));
   return c;
 }
 // Tri-planar rock (projections with < 3 % weight are skipped). Returns albedo, the lighting normal,
@@ -207,19 +209,20 @@ void rockShade(vec3 p, vec3 N, float fp, out vec3 col, out vec3 Nr, out vec3 Nh,
   col = vec3(0.0); band = 0.0;
   vec3 pert = vec3(0.0), pertH = vec3(0.0);
   vec3 c; vec2 g, gh; float j, bd;
+  tRockJoint = 0.0;
   if (w.x > 0.03) {
     rockLayer(vec2(p.z * sx, p.y), fp, c, g, gh, j, bd);
-    col += c * w.x; band += bd * w.x;
+    col += c * w.x; band += bd * w.x; tRockJoint += j * w.x;
     pert += w.x * vec3(0.0, g.y, g.x * sx); pertH += w.x * vec3(0.0, gh.y, gh.x * sx);
   }
   if (w.z > 0.03) {
     rockLayer(vec2(-p.x * sz, p.y) + 37.0, fp, c, g, gh, j, bd);
-    col += c * w.z; band += bd * w.z;
+    col += c * w.z; band += bd * w.z; tRockJoint += j * w.z;
     pert += w.z * vec3(-g.x * sz, g.y, 0.0); pertH += w.z * vec3(-gh.x * sz, gh.y, 0.0);
   }
   if (w.y > 0.03) {
     rockLayer(p.xz + 71.0, fp, c, g, gh, j, bd);
-    col += c * w.y;
+    col += c * w.y; tRockJoint += j * w.y;
     pert += w.y * vec3(g.x, 0.0, g.y); pertH += w.y * vec3(gh.x, 0.0, gh.y);
   }
   Nr = normalize(N + pert * 0.85);
@@ -245,6 +248,10 @@ float trackAtLod(vec2 xz) {
   if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return 0.0;
   return textureLod(uTrackMap, uv, 0.0).r;
 }
+vec3 macroNLod(vec2 xz) {
+  vec2 nn = textureLod(normalTex, tUV(xz), 0.0).rg * 2.0 - 1.0;
+  return vec3(nn.x, sqrt(max(0.0, 1.0 - dot(nn, nn))), nn.y);
+}
 vec3 macroN(vec2 xz) {
   vec2 nn = texture2D(normalTex, tUV(xz)).rg * 2.0 - 1.0;
   return vec3(nn.x, sqrt(max(0.0, 1.0 - dot(nn, nn))), nn.y);
@@ -258,6 +265,35 @@ vec2 noiseGrad(vec2 p, float scale, float eps, int ch) {
   float cx = ch == 0 ? bx.r : (ch == 1 ? bx.g : bx.b);
   float cz = ch == 0 ? bz.r : (ch == 1 ? bz.g : bz.b);
   return vec2(cx - c0, cz - c0) / eps;
+}
+// Fall-line flutes for the playable tile: each 64 m cell runs straight runnels down its own
+// (smoothed) fall line; the four nearest cells are blended (lines never cross or curl).
+vec3 flutesCells(vec3 p, vec3 N, float fp, float S, float amp) {
+  float slope = 1.0 - N.y;
+  float on = smoothstep(0.2, 0.36, slope) * (1.0 - smoothstep(0.62, 0.8, slope));
+  on *= smoothstep(0.35, 0.6, texture2D(noiseTex, p.xz * 0.0031 + 0.27).r);
+  on *= 1.0 - smoothstep(0.07, 0.2, fp / S);
+  if (on <= 0.0) return N;
+  const float C = 64.0;
+  vec2 cg = p.xz / C - 0.5;
+  vec2 cb = floor(cg), cf = fract(cg);
+  cf = cf * cf * (3.0 - 2.0 * cf);
+  vec3 g = vec3(0.0);
+  float tr = 0.0;
+  for (int j = 0; j < 2; j++) for (int i = 0; i < 2; i++) {
+    vec2 cc = (cb + vec2(float(i), float(j)) + 0.5) * C;
+    vec3 nC = normalize(macroNLod(cc) + macroNLod(cc + vec2(18.0, 0.0)) + macroNLod(cc - vec2(18.0, 0.0)) + macroNLod(cc + vec2(0.0, 18.0)) + macroNLod(cc - vec2(0.0, 18.0)));
+    vec2 fl = normalize(nC.xz + vec2(1e-4, 0.0));
+    vec2 ac = vec2(-fl.y, fl.x);                                   // across the fall line
+    float w = (i == 0 ? 1.0 - cf.x : cf.x) * (j == 0 ? 1.0 - cf.y : cf.y);
+    float u = dot(p.xz - cc, ac) + hash12(cc) * 40.0;
+    float tt;
+    float d = fluteD(u, p.y, S, tt);
+    g += vec3(ac.x, 0.0, ac.y) * d * w;
+    tr += tt * w;
+  }
+  tFlute = tr * on;
+  return normalize(N - g * amp * on);
 }
 `;
 
@@ -402,9 +438,9 @@ export const SNOW_FRAG_GLSL = /* glsl */`
   }
 
   // ---- sluff flutes on steep snow (walls, valley sides)
-  Ns = flutes(vW, Ns, tFP, 15.0, 0.14);
+  Ns = flutesCells(vW, Ns, tFP, 15.0, 0.12);
   float fl1 = tFlute;
-  Ns = flutes(vW + 7.3, Ns, tFP, 4.0, 0.14);
+  Ns = flutesCells(vW + 7.3, Ns, tFP, 4.0, 0.12);
   tCavity *= 1.0 - 0.1 * max(tFlute, fl1);
 
   // ---- carved tracks: deep soft trenches with pushed-up lips (parallax on high quality)
@@ -477,6 +513,7 @@ export const SNOW_FRAG_GLSL = /* glsl */`
   rock = clamp(rock, 0.0, 1.0);
   rock = mix(smoothstep(0.25, 0.6, rock + (m3 - 0.5) * 0.1), rock, farF);
   diffuseColor.rgb = mix(snowCol, rockCol, rock);
+  tCavity *= 1.0 - rock * tRockJoint * 0.55;          // cracks are dark in skylight too
   tN = normalize(mix(Ns, Nr, rock));
   tRock = rock;
   tGlintMask = (1.0 - rock) * (1.0 - tTrack * 0.6) * (1.0 - groomed * 0.4);
@@ -555,7 +592,8 @@ export const SNOW_BAND_GLSL = /* glsl */`
   vec3 sss = uSnowSSS * max(nl - lam, 0.0) * shadow * snow * 2.0;
   // Sky light is directional too (brightest from overhead / the sun side): reveals snow relief in shade.
   float skyDir = clamp(dot(nW, normalize(vec3(uSunDir.x * 0.35, 1.0, uSunDir.z * 0.35))), 0.0, 1.0);
-  vec3 skyL = sky * tCavity * mix(1.0, 0.66 + 0.38 * pow(skyDir, 3.0), snow);
+  // (rock too: facets turned up toward the open sky are brighter, which is what shows relief in shade)
+  vec3 skyL = sky * tCavity * mix(1.0, 0.66 + 0.38 * pow(skyDir, 3.0), max(snow, 0.8));
   light = uSunCol * nl * shadow + skyL + sss * uSunCol;
   // Specular: rough GGX sheen (tighter on glazed crust) + forward scattering toward the sun.
   vec3 Vv = normalize(vViewPosition);
