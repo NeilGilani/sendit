@@ -129,7 +129,7 @@ export class Rider {
     if (!this.model) return;
     p.t += dt;
     this.root.position.copy(pl.renderPos);
-    this.root.position.y -= pl.sink;   // deep powder swallows the skis when slow
+    this.root.position.y -= pl.sink * (this.fp ? 0.45 : 1);   // deep powder swallows the skis when slow
     this.root.quaternion.copy(pl.renderOrient);
     const st = pl.state;
     const ground = st === State.GROUNDED, air = st === State.AIR, sit = st === State.LIFT, crashed = st === State.CRASH;
@@ -272,6 +272,8 @@ export class Rider {
     // Eyes down the fall line.
     this.rotateGlobal(B.Head, new THREE.Quaternion().setFromAxisAngle(X, -(hipPitch * 0.55 + bend) * 0.45));
     for (const side of [1, -1]) { this.leg(side); this.arm(side, pl); }
+    // First person: collapse the head (and helmet) so the camera never sees inside it.
+    if (this.fp) B.Head.scale.setScalar(0.001);
   }
 
   /** Poles from the gloves down to the snow: trailing behind while skiing, tucked under the arms in a tuck. */
@@ -285,6 +287,7 @@ export class Rider {
       this.visual.worldToLocal(hand);
       const plant = Math.max(0, pl.turnInput * sx) * Math.max(0, Math.sin(p.t * 3.0)) * 0.6;   // inside pole swings forward on turns
       dir.set(sx * 0.16, -1, 0.42 - plant).normalize();
+      if (this.fp) dir.set(sx * 0.3, -1, -0.12 - plant * 0.5).normalize();   // first person: shafts drop away just outside the gloves
       dir.lerp(new THREE.Vector3(sx * 0.08, -0.3, 1).normalize(), p.tuck).normalize();
       dir.lerp(new THREE.Vector3(sx * 0.6, -0.4, 0.3).normalize(), p.air * 0.5).normalize();
       this.poles[i].position.copy(hand);
@@ -338,12 +341,18 @@ export class Rider {
     const loF = V(side * 0.5, 0.8 + Math.sin(fl * 1.7) * 0.5, Math.sin(fl + 1) * 0.9);
     const upSit = V(side * 0.2, -0.8, 0.45), loSit = V(side * 0.05, -0.15, 1);
     const upC = V(side, 0.4, 0.2), loC = V(side, 0.6, 0);
+    if (this.fp) {   // first person: hands carried higher and further forward so the gloves + poles frame the view
+      upS.set(side * 0.38, -0.5, 0.78); loS.set(side * 0.08, 0.12, 1.0);
+      upT.set(side * 0.3, -0.45, 0.85); loT.set(-side * 0.1, 0.2, 1.0);
+    }
     const u = upS.lerp(upT, p.tuck).lerp(upA, p.air).lerp(upF, p.stumble).lerp(upSit, p.sit).lerp(upC, p.crash);
     const l = loS.lerp(loT, p.tuck).lerp(loA, p.air).lerp(loF, p.stumble).lerp(loSit, p.sit).lerp(loC, p.crash);
     this.aim(upper, lower, u);
     this.inherit(lower);
     this.aim(lower, hand, l);
     this.inherit(hand);
+    // First person: turn the gloves into a pole grip (palms in, knuckles forward).
+    if (this.fp) this.rotateGlobal(hand, new THREE.Quaternion().setFromAxisAngle(Z, side * 1.35).multiply(new THREE.Quaternion().setFromAxisAngle(X, 0.5)));
   }
 }
 
@@ -405,8 +414,11 @@ function skiMaterial() {
     frag: /* glsl */`
       {
         float top = step(0.0, vB.y);
-        vec3 base = mix(vec3(0.08, 0.07, 0.22), vec3(0.98, 0.97, 1.0), top);
-        float stripe = smoothstep(0.012, 0.0, abs(vB.x)) * top;
+        // Dark navy topsheet with a hot-pink centre stripe (reads on white snow in first person).
+        vec3 base = mix(vec3(0.05, 0.05, 0.12), vec3(0.1, 0.08, 0.3), top);
+        float stripe = smoothstep(0.016, 0.006, abs(vB.x)) * top;
+        float chevron = step(0.5, fract(vB.z * 3.0 + abs(vB.x) * 8.0)) * smoothstep(-0.55, -0.85, vB.z) * top;
+        base = mix(base, vec3(0.18, 0.95, 0.85), chevron * 0.8);
         float edge = smoothstep(0.034, 0.042, abs(vB.x));
         diffuseColor.rgb = mix(base, vec3(1.0, 0.3, 0.55), stripe);
         toonEmissive = uNeon * edge * 1.2 + uNeon2 * stripe * 0.8;

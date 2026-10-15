@@ -7,10 +7,11 @@
 //   A [✕]        hold to crouch, release to jump
 //   RB [R1] / X [□]  tuck              B [○]    brake
 //   Y [△]        back to the top       Start [Options]  pause
+//   View/Back [Share] or click right stick: switch first person / chase camera
 //   Right stick  look around
 const KEYS = {
   speedUp: ['KeyW', 'ArrowUp'], brake: ['KeyS', 'ArrowDown'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'],
-  jump: ['Space'], tuck: ['ShiftLeft', 'ShiftRight'], reset: ['KeyR'], pause: ['Escape', 'KeyP'],
+  jump: ['Space'], tuck: ['ShiftLeft', 'ShiftRight'], reset: ['KeyR'], pause: ['Escape', 'KeyP'], view: ['KeyC', 'KeyV'],
 };
 // Standard-mapping button indices.
 export const PAD = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, BACK: 8, START: 9, LS: 10, RS: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
@@ -99,7 +100,8 @@ export class Input {
   }
 
   justPressed(action) {
-    const map = { reset: PAD.Y, pause: PAD.START, jump: PAD.A };
+    const map = { reset: PAD.Y, pause: PAD.START, jump: PAD.A, view: PAD.BACK };
+    if (action === 'view' && this.btnPressed(PAD.RS)) return true;
     return this.keyPressed(action) || (map[action] !== undefined && this.btnPressed(map[action]));
   }
 

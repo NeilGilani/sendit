@@ -23,7 +23,7 @@ import { FXManager } from './fx.js';
 import { SoundScape } from './audio.js';
 import { UI } from './ui.js';
 import { Input, PAD } from './input.js';
-import { game, Mode, setMode, on, settings, resetScore, emit } from './state.js';
+import { game, Mode, setMode, on, settings, setSetting, resetScore, emit } from './state.js';
 
 patchShaderChunks();
 
@@ -165,6 +165,7 @@ async function boot() {
   player.state = State.FROZEN;
 
   cam = new CameraController(camera, player, terrain, input);
+  cam.rider = rider;
   fx = new FXManager(player, renderer, scene);
   sound = new SoundScape(player, terrain);
 
@@ -304,6 +305,12 @@ function frame(now) {
   input.poll(dt);
   ui.navigate(input);
   if (game.mode === Mode.MENU && (input.btnPressed(PAD.START))) startRide();
+  if (input.justPressed('view') && (game.mode === Mode.RIDING || game.mode === Mode.LIFT)) {
+    setSetting('view', settings.view === 'fp' ? 'tp' : 'fp');
+    ui.pop(settings.view === 'fp' ? 'FIRST PERSON' : 'CHASE CAM', 'cyan', true);
+  }
+  rider.fp = settings.view === 'fp' && game.mode !== Mode.MENU && player.state !== State.CRASH;
+  document.body.classList.toggle('fp', rider.fp && (game.mode === Mode.RIDING || game.mode === Mode.LIFT));
   if (input.justPressed('pause')) {
     if (game.mode === Mode.PAUSED) resume();
     else if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) pause();
