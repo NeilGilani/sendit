@@ -137,7 +137,7 @@ export class Rider {
     this.p.stanceYaw = this.stanceYawTarget();
     this.contacts = (type === 'ski' ? ['left', 'right'] : ['nose', 'waist', 'tail']).map((id) => ({
       id, position: new THREE.Vector3(), direction: new THREE.Vector3(0, 0, -1), normal: new THREE.Vector3(0, 1, 0),
-      edgeAngle: 0, load: 0, speed: 0, grounded: false,
+      edgeAngle: 0, load: 0, speed: 0, grounded: false, depth: 0,
     }));
   }
 
@@ -292,7 +292,10 @@ export class Rider {
     if (p.grab > 0.01) { L.rotation.y += p.grab * 0.25; R.rotation.y -= p.grab * 0.1; }
     // Inner edge stays on the snow: pivot the roll about the edge.
     const off = Math.abs(Math.sin(gearRoll)) * 0.045;
-    L.position.y += off; R.position.y += off;
+    // The body rolls about the centre line, which would push the inside ski into the snow: lift each
+    // ski back to the surface (inside knee flexes, outside leg extends) — the classic carving stack.
+    const tl = Math.tan(this.p.lean);
+    L.position.y += off + L.position.x * tl; R.position.y += off + R.position.x * tl;
   }
 
   placeBoard(gearRoll) {
@@ -313,7 +316,8 @@ export class Rider {
    * World-space contact points for spray / tracks, refreshed every frame in update():
    *   skis: [left, right]; snowboard: [nose, waist, tail]
    * Each: { id, position, direction (unit travel dir), normal, edgeAngle (rad, signed: + = right-turn
-   * edge), load (0..1, sums to ~1 on the ground, 0 in the air), speed (m/s), grounded }.
+   * edge), load (0..1, sums to ~1 on the ground, 0 in the air), speed (m/s), grounded,
+   * depth (m the gear sits below the powder surface — add it to position.y for a surface point) }.
    * Objects are reused between frames — copy what you keep.
    */
   getContactPoints() { return this.contacts; }
@@ -337,7 +341,7 @@ export class Rider {
         const hw = this.equip.spec.waist * 0.5;
         ski.localToWorld(tmp.set(eSide * hw, 0, 0));
         c.position.copy(tmp); c.direction.copy(dir); c.normal.copy(n);
-        c.edgeAngle = edge; c.load = ground ? loads[i] : 0; c.speed = pl.speed; c.grounded = ground;
+        c.edgeAngle = edge; c.load = ground ? loads[i] : 0; c.speed = pl.speed; c.grounded = ground; c.depth = pl.sink;
       });
     } else {
       const spec = this.equip.spec;
@@ -350,7 +354,7 @@ export class Rider {
         const c = this.contacts[i];
         this.board.localToWorld(tmp.set(eSide * hw, 0, z));
         c.position.copy(tmp); c.direction.copy(dir); c.normal.copy(n);
-        c.edgeAngle = edge; c.load = ground ? Math.max(0, loads[i]) : 0; c.speed = pl.speed; c.grounded = ground;
+        c.edgeAngle = edge; c.load = ground ? Math.max(0, loads[i]) : 0; c.speed = pl.speed; c.grounded = ground; c.depth = pl.sink;
       });
     }
   }
@@ -444,7 +448,9 @@ export class Rider {
       -counter * 0.6, -(hipPitch * 0.55 + bend) * 0.95);
     for (const side of [1, -1]) {
       const s = side > 0 ? 0 : 1;   // armature +X = rider's left = ski index 0
-      const ankle = new THREE.Vector3(side * (ANIM.skiStance + p.plow * 0.1), this.ankleH + p.air * 0.12 + p.grab * 0.1, 0.0);
+      // Armature +X is the rider's left (visual −X): match the ski's lift so the boots stay clipped in.
+      const lx = -side * (ANIM.skiStance + p.plow * 0.1);
+      const ankle = new THREE.Vector3(side * (ANIM.skiStance + p.plow * 0.1), this.ankleH + p.air * 0.12 + p.grab * 0.1 + lx * Math.tan(p.lean), 0.0);
       // Feet point down the skis; tips pinch together in a snowplough.
       this.leg(side, ankle, new THREE.Vector3(side * 0.12, 0, 1), -side * p.plow * 0.28);
       void s;

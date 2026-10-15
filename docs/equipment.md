@@ -50,11 +50,11 @@ createEquipmentModel('ski', { id: 'park', graphic: { top: 0xff3355, pattern: 'st
   - It uses `toonMaterial`/`outlineMaterial` from `world.js`, which, like the rest of the game, needs `patchShaderChunks()`.
 - **`rider.getContactPoints()`** returns world-space contact points, refreshed every frame in `rider.update()`.
   - Skis return `[left, right]`. The board returns `[nose, waist, tail]`.
-  - Each point is `{ id, position, direction, normal, edgeAngle, load, speed, grounded }`:
+  - Each point is `{ id, position, direction, normal, edgeAngle, load, speed, grounded, depth }`:
     - `direction` is the unit travel direction.
     - `edgeAngle` is in radians and signed: + means the right-turn edge relative to travel.
     - `load` is 0..1 and sums to about 1 on the ground.
-    - `position` sits on the biting edge.
+    - `position` sits on the biting edge. `depth` is how far the gear sits below the powder surface; add it to `position.y` for a point on the surface.
   - The objects are reused from frame to frame, so copy anything you need to keep.
   - The outside ski carries up to 85% of the load in a hard turn. On the board, the load moves toward the nose or tail when pressing, and toward the tail in powder.
 - **URL parameters:**
