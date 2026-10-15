@@ -10,6 +10,7 @@ settings.
 npm --prefix web run dev          → http://localhost:5173/        (lobby)
                                     http://localhost:5173/?ride   (skip straight into a ride)
 node web/scripts/lobbytest.mjs http://localhost:5173/             (end-to-end check, ~1 min)
+node web/scripts/unittest.mjs                                     (data layer: profile, catalog, leaderboard, maps)
 node web/scripts/lobbyshot.mjs http://localhost:5173/ out.png 2 "tab:maps"   (screenshot)
 ```
 
