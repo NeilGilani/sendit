@@ -162,14 +162,14 @@ function crownGeometry(kind, lod, seed) {
 function farGeometry(kind, seed) {
   const rnd = mulberry32(seed);
   const H = TREES.height;
-  const parts = [trunkGeo(2.0, 0.22, 0.15, 4)];
-  const tiers = 4;
+  const parts = [trunkGeo(2.0, 0.22, 0.15, 3)];
+  const tiers = 3;
   for (let i = 0; i < tiers; i++) {
     const t = i / tiers;
     const r = (kind === 0 ? 2.4 : 2.8) * Math.pow(1 - t, 0.9) + 0.35;
     const h = (H / tiers) * 1.7;
     const y = 1.0 + t * (H - 2.2);
-    const cone = new THREE.ConeGeometry(r, h, 7, 1, true);
+    const cone = new THREE.ConeGeometry(r, h, 6, 1, true);
     const p = cone.attributes.position;
     for (let k = 0; k < p.count; k++) {
       if (p.getY(k) < 0) {
