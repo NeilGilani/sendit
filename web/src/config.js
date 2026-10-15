@@ -14,7 +14,7 @@ export const PHYSICS = {
   steerResponse: 5.0,         // fallback input smoothing (1/s); see ski / snowboard.steerResponse
   digitalSteerStart: 0.65,    // keys: share of full lock on press …
   digitalSteerRamp: 0.45,     // … reaching full lock after this many seconds held (linking turns skips the ramp)
-  holdStillSlope: 0.006,
+  holdStillSlope: 0.002,      // 1 − n.y below this counts as flat (≈ 3.6°)
   normalRadius: 1.4,          // m terrain normal sampling (park features use a fine upstream normal)
   takeoffGap: 0.3,
   terrainImpactLoss: 0.5,     // share of an abrupt impact into the terrain (beyond smoothFollow) lost as speed

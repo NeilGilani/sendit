@@ -226,7 +226,9 @@ export class Rider {
     p.look += (pl.travelSign - p.look) * k(5);
 
     // Lean = atan(contact force / g) across the gear; the gear rolls to its edge angle on top.
-    const lat = ground ? pl.gearLatAccel : 0;
+    // Players driven by physics lean on the real contact force; preview players (lobby) that only set
+    // turnInput get a matching lean from it.
+    const lat = ground ? (pl.simulated ? pl.gearLatAccel : (pl.turnInput || 0) * 4) : 0;
     const leanT = THREE.MathUtils.clamp(Math.atan2(lat, PHYSICS.gravity), -ANIM.maxLean, ANIM.maxLean);
     p.lean += (leanT - p.lean) * k(ANIM.rollResponse);
     const edgeNose = ground ? pl.edgeAngle * pl.travelSign : 0;
@@ -240,7 +242,7 @@ export class Rider {
     // Upper body leads the turn (rotation-led on a board, anticipation on skis).
     // Wind-up: while loading a pop and steering, the shoulders counter-rotate against the coming spin.
     // The upper body leads edge changes: follow the raw input (ahead of the smoothed edge) by ~0.1 s.
-    const leadGround = pl.squat > 0.05 && Math.abs(pl.windup || 0) > 0.05 ? (pl.windup || 0) * 1.4 : -(pl._ctrl?.steer ?? pl.turnInput);
+    const leadGround = pl.squat > 0.05 && Math.abs(pl.windup || 0) > 0.05 ? (pl.windup || 0) * 1.4 : -(pl._ctrl?.steer || pl.turnInput || 0);
     p.lead += ((ground ? leadGround : air ? THREE.MathUtils.clamp(pl.spinRate * 0.12, -0.6, 0.6) : 0) - p.lead) * k(6);
     // Double-pole push on skis (W when slow): a looping reach-plant-push cycle.
     const pushing = ground && !board && pl._ctrl?.up > 0.3 && pl.speed < (pl.dyn?.C.pushMaxSpeed ?? 8);

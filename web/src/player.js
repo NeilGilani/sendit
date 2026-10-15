@@ -132,6 +132,7 @@ export class Player {
   }
 
   step(dt) {
+    this.simulated = true;            // riders fall back to pose-only cues for players that never step (lobby previews)
     this.prevPos.copy(this.position);
     this.prevOrient.copy(this.orient);
     if (this.state === State.FROZEN) return;
