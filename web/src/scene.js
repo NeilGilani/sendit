@@ -343,6 +343,14 @@ export const SNOW_FRAG_GLSL = /* glsl */`
   float glint = step(0.985, hash13(cell)) * step(0.55, hash13(cell + vq * 7.13)) * max(1.0 - length(fr) * 5.0, 0.0)
               * (1.0 - smoothstep(10.0, 40.0, dist)) * (1.0 - rock) * (1.0 - tr);
   toonSparkle = glint * sparkle * sunMaskAt(vW).r * max(dot(N, uSunDir), 0.0);
+  // Lake surface (Lake Tahoe on the real mountains): deep blue, brighter at grazing angles.
+  if (vW.y < uWater + 0.9 && N.y > 0.985) {
+    vec3 Vw = normalize(cameraPosition - vW);
+    float fr = pow(1.0 - max(Vw.y, 0.0), 3.0);
+    diffuseColor.rgb = mix(vec3(0.03, 0.17, 0.3), vec3(0.5, 0.66, 0.85), fr);
+    tRock = 1.0;
+    toonSparkle = 0.0; tTrack = 0.0;
+  }
 }
 `;
 
@@ -357,6 +365,14 @@ export const FAR_SNOW_FRAG_GLSL = /* glsl */`
   float forest = (1.0 - smoothstep(1950.0, 2250.0, vW.y + (m - 0.5) * 300.0)) * (1.0 - rock) * smoothstep(0.03, 0.12, slope);
   diffuseColor.rgb = mix(mix(vec3(uSnowAlbedo), uForestCol, forest * 0.85), uRockCol, rock);
   tRock = max(rock, forest);
+  // Lake surface (Lake Tahoe on the real mountains): deep blue, brighter at grazing angles.
+  if (vW.y < uWater + 0.9 && N.y > 0.985) {
+    vec3 Vw = normalize(cameraPosition - vW);
+    float fr = pow(1.0 - max(Vw.y, 0.0), 3.0);
+    diffuseColor.rgb = mix(vec3(0.03, 0.17, 0.3), vec3(0.5, 0.66, 0.85), fr);
+    tRock = 1.0;
+    
+  }
 }
 `;
 

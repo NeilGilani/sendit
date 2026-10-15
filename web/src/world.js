@@ -23,6 +23,7 @@ export const globals = {
   uWind: { value: new THREE.Vector2(ART.windSpeed, ART.windIntensity) },
   uTrackMap: { value: null },
   uTrackRegion: { value: new THREE.Vector3(0, 0, 140) },  // centre x, centre z, size
+  uWater: { value: -1e5 },                                   // lake surface height (m); Lake Tahoe on real mountains
 };
 
 /**
@@ -108,7 +109,7 @@ varying vec3 vW;
 varying vec3 vWN;
 uniform vec3 uSunDir; uniform float uSunLum; uniform float uTime;
 uniform vec3 uSunCol; uniform vec3 uSkyAmb; uniform vec3 uGroundAmb; uniform float uLightWrap; uniform float uAOFloor; uniform float uExposure;
-uniform vec3 uRimColor; uniform float uRim; uniform float uEmissiveBoost;
+uniform vec3 uRimColor; uniform float uRim; uniform float uEmissiveBoost; uniform float uWater;
 float skyVis = 1.0;
 float toonSparkle = 0.0;
 vec3 toonAdd = vec3(0.0);   // added after the exposure curve (specular / sheen)

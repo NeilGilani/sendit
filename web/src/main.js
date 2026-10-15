@@ -11,6 +11,7 @@ import { HUD } from './config.js';
 import { ATMOSPHERE, col, createSnowfall } from './scene.js';
 import { Terrain } from './terrain.js';
 import { Course } from './course.js';
+import { RealCourse } from './realcourse.js';
 import { Sky } from './sky.js';
 import { Scatter } from './scatter.js';
 import { Lifts } from './lifts.js';
@@ -103,8 +104,18 @@ class WindEffect extends Effect {
 async function boot() {
   const loader = new GLTFLoader();
   terrain = new Terrain();
-  course = new Course();
-  await terrain.generate(course, (p) => ui.loading(p * 0.45, 'Carving the gully…'));
+  // Which mountain: ?resort=<id>&run=<n> (real Lake Tahoe data) or the hand-built gully.
+  const resort = params.get('resort') || settings.resort || '';
+  const runIndex = Number(params.get('run') ?? settings.run ?? 0);
+  course = null;
+  if (resort) {
+    ui.loading(0.02, 'Fetching the mountain…');
+    course = await RealCourse.load(resort, runIndex).catch((e) => { console.warn('resort load failed', e); return null; });
+  }
+  if (!course) course = new Course();
+  ui.setMountain(course);
+  await terrain.generate(course, (p) => ui.loading(p * 0.45, course.meta ? `Shaping ${course.name}…` : 'Carving the gully…'));
+  globals.uWater.value = course.water ?? -1e5;
   if (params.has('at')) {
     const [x, z, h] = params.get('at').split(',').map(Number);
     terrain.meta.spawn = { position: [x, 0, z], heading: h || 0 };
@@ -131,7 +142,7 @@ async function boot() {
   scene.add(features.group);
   for (const o of features.obstaclePoints || []) scatter.addObstacle(o[0], o[1], o[2], o[3]);
   ui.loading(0.8, 'Growing the forest…');
-  scatter.addEnvironment(features.path || []);
+  scatter.addEnvironment(features.path || [], course);
   console.log('[sendit] environment', JSON.stringify(scatter.envStats || {}));
   if (params.has('kicker')) {
     // Debug: start 40 m before a kicker, aimed at it.
@@ -140,7 +151,7 @@ async function boot() {
     terrain.meta.spawn = { position: [p0.x, 0, p0.y], heading: Math.atan2(-k.f.x, -k.f.y) };
   }
   lifts = new Lifts(terrain);
-  lifts.build([]);   // the hand-built course has no lifts: finish → back to the top
+  lifts.build(course.lifts || []);   // real mountains have their real lifts; the gully has none
   scene.add(lifts.group);
 
   ui.loading(0.88, 'Waxing the board…');
@@ -261,7 +272,7 @@ canvas.addEventListener('click', () => { if (game.mode === Mode.RIDING || game.m
 let finishing = false;
 function checkFinish() {
   if (finishing || game.mode !== Mode.RIDING || player.state === State.FROZEN) return;
-  if (course.tAt(player.position.z) < course.P.finishT) return;
+  if (course.progress(player.position.x, player.position.z) < course.finishAt) return;
   finishing = true;
   ui.pop('RUN COMPLETE!', 'gold');
   emit('runComplete');

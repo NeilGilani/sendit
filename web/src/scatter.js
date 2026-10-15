@@ -107,7 +107,11 @@ export class Scatter {
    * Dense hand-placed look around the opening run (`path`: Vector2 x/z polyline from the top):
    * clustered pine stands, frozen rock formations, fencing along the run and the ridge crests.
    */
-  addEnvironment(path) {
+  addEnvironment(path, course = null) {
+    const real = !!(course && course.forestAt);
+    const water = course?.water ?? -1e5;
+    const treeTop = real ? course.treeline : SPAWN.treeMaxAltitude;
+    const thinFrom = real ? course.treeline - 250 : SPAWN.treeThinFrom;
     const T = this.terrain;
     const rnd = mulberry32(911);
     const S = SPAWN;
@@ -150,11 +154,18 @@ export class Scatter {
         const tx = x + (rnd() - 0.5) * S.treeStep * 0.9, tz = z + (rnd() - 0.5) * S.treeStep * 0.9;
         if (!T.isInside(tx, tz, 20)) continue;
         const h = T.baseHeight(tx, tz);
-        if (h > S.treeMaxAltitude) continue;
+        if (h > treeTop || h < water + 3) continue;
         const cluster = noise(tx * S.treeClusterScale, tz * S.treeClusterScale) * 0.75 + noise(tx * S.treeClusterScale * 3.1 + 7, tz * S.treeClusterScale * 3.1) * 0.25;
-        const thin = 1 - smooth(S.treeThinFrom, S.treeMaxAltitude, h);
-        if (cluster < S.treeClusterThreshold + (1 - thin) * 0.15) continue;
-        if (rnd() > S.treeDensity * thin) continue;
+        const thin = 1 - smooth(thinFrom, treeTop, h);
+        if (real) {
+          // Real mountains: dense where OpenStreetMap maps forest, scattered elsewhere; runs stay clear.
+          const f = course.forestAt(tx, tz);
+          if (rnd() > (f > 0.5 ? 0.85 : 0.1 + 0.25 * cluster) * thin) continue;
+          if (course.pisteAt(tx, tz) > 0.3) continue;
+        } else {
+          if (cluster < S.treeClusterThreshold + (1 - thin) * 0.15) continue;
+          if (rnd() > S.treeDensity * thin) continue;
+        }
         T.getNormal(tx, tz, 3, n);
         if (n.y < cosTree) continue;
         T.getSurface(tx, tz, surf);
@@ -249,7 +260,7 @@ export class Scatter {
     const dirs = [[1, 0], [0, 1], [0.7071, 0.7071], [0.7071, -0.7071]];
     let crestSegs = 0;
     const off = 16;
-    for (let z = minZ; z < maxZ && crestSegs < S.ridgeFenceMax; z += S.ridgeFenceStep) {
+    for (let z = minZ; z < maxZ && crestSegs < (real ? 0 : S.ridgeFenceMax); z += S.ridgeFenceStep) {
       for (let x = minX; x < maxX && crestSegs < S.ridgeFenceMax; x += S.ridgeFenceStep) {
         const cx = x + (rnd() - 0.5) * 10, cz = z + (rnd() - 0.5) * 10;
         if (!T.isInside(cx, cz, 60)) continue;

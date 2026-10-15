@@ -349,10 +349,7 @@ export class Terrain {
 
   /** Menu flyover focus: above the middle of the course (or the highest summit for real data). */
   summit() {
-    if (this.course) {
-      const c = this.course.centre(this.course.P.finishT * 0.45);
-      return new THREE.Vector3(c.x, c.y + 650, c.z);
-    }
+    if (this.course) return this.course.menuFocus();
     let best = 0, bi = 0;
     for (let i = 0; i < this.heights.length; i += 7) if (this.heights[i] > best) { best = this.heights[i]; bi = i; }
     const N = this.res;

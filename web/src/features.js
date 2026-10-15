@@ -35,7 +35,7 @@ export class Features {
     const path = course.path;
     this.path = path;
     // Keep man-made features clear of the course's natural drops.
-    const dropsAt = course.P.drops.map(([t]) => course.pathLength(t));
+    const dropsAt = course.dropsAt;
     let len = 0;
     for (let i = 0; i < path.length - 1; i++) len += path[i].distanceTo(path[i + 1]);
     this.runLength = len;
@@ -61,7 +61,7 @@ export class Features {
     // Signature park kickers (with crowds) near the top.
     for (const k of KICKERS) this.planKicker(at(k.at), 0, k, true);
     // Then a stream of features all the way down.
-    const end = Math.min(J.endAt, course.pathLength(course.P.finishT) - 60);
+    const end = Math.min(J.endAt, course.finishAt - 60);
     for (let d = J.startAt; d < end; d += rr(J.spacing)) {
       if (KICKERS.some((k) => Math.abs(k.at - d) < 28)) continue;
       if (dropsAt.some((q) => d > q - 45 && d < q + 30)) continue;
@@ -163,7 +163,7 @@ export class Features {
     }
     const s0 = this.at(18);
     this.addBanner(s0.p, s0.dir);
-    const s1 = this.at(this.course.pathLength(this.course.P.finishT));
+    const s1 = this.at(this.course.finishAt);
     this.addBanner(s1.p, s1.dir);
     this.addFogPockets();
     this.buildSpectators();

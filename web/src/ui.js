@@ -9,7 +9,7 @@ const $ = (id) => document.getElementById(id);
 export class UI {
   constructor(handlers) {
     this.h = handlers;
-    this.screens = ['loading', 'menu', 'pause', 'settings', 'credits'].reduce((o, k) => ((o[k] = $(k)), o), {});
+    this.screens = ['loading', 'menu', 'pause', 'settings', 'credits', 'mountains'].reduce((o, k) => ((o[k] = $(k)), o), {});
     this.hud = $('hud');
     this.fadeEl = $('fade');
     this.settingsFrom = 'menu';
@@ -32,6 +32,7 @@ export class UI {
       case 'ride': this.h.ride(); break;
       case 'settings': this.settingsFrom = game.mode === Mode.PAUSED ? 'pause' : 'menu'; this.show('settings'); break;
       case 'credits': this.loadCredits(); this.show('credits'); break;
+      case 'mountains': this.loadMountains(); this.show('mountains'); break;
       case 'resume': this.h.resume(); break;
       case 'top': this.h.resume(); this.h.top(); break;
       case 'menu': this.h.menu(); break;
@@ -157,6 +158,50 @@ export class UI {
     const mark = () => seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', Number(b.dataset.v) === settings.quality));
     seg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { setSetting('quality', Number(b.dataset.v)); mark(); }));
     mark();
+  }
+
+  /** Menu subtitle for the loaded mountain. */
+  setMountain(course) {
+    const el = $('mountainName');
+    if (!el) return;
+    el.textContent = course.meta
+      ? `${course.name} · ${course.meta.region} — ${course.run.name} (${course.run.drop} m vertical)`
+      : 'Valcrest Gully · hand-built powder run';
+  }
+
+  /** Mountain picker: the hand-built gully + real Lake Tahoe mountains (each with up to 3 runs). */
+  async loadMountains() {
+    const list = $('mountainList');
+    if (this._mountains) return;
+    this._mountains = true;
+    let index = [];
+    try { index = await (await fetch('/resorts/index.json')).json(); } catch { /* no data built */ }
+    const go = (resort, run) => {
+      setSetting('resort', resort); setSetting('run', run);
+      const q = new URLSearchParams(location.search);
+      q.delete('kicker'); q.delete('at');
+      if (resort) { q.set('resort', resort); q.set('run', run); } else { q.delete('resort'); q.delete('run'); }
+      location.search = q.toString();
+    };
+    const card = (title, sub, runs) => {
+      const box = document.createElement('div');
+      box.className = 'mountain';
+      box.innerHTML = `<div class="m-title">${title}</div><div class="m-sub">${sub}</div>`;
+      const row = document.createElement('div');
+      row.className = 'm-runs';
+      for (const r of runs) {
+        const b = document.createElement('button');
+        b.innerHTML = `${r.label}<small>${r.meta}</small>`;
+        b.addEventListener('click', r.go);
+        row.appendChild(b);
+      }
+      box.appendChild(row);
+      list.appendChild(box);
+    };
+    card('Valcrest Gully', 'Hand-built powder gully · jumps, pillows and drops', [{ label: 'Ride the gully', meta: '2.5 km', go: () => go('', 0) }]);
+    for (const m of index) {
+      card(m.name, m.region, m.runs.map((r, i) => ({ label: r.name, meta: `${r.drop} m vertical · ${(r.length / 1000).toFixed(1)} km`, go: () => go(m.id, i) })));
+    }
   }
 
   async loadCredits() {

@@ -22,9 +22,10 @@
     <div class="vignette"></div>
     <div class="panel-left">
       <div class="title">SENDIT</div>
-      <div class="sub">Valcrest Alpine Resort · golden hour</div>
+      <div class="sub" id="mountainName">Valcrest Gully · hand-built powder run</div>
       <nav>
         <button data-act="ride" class="primary">Ride</button>
+        <button data-act="mountains">Mountains</button>
         <button data-act="settings">Settings</button>
         <button data-act="credits">Credits</button>
       </nav>
@@ -68,6 +69,15 @@
         <label>Light snowfall</label><input type="checkbox" data-key="snowfall" />
         <label>Fullscreen</label><input type="checkbox" data-key="fullscreen" />
       </div>
+      <button data-act="back">Back</button>
+    </div>
+  </div>
+
+  <div id="mountains" class="screen hidden">
+    <div class="vignette dim"></div>
+    <div class="card wide">
+      <h2>Mountains</h2>
+      <div id="mountainList" class="mountain-list"></div>
       <button data-act="back">Back</button>
     </div>
   </div>

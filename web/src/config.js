@@ -23,7 +23,7 @@ export const PHYSICS = {
   pushAccel: 4.0,             // skating when W is held at low speed
   pushMaxSpeed: 9,
   brakeDecel: 9.0,
-  holdStillSlope: 0.006,
+  holdStillSlope: 0.002,      // 1 − n.y below this counts as flat (≈ 3.6°)
   takeoffGap: 0.3,
   // Jump: hold to squat, release to pop. Impulse scales with squat depth.
   chargeTime: 0.6,

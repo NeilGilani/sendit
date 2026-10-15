@@ -1,0 +1,252 @@
+[
+ {
+  "id": "olympic_valley",
+  "name": "Olympic Valley",
+  "region": "North Lake Tahoe",
+  "runs": [
+   {
+    "name": "Main Chute \u2192 Newport \u2192 Sunnyside",
+    "drop": 785,
+    "length": 4136,
+    "difficulty": "expert"
+   },
+   {
+    "name": "Kitchen Wall \u2192 Sun Bowl \u2192 Bullet",
+    "drop": 775,
+    "length": 3832,
+    "difficulty": "expert"
+   },
+   {
+    "name": "Monument Ridge \u2192 Emigrant Face \u2192 Bailey's",
+    "drop": 760,
+    "length": 5609,
+    "difficulty": "intermediate"
+   }
+  ]
+ },
+ {
+  "id": "alpine_meadows",
+  "name": "Alpine Meadows",
+  "region": "North Lake Tahoe",
+  "runs": [
+   {
+    "name": "D5 \u2192 Wolverine \u2192 The Face",
+    "drop": 473,
+    "length": 2063,
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Alpine Bowl \u2192 Rock Garden \u2192 Upper Loop Road",
+    "drop": 468,
+    "length": 2616,
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Keyhole 2 \u2192 Keyhole 1 \u2192 East Palisades",
+    "drop": 458,
+    "length": 2062,
+    "difficulty": "expert"
+   }
+  ]
+ },
+ {
+  "id": "mt_pluto",
+  "name": "Mt. Pluto",
+  "region": "Truckee \u00b7 North Lake Tahoe",
+  "runs": [
+   {
+    "name": "Sierra Grande \u2192 Challenger \u2192 Lower Burnout",
+    "drop": 566,
+    "length": 2780,
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Polaris \u2192 Lower Burnout",
+    "drop": 564,
+    "length": 1877,
+    "difficulty": "advanced"
+   },
+   {
+    "name": "West Ridge \u2192 Upper Jibboom \u2192 Goldmine",
+    "drop": 550,
+    "length": 3800,
+    "difficulty": "intermediate"
+   }
+  ]
+ },
+ {
+  "id": "monument_peak",
+  "name": "Monument Peak",
+  "region": "South Lake Tahoe",
+  "runs": [
+   {
+    "name": "Ellie's \u2192 California Trail \u2192 High Five",
+    "drop": 1004,
+    "length": 7214,
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Aries \u2192 Orion's Belt \u2192 Big Dipper",
+    "drop": 689,
+    "length": 5148,
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cloud 9 \u2192 Olympic Downhill \u2192 Lower Stagecoach",
+    "drop": 594,
+    "length": 2860,
+    "difficulty": "intermediate"
+   }
+  ]
+ },
+ {
+  "id": "kirkwood",
+  "name": "Kirkwood Valley",
+  "region": "South of Lake Tahoe",
+  "runs": [
+   {
+    "name": "Headwaters \u2192 Wagon Trail \u2192 Short Spoke",
+    "drop": 489,
+    "length": 1823,
+    "difficulty": "advanced"
+   },
+   {
+    "name": "The Wall \u2192 Buckboard",
+    "drop": 483,
+    "length": 1714,
+    "difficulty": "expert"
+   },
+   {
+    "name": "Notch chute \u2192 all the way \u2192 The Drain",
+    "drop": 432,
+    "length": 1719,
+    "difficulty": "expert"
+   }
+  ]
+ },
+ {
+  "id": "huckleberry",
+  "name": "Huckleberry Ridge",
+  "region": "Echo Summit \u00b7 South Lake Tahoe",
+  "runs": [
+   {
+    "name": "Sugar n' Spice",
+    "drop": 477,
+    "length": 3834,
+    "difficulty": "easy"
+   },
+   {
+    "name": "Eastabout \u2192 Castle \u2192 Lower Castle",
+    "drop": 475,
+    "length": 2206,
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Chair Line (unofficial) \u2192 Lower Dynamite \u2192 Sugar n' Spice",
+    "drop": 470,
+    "length": 1506,
+    "difficulty": "expert"
+   }
+  ]
+ },
+ {
+  "id": "mt_rose",
+  "name": "Mt. Rose",
+  "region": "Reno \u00b7 North Lake Tahoe",
+  "runs": [
+   {
+    "name": "El Cap \u2192 Tailings",
+    "drop": 404,
+    "length": 1081,
+    "difficulty": "expert"
+   },
+   {
+    "name": "Main Lodge Return \u2192 Kit Carson Traverse \u2192 Around The World",
+    "drop": 402,
+    "length": 3582,
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Upper Northwest \u2192 Express \u2192 Northwest Passage",
+    "drop": 384,
+    "length": 1418,
+    "difficulty": "intermediate"
+   }
+  ]
+ },
+ {
+  "id": "mt_lincoln",
+  "name": "Mt. Lincoln",
+  "region": "Donner Summit",
+  "runs": [
+   {
+    "name": "Rhalves' Run \u2192 Shortcut \u2192 California Street",
+    "drop": 424,
+    "length": 2633,
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Century Club \u2192 Sherpa Creek \u2192 Sidewinder",
+    "drop": 381,
+    "length": 2375,
+    "difficulty": "expert"
+   },
+   {
+    "name": "Tunnel \u2192 Sunset Boulevard Upper \u2192 Sunset Boulevard Lower",
+    "drop": 345,
+    "length": 1380,
+    "difficulty": "expert"
+   }
+  ]
+ },
+ {
+  "id": "homewood",
+  "name": "Homewood",
+  "region": "West Shore \u00b7 Lake Tahoe",
+  "runs": [
+   {
+    "name": "Quail Peak \u2192 Rainbow Ridge \u2192 Upper Homeward Bound",
+    "drop": 498,
+    "length": 3247,
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Rainbow Ridge \u2192 Bonanza \u2192 Pot O' Gold",
+    "drop": 498,
+    "length": 3050,
+    "difficulty": "easy"
+   },
+   {
+    "name": "Noonchester Traverse \u2192 Hobbit Land \u2192 Second Creek",
+    "drop": 483,
+    "length": 3031,
+    "difficulty": "intermediate"
+   }
+  ]
+ },
+ {
+  "id": "diamond_peak",
+  "name": "Diamond Peak",
+  "region": "Incline Village \u00b7 Lake Tahoe",
+  "runs": [
+   {
+    "name": "Crystal Ridge \u2192 Lakeview \u2192 Penguin",
+    "drop": 536,
+    "length": 2820,
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "The Great Flume \u2192 Spillway \u2192 Lodgepole",
+    "drop": 535,
+    "length": 2531,
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "G. S. \u2192 School Yard",
+    "drop": 216,
+    "length": 634,
+    "difficulty": "advanced"
+   }
+  ]
+ }
+]

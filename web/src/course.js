@@ -117,6 +117,12 @@ export class Course {
   }
 
   tAt(z) { return this.P.startZ - z; }
+  // Shared course interface (see realcourse.js).
+  get dropsAt() { return this.P.drops.map(([t]) => this.pathLength(t)); }
+  get finishAt() { return this.pathLength(this.P.finishT); }
+  get lifts() { return []; }
+  progress(x, z) { return this.pathLength(this.tAt(z)); }
+  menuFocus() { const c = this.centre(this.P.finishT * 0.45); return new THREE.Vector3(c.x, c.y + 650, c.z); }
   /** Path length (metres along the winding line) at fall-line position t. */
   pathLength(t) { return this.at(this.pathLenAt, Math.min(Math.max(t, 0), this.P.finishT + 200)); }
   /** Course centre at fall-line position t: { x, z, y, heading }. */
