@@ -16,7 +16,7 @@ export const POST = {
   shadowTint: [0.985, 1.0, 1.03],   // cool lift in the shadows (blue shade on snow)
   highlightTint: [1.01, 1.0, 0.985], // faint warmth in the highlights (high-altitude sun)
   vignette: 0.22,
-  bloom: { intensity: 0.32, threshold: 2.1, smoothing: 0.6, radius: 0.7 },
+  bloom: { intensity: 0.32, threshold: 3.2, smoothing: 0.8, radius: 0.7 },   // HDR: sun, glints, hot backlit mist
   ao: { radius: 2.0, distanceFalloff: 1.0, intensity: 1.15, color: '#33415c' },
   glare: 0.12,                 // soft veiling glare when looking toward the sun (occlusion-aware)
   flare: 0.035,                // faint lens ghosts when the sun is in view (0 = off)
