@@ -85,7 +85,7 @@ void rockLayer(vec2 uv, float farF, float midF, out vec3 col, out vec2 g, out fl
   // Fractured blocks: Voronoi cells, each a tilted facet; dark joints between them.
   vec3 v1 = rockCells(uv * vec2(1.0, 1.6) / 4.2);
   g = (hash32(v1.z * vec2(7.1, 3.3)).xy - 0.5) * 0.9 * (1.0 - farF);
-  float joint = 1.0 - smoothstep(0.02, 0.09, v1.y);
+  float joint = (1.0 - smoothstep(0.02, 0.07, v1.y)) * smoothstep(0.35, 0.6, texture2D(noiseTex, uv * 0.02 + 0.8).r);
   float tone = hash12(vec2(v1.z, 1.7));
   if (midF < 1.0) {
     vec3 v2 = rockCells(uv / 1.1 + 3.7);
@@ -95,7 +95,7 @@ void rockLayer(vec2 uv, float farF, float midF, out vec3 col, out vec2 g, out fl
     float l0 = texture2D(noiseTex, q).g;
     g += vec2(texture2D(noiseTex, q + vec2(0.02, 0.0)).g - l0, texture2D(noiseTex, q + vec2(0.0, 0.02)).g - l0) * 1.1 * (1.0 - midF);
   }
-  col *= (0.82 + 0.3 * tone) * (1.0 - joint * 0.45 * (1.0 - farF));
+  col *= (0.86 + 0.22 * tone) * (1.0 - joint * 0.22 * (1.0 - farF));
   seg = smoothstep(0.42, 0.62, texture2D(noiseTex, uv * vec2(0.025, 0.1) + 0.7).r + uRockLook.y);
 }
 // Rock albedo: grey gneiss in blocks, lighter/darker beds, vertical runoff streaks, iron staining.
@@ -177,7 +177,10 @@ export const SNOW_FRAG_GLSL = /* glsl */`
   // Large-scale concavity across the face: gullies / couloirs hold snow, ribs and buttresses are bare.
   vec3 Na = macroN(xz + fT.xz * 30.0), Nb = macroN(xz - fT.xz * 30.0);
   float concav = clamp(-dot(Na - Nb, fT) * 3.0, -1.0, 1.0);
-  float exposeN = slope + (m3 - 0.5) * 0.12 + (m2 - 0.5) * 0.1 - concav * 0.13 + exposure * 0.04;
+  // Slope over ~20 m: short steps (wall feet, berms) stay snow-filled, only real faces go bare.
+  vec3 Nw = normalize(N + Na + Nb + macroN(xz + fB.xz * 10.0) + macroN(xz - fB.xz * 10.0));
+  float slopeW = 1.0 - Nw.y;
+  float exposeN = min(slope, slopeW + 0.06) + (m3 - 0.5) * 0.12 + (m2 - 0.5) * 0.1 - concav * 0.13 + exposure * 0.04;
   float rock = smoothstep(uRockLook.z - uRockLook.w, uRockLook.z + uRockLook.w, exposeN);
   rock = max(rock, smoothstep(0.35, 0.75, s.g + (m2 - 0.5) * 0.4) * smoothstep(0.1, 0.25, slope) * (1.0 - smoothstep(0.1, 0.4, concav)));
   vec3 rockCol = vec3(0.0);
@@ -210,7 +213,7 @@ export const SNOW_FRAG_GLSL = /* glsl */`
   float detailFade = (1.0 - farF) * smoothstep(0.5, 0.8, N.y);   // xz-projected detail would stretch on steep faces
   if (detailFade > 0.0) {
     // Soft drifts / pillows (metres).
-    vec2 g1 = noiseGrad(xz, 0.011, 1.6, 0) * 7.0 + noiseGrad(xz, 0.052, 0.4, 0) * 1.3;
+    vec2 g1 = noiseGrad(xz, 0.011, 3.0, 0) * 7.0 + noiseGrad(xz, 0.052, 1.2, 0) * 0.55;
     Ns = normalize(Ns - vec3(g1.x, 0.0, g1.y) * uSnowShape.x * (1.0 - groomed * 0.7));
     vec2 wd = uWindDir, wp = vec2(-wd.y, wd.x);
     float sAl = dot(xz, wd), sAc = dot(xz, wp);
@@ -225,7 +228,7 @@ export const SNOW_FRAG_GLSL = /* glsl */`
       Ns = normalize(Ns - vec3(gw.x, 0.0, gw.y));
     }
     // Wind ripples: asymmetric ripples across the wind (gentle stoss, steep lee), warped.
-    float rip = uSnowShape.y * 0.6 * (0.3 + 0.7 * exposure) * (1.0 - groomed) * (1.0 - forest * 0.6);
+    float rip = uSnowShape.y * 0.4 * (0.3 + 0.7 * exposure) * (1.0 - groomed) * (1.0 - forest * 0.6);
     if (rip > 0.01 && uDetail > 0.5) {
       float warp = (texture2D(noiseTex, xz * 0.011).r - 0.5) * 7.0 + (texture2D(noiseTex, xz * 0.045 + 0.2).r - 0.5) * 0.9;
       float k = 6.2831853 / 0.32;

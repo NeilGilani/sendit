@@ -168,7 +168,7 @@ class WindEffect extends Effect {
               float thin = exp(-(across * across) / max(w * w, 1e-4));
               alpha = max(alpha, thin * body * smoothstep(0.0, 0.25, head) * (1.0 - smoothstep(0.75, 1.0, head)));
             }
-            col = mix(col, vec3(0.94, 0.95, 1.0), clamp(alpha * corner * intensity * 0.45, 0.0, 1.0));
+            col = mix(col, col * 1.08 + 0.04, clamp(alpha * corner * intensity * 0.5, 0.0, 1.0));
             col *= 1.0 - corner * intensity * 0.08;
           }
         }

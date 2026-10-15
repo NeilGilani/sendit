@@ -12,8 +12,8 @@ import * as THREE from 'three';
 
 // ------------------------------------------------------------------ LIGHTING (linear HDR)
 export const LIGHTING = {
-  sunElevation: 38,              // degrees — long readable shadows, every lump has a lit and a shaded side
-  sunBearing: 200,               // degrees from north — side / back light down the north-running gully
+  sunElevation: 40,              // degrees — long readable shadows, every lump has a lit and a shaded side
+  sunBearing: 163,               // degrees from north — SSE: keeps ~85 % of the gully floor sunlit, light from behind-left
   sunWhiten: 0.45,               // pull the transmitted sun colour toward white
   sunBoost: 1.0,                 // multipliers on the colours derived from the atmosphere model
   skyBoost: 1.0,                 // single scattering underestimates the sky; artistic lift
@@ -33,6 +33,12 @@ export const LIGHTING = {
   groundAmbient: '#b8bcc6',
   exposure: 1.0,
 };
+
+// Debug: ?sun=bearing,elevation overrides the sun (degrees).
+if (typeof location !== 'undefined') {
+  const q = new URLSearchParams(location.search).get('sun');
+  if (q) { const [b, e] = q.split(',').map(Number); if (Number.isFinite(b)) LIGHTING.sunBearing = b; if (Number.isFinite(e)) LIGHTING.sunElevation = e; }
+}
 
 // ------------------------------------------------------------------ SNOW material (gfx/snow.js)
 export const SNOW = {
@@ -133,14 +139,17 @@ export const RING = {
   height: 2300,                  // metres of peak relief
 };
 
-// ------------------------------------------------------------------ FALLING SNOW
+// ------------------------------------------------------------------ DIAMOND DUST (clear-sky ice crystals)
+// On a clear cold day there is no snowfall, but tiny ice crystals drift in the air and flash when
+// they mirror the sun (strongest looking toward the sun). Kept sparse and subtle.
 export const SNOWFALL = {
-  count: 2200,
-  box: 60,                       // metres — cube of flakes that follows the camera
-  fallSpeed: 0.9,                // m/s
+  count: 1400,
+  box: 50,                       // metres — cube of crystals that follows the camera
+  fallSpeed: 0.25,               // m/s
   wind: [0.9, 0.35],             // m/s drift (x, z)
-  size: 0.035,                   // metres
-  opacity: 0.55,
+  size: 0.02,                    // metres
+  opacity: 0.35,                 // base visibility (they are mostly invisible until they glint)
+  glint: 14,                     // HDR flash brightness
 };
 
 // ------------------------------------------------------------------ SNOW SPRAY (gfx/spray.js)
@@ -156,8 +165,8 @@ export const SPRAY = {
   mistAlpha: 0.17,
   inherit: 0.55,                 // share of the contact's velocity the snow keeps
   stopBurst: 260,                // particles in a hard-stop fan
-  forwardG: 0.62,                // Henyey-Greenstein g: backlit spray glows
-  forwardMix: 0.42,
+  forwardG: 0.45,                // Henyey-Greenstein g: backlit spray glows
+  forwardMix: 0.5,
   albedo: 0.92,
   wind: [0.9, 0.35],             // m/s drift of lingering powder
 };
@@ -305,14 +314,15 @@ export function createSnowfall() {
     uCam: { value: new THREE.Vector3() }, uTime: { value: 0 }, uBox: { value: S.box },
     uFall: { value: S.fallSpeed }, uWind: { value: new THREE.Vector2(...S.wind) },
     uSize: { value: S.size }, uPx: { value: 600 }, uOpacity: { value: S.opacity },
+    uSunDir: { value: sunDirection() }, uGlint: { value: S.glint },
   };
   const mat = new THREE.ShaderMaterial({
     uniforms, transparent: true, depthWrite: false,
     vertexShader: /* glsl */`
       attribute float aSeed;
       uniform vec3 uCam; uniform float uTime; uniform float uBox; uniform float uFall; uniform vec2 uWind;
-      uniform float uSize; uniform float uPx;
-      varying float vA;
+      uniform float uSize; uniform float uPx; uniform vec3 uSunDir;
+      varying float vA; varying float vFlash;
       void main() {
         float sp = 0.7 + aSeed * 0.6;
         vec3 p = position * uBox;
@@ -323,16 +333,21 @@ export function createSnowfall() {
         vec4 mv = viewMatrix * vec4(p, 1.0);
         float d = -mv.z;
         vA = smoothstep(0.6, 2.5, d) * (1.0 - smoothstep(uBox * 0.3, uBox * 0.5, d));
-        gl_PointSize = clamp(uSize * (0.6 + aSeed * 0.8) * uPx / max(d, 0.1), 1.0, 14.0);
+        gl_PointSize = clamp(uSize * (0.6 + aSeed * 0.8) * uPx / max(d, 0.1), 1.0, 6.0);
+        // A tumbling flat crystal flashes when its facet mirrors the sun into the eye.
+        vec3 V = normalize(p - cameraPosition);
+        float fwd = pow(max(dot(V, uSunDir), 0.0), 3.0);
+        float tumble = pow(max(sin(uTime * (1.3 + aSeed * 2.7) + aSeed * 61.0), 0.0), 24.0);
+        vFlash = tumble * (0.25 + 1.6 * fwd);
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */`
-      uniform float uOpacity; varying float vA;
+      uniform float uOpacity; uniform float uGlint; varying float vA; varying float vFlash;
       void main() {
         vec2 q = gl_PointCoord - 0.5;
-        float a = smoothstep(0.5, 0.15, length(q)) * vA * uOpacity;
-        if (a < 0.01) discard;
-        gl_FragColor = vec4(vec3(0.97, 0.98, 1.0) * 2.3, a);
+        float a = smoothstep(0.5, 0.1, length(q)) * vA * uOpacity * (0.25 + vFlash);
+        if (a < 0.004) discard;
+        gl_FragColor = vec4(vec3(1.0, 0.99, 0.96) * (1.5 + uGlint * vFlash), a);
       }`,
   });
   const points = new THREE.Points(geo, mat);

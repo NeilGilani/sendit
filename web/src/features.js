@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { toonMaterial, outlineMaterial, globals, mulberry32 } from './world.js';
 import { ATMOSPHERE, JUMPS, col } from './scene.js';
 import { ATMO } from './gfx/atmosphere.js';
+import { snowUniforms, SNOW_COMMON_PARS, SNOW_BAND_GLSL } from './gfx/snow.js';
 
 // Signature kickers near the top (with crowds); the rest of the run is laid out from JUMPS.
 const KICKERS = [
@@ -150,7 +151,14 @@ export class Features {
 
   /** Meshes for the planned features (after the terrain is built). */
   build() {
-    const snowMat = toonMaterial({ name: 'kicker', vertexColors: true });
+    // Shaped park snow: packed, shovel-smoothed, glazed lip (same optics as the terrain snow).
+    const snowMat = toonMaterial({
+      name: 'kicker', vertexColors: true,
+      uniforms: { ...snowUniforms(), noiseTex: { value: this.terrain.terrainUniforms?.noiseTex.value } },
+      fragPars: SNOW_COMMON_PARS,
+      frag: 'float kn = texture2D(noiseTex, vW.xz * 0.6).g; diffuseColor.rgb = uSnowOld * (0.97 + 0.06 * kn); tGlaze = 0.8; tGlintMask = 0.6;',
+      band: SNOW_BAND_GLSL,
+    });
     for (const kick of this.kickers) {
       const mesh = new THREE.Mesh(this.kickerGeometry(kick), snowMat);
       mesh.castShadow = true;
@@ -202,7 +210,7 @@ export class Features {
       const y = (lift ? g + k.H * Math.pow(a / k.L, 1.7) * side : T.baseHeight(x, z) - 0.3) + 0.03;
       pos.push(x, y, z);
       const lip = a > k.L - 0.35 && lift ? 1 : 0;
-      col.push(lip ? 0.3 : 0.93, lip ? 0.5 : 0.93, lip ? 0.85 : 0.93);
+      col.push(lip ? 0.86 : 1.0, lip ? 0.92 : 1.0, lip ? 1.0 : 1.0);   // icy, blue-ish lip
     };
     for (let i = 0; i <= nA; i++) for (let j = 0; j <= nB; j++) vert((i / nA) * k.L, (j / nB - 0.5) * (k.W + 1.6), true);
     for (let i = 0; i < nA; i++) for (let j = 0; j < nB; j++) {
