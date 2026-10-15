@@ -106,8 +106,8 @@ export const PHYSICS = {
     maxVelocity: 14.5,
     steerResponse: 11,
     maxEdgeToe: 64, maxEdgeHeel: 55,
-    edgeSwitchTime: 0.42, heelToToe: 0.38, toeToHeel: 0.46,
-    edgeResponse: 7,
+    edgeSwitchTime: 0.42, heelToToe: 0.3, toeToHeel: 0.4,   // s full edge to full edge (rate limit; with the lean response ≈0.38 / 0.46 s)
+    edgeResponse: 9,
     engage: [3, 13],
     latGToe: 1.6, latGHeel: 1.45,
     sidecutToe: 1.0, sidecutHeel: 0.95,     // × spec sidecut (heel side bends a touch tighter)

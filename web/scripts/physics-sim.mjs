@@ -84,15 +84,17 @@ function bench(type, variant) {
     const p = rider(type, variant, { deg: 0 });
     p.velocity.set(0, 0, -12);
     run(p, 1.0, { steer: 1 });
-    const e0 = p.edgeAngle; let tSwitch = null;
-    run(p, 1.5, { steer: -1 }, (pl, t) => { if (tSwitch === null && pl.edgeAngle < -Math.abs(e0) * 0.9) tSwitch = t; });
-    say('edge switch R→L (90%)', `${f(tSwitch ?? -1, 2)} s from ${deg(e0)}° to ${deg(p.edgeAngle)}°`, type === 'ski' ? '≈0.30 s' : '≈0.42 s');
+    const e0 = p.edgeAngle; const hist = [];
+    run(p, 1.5, { steer: -1 }, (pl, t) => hist.push([t, pl.edgeAngle]));
+    const eEnd = p.edgeAngle, tSwitch = hist.find(([, e]) => e - e0 <= (eEnd - e0) * 0.9)?.[0];
+    say(type === 'snowboard' ? 'edge switch toe→heel (regular, 90%)' : 'edge switch R→L (90%)', `${f(tSwitch ?? -1, 2)} s from ${deg(e0)}° to ${deg(p.edgeAngle)}°`, type === 'ski' ? '≈0.30 s' : '≈0.46 s');
     if (type === 'snowboard') {
       const q = rider(type, variant, { deg: 0 });
       q.velocity.set(0, 0, -12);
       run(q, 1.0, { steer: -1 });
-      const e1 = q.edgeAngle; let t2 = null;
-      run(q, 1.5, { steer: 1 }, (pl, t) => { if (t2 === null && pl.edgeAngle > Math.abs(e1) * 0.9) t2 = t; });
+      const e1 = q.edgeAngle; const h2 = [];
+      run(q, 1.5, { steer: 1 }, (pl, t) => h2.push([t, pl.edgeAngle]));
+      const e2 = q.edgeAngle, t2 = h2.find(([, e]) => e - e1 >= (e2 - e1) * 0.9)?.[0];
       say('edge switch heel→toe (regular)', `${f(t2 ?? -1, 2)} s (${deg(e1)}°→${deg(q.edgeAngle)}°)`, '≈0.38 s');
     }
   }
