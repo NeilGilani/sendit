@@ -91,11 +91,11 @@ createEquipmentModel('ski', { id: 'park', graphic: { top: 0xff3355, pattern: 'st
 
 | Input | Skis | Snowboard |
 |---|---|---|
-| A / D, stick | Edge and steer: carve at speed, pivot (skid) when slow | Toe-side or heel-side edge. For a regular rider riding forward, right is toe side. |
+| A / D, stick | Edge and steer: carve at speed, pivot (skid) when slow. A key press starts at 65% lock and reaches full lock in 0.45 s; linking straight from the other key commits at once. | Toe-side or heel-side edge. For a regular rider riding forward, right is toe side. Same key ramp. |
 | S, LT | Snowplough below 6.5 m/s, hockey stop above | Heel-side slide stop, or a toe-side stop when steering toward the toes |
-| W, RT | Pole and skate push when slow; tuck at speed | One-foot skate when slow; low crouch at speed. Held while charging a pop, it gives a nose press and a **nollie**. |
-| Hold Space | Crouch to charge, release to pop | Tail press to charge, release to **ollie**. Steering while pressing gives a **butter** (pivot on the pressed end). |
-| A / D in the air | Spin, named Left/Right 180/360… | Spin, named **FS/BS** 180/360… by stance and switch |
+| W, RT | Double-pole / skate push below 8.5 m/s; tuck above | One-foot skate when slow; low crouch at speed. Held while charging a pop, it gives a nose press and a **nollie**. |
+| Hold Space | Crouch to charge, release to pop. Steering while charging **winds up** a spin. | Tail press to charge, release to **ollie**. Steering while pressing gives a **butter** (pivot on the pressed end) and winds up the spin. |
+| A / D in the air | Spin, named Left/Right 180/360…. Let go and the spin carries on to the next 360 (or 180 on twin tips). | Spin, named **FS/BS** 180/360… by stance and switch. Let go and the spin carries on to the next 180. |
 | Shift in the air | Grab: Safety, Mute or Japan | Grab: Indy or Melon. With W it is a Nose grab; with S, a Tail grab. |
 | E (debug) | Swap to the snowboard | Swap to skis |
 
@@ -157,8 +157,17 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
 
 ### Air and tricks (shared)
 
-- **Spins.** Stick X drives the spin rate with an exponential response: 6.4 rad/s for skis, 7.6 rad/s for the board, × the spec spin factor from swing weight. About 30% of the ground yaw rate carries into the air as pre-wind.
-- **Grabs.** Shift in the air, after 0.12 s of air time. A grab held for 0.25 s or more scores and names the trick.
+- **Spins.** Stick X drives the spin rate with an exponential response: 6.4 rad/s for skis, 7.6 rad/s for the board, × the spec spin factor from swing weight. Take-off adds spin from two sources:
+  - About 45–55% of the ground yaw rate carries into the air as pre-wind.
+  - A **wind-up** (steering while charging the pop) adds up to 2.6 rad/s on skis and 3.2 rad/s on the board.
+- **Spin momentum.** With the stick released, rotation does not stop dead:
+  - Within `spinCheckAngle` (40°) of a landable alignment, the spin settles onto it. Just past one, the rider checks the spin back.
+  - Farther away, momentum carries the spin on to the next alignment, timed to arrive by touchdown when reachable. Alignments are the nose, or the tail too for boards and twin tips.
+  - A 180 attempt on non-twin skis therefore becomes a 360.
+- **Landing assist (SSX-style).** In the last `landAssistTime` (0.25 s) with the stick released, a gear within `landAssistAngle` (14°) of its path settles straight.
+- **Grabs.** Shift in the air, after 0.12 s of air time. A grab held for 0.25 s or more scores and names the trick. Each grab moves its own hand to its own spot:
+  - Board: Indy is the rear hand to the toe edge, Melon the front hand to the heel edge, Nose grab the front hand to the nose, Tail grab the rear hand to the tail.
+  - Skis: Safety is the left hand to its ski, Mute the right hand across, and Japan crosses the skis.
 - **Trick label.**
   - Board example: `Switch Nollie FS 540 Indy`.
   - Ski example: `Switch Right 360 Japan`.
@@ -177,6 +186,8 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
   - `gravity`, friction by surface, `softCapDrag`.
   - `powderDepth`, `turnScrub`.
   - `lipPopBonus`, `terrainImpactLoss`, `smoothFollow`.
+  - `landAssistTime`, `landAssistAngle`, `spinCheckAngle`.
+  - `digitalSteerStart`, `digitalSteerRamp` (the key steering ramp).
   - Landing impact and crash speeds, stumble time and handling.
 - `PHYSICS.ski` and `PHYSICS.snowboard`:
 
@@ -192,7 +203,7 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
   | Push and drag | `pushAccel`, `pushMaxSpeed`, `dragUpright`, `dragTuck` |
   | Powder | `powderFloat`, `sinkSlow`/`sinkFast`, `powderBog`, `powderDrag`, `powderBogDecel`, `powderSteer` |
   | Butter (board) | `butterRate`, `butterMaxSpeed`, `butterDrag` |
-  | Air | `popMin`/`popMax`, `nollie`, `chargeTime`, `spinRateMax`, `spinResponse`, `prewind` |
+  | Air | `popMin`/`popMax`, `nollie`, `chargeTime`, `spinRateMax`, `spinResponse`, `prewind`, `windupSpin` |
   | Landing | `landClean`/`landStumble`/`landCrash`/`landSlide`, `switchLand` |
 - `ANIM`:
   - Lean and edge caps: `maxLean`, `maxGearEdge`.
@@ -224,13 +235,15 @@ At runtime, `registerVariant(type, spec)` adds a model (for DLC or user presets)
 - **Skis:**
   - Angulation: the hips move inside and the spine counter-rolls, so the upper body stays upright.
   - Hockey-stop counter-rotation: the torso keeps facing down the path.
-  - Pole plant on every edge change at speed, snowplough wedge, tuck, grab (the hand reaches for the ski, which crosses slightly).
+  - Pole plant on every edge change at speed, a double-pole cycle when pushing with W, snowplough wedge, tuck, grabs.
+  - When leaning, the inside ski is lifted back to the snow (inside knee flexes, outside leg extends).
 - **Snowboard:**
   - Sideways stance: the chest faces the toe edge, with binding angles on the feet and knees toward the toes.
   - Hips and shoulders open toward the nose; the head turns toward the travel direction, over the back shoulder when switch.
   - The upper body leads the turn.
   - Toe side: knees drive and the torso stays tall. Heel side: sits down with the arms forward.
   - Pressing shifts the pelvis to the pressed end and flexes the board up at the other end. The ollie crouch loads the tail.
+  - A wind-up counter-rotates the shoulders against the coming spin; in the air the shoulders lead the spin.
   - In the air: knees tucked and arms wide for balance. Indy grab: the rear hand goes to the toe edge between the feet, and the board is pulled up.
 
 ## Testing and tuning results
