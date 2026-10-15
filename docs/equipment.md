@@ -156,7 +156,7 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
 - **Slide stop.** The board pivots about 86° across the path. A heel-side stop gives about 5.6 m/s²; a toe-side stop, when steering toward the toes, about 4.9 m/s².
 - **Butter.** Hold Space, plus W for the nose, and steer under 13 m/s. The board pivots on the flexed end at up to 3.4 rad/s × spec pivot, with a flat base, little grip and little skid scrub.
 - **Ollie and nollie.** The pop comes from the stored flex: 2.2–4.0 m/s × spec pop, and a nollie is ×0.88. Spinning out of a butter pre-winds the spin.
-- **Landing.** Either end may lead. The deviation is measured from the nearest end: clean at 15° or less, stumble at 45° or less, a **slide** (heavy speed loss) at 75° or less, crash beyond that. Landing tail-first flips `travelSign`.
+- **Landing.** Either end may lead. The deviation is measured from the nearest end: clean at 15° or less, stumble at 45° or less, a **slide** (heavy speed loss) at 82° or less, crash beyond that. Landing tail-first flips `travelSign`.
 - **Push.** A one-foot skate gives 2.4 m/s² up to 4.5 m/s, weaker than poling. The crouch is less aerodynamic than a ski tuck, so top speed is a little lower.
 
 ### Air and tricks (shared)

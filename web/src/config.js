@@ -134,7 +134,7 @@ export const PHYSICS = {
     // Air
     popMin: 2.2, popMax: 4.0, nollie: 0.88, chargeTime: 0.45,
     spinRateMax: 7.6, spinResponse: 7.5, prewind: 0.55, windupSpin: 3.2,
-    landClean: 15, landStumble: 45, landSlide: 75, // deg yaw from the nearest board end to the path
+    landClean: 15, landStumble: 45, landSlide: 82, // deg yaw from the nearest board end to the path (sideways = hard slide)
   },
 };
 

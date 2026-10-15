@@ -223,7 +223,8 @@ export class Rider {
     p.heel += ((board ? Math.abs(p.lean) / ANIM.maxLean * (1 - edgeSideToe) : 0) - p.heel) * k(8);
     // Upper body leads the turn (rotation-led on a board, anticipation on skis).
     // Wind-up: while loading a pop and steering, the shoulders counter-rotate against the coming spin.
-    const leadGround = pl.squat > 0.05 && Math.abs(pl.windup || 0) > 0.05 ? (pl.windup || 0) * 1.4 : -pl.turnInput;
+    // The upper body leads edge changes: follow the raw input (ahead of the smoothed edge) by ~0.1 s.
+    const leadGround = pl.squat > 0.05 && Math.abs(pl.windup || 0) > 0.05 ? (pl.windup || 0) * 1.4 : -(pl._ctrl?.steer ?? pl.turnInput);
     p.lead += ((ground ? leadGround : air ? THREE.MathUtils.clamp(pl.spinRate * 0.12, -0.6, 0.6) : 0) - p.lead) * k(6);
     // Double-pole push on skis (W when slow): a looping reach-plant-push cycle.
     const pushing = ground && !board && pl._ctrl?.up > 0.3 && pl.speed < (pl.dyn?.C.pushMaxSpeed ?? 8);
