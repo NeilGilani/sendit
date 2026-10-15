@@ -203,7 +203,7 @@ varying vec2 vQ2; varying float vA2;`)
   }
 
   setQuality(q) {
-    this.mesh.castShadow = q >= 1;
+    this.mesh.castShadow = q >= 2;   // spray shadows: high only (extra shadow-pass draw)
     this.budget = [0.35, 0.65, 1.0][q] ?? 1;
     this.mistScale = [0.6, 0.85, 1.0][q] ?? 1;
   }

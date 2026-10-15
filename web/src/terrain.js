@@ -209,7 +209,7 @@ export class Terrain {
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(tN, 0.0)).xyz);');
     };
-    this.material.defines = { SNOW_TRACKS: 2, SNOW_SPARKLE: 1, SNOW_TREEMASK: 1 };
+    this.material.defines = { SNOW_TRACKS: 2, SNOW_SPARKLE: 1, SNOW_TREEMASK: 1, SNOW_FLUTES: 1 };
 
     // Far forest band: real mountains use their own treeline and keep forest to the horizon.
     const farU = snowUniforms();
@@ -477,9 +477,13 @@ export class Terrain {
       const d = { SNOW_TRACKS: q === 2 ? 2 : 1, SNOW_TREEMASK: 1 };
       if (q === 0) d.ROCK_LITE = 1;
       if (q > 0) d.SNOW_SPARKLE = 1;
+      if (q === 2) d.SNOW_FLUTES = 1;          // fall-line flutes on steep snow: high only
       this.material.defines = d;
       this.material.needsUpdate = true;
       this.terrainUniforms.uDetail.value = q;
+      // Backdrop + mid ring cover much of the screen: full faceted rock / flutes on high only.
+      this.farMaterial.defines = q === 2 ? { ROCK_FAR: 1 } : { FAR_LITE: 1, ROCK_LITE: 1 };
+      this.farMaterial.needsUpdate = true;
     }
     this._lastFocus = null;
   }

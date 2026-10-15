@@ -152,7 +152,11 @@ void rockLayer(vec2 uv, float fp, out vec3 col, out vec2 g, out vec2 gh, out flo
   gh = g;
   g *= 0.7;                       // lighting: big blocks tilt less than the snow test assumes
   // Vertical joint columns inside the slabs.
+  #ifdef ROCK_LITE
+  float wM = 0.0;
+  #else
   float wM = 1.0 - smoothstep(0.06, 0.2, fp / uRockScale.y);
+  #endif
   if (wM > 0.0) {
     vec3 c2 = rockCells((uv + wp * uRockScale.y * 1.2) * vec2(1.7, 0.6) / uRockScale.y + 5.3);
     vec3 r2 = hash32(vec2(c2.z, 7.7));
@@ -438,10 +442,12 @@ export const SNOW_FRAG_GLSL = /* glsl */`
   }
 
   // ---- sluff flutes on steep snow (walls, valley sides)
+  #ifdef SNOW_FLUTES
   Ns = flutesCells(vW, Ns, tFP, 15.0, 0.12);
   float fl1 = tFlute;
   Ns = flutesCells(vW + 7.3, Ns, tFP, 4.0, 0.12);
   tCavity *= 1.0 - 0.1 * max(tFlute, fl1);
+  #endif
 
   // ---- carved tracks: deep soft trenches with pushed-up lips (parallax on high quality)
   vec2 tp = xz;
@@ -541,8 +547,10 @@ export const FAR_SNOW_FRAG_GLSL = /* glsl */`
     float steep = smoothstep(0.03, 0.25, 1.0 - N.y) * (0.2 + 0.8 * smoothstep(2500.0, 7000.0, dist));
     N = normalize(N - vec3(g1.x, 0.0, g1.y) * 150.0 * steep - vec3(g2.x, 0.0, g2.y) * 60.0 * steep);
   }
+  #ifndef FAR_LITE
   N = flutes(vW, N, length(fwidth(vW)), 15.0, 0.14);
   N = flutes(vW * 0.37, N, length(fwidth(vW)) * 0.37, 15.0, 0.14);   // 40 m spines far away
+  #endif
   tN = N;
   float m = texture2D(noiseTex, vW.xz * 0.0004).r;
   float m2 = texture2D(noiseTex, vW.xz * 0.003 + 0.5).r;
@@ -555,7 +563,12 @@ export const FAR_SNOW_FRAG_GLSL = /* glsl */`
   rock *= 1.0 - smoothstep(10500.0, 12500.0, max(abs(vW.x), abs(vW.z))) * (1.0 - smoothstep(1400.0, 1900.0, vW.y));
   float forest = (1.0 - smoothstep(uFarForest.x - uFarForest.y, uFarForest.x, vW.y + (m - 0.5) * 300.0)) * (1.0 - rock) * (1.0 - smoothstep(uFarForest.z - 2500.0, uFarForest.z, max(abs(vW.x), abs(vW.z)))) * smoothstep(0.03, 0.14, slope) * smoothstep(0.35, 0.55, m2 + 0.15);
   vec3 rc = vec3(0.4);
+  #ifdef FAR_LITE
+  rc = rockAlbedo(abs(N.x) > abs(N.z) ? vW.zy : vW.xy, 1.0);    // low quality: plain rock tone
+  if (false) {
+  #else
   if (rock > 0.001) {
+  #endif
     vec3 Nr, Nh; float band;
     float fp = length(fwidth(vW));
     rockShade(vW, N, fp, rc, Nr, Nh, band);

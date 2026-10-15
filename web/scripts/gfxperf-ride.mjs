@@ -1,6 +1,6 @@
 // Graphics perf check: ride with the throttle held on the real GPU (ANGLE/D3D11 on Windows), uncapped
 // frame rate, and report CPU-side frame intervals plus renderer stats for each quality level.
-// Usage: node scripts/gfxperf.mjs [baseUrl] [seconds] [W H]
+// Usage: node scripts/gfxperf-ride.mjs [baseUrl] [seconds] [W H]
 import { chromium } from '@playwright/test';
 const [base = 'http://localhost:5174/', secs = '12', W = '1600', H = '900'] = process.argv.slice(2);
 const browser = await chromium.launch({
