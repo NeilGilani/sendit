@@ -14,7 +14,7 @@ import { getEquipmentSpec, deriveHandling, normalizeType } from './equipment/reg
 
 export const State = { FROZEN: 0, GROUNDED: 1, AIR: 2, CRASH: 3, LIFT: 4 };
 const UP = new THREE.Vector3(0, 1, 0);
-const _n = new THREE.Vector3(), _v = new THREE.Vector3();
+const _n = new THREE.Vector3(), _v = new THREE.Vector3(), _t1 = new THREE.Vector3(), _t2 = new THREE.Vector3();
 
 export class Player {
   constructor(terrain, scatter, lifts, input) {
@@ -163,9 +163,30 @@ export class Player {
     if (this.dyn.control(dt, c, this.state === State.GROUNDED)) this.jump();
   }
 
+  /**
+   * Ground normal for physics. The terrain's own normal is sampled at grid spacing (~3 m), which
+   * smears across kicker lips; on park features use a fine finite difference of the true height.
+   */
+  normalAt(x, z, out) {
+    const T = this.terrain;
+    const feat = T.baseHeight ? Math.max(T.getHeight(x, z) - T.baseHeight(x, z), T.getHeight(x + 1.5, z) - T.baseHeight(x + 1.5, z),
+      T.getHeight(x - 1.5, z) - T.baseHeight(x - 1.5, z), T.getHeight(x, z + 1.5) - T.baseHeight(x, z + 1.5), T.getHeight(x, z - 1.5) - T.baseHeight(x, z - 1.5)) : 0;
+    if (feat < 0.02) return T.getNormal(x, z, P.normalRadius, out);
+    // One-sided along the direction of travel (never looks past a lip), centred across it.
+    const e = 0.35, sp = Math.hypot(this.velocity.x, this.velocity.z);
+    const dx = sp > 0.5 ? this.velocity.x / sp : -Math.sin(this.heading), dz = sp > 0.5 ? this.velocity.z / sp : -Math.cos(this.heading);
+    const rx = -dz, rz = dx;
+    const h0 = T.getHeight(x, z), hb = T.getHeight(x - dx * e, z - dz * e);
+    const hl = T.getHeight(x + rx * e, z + rz * e), hr = T.getHeight(x - rx * e, z - rz * e);
+    _t1.set(dx * e, h0 - hb, dz * e); _t2.set(rx * 2 * e, hl - hr, rz * 2 * e);
+    out.crossVectors(_t2, _t1).normalize();
+    if (out.y < 0) out.negate();
+    return out;
+  }
+
   groundStep(dt) {
     const T = this.terrain;
-    const n = T.getNormal(this.position.x, this.position.z, P.normalRadius, _n);
+    const n = this.normalAt(this.position.x, this.position.z, _n);
     this.groundNormal.copy(n);
     T.getSurface(this.position.x, this.position.z, this.surface);
     const g = new THREE.Vector3(0, -P.gravity, 0);
@@ -186,7 +207,7 @@ export class Player {
       this.enterAir(false);
     } else {
       np.y = gh;
-      const n2 = T.getNormal(np.x, np.z, P.normalRadius, _v);
+      const n2 = this.normalAt(np.x, np.z, _v);
       const into = this.velocity.dot(n2);
       if (into < 0) {
         const mag = this.velocity.length();
@@ -204,7 +225,12 @@ export class Player {
   jump() {
     if (this.state !== State.GROUNDED) return;
     const depth = this.dyn.charge;
-    const pop = this.dyn.pop();
+    // Popping off a kicker / roller lip springs much higher than an ollie on the flat (arcade bonus).
+    const T = this.terrain;
+    const feature = T.baseHeight ? T.getHeight(this.position.x, this.position.z) - T.baseHeight(this.position.x, this.position.z) : 0;
+    const lip = clamp(feature / 0.5, 0, 1);
+    const pop = this.dyn.pop() * (1 + (P.lipPopBonus - 1) * lip);
+    this.lastLip = lip;
     this.lastPop = pop;
     this.velocity.addScaledVector(this.groundNormal, pop);
     this.position.addScaledVector(this.groundNormal, 0.06);
@@ -231,11 +257,17 @@ export class Player {
     this.speed = this.velocity.length();
     this.position.addScaledVector(this.velocity, dt);
     const gh = this.terrain.getHeight(this.position.x, this.position.z);
-    if (this.position.y <= gh) { this.position.y = gh; this.land(); }
+    if (this.position.y <= gh) {
+      this.position.y = gh;
+      // Just popped on a rising ramp and still moving away from the surface: ride up it airborne.
+      const n = this.normalAt(this.position.x, this.position.z, _n);
+      if (this.airTime < 0.25 && this.velocity.dot(n) > 0.8) return;
+      this.land();
+    }
   }
 
   land() {
-    const n = this.terrain.getNormal(this.position.x, this.position.z, P.normalRadius, this.groundNormal);
+    const n = this.normalAt(this.position.x, this.position.z, this.groundNormal);
     const vn = this.velocity.dot(n);
     const impact = Math.max(0, -vn);
     this.landingVy = impact;

@@ -25,6 +25,7 @@ export const PHYSICS = {
   brakeDecel: 9.0,
   holdStillSlope: 0.006,
   takeoffGap: 0.3,
+  lipPopBonus: 1.7,           // pop multiplier when popping on a kicker / roller (vs an ollie on the flat)
   terrainImpactLoss: 0.5,     // share of an abrupt impact into the terrain (beyond smoothFollow) lost as speed
   smoothFollow: 0.25,         // m/s per step of normal velocity absorbed loss-free (smooth rolls and dips)
   // Jump: hold to squat, release to pop. Impulse scales with squat depth.
