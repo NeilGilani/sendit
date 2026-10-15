@@ -123,7 +123,7 @@ export const PHYSICS = {
 
 // ------------------------------------------------------------------ Rider animation ("juice")
 export const ANIM = {
-  maxRollAngle: 0.5,          // rad — carve lean at full turn & speed
+  maxRollAngle: 0.5,          // legacy: the lean now comes from the contact force (maxLean below)
   skiStance: 0.13,            // metres from centre to each ski
   rollResponse: 10,
   squatMax: 0.25,             // pre-jump Y compression (25%)
