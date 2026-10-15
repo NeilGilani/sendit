@@ -23,6 +23,8 @@ The research behind the numbers is in [equipment-research.md](equipment-research
 | `web/scripts/physics-sim.mjs` | Headless bench that compares the physics against the research targets. |
 | `web/scripts/physics-variants.mjs` | Headless check of trick naming (regular/goofy, switch, nollie), wind-up, landing assist and per-variant handling. |
 | `web/scripts/physics-scenarios.mjs` | Headless player-like scenarios: board stop-then-go, edge traverse vs flat-base drift, held ski turn. |
+| `web/scripts/equipment-check.mjs` | Headless catalogue check: every spec validates, partial overrides merge, handling stays finite and clamped. |
+| `web/scripts/physics-fuzz.mjs` | Headless fuzz on the real course: random inputs, gear and stance swaps; fails on NaN, falling through the snow, or a stuck air state. Prints crash causes. |
 | `web/scripts/physics-tricks.mjs` | Headless flip and cork bench: launches, stick timing, landings and trick names for both types. |
 | `web/scripts/physics-kicker.mjs` | Headless kicker bench: a features.js-shaped kicker on a slope, straight, popped, spun, flipped and preloaded. Takes `[ski\|snowboard\|both] [slopeDeg]`. |
 | `web/scripts/physics-course.mjs` | Headless bot on the real hand-built gully (course.js on the game's 1.25 m grid), start to finish. Styles: `carve`, `straight`, `park` (pop + 360 off the drops), `flip` (preloaded backflips). Logs landings, stumbles, crashes and speeds. |
@@ -269,7 +271,12 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
    - Boards only: `stance` `{ width, front, back }`.
    - `graphic` `{ base, top, top2, accent, edge, pattern }`, where the patterns are `solid | stripe | fade | chevron | split`.
 2. That's all. The model, the physics multipliers (`deriveHandling`: grip, pop, pivot, stability, float, spin) and the rider pick it up automatically.
-3. Check it with `node web/scripts/physics-variants.mjs` (carve radius, pop, powder speed, butter) and `?equip=snowboard&variant=<id>`.
+3. Check it with `node web/scripts/equipment-check.mjs` (every spec validates; handling is finite), `node web/scripts/physics-variants.mjs` (carve radius, pop, powder speed, butter) and `?equip=snowboard&variant=<id>`.
+
+**Guard rails for big catalogues:**
+- `validateSpec(type, spec)` lists missing or out-of-range fields (length, widths, sidecut, flex, mass, rocker, stance…). `registerVariant` warns with that list.
+- Partial specs merge nested groups (`graphic`, `profile`, `kick`, `stance`) field by field, so `{ id: 'park', profile: { type: 'rocker' } }` keeps the rest of the profile.
+- `deriveHandling` clamps every multiplier (grip 0.6–1.45, pop 0.6–1.4, pivot 0.5–1.8, stability 0.6–1.5, float 0.5–2.5, spin 0.7–1.35), so odd data can't make the physics silly or NaN.
 
 At runtime, `registerVariant(type, spec)` adds a model (for DLC or user presets). A colourway or graphic is a partial spec, `{ id: 'park', graphic: {...} }`, passed to `setEquipment` or `createEquipmentModel`. The lobby can expose `graphic` fields as paint options. Per-rider stance overrides go through `player.setStance()`, with binding angles in `spec.stance`.
 
