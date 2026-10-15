@@ -162,7 +162,8 @@ export const ANIM = {
   skiPressShift: 0.09,        // m hips over the pressed end
   skiPopSnap: 0.3,            // rad the tips snap up at the pop
   flipLoadArch: 0.45,         // rad the upper body arches back while preloading a backflip (S while charging)
-  flipPivot: 0.85,            // m above the feet the rider flips about (centre of mass)
+  flipPivot: 0.85,
+  flipTuckLift: 0.14,         // m the feet pull up toward the hips while flipping            // m above the feet the rider flips about (centre of mass)
   gearSinkVisual: 0.15,       // share of the physics powder sink shown (the snow reads as packed, so the gear rides on top)
   board: {
     crouch: 0.17,             // m pelvis drop at rest (riders stand lower than skiers)

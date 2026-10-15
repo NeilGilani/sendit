@@ -232,6 +232,8 @@ export class Rider {
     p.press += ((ground ? pl.press : 0) - p.press) * k(12);
     p.flipLoad = (p.flipLoad || 0) + (((ground ? pl.flipLoad : 0) || 0) - (p.flipLoad || 0)) * k(10);
     p.grab += ((air ? pl.grab : 0) - p.grab) * k(14);
+    // Flipping: knees pulled up, hands in toward the shins (a tuck spins faster and reads as a flip).
+    p.flipTuck = (p.flipTuck || 0) + ((air ? THREE.MathUtils.clamp(Math.abs(pl.flipRate || 0) / 3.5, 0, 1) * (1 - pl.grab) : 0) - (p.flipTuck || 0)) * k(8);
     p.stanceYaw += (this.stanceYawTarget() * (1 - p.sit) - p.stanceYaw) * k(10);
     // Look direction along the bord: +1 toward the nose, −1 toward the tail (switch).
     p.look += (pl.travelSign - p.look) * k(5);
@@ -339,7 +341,7 @@ export class Rider {
     const snap = this.snapT < 0.5 ? this.snapSign * ANIM.skiPopSnap * Math.exp(-9 * this.snapT) * Math.min(1, this.snapT * 25) : 0;
     p.pitch += ((-p.press * ANIM.skiPressPitch + snap) - p.pitch) * (this.snapT < 0.5 ? 0.6 : 0.3);
     this.skiPitchLift = Math.abs(Math.sin(p.pitch)) * this.equip.spec.length * 0.4;
-    const lift = 0.0 + p.air * 0.12 + p.grab * 0.1 + this.skiPitchLift;
+    const lift = 0.0 + p.air * 0.12 + p.grab * 0.1 + p.flipTuck * ANIM.flipTuckLift + this.skiPitchLift;
     const wide = ANIM.skiStance + p.plow * 0.1;
     const [L, R] = this.skis;
     L.position.set(-wide, lift, 0.0); L.rotation.set(p.pitch, -p.plow * 0.28, gearRoll * -1, 'YXZ');
@@ -356,7 +358,7 @@ export class Rider {
 
   placeBoard(gearRoll) {
     const p = this.p, B = this.board, spec = this.equip.spec;
-    const lift = p.air * BA.airTuck + p.grab * BA.grabTuck;
+    const lift = p.air * BA.airTuck + p.grab * BA.grabTuck + p.flipTuck * ANIM.flipTuckLift;
     // Board flex while pressing: tail press lifts the nose and vice versa; the pop snaps the free end up.
     const snap = this.snapT < 0.5 ? this.snapSign * BA.popSnap * Math.exp(-9 * this.snapT) * Math.min(1, this.snapT * 25) : 0;
     const pitch = -p.press * BA.pressPitch + snap + this.player.powder * 0.04 * (1 - this.player.speedRatio);
@@ -535,7 +537,7 @@ export class Rider {
     for (const side of [1, -1]) {
       // Armature +X is the rider's left (visual −X): match the ski's lift so the boots stay clipped in.
       const lx = -side * (ANIM.skiStance + p.plow * 0.1);
-      const ankle = new THREE.Vector3(side * (ANIM.skiStance + p.plow * 0.1), this.ankleH + p.air * 0.12 + p.grab * 0.1 + (this.skiPitchLift || 0) + lx * Math.tan(p.lean), 0.0);
+      const ankle = new THREE.Vector3(side * (ANIM.skiStance + p.plow * 0.1), this.ankleH + p.air * 0.12 + p.grab * 0.1 + p.flipTuck * ANIM.flipTuckLift + (this.skiPitchLift || 0) + lx * Math.tan(p.lean), 0.0);
       // Feet point down the skis; tips pinch together in a snowplough.
       this.leg(side, ankle, new THREE.Vector3(side * 0.12, 0, 1), -side * p.plow * 0.28);
       this.armSki(side, pl);
@@ -546,7 +548,7 @@ export class Rider {
     const p = this.p, st = this.equip.spec.stance;
     const ns = 1 - p.sit;
     const nx = this.equip.stance === 'goofy' ? -1 : 1;   // armature X of the board nose
-    const lift = p.air * BA.airTuck + p.grab * BA.grabTuck;
+    const lift = p.air * BA.airTuck + p.grab * BA.grabTuck + p.flipTuck * ANIM.flipTuckLift;
     const drop = BA.crouch + p.crouch * 0.14 + pl.speedRatio * BA.crouchSpeed * (1 - p.air) + p.grab * 0.08;
     const off = new THREE.Vector3(
       nx * p.press * BA.pressShift - nx * 0.02,
@@ -669,8 +671,9 @@ export class Rider {
     // Double-pole push: reach forward and up, then plant and drive the hands back past the hips.
     const ph = p.pushPhase || 0, reachF = ph < 0.4 ? ph / 0.4 : 1 - (ph - 0.4) / 0.6;
     const upP = V(side * 0.3, -0.75 + reachF * 0.45, -0.25 + reachF * 1.0), loP = V(side * 0.1, -0.5 + reachF * 0.3, 0.2 + reachF * 0.7);
-    let u = upS.lerp(upP, p.push).lerp(upT, p.tuck).lerp(upA, p.air * (1 - g)).lerp(upG, g);
-    let l = loS.lerp(loP, p.push).lerp(loT, p.tuck).lerp(loA, p.air * (1 - g)).lerp(loG, g);
+    const upF = V(side * 0.3, -0.55, 0.65), loF = V(-side * 0.05, -0.45, 0.9);   // flip tuck: hands to the shins
+    let u = upS.lerp(upP, p.push).lerp(upT, p.tuck).lerp(upA, p.air * (1 - g)).lerp(upF, p.flipTuck).lerp(upG, g);
+    let l = loS.lerp(loP, p.push).lerp(loT, p.tuck).lerp(loA, p.air * (1 - g)).lerp(loF, p.flipTuck).lerp(loG, g);
     [u, l] = this.armOverlays(side, u, l);
     this.armAim(side, u, l);
     // First person: turn the gloves into a pole grip (palms in, knuckles forward).
@@ -695,6 +698,8 @@ export class Rider {
     const sw = Math.sin(p.t * 3.1 + side) * 0.1;
     u.lerp(V(fx * 0.9, 0.05 + sw, 0.25), p.air * 0.8);
     l.lerp(V(fx * 0.8, 0.2, 0.35), p.air * 0.8);
+    u.lerp(V(fx * 0.3, -0.55, 0.65), p.flipTuck);    // flip tuck: hands in toward the shins
+    l.lerp(V(-fx * 0.05, -0.45, 0.9), p.flipTuck);
     // Hand drag on deep carves: toe side the front hand reaches down to the snow in front of the toes,
     // heel side the rear hand trails behind the heels.
     const drag = p.drag || 0;
