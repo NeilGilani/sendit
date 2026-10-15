@@ -330,7 +330,8 @@ export class TreeSystem {
         cx += t[0]; cz += t[2];
       });
       im.computeBoundingSphere();
-      im.castShadow = true; im.receiveShadow = true;
+      // Far shells only exist beyond the near/mid pools, which always cover the shadow box.
+      im.castShadow = false; im.receiveShadow = true;
       im.userData = { center: new THREE.Vector2(cx / list.length, cz / list.length) };
       im.name = 'TreesFar';
       this.group.add(im);

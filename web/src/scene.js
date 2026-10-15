@@ -51,8 +51,8 @@ export const SNOW = {
   specular: 0.9,
   forwardScatter: 1.6,           // grazing glow when looking toward the sun
   sparkle: 26,                   // HDR glint brightness (blooms)
-  sparkleDensity: 0.55,          // share of grid cells holding a facet
-  sparkleCone: 0.32,             // random facet tilt (larger = fewer, more scattered glints)
+  sparkleDensity: 0.9,           // share of grid cells holding a facet
+  sparkleCone: 0.45,             // up-bias of the random facet normals (0 = isotropic, larger = flatter)
   windAngle: 0.65,               // radians: prevailing wind direction in xz (ripples / sastrugi)
   drift: 1.0,                    // soft drifts / pillows
   ripple: 1.0,                   // wind ripples (cm scale)

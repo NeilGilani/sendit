@@ -423,10 +423,12 @@ export const SNOW_BAND_GLSL = /* glsl */`
       vec2 off = fract(q) - (0.25 + 0.5 * h.xy);
       float r = length(off);
       vec3 hb = hash32(cid * 1.37 + 5.1);
-      vec3 fn = normalize(nw + (hb - 0.5) * vec3(uSparkle.z, 0.0, uSparkle.z) * 2.0);
+      // Ice facets point every which way (biased up): some always mirror the sun into the eye.
+      vec3 rd = normalize(hb * 2.0 - 1.0 + vec3(0.0, 1e-3, 0.0));
+      vec3 fn = normalize(nw * uSparkle.z + rd);
       float al = dot(reflect(-uSunDir, fn), Vw);
-      float spot = 1.0 - smoothstep(0.0, max(0.12, fp * cells * 0.6), r);
-      gl += smoothstep(0.9965, 0.9995, al) * spot * lodW;
+      float spot = 1.0 - smoothstep(0.0, max(0.15, fp * cells * 1.1), r);
+      gl += smoothstep(0.989, 0.998, al) * spot * lodW;
     }
     toonSparkle = gl * uSparkle.x * tGlintMask * shadow * snow;
   }

@@ -47,7 +47,7 @@ for (const v of views) {
     const s = window.__sendit;
     return { st: s.player.state, v: s.player.speed.toFixed(1), p: s.player.position.toArray().map((x) => x.toFixed(0)).join(','), h: s.player.heading.toFixed(2) };
   });
-  await page.screenshot({ path: `${outDir}/${v.name}${process.env.SUF || ''}.png`, timeout: 300000 });
+  await page.screenshot({ path: `${outDir}/${v.name}${process.env.SUF || ''}.png`, timeout: 300000, ...(v.clip ? { clip: { x: v.clip[0], y: v.clip[1], width: v.clip[2], height: v.clip[3] } } : {}) });
   console.log(v.name, JSON.stringify(info), ((Date.now() - t0) / 1000).toFixed(0) + 's');
 }
 console.log('errors:', errors);
