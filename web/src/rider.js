@@ -471,8 +471,10 @@ export class Rider {
     let bend = THREE.MathUtils.degToRad(10 + p.crouch * 16 + p.tuck * 30) * (1 - p.air * 0.3);
     bend -= THREE.MathUtils.degToRad(12) * p.sit;
     const wob = p.stumble * Math.sin(p.t * 9) * 0.25;
-    this.trunk(off, twist * 0.45 + counter * 0.3, hipPitch * 0.55 + p.hip * 0.5, bend + p.hip * 0.6, twist * 0.55 + counter * 0.7, -angul * 1.3 + wob,
-      -counter * 0.6, -(hipPitch * 0.55 + bend) * 0.95);
+    // Riding switch (twin tips): twist the torso and look back over the shoulder down the path.
+    const back = (1 - p.look) * 0.5 * ns;
+    this.trunk(off, twist * 0.45 + counter * 0.3 + back * 0.25, hipPitch * 0.55 + p.hip * 0.5, bend + p.hip * 0.6, twist * 0.55 + counter * 0.7 + back * 0.6, -angul * 1.3 + wob,
+      -counter * 0.6 + back * 1.15, -(hipPitch * 0.55 + bend) * 0.95 * (1 - back * 0.6));
     for (const side of [1, -1]) {
       // Armature +X is the rider's left (visual −X): match the ski's lift so the boots stay clipped in.
       const lx = -side * (ANIM.skiStance + p.plow * 0.1);
