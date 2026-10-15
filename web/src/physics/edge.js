@@ -163,6 +163,8 @@ export class EdgePhysics {
     if (pivot * beta > 0) pivot *= Math.max(0, 1 - Math.abs(beta) / (C.betaMax * DEG));
     yaw += pivot + (mode.yaw || 0);
     pl.heading -= yaw * dt;              // + yaw = turning right = heading decreasing
+    // Pivoting about a pressed end (butters): the stance centre swings around that end.
+    if (mode.pivotOffset) pl.position.addScaledVector(_r.crossVectors(fwd, n).normalize(), mode.pivotOffset * (mode.yaw || 0) * dt);
     // Edges track their own path when the rider isn't steering (self-aligning).
     if (speed > 1.2 && !mode.noAlign) {
       const velYaw = Math.atan2(-v.x, -v.z) + (this.travel < 0 ? Math.PI : 0);

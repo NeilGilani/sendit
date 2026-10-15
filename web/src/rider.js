@@ -48,6 +48,8 @@ export class Rider {
     this.rnd = mulberry32(3);
     this.equip = null;                     // { type, variant, spec, stance }
     this.contacts = [];
+    on('jumped', () => { this.snapT = 0; this.snapSign = this.player.dyn?._popEnd === 'nose' ? -1 : 1; });
+    this.snapT = 10; this.snapSign = 1;
     on('equipmentChanged', (e) => {
       if (!this.model) return;
       const cur = this.equip;
@@ -179,6 +181,7 @@ export class Rider {
     const pl = this.player, p = this.p;
     if (!this.model || !this.equip) return;
     p.t += dt;
+    this.snapT += dt;
     this.root.position.copy(pl.renderPos);
     this.root.position.y -= pl.sink;   // deep powder swallows the gear when slow
     this.root.quaternion.copy(pl.renderOrient);
@@ -307,9 +310,10 @@ export class Rider {
   placeBoard(gearRoll) {
     const p = this.p, B = this.board, spec = this.equip.spec;
     const lift = p.air * BA.airTuck + p.grab * BA.grabTuck;
-    // Board flex while pressing: tail press lifts the nose and vice versa.
-    const pitch = -p.press * BA.pressPitch + this.player.powder * 0.04 * (1 - this.player.speedRatio);
-    p.pitch += (pitch - p.pitch) * 0.3;
+    // Board flex while pressing: tail press lifts the nose and vice versa; the pop snaps the free end up.
+    const snap = this.snapT < 0.5 ? this.snapSign * BA.popSnap * Math.exp(-9 * this.snapT) * Math.min(1, this.snapT * 25) : 0;
+    const pitch = -p.press * BA.pressPitch + snap + this.player.powder * 0.04 * (1 - this.player.speedRatio);
+    p.pitch += (pitch - p.pitch) * (this.snapT < 0.5 ? 0.6 : 0.3);
     // Roll about the edge that's in the snow, pitch about the end that's pressed.
     const hw = spec.waist * 0.5;
     const roll = -gearRoll;

@@ -85,6 +85,8 @@ export class SnowboardPhysics extends EdgePhysics {
       m.gripMul = 1 - this.butter * 0.85;
       m.effMul = 1 - this.butter * 0.7;
       m.skidMul = 1 - this.butter * 0.8;   // flat base slides, edges don't scrape
+      // Pivot on the pressed end: tail press → the centre swings with the nose, nose press → opposite.
+      m.pivotOffset = -Math.sign(this.press || -1) * this.spec.length * 0.33 * this.butter;
       m.noAlign = true;
     } else if (Math.abs(this.press) > 0.05) {
       m.pivotMul = 1 + Math.abs(this.press) * 0.3;
