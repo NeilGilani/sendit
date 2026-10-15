@@ -25,7 +25,7 @@ import { UI } from './ui.js';
 import { Input } from './input.js';
 import { game, Mode, setMode, on, settings, setSetting, resetScore, emit, scoreSnapshot } from './state.js';
 import './maps/builtin.js';
-import { resolveMapSelection, loadMap, describeSelection } from './maps/registry.js';
+import { resolveMapSelection, loadMap, describeSelection, lobbySpot } from './maps/registry.js';
 import { profileStore } from './profile/store.js';
 import { installRideTracker } from './profile/tracker.js';
 import { services } from './services/index.js';
@@ -36,7 +36,7 @@ patchShaderChunks();
 profileStore.load();
 
 const params = new URLSearchParams(location.search);
-const gearVariant = params.get('variant') || undefined;   // ?variant=<model id> (debug; the lobby will pick models later)
+const gearVariant = params.get('variant') || undefined;   // ?variant=<model id> (debug: overrides the equipped catalog item's model)
 if (params.has('quality')) settings.quality = Number(params.get('quality'));
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false, depth: true });
@@ -64,7 +64,7 @@ const ui = new UI({
 let activities, life;
 let course, snowfall, terrain, sky, scatter, lifts, features, player, rider, cam, fx, sound, composer, post;
 let currentMap = null;          // { map, variant, course } from the map registry
-let stage = null, lobby = null, stageReady = null, gearSupported = false;
+let stage = null, lobby = null, stageReady = null;
 installRideTracker({ getMapId: () => currentMap?.map.id ?? 'unknown' });
 
 async function boot() {
@@ -86,7 +86,8 @@ async function boot() {
   features.plan(course);
   ui.loading(0.5, 'Painting the snow…');
   terrain.bakeSunMask(renderer);
-  terrain.buildMaterials({ noise: makeNoiseTexture(512, 11) });
+  const noise = makeNoiseTexture(512, 11);
+  terrain.buildMaterials({ noise });
   terrain.build();
   scene.add(terrain.group);
   sky = new Sky(scene);
@@ -124,7 +125,7 @@ async function boot() {
   player.fade = (b, d) => ui.fade(b, d);
   // ?equip=ski|snowboard overrides the saved loadout (and is saved, so the lobby agrees); ?variant picks a model.
   if (params.has('equip')) profileStore.setEquipment(normalizeType(params.get('equip')) === 'snowboard' ? 'snowboard' : 'skis');
-  player.setEquipment(profileStore.equipment, gearVariant);
+  player.setEquipment(profileStore.equipment, gearVariant ?? profileStore.gearModel());
   if (params.has('stance')) player.setStance(params.get('stance'));                       // ?stance=regular|goofy
   rider = new Rider(player);
   await rider.load(loader);
@@ -134,10 +135,13 @@ async function boot() {
   player.place(s.position, s.heading);
   player.state = State.FROZEN;
 
-  // The lobby: built now unless we go straight into a ride (?ride), then on first visit.
+  // The lobby: the rider on a plinth at the map's lobby spot (the start, looking down the run), in
+  // the world itself. Built now unless we go straight into a ride (?ride), then on first visit.
+  stage = new LobbyStage({ scene, camera, terrain, noise });
+  stage.setSpot(lobbySpot(currentMap.map, course, terrain));
   lobby = new Lobby({
     root: document.getElementById('lobby'),
-    stage: (stage = new LobbyStage(renderer)),
+    stage,
     input,
     onRide: (mode) => startRide(false, mode),
     ui: { showCredits: () => ui.showCredits() },
@@ -178,15 +182,15 @@ async function boot() {
 }
 
 /**
- * Build the lobby stage once (scene, preview rider, shaders). Never rejects: if the stage fails,
- * the lobby UI still works over the world's menu flyover (frame() renders the world instead).
+ * Build the lobby stage once (plinth, preview rider, shaders). Never rejects: if the stage fails,
+ * the lobby UI still works over the world's menu flyover (the camera controller drives the view).
  */
 function ensureStage() {
   if (!stageReady) {
     stageReady = stage.init(new GLTFLoader()).then(async () => {
-      await stage.setEquipment(profileStore.equipment, { animate: false });
+      await stage.setEquipment(profileStore.equipment, { animate: false, variant: profileStore.gearModel() });
       stage.resize(innerWidth, innerHeight);
-      stage.compile();
+      renderer.compile(scene, camera);
     }).catch((e) => {
       console.error('[lobby] stage failed to build; showing the lobby over the world instead', e);
       stage.ready = false;
@@ -195,15 +199,18 @@ function ensureStage() {
   return stageReady;
 }
 
-/** Give the in-game rider/player the profile's equipment (optional API, see lobby/equipmentBridge.js). */
+/**
+ * Give the in-game rider/player the profile's equipment (optional API, see lobby/equipmentBridge.js):
+ * the equipped catalog item's model (profileStore.gearModel), unless ?variant= overrides it.
+ */
 function applyGameEquipment(type) {
-  gearSupported = applyEquipment({ rider, player }, type, gearVariant) === 'native' || type === 'skis';
+  applyEquipment({ rider, player }, type, gearVariant ?? profileStore.gearModel(type));
 }
 
 // Loadout changes (lobby toggle, other tabs, profile sync) reach the preview and the game rider.
 on('loadout', ({ equipment }) => {
   if (stage?.ready) {
-    stage.setEquipment(equipment);
+    stage.setEquipment(equipment, { variant: profileStore.gearModel(equipment) });
     sfx('jump_pop', 0.3, 1.15);
     setTimeout(() => sfx('land_soft', 0.4, 1.1), 650);
   }
@@ -262,7 +269,7 @@ async function startRide(instant = false, mode = 'zen') {
     input.lock();                // needs the click's user gesture, so before any await
     sfx('whoosh_slow', 0.5, 1);
     await ui.fade(true, 0.35);
-    cam.update(0);               // put the world camera on its menu flyover: the intro sweeps from there
+    if (!stage?.active) cam.update(0);   // no lobby stage: start from the menu flyover. Else the intro sweeps on from the lobby camera.
   }
   applyGameEquipment(profileStore.equipment);
   resetScore();
@@ -274,7 +281,6 @@ async function startRide(instant = false, mode = 'zen') {
   finishing = false;
   emit('rideStarted', { mapId: currentMap.map.id, equipment: profileStore.equipment });
   if (!instant) ui.fade(false, 0.9);
-  if (!gearSupported) setTimeout(() => emit('hint', 'Snowboards are coming soon · riding skis for now'), 1600);
   busy = false;
 }
 
@@ -367,16 +373,12 @@ function frame(now) {
     else if (game.mode === Mode.PAUSED) resume();
     else if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) pause();
   }
-  // Lobby: only the stage is simulated and rendered; the world waits, frozen.
-  if (game.mode === Mode.MENU && lobby?.visible && stage?.ready) {
-    lobby.update(dt);
-    stage.update(dt);
-    sound.update(dt, camera);
-    ui.update(dt, player);
-    input.endFrame();
-    stage.render(dt);
-    return;
-  }
+  // Lobby: the stage (plinth + preview rider) stands in the world and drives the camera; the game
+  // rider is hidden and frozen at the start.
+  const inLobby = game.mode === Mode.MENU && !!lobby?.visible && !!stage?.ready;
+  if (stage?.ready && inLobby !== stage.active) { if (inLobby) stage.activate(); else stage.deactivate(); }
+  rider.root.visible = !inLobby;
+  if (inLobby) { lobby.update(dt); stage.update(dt); }
   const paused = game.mode === Mode.PAUSED;
   if (!paused) {
     time += dt;
@@ -388,8 +390,8 @@ function frame(now) {
   }
   globals.uTime.value = time;
   rider.update(paused ? 0 : dt, camera);
-  cam.update(paused ? 0 : dt);
-  sky.update(camera, game.mode === Mode.MENU ? camera.position.clone().add(new THREE.Vector3(0, -200, 0)) : player.renderPos, time);
+  if (!inLobby) cam.update(paused ? 0 : dt);
+  sky.update(camera, inLobby ? stage.focusPoint : game.mode === Mode.MENU ? camera.position.clone().add(new THREE.Vector3(0, -200, 0)) : player.renderPos, time);
   terrain.update(camera.position);
   scatter.update(camera.position);
   lifts.update(time, camera.position);

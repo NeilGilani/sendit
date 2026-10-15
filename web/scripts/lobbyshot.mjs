@@ -5,12 +5,15 @@
 //     tab:<id>   open a lobby tab          key:<Code>   press a key
 //     click:<css selector>                 wait:<seconds>
 //     eval:<js>  run JS in the page
-// Env: W, H (viewport, default 1280×720), DPR (device scale factor).
+// Env: W, H (viewport, default 1280×720), DPR (device scale factor), GPU=1 (real GPU via ANGLE D3D11:
+// much faster than SwiftShader, needed for the full world behind the lobby).
 import { chromium } from '@playwright/test';
 
 const [url = 'http://localhost:5175/', out = 'lobby.png', wait = '3', steps = ''] = process.argv.slice(2);
 const browser = await chromium.launch({
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
+  args: process.env.GPU
+    ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required']
+    : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
 });
 const page = await browser.newPage({
   viewport: { width: Number(process.env.W || 1280), height: Number(process.env.H || 720) },

@@ -13,7 +13,9 @@
 //     variants: [{ id, name, colors: { base, accent, trim } }],   first = default colorway
 //     stats: { speed, carve, pop, stability },                     0..10, see STATS
 //     unlock: { type: 'default' } | { type: 'score' | 'distance' | 'runs', value } | { type: 'locked' }
-//     model: { kind: 'builtin' | 'equipment', ref }   how the 3D model is produced (hint for renderers)
+//     model: { kind: 'builtin' | 'equipment', ref }   how the 3D model is produced (hint for renderers):
+//            'equipment' = a model id from src/equipment (getEquipmentSpec(type, ref)) — the lobby
+//            preview and the game rider both ride that model, with its physics (see gearModel()).
 //   }
 // Nothing here renders anything; the lobby and the rider read this data.
 
@@ -79,6 +81,12 @@ export function listItems(filter = {}) {
     .sort((a, b) => (SLOTS[a.slot].order - SLOTS[b.slot].order) || a.name.localeCompare(b.name));
 }
 
+/**
+ * The equipment model to ride for an item: its `model.ref` when it is an src/equipment model
+ * (kind 'equipment'), else undefined (the rider's default model for the type).
+ */
+export const gearModel = (item) => (item?.model?.kind === 'equipment' && item.model.ref) || undefined;
+
 /** The first default-unlocked item for a slot (used to build fresh loadouts). */
 export function defaultItemFor(slot) {
   return listItems({ slot }).find((i) => i.unlock.type === 'default') ?? listItems({ slot })[0] ?? null;
@@ -129,12 +137,13 @@ registerItem({
   description: 'Teal pants with a pink neon leg stripe.',
   variants: [{ id: 'teal', name: 'Teal', colors: { base: '#1f99a8', trim: '#ff33bf' } }],
 });
+// Starter gear = the default models of src/equipment/specs.js (names and looks match what you ride).
 registerItem({
-  id: 'skis-northwake-carver', name: 'Northwake Carver 168', slot: 'skis', brand: NW,
-  description: 'Slim all-mountain skis with cyan neon edges. Quick edge to edge.',
-  variants: [{ id: 'classic', name: 'Classic', colors: { base: '#faf8ff', accent: '#ff4d8c', trim: '#1affd9' } }],
-  stats: { speed: 7, carve: 8, pop: 5, stability: 6 },
-  model: { kind: 'builtin', ref: 'rider.skis' },
+  id: 'skis-northwake-carver', name: 'Northwake Ridge 172', slot: 'skis', brand: NW,
+  description: 'Do-everything all-mountain ski with cyan neon edges. Quick edge to edge.',
+  variants: [{ id: 'classic', name: 'Classic', colors: { base: '#141238', accent: '#ff4f8c', trim: '#1affd9' } }],
+  stats: { speed: 7, carve: 7, pop: 6, stability: 7 },
+  model: { kind: 'equipment', ref: 'allmountain' },
   tags: ['starter'],
 });
 registerItem({
@@ -143,11 +152,11 @@ registerItem({
   model: { kind: 'builtin', ref: 'rider.poles' },
 });
 registerItem({
-  id: 'board-northwake-twin', name: 'Northwake Twin 152', slot: 'board', brand: NW,
-  description: 'Playful true-twin snowboard. Soft flex, big pop, loves side hits.',
-  variants: [{ id: 'sunset', name: 'Sunset', colors: { base: '#1b1446', accent: '#ff5fb0', trim: '#2ff5d6' } }],
-  stats: { speed: 6, carve: 7, pop: 8, stability: 5 },
-  model: { kind: 'equipment', ref: 'snowboard' },
+  id: 'board-northwake-twin', name: 'Northwake Atlas 156', slot: 'board', brand: NW,
+  description: 'Directional-twin camber board for the whole mountain. Lively pop, holds an edge.',
+  variants: [{ id: 'sunset', name: 'Sunset', colors: { base: '#2a2470', accent: '#ff4f8c', trim: '#1affd9' } }],
+  stats: { speed: 6, carve: 7, pop: 7, stability: 6 },
+  model: { kind: 'equipment', ref: 'allmountain' },
   tags: ['starter'],
 });
 registerItem({

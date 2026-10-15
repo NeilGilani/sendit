@@ -23,6 +23,10 @@
   -webkit-user-select: none;
 }
 #lobby > * { position: relative; z-index: 1; pointer-events: auto; }
+/* Soft navy scrims at the top and bottom: keep the brand, tabs and hints readable over bright snow and sky. */
+#lobby::before { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(12, 16, 40, 0.34) 0%, rgba(12, 16, 40, 0.12) 11%, rgba(12, 16, 40, 0) 22%),
+              linear-gradient(0deg, rgba(12, 16, 40, 0.3) 0%, rgba(12, 16, 40, 0) 18%); }
 #lobby > .lb-hit { position: absolute; inset: 0; z-index: 0; cursor: grab; touch-action: none; }
 #lobby > .lb-hit.dragging { cursor: grabbing; }
 #lobby > .lb-toast { position: absolute; }
@@ -47,7 +51,7 @@ body.device-touch .g-kb { display: none; }
 .lb-top { grid-column: 1 / -1; display: flex; align-items: center; gap: 1.2em; min-width: 0; }
 .lb-brand { font-size: 2.3em; font-weight: 900; font-style: italic; letter-spacing: 0.05em; line-height: 1; padding-right: 0.2em;
   background: linear-gradient(100deg, #ffffff 0%, #fff3d6 40%, #ff9fd0 75%, #7ff9ea 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
-  filter: drop-shadow(0 3px 0 rgba(26, 20, 70, 0.6)) drop-shadow(0 6px 18px rgba(0,0,0,0.18)); }
+  filter: drop-shadow(0 3px 0 rgba(26, 20, 70, 0.7)) drop-shadow(0 0 12px rgba(12, 16, 40, 0.55)); }
 .lb-tabbar { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 0.5em; }
 .lb-key { flex: none; font: 800 0.72em/1 var(--font); color: rgba(255,255,255,0.75); background: rgba(18,22,46,0.5); border: 1px solid var(--lb-line);
   border-radius: 0.4em; padding: 0.4em 0.5em; letter-spacing: 0.04em; }
@@ -132,8 +136,6 @@ body.device-touch .lb-key { display: none; }
 .eq-card { margin-top: 1em; padding: 1.1em 1.15em; border-radius: 0.95em; background: rgba(8, 10, 28, 0.32); border: 1px solid rgba(255,255,255,0.08); }
 .eq-card-head { display: flex; align-items: center; justify-content: space-between; gap: 0.6em; }
 .eq-slot { font-size: 0.72em; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 800; color: var(--lb-cyan); }
-.eq-badge { font-size: 0.68em; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.3em 0.7em; border-radius: 999px;
-  color: var(--lb-navy); background: repeating-linear-gradient(-45deg, var(--lb-gold) 0 8px, #ffe48a 8px 16px); }
 .eq-name { margin-top: 0.3em; font-size: 1.35em; font-weight: 900; font-style: italic; }
 .eq-brand { font-size: 0.82em; color: var(--lb-dim); margin-top: 0.1em; }
 .eq-desc { margin: 0.7em 0 0.9em; font-size: 0.88em; line-height: 1.45; color: rgba(250,248,243,0.84); }

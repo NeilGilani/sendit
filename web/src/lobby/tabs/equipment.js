@@ -57,7 +57,6 @@ registerLobbyTab({
       card.innerHTML = `
         <div class="eq-card-head">
           <span class="eq-slot">${esc(SLOTS[item.slot].label)}</span>
-          <span class="eq-badge" hidden>Placeholder model</span>
         </div>
         <div class="eq-name">${esc(item.name)}</div>
         <div class="eq-brand">${esc(item.brand)}${main.variant ? ` · ${esc(main.variant.name)}` : ''}</div>
@@ -76,16 +75,10 @@ registerLobbyTab({
       renderMode();
     };
 
+    // Only if the rider cannot swap gear (rider.setEquipment missing): say why the board is not shown.
     const renderMode = () => {
-      const type = ctx.profile.equipment;
-      const mode = ctx.stage.gearMode;
-      const placeholder = type === 'snowboard' && mode === 'placeholder';
-      const badge = card.querySelector('.eq-badge');
-      if (badge) badge.hidden = !placeholder;
-      note.hidden = !(type === 'snowboard' && mode !== 'native');
-      note.textContent = placeholder
-        ? 'Preview shows a labelled placeholder board until the real snowboard lands. Rides still use skis for now.'
-        : 'The snowboard model is ready; snowboard riding arrives with the rider update. Rides still use skis for now.';
+      note.hidden = !(ctx.profile.equipment === 'snowboard' && ctx.stage.gearMode === 'unsupported');
+      note.textContent = 'The snowboard preview is unavailable in this build; the rider keeps skis.';
     };
 
     render();
