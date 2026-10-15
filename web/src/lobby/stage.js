@@ -206,7 +206,8 @@ export class LobbyStage {
     this.turntable.add(disc);
 
     // Neon ring + inner guide rings (rotate with the turntable so spinning reads clearly).
-    this.ringMat = new THREE.MeshBasicMaterial({ color: c(STAGE.neon).multiplyScalar(2.2), toneMapped: false });
+    this.neonBase = c(STAGE.neon);
+    this.ringMat = new THREE.MeshBasicMaterial({ color: this.neonBase.clone().multiplyScalar(2.2), toneMapped: false });
     const ring = new THREE.Mesh(new THREE.TorusGeometry(R - 0.2, 0.018, 8, 160), this.ringMat);
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 0.006;
@@ -470,7 +471,7 @@ export class LobbyStage {
     // Neon ring breathes; flashes when the gear changes.
     this.pulse = Math.max(0, this.pulse - dt * 1.4);
     const glow = 1.6 + Math.sin(this.t * 2.2) * 0.25 + this.pulse * 3.0;
-    this.ringMat.color.set(STAGE.neon).multiplyScalar(glow);
+    this.ringMat.color.copy(this.neonBase).multiplyScalar(glow);
 
     // Snowfall drift.
     const p = this.flakes.geometry.attributes.position;
@@ -514,7 +515,11 @@ export class LobbyStage {
       pl.squat = Math.max(0, pl.squat - dt * 6);
     }
     this.rider.update(dt, this.camera);
-    if (this.board) this.setSkis(false);   // rider.update re-shows the poles every frame
+    if (this.board) {
+      this.setSkis(false);                     // rider.update re-shows the poles every frame
+      const ski = this.rider.skis?.[0];
+      if (ski) this.board.position.y = ski.position.y - 0.025;   // follow the feet (they lift in the air)
+    }
   }
 
   updateCamera(dt) {
@@ -550,7 +555,8 @@ export class LobbyStage {
   render(dt) {
     if (!this.ready) return;
     const G = globals;
-    const saved = { dir: G.uSunDir.value.clone(), mask: G.sunMaskTex.value, water: G.uWater.value };
+    const saved = this._saved || (this._saved = { dir: new THREE.Vector3() });
+    saved.dir.copy(G.uSunDir.value); saved.mask = G.sunMaskTex.value; saved.water = G.uWater.value;
     G.uSunDir.value.copy(this.keyDir);
     G.sunMaskTex.value = WHITE;
     G.uWater.value = -1e5;

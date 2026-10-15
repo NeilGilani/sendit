@@ -62,7 +62,7 @@ export class Lobby {
           <span class="lb-chip-text"><b class="lb-pname"></b><small class="lb-pmeta"></small></span>
         </button>
       </header>
-      <section class="lb-panel" role="tabpanel"></section>
+      <section class="lb-panel" id="lb-panel" role="tabpanel" tabindex="-1"></section>
       <footer class="lb-bottom">
         <div class="lb-hints">
           <span class="g-kb">Drag or <kbd>A</kbd><kbd>D</kbd> rotate · Scroll zoom · <kbd>Q</kbd><kbd>E</kbd> tabs · <kbd>R</kbd> reset view</span>
@@ -106,6 +106,7 @@ export class Lobby {
       b.setAttribute('role', 'tab');
       b.dataset.tab = t.id;
       b.id = `lb-tab-${t.id}`;
+      b.setAttribute('aria-controls', 'lb-panel');
       b.innerHTML = `${t.icon || ''}<span>${esc(t.label)}</span>${t.status === 'soon' ? '<i class="lb-soon-dot" title="Coming soon"></i>' : ''}`;
       b.addEventListener('click', () => { if (t.id !== this.activeId) this.sfx('ui_click', 0.3, 1.1); this.select(t.id); });
       this.el.tabs.appendChild(b);
