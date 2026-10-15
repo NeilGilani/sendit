@@ -1,0 +1,210 @@
+// Post stack (HDR): the scene renders linear HDR radiance into a half-float buffer, then
+//   RenderPass → N8AO (soft contact AO, medium/high) → bloom (threshold on HDR, only sun / glints /
+//   backlit spray really bloom) + Grade (exposure, filmic tone curve, gentle grade, vignette, optional
+//   goggle tint, sun glare) → speed wind (only when moving fast) → SMAA.
+// Tunables: POST below. Quality tiers: setQuality(q).
+import * as THREE from 'three';
+import { EffectComposer, RenderPass, EffectPass, BloomEffect, SMAAEffect, SMAAPreset, Effect, BlendFunction } from 'postprocessing';
+import { N8AOPostPass } from 'n8ao';
+import { SUN_DIR } from '../world.js';
+
+export const POST = {
+  exposure: 0.7,              // linear multiplier before the tone curve (sunlit snow ≈ 0.9 display)
+  toneMap: 'neutral',          // 'neutral' (Khronos PBR Neutral: clean whites) | 'agx' (filmic, softer)
+  contrast: 1.06,              // gentle S-curve around mid grey after the tone curve
+  saturation: 1.04,
+  shadowTint: [0.985, 1.0, 1.03],   // cool lift in the shadows (blue shade on snow)
+  highlightTint: [1.01, 1.0, 0.985], // faint warmth in the highlights (high-altitude sun)
+  vignette: 0.22,
+  bloom: { intensity: 0.32, threshold: 2.1, smoothing: 0.6, radius: 0.7 },
+  ao: { radius: 2.0, distanceFalloff: 1.0, intensity: 1.15, color: '#33415c' },
+  glare: 0.12,                 // soft veiling glare when looking toward the sun
+  goggles: 0.0,                // 0 = off; 1 = full amber goggle-lens tint (set with ?goggles=1)
+};
+
+/** Exposure, tone curve, grade, vignette, sun glare and optional goggle tint, in one pass. */
+class GradeEffect extends Effect {
+  constructor() {
+    super('GradeEffect', /* glsl */`
+      uniform float exposure; uniform float contrast; uniform float saturation; uniform float vignette;
+      uniform vec3 shadowTint; uniform vec3 highlightTint; uniform float goggles;
+      uniform vec3 sunScreen;      // xy = sun position in uv, z = facing (0..1)
+      uniform float glare;
+      vec3 gfxNeutral(vec3 color) {
+        const float startCompression = 0.8 - 0.04;
+        const float desaturation = 0.15;
+        float x = min(color.r, min(color.g, color.b));
+        float offset = x < 0.08 ? x - 6.25 * x * x : 0.04;
+        color -= offset;
+        float peak = max(color.r, max(color.g, color.b));
+        if (peak < startCompression) return color;
+        const float d = 1.0 - startCompression;
+        float newPeak = 1.0 - d * d / (peak + d - startCompression);
+        color *= newPeak / peak;
+        float g = 1.0 - 1.0 / (desaturation * (peak - newPeak) + 1.0);
+        return mix(color, vec3(newPeak), g);
+      }
+      vec3 gfxAgxContrast(vec3 x) {
+        vec3 x2 = x * x; vec3 x4 = x2 * x2;
+        return 15.5 * x4 * x2 - 40.14 * x4 * x + 31.96 * x4 - 6.868 * x2 * x + 0.4298 * x2 + 0.1191 * x - 0.00232;
+      }
+      vec3 gfxAgX(vec3 color) {
+        const mat3 toRec2020 = mat3(vec3(0.6274, 0.0691, 0.0164), vec3(0.3293, 0.9195, 0.0880), vec3(0.0433, 0.0113, 0.8956));
+        const mat3 fromRec2020 = mat3(vec3(1.6605, -0.1246, -0.0182), vec3(-0.5876, 1.1329, -0.1006), vec3(-0.0728, -0.0083, 1.1187));
+        const mat3 inset = mat3(vec3(0.856627153315983, 0.137318972929847, 0.11189821299995), vec3(0.0951212405381588, 0.761241990602591, 0.0767994186031903), vec3(0.0482516061458583, 0.101439036467562, 0.811302368396859));
+        const mat3 outset = mat3(vec3(1.1271005818144368, -0.1413297634984383, -0.14132976349843826), vec3(-0.11060664309660323, 1.157823702216272, -0.11060664309660294), vec3(-0.016493938717834573, -0.016493938717834257, 1.2519364065950405));
+        color = inset * (toRec2020 * color);
+        color = clamp((log2(max(color, 1e-10)) + 12.47393) / 16.5, 0.0, 1.0);
+        color = outset * gfxAgxContrast(color);
+        color = pow(max(vec3(0.0), color), vec3(2.2));
+        return clamp(fromRec2020 * color, 0.0, 1.0);
+      }
+      void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
+        vec3 c = inputColor.rgb * exposure;
+        // Veiling glare toward the sun (scattering in the eye / lens): lifts and warms the image a touch.
+        vec2 sd = (uv - sunScreen.xy) * vec2(aspect, 1.0);
+        float sg = sunScreen.z * glare;
+        c += vec3(1.0, 0.93, 0.82) * sg * (0.35 * exp(-dot(sd, sd) * 6.0) + 0.06 * exp(-length(sd) * 2.0));
+#ifdef TM_AGX
+        c = gfxAgX(c);
+#else
+        c = gfxNeutral(c);
+#endif
+        c = clamp(c, 0.0, 1.0);
+        // Grade in a perceptual-ish space.
+        vec3 g = sqrt(c);
+        float l = dot(g, vec3(0.2126, 0.7152, 0.0722));
+        g = mix(vec3(l), g, saturation);
+        g = (g - 0.5) * contrast + 0.5;
+        g *= mix(shadowTint, highlightTint, smoothstep(0.2, 0.85, l));
+        // Optional goggle lens: warm amber/rose tint, slightly deeper blues.
+        g = mix(g, g * vec3(1.06, 0.98, 0.84) + vec3(0.02, 0.0, -0.01), goggles);
+        vec2 dv = (uv - 0.5) * vec2(aspect * 0.8, 1.0);
+        g *= 1.0 - vignette * smoothstep(0.25, 0.95, dot(dv, dv) * 1.6);
+        c = max(g, 0.0); c *= c;
+        outputColor = vec4(c, inputColor.a);
+      }`, {
+      blendFunction: BlendFunction.NORMAL,
+      defines: new Map(POST.toneMap === 'agx' ? [['TM_AGX', '1']] : []),
+      uniforms: new Map([
+        ['exposure', new THREE.Uniform(POST.exposure)], ['contrast', new THREE.Uniform(POST.contrast)],
+        ['saturation', new THREE.Uniform(POST.saturation)], ['vignette', new THREE.Uniform(POST.vignette)],
+        ['shadowTint', new THREE.Uniform(new THREE.Vector3(...POST.shadowTint))],
+        ['highlightTint', new THREE.Uniform(new THREE.Vector3(...POST.highlightTint))],
+        ['goggles', new THREE.Uniform(POST.goggles)],
+        ['sunScreen', new THREE.Uniform(new THREE.Vector3())], ['glare', new THREE.Uniform(POST.glare)],
+      ]),
+    });
+  }
+}
+
+/**
+ * Speed wind: smooth, organic, tapered alpha streaks that live only in the four screen corners and
+ * only at extreme speed (no fullscreen radial lines), plus a soft corner-only motion smear.
+ */
+class WindEffect extends Effect {
+  constructor() {
+    super('WindEffect', /* glsl */`
+      uniform float intensity;
+      uniform float windTime;
+      float h1(float n) { return fract(sin(n * 91.345) * 47453.21); }
+      void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
+        vec3 col = inputColor.rgb;
+        if (intensity > 0.001) {
+          vec2 d = uv - vec2(0.5);
+          vec2 ds = d * vec2(aspect, 1.0);
+          float r = length(ds);
+          vec2 ad = abs(d) * 2.0;
+          float corner = smoothstep(0.42, 0.9, ad.x) * smoothstep(0.36, 0.86, ad.y);
+          if (corner > 0.001) {
+            vec3 acc = vec3(0.0);
+            for (int i = 1; i <= 5; i++) acc += texture2D(inputBuffer, uv - d * float(i) * 0.007 * intensity).rgb;
+            col = mix(col, acc / 5.0, corner * 0.6 * intensity);
+            float ang = atan(ds.y, ds.x);
+            float alpha = 0.0;
+            for (int k = 0; k < 2; k++) {
+              float fk = float(k);
+              float lanes = 64.0 + fk * 41.0;
+              float a = ang + 0.045 * sin(r * 8.0 + fk * 2.3 + windTime * 0.8);
+              float x = a * lanes / 6.2831853;
+              float lane = floor(x);
+              float seed = h1(lane + fk * 113.0);
+              if (seed < 0.55) continue;
+              float head = fract(seed * 13.7 + windTime * (0.7 + seed * 1.3));
+              float rr = 0.45 + head * 0.7;
+              float len = 0.14 + seed * 0.22;
+              float t = (rr - r) / len;
+              float body = smoothstep(0.0, 0.1, t) * (1.0 - smoothstep(0.3, 1.0, t));
+              float w = (0.06 + 0.1 * (seed - 0.55)) * (1.0 - clamp(t, 0.0, 1.0) * 0.8);
+              float across = abs(fract(x) - 0.5) * 2.0;
+              float thin = exp(-(across * across) / max(w * w, 1e-4));
+              alpha = max(alpha, thin * body * smoothstep(0.0, 0.25, head) * (1.0 - smoothstep(0.75, 1.0, head)));
+            }
+            col = mix(col, vec3(0.94, 0.95, 1.0), clamp(alpha * corner * intensity * 0.45, 0.0, 1.0));
+            col *= 1.0 - corner * intensity * 0.08;
+          }
+        }
+        outputColor = vec4(col, inputColor.a);
+      }`, {
+      blendFunction: BlendFunction.NORMAL,
+      uniforms: new Map([['intensity', new THREE.Uniform(0)], ['windTime', new THREE.Uniform(0)]]),
+    });
+  }
+}
+
+export class PostStack {
+  constructor(renderer, scene, camera, params = new URLSearchParams(location.search)) {
+    this.renderer = renderer; this.camera = camera;
+    if (params.has('goggles')) POST.goggles = Number(params.get('goggles')) || 0;
+    if (params.has('tm')) POST.toneMap = params.get('tm');
+    if (params.has('exposure')) POST.exposure = Number(params.get('exposure'));
+    const composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
+    composer.addPass(new RenderPass(scene, camera));
+    const ao = new N8AOPostPass(scene, camera, innerWidth, innerHeight);
+    ao.configuration.aoRadius = POST.ao.radius;
+    ao.configuration.distanceFalloff = POST.ao.distanceFalloff;
+    ao.configuration.intensity = POST.ao.intensity;
+    ao.configuration.color = new THREE.Color(POST.ao.color);
+    ao.configuration.gammaCorrection = false;
+    ao.setQualityMode('Medium');
+    composer.addPass(ao);
+    const B = POST.bloom;
+    this.bloom = new BloomEffect({ intensity: B.intensity, luminanceThreshold: B.threshold, luminanceSmoothing: B.smoothing, mipmapBlur: true, radius: B.radius });
+    this.grade = new GradeEffect();
+    composer.addPass(new EffectPass(camera, this.bloom, this.grade));
+    this.wind = new WindEffect();
+    this.windPass = new EffectPass(camera, this.wind);
+    this.windPass.enabled = false;
+    composer.addPass(this.windPass);
+    this.smaa = new EffectPass(camera, new SMAAEffect({ preset: SMAAPreset.HIGH }));
+    composer.addPass(this.smaa);
+    this.composer = composer;
+    this.ao = ao;
+    this._v = new THREE.Vector3();
+  }
+
+  setQuality(q) {
+    this.ao.enabled = q > 0;
+    if (q > 0) this.ao.setQualityMode(q === 2 ? 'High' : 'Medium');
+    this.bloom.intensity = POST.bloom.intensity * (q === 0 ? 0.7 : 1);
+    this.grade.uniforms.get('glare').value = q === 0 ? 0 : POST.glare;
+  }
+
+  setSize(w, h) { this.composer.setSize(w, h); }
+
+  /** Per frame: wind streak intensity (0..1 target) and the sun's screen position for the glare. */
+  update(dt, time, windTarget) {
+    const wu = this.wind.uniforms.get('intensity');
+    wu.value += (windTarget - wu.value) * (1 - Math.exp(-3 * dt));
+    this.wind.uniforms.get('windTime').value = time;
+    this.windPass.enabled = wu.value > 0.002;
+    const cam = this.camera;
+    const v = this._v.copy(SUN_DIR).multiplyScalar(1000).add(cam.position).project(cam);
+    const fwd = cam.getWorldDirection(new THREE.Vector3());
+    const facing = Math.max(0, fwd.dot(SUN_DIR));
+    this.grade.uniforms.get('sunScreen').value.set(v.x * 0.5 + 0.5, v.y * 0.5 + 0.5, v.z < 1 ? facing * facing : 0);
+  }
+
+  render(dt) { this.composer.render(dt); }
+}
+

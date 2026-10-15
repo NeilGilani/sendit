@@ -4,7 +4,7 @@
 // backdrop. Answers height/normal/surface queries; park features add to the height field.
 import * as THREE from 'three';
 import { globals, toonMaterial, SUN_DIR } from './world.js';
-import { SNOW, snowUniforms, SNOW_BAND_PARS, SNOW_PARS_GLSL, SNOW_FRAG_GLSL, SNOW_BAND_GLSL, FAR_SNOW_FRAG_GLSL } from './scene.js';
+import { snowUniforms, SNOW_COMMON_PARS, SNOW_PARS_GLSL, SNOW_FRAG_GLSL, SNOW_BAND_GLSL, FAR_SNOW_FRAG_GLSL } from './gfx/snow.js';
 
 const CHUNK = 128;
 const LODS = 5;
@@ -143,12 +143,15 @@ export class Terrain {
     const terrainUniforms = {
       ...snowUniforms(),
       normalTex: { value: this.normalTex }, splatTex: { value: this.splatTex }, noiseTex: { value: tex.noise },
-      sparkle: { value: SNOW.sparkle }, terrainRes: { value: this.res }, terrainSpacing: { value: this.spacing },
+      terrainRes: { value: this.res }, terrainSpacing: { value: this.spacing },
     };
+    const blank = new THREE.DataTexture(new Uint8Array(4), 1, 1);
+    blank.needsUpdate = true;
+    terrainUniforms.uTreeMask.value = blank;
     this.terrainUniforms = terrainUniforms;
     this.material = toonMaterial({
       name: 'terrainSnow', uniforms: terrainUniforms,
-      fragPars: SNOW_BAND_PARS + SNOW_PARS_GLSL, frag: SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
+      fragPars: SNOW_COMMON_PARS + SNOW_PARS_GLSL, frag: SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
     });
     const prev = this.material.onBeforeCompile;
     this.material.onBeforeCompile = (shader, r) => {
@@ -156,9 +159,10 @@ export class Terrain {
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(tN, 0.0)).xyz);');
     };
+    this.material.defines = { SNOW_TRACKS: 2, SNOW_SPARKLE: 1, SNOW_TREEMASK: 1 };
     this.farMaterial = toonMaterial({
       name: 'terrainFarSnow', uniforms: { ...snowUniforms(), noiseTex: { value: tex.noise } },
-      fragPars: SNOW_BAND_PARS + 'uniform sampler2D noiseTex;', frag: FAR_SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
+      fragPars: SNOW_COMMON_PARS, frag: FAR_SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
     });
   }
 
@@ -275,11 +279,18 @@ export class Terrain {
   setQuality(q) {
     const s = [0.6, 1.0, 1.5][q];
     this.lodDistances = [280 * s, 600 * s, 1200 * s, 2400 * s];
-    if (this.terrainUniforms) this.terrainUniforms.sparkle.value = q === 0 ? 0 : SNOW.sparkle;
+    if (this.material) {
+      // Quality tiers: low = no glints / plain normal-mapped tracks / no fine wind detail;
+      // medium = everything but parallax tracks; high = parallax trenches.
+      const d = { SNOW_TRACKS: q === 2 ? 2 : 1, SNOW_TREEMASK: 1 };
+      if (q > 0) d.SNOW_SPARKLE = 1;
+      this.material.defines = d;
+      this.material.needsUpdate = true;
+      this.terrainUniforms.uDetail.value = q;
+    }
     this._lastFocus = null;
   }
 
-  /** Update chunk LODs around the camera; builds at most a few chunks per frame. */
   /** Pick each chunk's LOD; new geometry is built nearest-first within a per-frame budget. */
   update(camPos, budget = 6) {
     const todo = [];

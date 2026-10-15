@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { toonMaterial, outlineMaterial, globals, mulberry32 } from './world.js';
 import { ATMOSPHERE, JUMPS, col } from './scene.js';
+import { ATMO } from './gfx/atmosphere.js';
 
 // Signature kickers near the top (with crowds); the rest of the run is laid out from JUMPS.
 const KICKERS = [
@@ -340,8 +341,7 @@ export class Features {
         void main() {
           vec4 c = texture2D(atlas, vec2((vVar + vUv.x) / 4.0, vUv.y));
           if (c.a < 0.5) discard;
-          gl_FragColor = c;
-          #include <colorspace_fragment>
+          gl_FragColor = vec4(c.rgb * 1.7, c.a);
         }`,
     });
     const mesh = new THREE.Mesh(geo, mat);
@@ -366,7 +366,7 @@ export class Features {
     geo.setAttribute('aFog', new THREE.InstancedBufferAttribute(new Float32Array(pts.flat()), 4));
     geo.instanceCount = pts.length;
     const mat = new THREE.ShaderMaterial({
-      uniforms: { noise: { value: null }, uTime: globals.uTime, uMistTeal: { value: col(ATMOSPHERE.mistColor) }, uMistDeep: { value: col(ATMOSPHERE.mistDeepColor) } },
+      uniforms: { noise: { value: null }, uTime: globals.uTime, uMistTeal: { value: new THREE.Color(...ATMO.hor.side) }, uMistDeep: { value: new THREE.Color(...ATMO.hor.away).multiplyScalar(0.85) } },
       transparent: true, depthWrite: false,
       vertexShader: /* glsl */`
         attribute vec4 aFog; uniform float uTime; varying vec2 vP; varying float vFade; varying float vSeed;
