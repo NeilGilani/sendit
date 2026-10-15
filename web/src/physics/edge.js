@@ -119,6 +119,9 @@ export class EdgePhysics {
    */
   pressAndButter(dt, ctrl, grounded) {
     const pl = this.pl, C = this.C;
+    // Flip preload (Steep / Shredders): S held while charging winds up a backflip off the tail.
+    this.flipLoad = approach(this.flipLoad || 0, grounded && this.charging && ctrl.brake > 0.3 ? 1 : 0, dt / (this.charging ? 0.35 : 0.1));
+    pl.flipLoad = this.flipLoad;
     const pressT = grounded && this.charging ? (this._popEnd === 'nose' ? 1 : -1) * (0.4 + 0.6 * this.charge) : 0;
     this.press += (pressT - this.press) * (1 - Math.exp(-10 * dt));
     const canButter = grounded && this.charging && pl.speed < C.butterMaxSpeed;
@@ -304,6 +307,10 @@ export class EdgePhysics {
     const pl = this.pl;
     this.takeoff = { switch: this.travel < 0, popped, spin: 0, flip: 0, grabT: 0, grab: null, end: this._popEnd || 'tail' };
     pl.flip = 0; pl.flipRate = 0;
+    // A preloaded backflip leaves the lip already rotating and commits to the flip.
+    this._flipCommit = popped && (this.flipLoad || 0) > 0.25;
+    if (this._flipCommit) pl.flipRate = this.flipLoad * this.C.flipPreload;
+    this.flipLoad = 0; pl.flipLoad = 0;
     // W / S already held at take-off (tuck, brake, nollie) don't start a flip until pressed again.
     const c = pl._ctrl || {};
     this._flipLock = { up: (c.up || 0) > 0.2, brake: (c.brake || 0) > 0.2 };
@@ -388,9 +395,12 @@ export class EdgePhysics {
     if (ctrl.brake < 0.2) L.brake = false;
     const input = ctrl.active && !grabbing && pl.airTime > 0.08 ? (L.brake ? 0 : ctrl.brake) - (L.up ? 0 : ctrl.up) : 0;
     const rem = wrapPi(pl.flip);                       // signed distance from upright
+    // A preloaded take-off is committed through its first half turn (then momentum carries it anyway).
+    if (Math.abs(pl.flip) >= Math.PI) this._flipCommit = false;
+    const starting = this._flipCommit && Math.abs(pl.flip) < Math.PI;
     let target = 0, resp = C.flipResponse;
     if (Math.abs(input) > 0.2) target = input * max;
-    else if (Math.abs(rem) < 50 * DEG || Math.abs(pl.flipRate) < 0.6) {
+    else if (!starting && (Math.abs(rem) < 50 * DEG || Math.abs(pl.flipRate) < 0.6)) {
       target = clamp(-rem / Math.max(tLand, 0.15), -max * 0.7, max * 0.7);
       resp = 6;
     } else {

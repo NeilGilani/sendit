@@ -43,7 +43,7 @@ export class SnowboardPhysics extends EdgePhysics {
     const pl = this.pl;
     this.pressAndButter(dt, ctrl, grounded);
     // Slide stop: heel side by default; toe side when steering toward the toes.
-    const b = grounded ? ctrl.brake : 0;
+    const b = grounded && !this.charging ? ctrl.brake : 0;   // S while charging preloads a backflip instead
     const wantStop = b > 0.3 && (pl.speed > 1.0 || this.stop > 0.3);
     if (wantStop && this.stop < 0.05) {
       const toward = Math.sign(ctrl.steer);

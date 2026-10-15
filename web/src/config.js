@@ -95,7 +95,7 @@ export const PHYSICS = {
     spinRateMax: 6.4, spinResponse: 7, prewind: 0.45,
     windupSpin: 2.6,          // rad/s of spin added at take-off by a full wind-up (steer while charging)
     // Flips (W = frontflip, S = backflip in the air): rate, response, and the pitch tolerance at touchdown.
-    flipRateMax: 5.6, flipResponse: 5, flipLandClean: 22, flipLandStumble: 42,
+    flipRateMax: 5.6, flipResponse: 5, flipLandClean: 22, flipLandStumble: 42, flipPreload: 4.2,
     landClean: 15, landStumble: 30, landCrash: 38, // deg yaw between ski and path
     switchLand: 30,           // deg — backwards landings within this are "switch" (twin tips clean)
   },
@@ -126,7 +126,7 @@ export const PHYSICS = {
     popMin: 2.2, popMax: 4.0, nollie: 0.88, chargeTime: 0.45,
     spinRateMax: 7.6, spinResponse: 7.5, prewind: 0.55, windupSpin: 3.2,
     // Flips (W = tamedog / front, S = wildcat / back, over the toe-heel axis), pitch tolerance at touchdown.
-    flipRateMax: 5.9, flipResponse: 5, flipLandClean: 22, flipLandStumble: 42,
+    flipRateMax: 5.9, flipResponse: 5, flipLandClean: 22, flipLandStumble: 42, flipPreload: 4.4,
     landClean: 15, landStumble: 45, landSlide: 82, // deg yaw from the nearest board end to the path (sideways = hard slide)
   },
 };
@@ -158,6 +158,7 @@ export const ANIM = {
   skiPressPitch: 0.14,        // rad the skis pitch up while pressing the tails / tips (butters, ollie load)
   skiPressShift: 0.09,        // m hips over the pressed end
   skiPopSnap: 0.3,            // rad the tips snap up at the pop
+  flipLoadArch: 0.45,         // rad the upper body arches back while preloading a backflip (S while charging)
   flipPivot: 0.85,            // m above the feet the rider flips about (centre of mass)
   gearSinkVisual: 0.15,       // share of the physics powder sink shown (the snow reads as packed, so the gear rides on top)
   board: {

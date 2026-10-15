@@ -46,6 +46,7 @@ function ride(type, kick, plan) {
         const nz = pl.position.z + pl.velocity.z * DT * 1.5;
         const f1 = T.getHeight(pl.position.x, nz) - T.baseHeight(pl.position.x, nz);
         c.jump = !(f0 > kick.H * 0.6 && f1 < f0 * 0.98);
+        if (plan.preload) c.brake = 1;
         if (!c.jump && f0 > 0) { popped = true; lipV = pl.speed; }
       }
       if (pl.state === State.AIR) Object.assign(c, plan.air?.(pl) || {});
@@ -70,6 +71,7 @@ for (const type of ['ski', 'snowboard']) {
     console.log(`  kicker ${kick.name}  pop               ${ride(type, kick, { pop: true })}`);
     console.log(`  kicker ${kick.name}  pop + 360         ${ride(type, kick, { pop: true, air: spinTo(360) })}`);
     console.log(`  kicker ${kick.name}  pop + backflip    ${ride(type, kick, { pop: true, air: flipTo(1, 1) })}`);
+    console.log(`  kicker ${kick.name}  preload backflip  ${ride(type, kick, { pop: true, preload: true })}`);
     console.log(`  kicker ${kick.name}  pop + cork 720    ${ride(type, kick, { pop: true, air: (p) => ({ ...flipTo(1, 1)(p), ...spinTo(720)(p) }) })}`);
   }
 }

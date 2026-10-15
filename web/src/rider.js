@@ -230,6 +230,7 @@ export class Rider {
     p.plow += ((ground ? pl.plow : 0) - p.plow) * k(8);
     p.stop += ((ground ? pl.stop : 0) - p.stop) * k(8);
     p.press += ((ground ? pl.press : 0) - p.press) * k(12);
+    p.flipLoad = (p.flipLoad || 0) + (((ground ? pl.flipLoad : 0) || 0) - (p.flipLoad || 0)) * k(10);
     p.grab += ((air ? pl.grab : 0) - p.grab) * k(14);
     p.stanceYaw += (this.stanceYawTarget() * (1 - p.sit) - p.stanceYaw) * k(10);
     // Look direction along the bord: +1 toward the nose, −1 toward the tail (switch).
@@ -524,7 +525,7 @@ export class Rider {
     // Pressing shifts the hips over the pressed end (tails: back, tips: forward).
     const off = new THREE.Vector3(-angul * 0.12, -drop * ns - p.crash * 0.5, -p.crouch * 0.06 * ns - p.stop * 0.05 + p.press * ANIM.skiPressShift * ns);
     const twist = p.twist * ns;
-    let bend = THREE.MathUtils.degToRad(10 + p.crouch * 16 + p.tuck * 30) * (1 - p.air * 0.3);
+    let bend = THREE.MathUtils.degToRad(10 + p.crouch * 16 + p.tuck * 30) * (1 - p.air * 0.3) - p.flipLoad * ANIM.flipLoadArch;
     bend -= THREE.MathUtils.degToRad(12) * p.sit;
     const wob = p.stumble * Math.sin(p.t * 9) * 0.25;
     // Riding switch (twin tips): twist the torso and look back over the shoulder down the path.
@@ -562,7 +563,8 @@ export class Rider {
     const sk = p.skate || 0;
     off.x += nx * 0.08 * sk;                                  // weight over the front foot while skating
     const spineTwist = (nx * (BA.shoulderOpen - BA.hipOpen) + lead + nx * 0.45 * sk) * ns;
-    const bend = (0.1 + p.crouch * 0.2 - p.toe * 0.04 + p.heel * 0.12 + p.grab * 0.26) * ns;
+    // A preloaded backflip arches the chest up and back (the shoulders throw first).
+    const bend = (0.1 + p.crouch * 0.2 - p.toe * 0.04 + p.heel * 0.12 + p.grab * 0.26) * ns - p.flipLoad * ANIM.flipLoadArch;
     // Head: look down the direction of travel (nose, or over the back shoulder when switch).
     const headYaw = (nx * p.look * BA.headTurn - nx * BA.shoulderOpen - lead - nx * 0.5 * sk) * ns;
     this.trunk(off, hipYaw + nx * 0.3 * sk, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist, wob - p.lean * 0.15, headYaw, -(hipPitch + bend) * 0.6);

@@ -23,7 +23,7 @@ export class SkiPhysics extends EdgePhysics {
     const pl = this.pl, C = this.C;
     this.pressAndButter(dt, ctrl, grounded);
     // Snowplough (pizza) when slow, hockey stop when fast. Hysteresis keeps a stop going until slow.
-    const b = grounded ? ctrl.brake : 0;
+    const b = grounded && !this.charging ? ctrl.brake : 0;   // S while charging preloads a backflip instead
     const wantStop = b > 0.3 && (pl.speed > C.plowSpeed || (this.stop > 0.3 && pl.speed > 1.2));
     if (wantStop && this.stop < 0.05) {
       // Stop toward the steer side, else toward the side the skis already point, else uphill.
