@@ -426,7 +426,9 @@ export class EdgePhysics {
     if (ctrl.brake < 0.2) L.brake = false;
     // No flip from a little hop (a tuck tapped over a crest): starting one needs real air ahead.
     const canStart = Math.abs(pl.flip) > 0.3 || tLand > C.flipMinAir;
-    const input = ctrl.active && !grabbing && pl.airTime > 0.08 && canStart ? (L.brake ? 0 : ctrl.brake) - (L.up ? 0 : ctrl.up) : 0;
+    const raw = ctrl.active && !grabbing && pl.airTime > 0.08 && canStart ? (L.brake ? 0 : ctrl.brake) - (L.up ? 0 : ctrl.up) : 0;
+    // Wide dead zone: a stick pushed a little off-axis while spinning shouldn't start a flip (keys = full rate).
+    const input = Math.sign(raw) * clamp((Math.abs(raw) - 0.4) / 0.6, 0, 1);
     const rem = wrapPi(pl.flip);                       // signed distance from upright
     // A preloaded take-off is committed through its first half turn (then momentum carries it anyway).
     if (Math.abs(pl.flip) >= Math.PI) this._flipCommit = false;
