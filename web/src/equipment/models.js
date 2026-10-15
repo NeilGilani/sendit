@@ -87,8 +87,15 @@ export function createEquipmentModel(type, variant, opts = {}) {
   return group;
 }
 
+/** Free a model's GPU resources (geometry shared between models is kept). */
 export function disposeEquipmentModel(group) {
-  group?.traverse((o) => { if (o.isMesh) { o.geometry?.dispose(); } });
+  const mats = new Set();
+  group?.traverse((o) => {
+    if (!o.isMesh) return;
+    if (!o.geometry?.userData.shared) o.geometry?.dispose();
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (m) mats.add(m);
+  });
+  for (const m of mats) m.dispose();
 }
 
 // ------------------------------------------------------------------ geometry
@@ -200,6 +207,7 @@ function skiBinding() {
     const heel = new THREE.BoxGeometry(0.075, 0.055, 0.11); heel.translate(0, 0.045, 0.16);
     const plate = new THREE.BoxGeometry(0.07, 0.016, 0.42); plate.translate(0, 0.025, 0.01);
     _skiBindingGeo = mergeGeometries([toe, heel, plate].map((g) => g.toNonIndexed()));
+    _skiBindingGeo.userData.shared = true;
   }
   const m = new THREE.Mesh(_skiBindingGeo, toonMaterial({ name: 'skiBinding', color: 0x1a1830, rim: 0.4 }));
   m.castShadow = true;
