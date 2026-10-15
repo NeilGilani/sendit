@@ -159,28 +159,37 @@ export class LobbyStage {
   }
 
   buildRidges() {
-    // Layered hazy ranges on the horizon, far → near (flat colours, like the game's backdrop).
+    // Layered hazy ranges on the horizon, far → near (flat colours, like the game's backdrop):
+    // ridged-noise peaks, a snow cap on the upper third, a lit and a shaded side per facet.
     const rnd = mulberry32(17);
-    const radii = [330, 250, 190, 140];
-    const heights = [70, 52, 36, 22];
+    const radii = [340, 260, 195, 145];
+    const heights = [125, 82, 50, 28];
+    const snow = c('#ffffff');
     STAGE.ridgeColors.forEach((hex, k) => {
-      const segs = 160, R = radii[k];
-      const phase = rnd() * TAU;
-      const peak = (a) => {
-        const s = Math.abs(Math.sin(a * 3 + phase)) * 0.55 + Math.abs(Math.sin(a * 7.3 + phase * 2)) * 0.3 + Math.sin(a * 17 + phase) * 0.08;
-        return heights[k] * (0.35 + s);
+      const segs = 220, R = radii[k], H = heights[k];
+      const phase = rnd() * TAU, f0 = 2 + k * 1.3;
+      const ridged = (a) => {
+        let v = 0, amp = 1, fr = f0;
+        for (let o = 0; o < 4; o++) { v += amp * Math.pow(1 - Math.abs(Math.sin(a * fr + phase * (o + 1))), 2); amp *= 0.5; fr *= 2.17; }
+        return v / 1.875;
       };
+      const peak = (a) => H * (0.12 + 0.88 * Math.pow(ridged(a), 1.6));
       const pos = [], col = [], idx = [];
-      const base = c(hex), lit = base.clone().lerp(c('#ffffff'), 0.35);
+      const base = c(hex), shade = base.clone().lerp(c('#9fb3d1'), 0.18 - k * 0.03), cap = base.clone().lerp(snow, 0.55 - k * 0.08);
       for (let j = 0; j <= segs; j++) {
         const a = (j / segs) * TAU;
         const h = peak(a);
-        const slope = peak(a + 0.01) - h;
+        const lit = peak(a + 0.004) > h;                  // facing the key light (left in frame)
         const x = Math.cos(a) * R, z = Math.sin(a) * R;
-        pos.push(x, -12, z, x, h, z);
-        const top = slope > 0 ? lit : base.clone().lerp(lit, 0.25);
-        col.push(base.r, base.g, base.b, top.r, top.g, top.b);
-        if (j < segs) { const i = j * 2; idx.push(i, i + 2, i + 1, i + 1, i + 2, i + 3); }
+        const mid = h * 0.62;
+        pos.push(x, -14, z, x, mid, z, x, h, z);
+        const side = lit ? base : shade;
+        const top = lit ? cap : cap.clone().lerp(shade, 0.45);
+        col.push(base.r, base.g, base.b, side.r, side.g, side.b, top.r, top.g, top.b);
+        if (j < segs) {
+          const i = j * 3;
+          idx.push(i, i + 3, i + 1, i + 1, i + 3, i + 4, i + 1, i + 4, i + 2, i + 2, i + 4, i + 5);
+        }
       }
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
