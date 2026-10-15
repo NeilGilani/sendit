@@ -98,6 +98,10 @@ export class EdgePhysics {
         this.charging = true;
         this.charge = Math.min(1, this.charge + dt / C.chargeTime);
       } else if (this.charging) { this.charging = false; fire = true; }
+    } else if (ctrl.active && this._lateT > 0 && this.charging) {
+      // Late pop ("coyote time"): the snow fell away under a loaded rider; releasing now still pops.
+      this._lateT -= dt;
+      if (!ctrl.jump) { this.charging = false; fire = true; }
     } else this.charging = false;
     if (!this.charging && !fire) this.charge = Math.max(0, this.charge - dt * 6);
     pl.squat = this.charge;
@@ -120,7 +124,8 @@ export class EdgePhysics {
   pressAndButter(dt, ctrl, grounded) {
     const pl = this.pl, C = this.C;
     // Flip preload (Steep / Shredders): S held while charging winds up a backflip off the tail.
-    this.flipLoad = approach(this.flipLoad || 0, grounded && this.charging && ctrl.brake > 0.3 ? 1 : 0, dt / (this.charging ? 0.35 : 0.1));
+    const loading = (grounded || this._lateT > 0) && this.charging;
+    this.flipLoad = approach(this.flipLoad || 0, loading && ctrl.brake > 0.3 ? 1 : 0, dt / (this.charging ? 0.35 : 0.1));
     pl.flipLoad = this.flipLoad;
     const pressT = grounded && this.charging ? (this._popEnd === 'nose' ? 1 : -1) * (0.4 + 0.6 * this.charge) : 0;
     this.press += (pressT - this.press) * (1 - Math.exp(-10 * dt));
@@ -323,6 +328,10 @@ export class EdgePhysics {
   /** Called by Player.enterAir — trick bookkeeping. */
   takeoffInfo(popped) {
     const pl = this.pl;
+    // Rolled off a crest while loaded: keep the charge (and preload / wind-up) for a late pop.
+    const late = !popped && this.charging;
+    const keep = late ? { charge: this.charge, flipLoad: this.flipLoad, windup: this.windup } : null;
+    this._lateT = late ? P.latePopTime : 0;
     this.takeoff = { switch: this.travel < 0, popped, spin: 0, flip: 0, grabT: 0, grab: null, end: this._popEnd || 'tail' };
     pl.flip = 0; pl.flipRate = 0;
     // A preloaded backflip leaves the lip already rotating and commits to the flip.
@@ -343,6 +352,7 @@ export class EdgePhysics {
     this.windup = 0; pl.windup = 0; pl.grabName = null;
     this.charge = 0; this.charging = false; pl.squat = 0;
     this.butter = 0; this.press = 0;
+    if (keep) { Object.assign(this, keep); this.charging = true; pl.squat = this.charge; }
   }
 
   air(dt, ctrl) {

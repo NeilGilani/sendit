@@ -19,7 +19,8 @@ export const PHYSICS = {
   takeoffGap: 0.3,
   liftOffGrip: 1.25,          // natural air: leave the snow when the crest needs > this × g·cos θ of downward pull
   liftOffAbsorb: 0.8,         // … × (1 + this · charge): crouching (charging a pop) soaks up crests
-  liftOffMin: 0.06,           // m/s per step of separation below which the rider just stays on (no micro-hops)
+  liftOffMin: 0.06,
+  latePopTime: 0.15,          // s after rolling off a crest while loaded that releasing still pops (coyote time)           // m/s per step of separation below which the rider just stays on (no micro-hops)
   terrainImpactLoss: 0.5,     // share of an abrupt impact into the terrain (beyond smoothFollow) lost as speed
   smoothFollow: 0.25,         // m/s per step of normal velocity absorbed loss-free (smooth rolls and dips)
   lipPopBonus: 1.0,           // pop multiplier on a kicker lip (1 = a plain ollie; the pop already rides the ramp's launch angle)

@@ -250,7 +250,8 @@ export class Player {
   }
 
   jump() {
-    if (this.state !== State.GROUNDED) return;
+    const late = this.state === State.AIR && this.dyn._lateT > 0;
+    if (this.state !== State.GROUNDED && !late) return;
     const depth = this.dyn.charge;
     // Popping off a kicker / roller lip springs much higher than an ollie on the flat (arcade bonus).
     const T = this.terrain;
@@ -260,6 +261,13 @@ export class Player {
     this.lastLip = lip;
     this.lastPop = pop;
     this.velocity.addScaledVector(this.groundNormal, pop);
+    if (late) {
+      // Late pop off a crest: already airborne, so re-run the take-off bookkeeping as a popped jump.
+      this.dyn._lateT = 0;
+      emit('jumped', depth);
+      this.dyn.takeoffInfo(true);
+      return;
+    }
     this.position.addScaledVector(this.groundNormal, 0.06);
     emit('jumped', depth);
     this.enterAir(true);

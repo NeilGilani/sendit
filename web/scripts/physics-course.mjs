@@ -3,7 +3,8 @@
 // The bot steers toward the centre line ahead with linked S-turns (a fixed rhythm), pops at the
 // natural drops, and logs every landing, stumble and crash plus speed statistics.
 // Usage: node web/scripts/physics-course.mjs [ski|snowboard|both] [style]
-//   style: carve (default, linked turns), straight (line down the middle, tuck), park (pop + spin off drops)
+//   style: carve (default, linked turns), straight (line down the middle, tuck), park (pop + spin off drops),
+//          flip (pop with a preloaded backflip off every drop)
 globalThis.localStorage = { getItem: () => null, setItem: () => {} };
 globalThis.addEventListener = () => {};
 const THREE = await import('three');
@@ -32,9 +33,11 @@ const terrain = {
 
 const events = [];
 on('landed', (e) => events.push({ kind: 'land', ...e }));
+on('takeoff', (e) => events.push({ kind: 'takeoff', ...e }));
 on('crashed', (k) => events.push({ kind: 'crash', k }));
 on('stumble', (r) => events.push({ kind: 'stumble', r }));
 const DT = 1 / 60;
+const LIP = Number(process.env.LIP ?? 0.3);   // m before the drop's t where the bot releases the pop
 
 function ride(type, style) {
   events.length = 0;
@@ -61,7 +64,8 @@ function ride(type, style) {
       if (style === 'straight') c.tuck = Math.abs(d) < 0.15 ? 1 : 0;
       // Pop just before the natural drops (style park also spins).
       const nextDrop = drops.find((x) => x > tt - 2);
-      if (style === 'park' && nextDrop !== undefined && pl.state === State.GROUNDED && nextDrop - tt < 9 && nextDrop - tt > 0) c.jump = nextDrop - tt > 1.2;
+      const tricks = style === 'park' || style === 'flip';
+      if (tricks && nextDrop !== undefined && pl.state === State.GROUNDED && nextDrop - tt < 9 && nextDrop - tt > 0) { c.jump = nextDrop - tt > LIP; if (style === 'flip') c.brake = 1; }
       if (style === 'park' && pl.state === State.AIR && Math.abs(pl._spinTotal) + Math.abs(pl.spinRate) * 0.14 < Math.PI * 2) c.steer = -1;
     };
     const was = p.state;
@@ -75,8 +79,9 @@ function ride(type, style) {
   const lands = events.filter((e) => e.kind === 'land');
   for (const l of lands) maxImpact = Math.max(maxImpact, l.impact);
   const st = events.filter((e) => e.kind === 'stumble').map((e) => e.r);
-  const big = lands.filter((l) => l.air > 0.5).map((l) => `${l.air.toFixed(1)}s/${l.impact.toFixed(1)}${l.result === 'clean' ? '' : ':' + l.result}`);
-  console.log(`  ${type.padEnd(9)} ${style.padEnd(8)} ${t.toFixed(0)} s to the finish, avg ${(vSum / Math.max(1, n)).toFixed(1)} m/s, max ${vMax.toFixed(1)} m/s, crashes ${crashes}, stumbles ${st.length} [${st.join(',')}], max air ${airMax.toFixed(1)} s, max impact ${maxImpact.toFixed(1)} m/s`);
+  const big = lands.filter((l) => l.air > 0.5).map((l) => `${l.air.toFixed(1)}s/${l.impact.toFixed(1)}${l.result === 'clean' ? '' : ':' + l.result}${l.trick ? ' "' + l.trick + '"' : ''}`);
+  const pops = events.filter((e) => e.kind === 'takeoff' && e.popped).length;
+  console.log(`  ${type.padEnd(9)} ${style.padEnd(8)} ${t.toFixed(0)} s to the finish, avg ${(vSum / Math.max(1, n)).toFixed(1)} m/s, max ${vMax.toFixed(1)} m/s, crashes ${crashes}, stumbles ${st.length} [${st.join(',')}], max air ${airMax.toFixed(1)} s, max impact ${maxImpact.toFixed(1)} m/s, pops ${pops}`);
   const hops = lands.filter((l) => l.air <= 0.5);
   console.log(`            big landings (air/impact): ${big.join('  ')}`);
   console.log(`            small hops (≤0.5 s): ${hops.length}, longest ${Math.max(0, ...hops.map((l) => l.air)).toFixed(2)} s`);
