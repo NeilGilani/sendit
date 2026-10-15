@@ -6,44 +6,25 @@
 // ------------------------------------------------------------------ PlayerPhysics
 export const PHYSICS = {
   gravity: 9.81,
-  maxVelocity: 15,            // m/s — "max" used by all speed ratios (~54 km/h): a normal skiing pace
-  softCapDrag: 0.12,          // extra drag above maxVelocity keeps things arcade but bounded
-  frictionGroomed: 0.028,
+  maxVelocity: 15,            // m/s — default speed ratio reference (each equipment type has its own below)
+  softCapDrag: 0.12,          // extra drag above the equipment's maxVelocity keeps things arcade but bounded
+  frictionGroomed: 0.028,     // glide μ by surface (the course "powder" blends toward groomed via powderDepth)
   frictionPowder: 0.07,
   frictionRock: 0.12,
-  dragUpright: 0.011,        // quadratic air drag
-  dragTuck: 0.0065,
-  turnRateSlow: 2.3,          // rad/s carving at low speed
-  turnRateFast: 1.5,          // rad/s at max speed — wide fast arcs
-  steerResponse: 5.0,         // how fast steering input eases in (1/s) — fallback; see ski/snowboard.steerResponse
+  steerResponse: 5.0,         // fallback input smoothing (1/s); see ski / snowboard.steerResponse
   digitalSteerStart: 0.65,    // keys: share of full lock on press …
-  digitalSteerRamp: 0.45,     // … reaching full lock after this many seconds held
-  grip: 5.5,                  // lateral velocity decay (1/s)
-  powderGrip: 3.6,
-  carveEfficiency: 0.94,      // share of lateral speed redirected forward when carving
-  autoAlign: 1.4,
-  pushAccel: 4.0,             // skating when W is held at low speed
-  pushMaxSpeed: 9,
-  brakeDecel: 9.0,
+  digitalSteerRamp: 0.45,     // … reaching full lock after this many seconds held (linking turns skips the ramp)
   holdStillSlope: 0.006,
+  normalRadius: 1.4,          // m terrain normal sampling (park features use a fine upstream normal)
   takeoffGap: 0.3,
-  landAssistTime: 0.25,       // s before touchdown when a released stick lets the gear settle onto its path …
-  landAssistAngle: 14,
-  spinCheckAngle: 40,         // deg: stick released just past an alignment → check the spin back onto it        // … if it's within this many degrees (SSX-style auto-righting)
-  lipPopBonus: 1.7,           // pop multiplier when popping on a kicker / roller (vs an ollie on the flat)
   terrainImpactLoss: 0.5,     // share of an abrupt impact into the terrain (beyond smoothFollow) lost as speed
   smoothFollow: 0.25,         // m/s per step of normal velocity absorbed loss-free (smooth rolls and dips)
-  // Jump: hold to squat, release to pop. Impulse scales with squat depth.
-  chargeTime: 0.6,
-  jumpMin: 3.0,               // legacy (pre-equipment) pop — see PHYSICS.ski / .snowboard popMin/popMax
-  jumpMax: 8.0,
+  lipPopBonus: 1.7,           // pop multiplier when popping on a kicker (vs an ollie on the flat)
   airDrag: 0.006,
-  spinRateMax: 5.5,           // rad/s
-  spinResponse: 7.0,
-  landAlignRate: 9.0,
-  // Landing tolerance (degrees between board and travel / slope)
-  stumbleAngle: 20,
-  crashAngle: 45,
+  landAssistTime: 0.25,       // s before touchdown when a released stick lets the gear settle onto its path …
+  landAssistAngle: 14,        // … if it's within this many degrees (SSX-style auto-righting)
+  spinCheckAngle: 40,         // deg: stick released within this of an alignment → settle (or check back) onto it
+  // Landing / crashes (yaw tolerances are per equipment type below)
   stumbleTime: 1.0,
   stumbleHandling: 0.6,       // handling multiplier while stumbling (−40%)
   crashImpact: 18,            // m/s into the slope
@@ -52,15 +33,17 @@ export const PHYSICS = {
   // Aerodynamic auto-tuck
   autoTuckDelay: 2.5,         // seconds without directional input
   autoTuckSpeedRatio: 0.6,
-  normalRadius: 1.4,
-  // Powder feel: sink in when slow, plane up with speed; turning in deep snow scrubs speed.
-  powderSink: 0.24,           // metres the rider sinks into powder when slow
-  powderSinkFast: 0.07,       // … and when planing at speed
-  planeSpeed: [3, 12],        // m/s range over which the skis rise to the surface (legacy)
-  powderDepth: 0.35,          // how deep the course powder is (0 = sugar on a groomer, 1 = bottomless): scales bog + plough drag
+  // Powder: sink depth / bog / plough per equipment type below; these scale the whole course.
+  powderDepth: 0.35,          // how deep the course powder is (0 = sugar on a groomer, 1 = bottomless)
   turnScrub: 0.16,            // speed lost turning in powder (1/s per unit of carve)
   liftRideSeconds: 45,
   liftBoardSpeed: 8,
+  // Legacy pre-equipment tunables, kept so older code / other branches still resolve them. The physics
+  // no longer reads these — tune PHYSICS.ski / PHYSICS.snowboard instead.
+  dragUpright: 0.011, dragTuck: 0.0065, turnRateSlow: 2.3, turnRateFast: 1.5, grip: 5.5, powderGrip: 3.6,
+  carveEfficiency: 0.94, autoAlign: 1.4, pushAccel: 4.0, pushMaxSpeed: 9, brakeDecel: 9.0, chargeTime: 0.6,
+  jumpMin: 3.0, jumpMax: 8.0, spinRateMax: 5.5, spinResponse: 7.0, landAlignRate: 9.0, stumbleAngle: 20,
+  crashAngle: 45, powderSink: 0.24, powderSinkFast: 0.07, planeSpeed: [3, 12],
 
   // ---------------------------------------------------------------- equipment physics
   // Shared carve / skid model (physics/edge.js), numbers from docs/equipment-research.md:
