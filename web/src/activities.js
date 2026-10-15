@@ -220,6 +220,16 @@ export class Activities {
       const dx = pl.renderPos.x - fl.m.position.x, dz = pl.renderPos.z - fl.m.position.z, dy = pl.renderPos.y + 0.9 - fl.m.position.y;
       if (dx * dx + dz * dz < 2.6 && Math.abs(dy) < 1.9 && pl.state !== State.FROZEN && pl.state !== State.CRASH) this.collect(fl);
     }
+    // Carve chains: a committed carve held at speed scores when you release or switch edges.
+    if (pl.state === State.GROUNDED) {
+      const dirNow = Math.abs(pl.turnInput) > 0.55 && pl.speed > 6 ? Math.sign(pl.turnInput) : 0;
+      if (dirNow && dirNow === this._carveDir) this._carveT = (this._carveT || 0) + dt;
+      else {
+        if ((this._carveT || 0) > 0.7) addScore(dirNow ? 'Linked carve' : 'Carve', 15 + Math.round(this._carveT * 12));
+        this._carveT = 0;
+        this._carveDir = dirNow;
+      }
+    } else this._carveT = 0;
     if (this.mode !== 'challenge') return;
     if (this.state === 'countdown') {
       this.count -= dt;

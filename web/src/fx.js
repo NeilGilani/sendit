@@ -1,32 +1,68 @@
-// FXManager — snow particles in three tiers (cruising fog trail, carving wedges, braking fan),
-// landing rings and jump pops, proximity speed lines on close shaves, and a persistent top-down
-// track render-texture that the terrain shader carves into the snow.
+// FXManager — snow spray (gfx/spray.js: rooster tails, lingering backlit powder clouds, chunks,
+// glints, hard-stop fans, landing puffs), proximity speed lines on close shaves, and a persistent
+// top-down track render texture that the terrain shader carves into the snow (deep in powder,
+// shallow on hardpack).
+//
+// Contact points: the spray is equipment-agnostic. Each frame we hand it a list of
+// { position, direction, edgeAngle, load, speed } (see gfx/spray.js). If the rider exposes
+// `rider.getContactPoints()` (snowboard), pass it via fx.setContactSource(() => rider.getContactPoints());
+// otherwise the two skis are derived from PlayerPhysics fields (contactsFromSkis below).
 import * as THREE from 'three';
 import { FX, PHYSICS } from './config.js';
 import { State } from './player.js';
 import { globals } from './world.js';
-import { on, emit } from './state.js';
+import { on, emit, settings } from './state.js';
+import { SprayEmitter, K_MIST, K_CHUNK } from './gfx/spray.js';
 
-const KIND_PUFF = 0, KIND_WEDGE = 1, KIND_LINE = 2, KIND_GRAIN = 3;
+const KIND_LINE = 2;
+const UP = new THREE.Vector3(0, 1, 0);
+
+/** Derive two ski contacts from the player (edge roll from the turn's lean angle, wedge/skid from brake). */
+export function contactsFromSkis(pl, out = []) {
+  const fwd = pl.forward(new THREE.Vector3());
+  const n = pl.groundNormal || UP;
+  const right = new THREE.Vector3().crossVectors(fwd, n).normalize();
+  // Lean angle that balances the turn: tan(φ) = v·ω / g. Right turn → ω < 0 → right edge (> 0).
+  const lean = Math.atan(pl.speed * -(pl.turnVelocity || 0) / PHYSICS.gravity);
+  const edge = THREE.MathUtils.clamp(lean, -1.15, 1.15);
+  const turnSide = Math.sign(edge || pl.turnInput || 0);
+  // Skid / brake: the skis swing across the travel direction (that slip is what throws the snow).
+  const skidAng = THREE.MathUtils.clamp((pl.skid || 0) * 0.9 + (pl.brake || 0) * 0.5, 0, 1.2) * (turnSide || 1);
+  const half = 0.13 + (pl.brake || 0) * 0.08;
+  const outside = Math.min(0.3, Math.abs(edge) * 0.35);
+  for (let i = 0; i < 2; i++) {
+    const s = i === 0 ? -1 : 1;                               // -1 left ski, +1 right ski
+    const c = out[i] || (out[i] = { position: new THREE.Vector3(), direction: new THREE.Vector3(), edgeAngle: 0, load: 0.5, speed: 0, id: i ? 'skiR' : 'skiL' });
+    c.position.copy(pl.renderPos).addScaledVector(right, s * half);
+    // Wedge: each ski toes in a little when braking; skidding rotates both skis toward the turn.
+    const toe = -(pl.brake || 0) * 0.28 * s;
+    c.direction.copy(fwd).applyAxisAngle(n, -skidAng + toe).normalize();
+    c.edgeAngle = (pl.brake || 0) > 0.3 && Math.abs(edge) < 0.2 ? -s * 0.5 * pl.brake : edge;   // snowplough: inside edges
+    // The outside ski carries more weight in a turn (outside = left ski in a right turn).
+    c.load = 0.5 + (s === -turnSide ? outside : -outside);
+    c.speed = pl.speed;
+  }
+  out.length = 2;
+  return out;
+}
 
 export class FXManager {
   constructor(player, renderer, scene) {
     this.player = player;
     this.renderer = renderer;
-    this.n = FX.maxParticles;
+    this.n = 600;
     const n = this.n;
     this.pos = new Float32Array(n * 3);
     this.vel = new Float32Array(n * 3);
     this.life = new Float32Array(n);
     this.max = new Float32Array(n);
     this.size0 = new Float32Array(n);
-    this.kind = new Float32Array(n);
-    this.drag = new Float32Array(n);
-    this.grav = new Float32Array(n);
     this.next = 0;
-    this.acc = { cruise: 0, carve: 0, brake: 0, lines: 0, grain: 0 };
+    this.acc = { lines: 0 };
+    this.contactSource = null;
+    this._contacts = [];
 
-    // Instanced camera-facing quads; wedges and lines stretch along their screen-space velocity.
+    // Speed lines: instanced camera-facing quads stretched along their screen-space velocity.
     const geo = new THREE.InstancedBufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], 3));
     geo.setIndex([0, 1, 2, 0, 2, 3]);
@@ -40,39 +76,25 @@ export class FXManager {
     this.geo = geo;
     this.material = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false,
-      uniforms: { uLit: { value: new THREE.Color(1.0, 0.99, 0.97) }, uShade: { value: new THREE.Color(0.7, 0.77, 0.9) }, uSunDir: globals.uSunDir },
       vertexShader: /* glsl */`
         attribute vec3 iPos; attribute vec3 iVel; attribute vec3 iData;
-        varying vec2 vQ; varying float vA; varying float vKind; varying float vShade;
-        uniform vec3 uSunDir;
+        varying vec2 vQ; varying float vA;
         void main() {
-          float size = iData.x; vA = iData.y; vKind = iData.z; vQ = position.xy;
+          float size = iData.x; vA = iData.y; vQ = position.xy;
           vec4 c = viewMatrix * vec4(iPos, 1.0);
           vec3 vv = (viewMatrix * vec4(iVel, 0.0)).xyz;
           vec2 dir = length(vv.xy) > 1e-3 ? normalize(vv.xy) : vec2(0.0, 1.0);
-          vec2 perp = vec2(-dir.y, dir.x);
-          bool isLine = abs(vKind - 2.0) < 0.5, isGrain = vKind > 2.5;
-          float stretch = vKind < 0.5 ? 1.0 : (isGrain ? 1.0 + min(length(vv) * 0.05, 1.2) : (vKind < 1.5 ? 1.0 + min(length(vv) * 0.09, 2.5) : 1.0 + min(length(vv) * 0.12, 10.0)));
-          float thin = isLine ? 0.04 : 1.0;
-          vec2 off = dir * position.y * size * stretch + perp * position.x * size * thin * (vKind > 0.5 && vKind < 1.5 ? 0.55 : 1.0);
-          c.xy += off;
-          vShade = 0.5 + 0.5 * dot(normalize(vec3(position.xy, 0.6)), normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz));
+          vec2 perp = vec2(dir.y, -dir.x);   // keeps the quad front-facing
+          float stretch = 1.0 + min(length(vv) * 0.12, 10.0);
+          c.xy += dir * position.y * size * stretch + perp * position.x * size * 0.04;
           gl_Position = projectionMatrix * c;
         }`,
       fragmentShader: /* glsl */`
-        varying vec2 vQ; varying float vA; varying float vKind; varying float vShade;
-        uniform vec3 uLit; uniform vec3 uShade;
+        varying vec2 vQ; varying float vA;
         void main() {
-          float a;
-          if (vKind > 2.5) a = smoothstep(1.0, 0.15, length(vQ));                      // sugar grain
-          else if (vKind < 0.5) a = smoothstep(1.0, 0.3, length(vQ));                  // soft puff
-          else if (vKind < 1.5) a = smoothstep(1.0, 0.6, abs(vQ.x) + max(vQ.y, 0.0) * 0.8) * smoothstep(-1.0, -0.6, vQ.y); // wedge
-          else a = smoothstep(1.0, 0.0, abs(vQ.x)) * (1.0 - abs(vQ.y));              // speed line
-          a *= vA;
+          float a = smoothstep(1.0, 0.0, abs(vQ.x)) * (1.0 - abs(vQ.y)) * vA;
           if (a < 0.01) discard;
-          // Two-tone cel shading on snow particles; lines are pure white.
-          vec3 col = vKind > 2.5 ? mix(uLit, vec3(1.15), vA) : (vKind > 1.5 ? vec3(1.0) : mix(uShade, uLit, smoothstep(0.3, 0.6, vShade)));
-          gl_FragColor = vec4(col, a);
+          gl_FragColor = vec4(vec3(1.4), a);
         }`,
     });
     this.mesh = new THREE.Mesh(geo, this.material);
@@ -80,126 +102,78 @@ export class FXManager {
     this.mesh.renderOrder = 5;
     scene.add(this.mesh);
 
+    this.spray = new SprayEmitter(scene, player.terrain, settings.quality ?? 2);
+    this._q = settings.quality;
+
     this.track = new TrackMap(renderer);
     globals.uTrackMap.value = this.track.texture;
 
-    on('jumped', (depth) => this.burst(this.player.renderPos, 18 + depth * 30, 2.5 + depth * 2, 0.9, 0.5));
-    on('landed', ({ impact, perfect }) => {
-      if (impact > 2) this.ring(this.player.renderPos, Math.min(FX.landBurst, 30 + impact * 9), 3 + impact * 0.5);
-      if (perfect) this.ring(this.player.renderPos, 120, 9);
+    const pw = () => this.player.powder ?? 0.5;
+    on('jumped', (depth) => this.spray.puff(this.player.renderPos, 8 + depth * 22, pw(), 2 + depth * 2));
+    on('landed', ({ impact }) => this.spray.landing(this.player.renderPos, impact, pw()));
+    on('hardBrake', (speed) => {
+      const pl = this.player;
+      this.spray.stopFan(pl.renderPos, pl.forward(), speed || pl.speed, pw(), Math.sign(pl.turnInput || 1));
     });
-    on('hardBrake', () => this.brakeFan(FX.brakeBurst));
-    on('crashed', () => this.burst(this.player.renderPos, 90, 4, 1.4, 0.8));
+    on('crashed', () => this.spray.crash(this.player.renderPos, pw()));
     on('nearMiss', (e) => {
       this.acc.lines += FX.speedLineCount * 0.25;
       if (e?.kind === 'tree') this.treePlop(e.x, e.z);
     });
   }
 
-  spawn(p, v, size, life, kind, drag = 2.0, grav = 2.5) {
-    const i = this.next;
-    this.next = (this.next + 1) % this.n;
-    this.pos[i * 3] = p.x; this.pos[i * 3 + 1] = p.y; this.pos[i * 3 + 2] = p.z;
-    this.vel[i * 3] = v.x; this.vel[i * 3 + 1] = v.y; this.vel[i * 3 + 2] = v.z;
-    this.life[i] = life; this.max[i] = life; this.size0[i] = size; this.kind[i] = kind;
-    this.drag[i] = drag; this.grav[i] = grav;
-  }
-
-  burst(at, count, speed, life, size) {
-    const v = new THREE.Vector3();
-    for (let k = 0; k < count; k++) {
-      const a = Math.random() * Math.PI * 2;
-      v.set(Math.cos(a) * speed * Math.random(), 1 + Math.random() * speed * 0.8, Math.sin(a) * speed * Math.random());
-      this.spawn(at.clone().add(new THREE.Vector3(0, 0.2, 0)), v.clone(), size * (0.6 + Math.random() * 0.8), life * (0.7 + Math.random() * 0.6), KIND_PUFF);
-    }
-  }
-
-  ring(at, count, speed) {
-    const v = new THREE.Vector3();
-    for (let k = 0; k < count; k++) {
-      const a = (k / count) * Math.PI * 2 + Math.random() * 0.1;
-      v.set(Math.cos(a) * speed, 0.6 + Math.random() * 1.2, Math.sin(a) * speed);
-      this.spawn(at.clone().add(new THREE.Vector3(Math.cos(a) * 0.4, 0.15, Math.sin(a) * 0.4)), v.clone(), 0.35 + Math.random() * 0.3, 0.7 + Math.random() * 0.4, KIND_WEDGE, 4.5, 3.0);
-    }
-  }
-
-  /** Snow sliding off a branch you brushed past: a clump of puffs tumbling down. */
+  /** Snow sliding off a branch you brushed past: clumps tumbling down in a soft cloud. */
   treePlop(x, z) {
-    const T = this.player.terrain;
-    const y = T.getHeight(x, z) + 2.5 + Math.random() * 3;
-    for (let k = 0; k < 26; k++) {
-      const p = new THREE.Vector3(x + (Math.random() - 0.5) * 1.6, y + Math.random() * 1.2, z + (Math.random() - 0.5) * 1.6);
-      const v = new THREE.Vector3((Math.random() - 0.5) * 0.8, -0.2 - Math.random() * 0.6, (Math.random() - 0.5) * 0.8);
-      this.spawn(p, v, k < 8 ? 0.5 + Math.random() * 0.4 : 0.05 + Math.random() * 0.06, 1.2 + Math.random() * 0.8, k < 8 ? KIND_PUFF : KIND_GRAIN, 0.8, 3.5);
+    const y = this.player.terrain.getHeight(x, z) + 2.5 + Math.random() * 3;
+    const p = new THREE.Vector3(), v = new THREE.Vector3();
+    for (let k = 0; k < 22; k++) {
+      p.set(x + (Math.random() - 0.5) * 1.6, y + Math.random() * 1.2, z + (Math.random() - 0.5) * 1.6);
+      v.set((Math.random() - 0.5) * 0.8, -0.2 - Math.random() * 0.6, (Math.random() - 0.5) * 0.8);
+      if (k < 8) this.spray.spawn(K_MIST, p, v, 0.45 + Math.random() * 0.4, 1.4 + Math.random() * 0.8, { grav: 0.6, drag: 0.9, grow: 1.6, dens: 0.4 });
+      else this.spray.spawn(K_CHUNK, p, v, 0.05 + Math.random() * 0.06, 1.2 + Math.random() * 0.6, { grav: 4.5 });
     }
     emit('treePlop', { x, y, z });
   }
 
-  brakeFan(count) {
-    const pl = this.player;
-    const fwd = pl.forward();
-    const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
-    for (let k = 0; k < count; k++) {
-      const a = (Math.random() - 0.5) * 2.2;  // wide fan in front of / around the board
-      const dir = fwd.clone().multiplyScalar(Math.cos(a)).addScaledVector(side, Math.sin(a)).add(new THREE.Vector3(0, 0.35 + Math.random() * 0.5, 0)).normalize();
-      const v = dir.multiplyScalar(3 + Math.random() * 6).addScaledVector(pl.velocity, 0.5);
-      this.spawn(pl.renderPos.clone().addScaledVector(fwd, 0.5).add(new THREE.Vector3(0, 0.1, 0)), v, 0.3 + Math.random() * 0.35, FX.brakeLife * (0.6 + Math.random() * 0.6), KIND_WEDGE, 2.5, 3.0);
-    }
+  /** Generic sparkly puff (snowflake pickups). */
+  burst(at, count, speed) { this.spray.puff(at, count, 1, speed); }
+
+  /** Chimney smoke: slow, rising, spreading wisps. */
+  smoke(p) {
+    this.spray.spawn(K_MIST, p, new THREE.Vector3(0.4 + Math.random() * 0.3, 1.1 + Math.random() * 0.5, Math.random() * 0.3),
+      0.8 + Math.random() * 0.5, 5, { grav: -0.15, drag: 0.25, grow: 2.6, dens: 0.22 });
+  }
+
+  /** Optional: supply contact points from the equipment (e.g. () => rider.getContactPoints()). */
+  setContactSource(fn) { this.contactSource = fn; }
+
+  spawnLine(p, v, size, life) {
+    const i = this.next;
+    this.next = (this.next + 1) % this.n;
+    this.pos[i * 3] = p.x; this.pos[i * 3 + 1] = p.y; this.pos[i * 3 + 2] = p.z;
+    this.vel[i * 3] = v.x; this.vel[i * 3 + 1] = v.y; this.vel[i * 3 + 2] = v.z;
+    this.life[i] = life; this.max[i] = life; this.size0[i] = size;
   }
 
   update(dt, camera) {
     this.time = (this.time || 0) + dt;
     const pl = this.player;
+    if (settings.quality !== this._q) { this._q = settings.quality; this.spray.setQuality(this._q); }
     const ground = pl.state === State.GROUNDED;
     const ratio = pl.speedRatio;
     const fwd = pl.forward();
-    const back = fwd.clone().negate();
     const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
-    const powder = pl.surface.y + pl.surface.w * 0.6 + pl.surface.x * 0.35;
 
-    const pw = pl.powder ?? powder;
-    const carve = Math.abs(pl.turnInput) * Math.min(1, pl.speed / 8);
-    const out = side.clone().multiplyScalar(-Math.sign(pl.turnInput || 1));
-    // Sugar spray: a constant stream of fine glittering grains kicked up off both skis.
-    if (ground && pl.speed > 1.2) {
-      this.acc.grain += FX.grainRate * (0.2 + ratio) * (0.35 + pw * 0.65) * (1 + carve * 2.2) * dt;
-      while (this.acc.grain >= 1) {
-        this.acc.grain -= 1;
-        const sk = Math.random() < 0.5 ? -1 : 1;
-        const p = pl.renderPos.clone().addScaledVector(side, sk * 0.13).addScaledVector(back, 0.3 + Math.random() * 0.6)
-          .add(new THREE.Vector3((Math.random() - 0.5) * 0.15, 0.04, (Math.random() - 0.5) * 0.15));
-        const v = back.clone().multiplyScalar(0.6 + Math.random() * 1.8).add(new THREE.Vector3((Math.random() - 0.5) * 1.3, 1.2 + Math.random() * 2.2 * (0.4 + pw), (Math.random() - 0.5) * 1.3))
-          .addScaledVector(out, carve * (1.5 + Math.random() * 3.5)).addScaledVector(pl.velocity, 0.35);
-        this.spawn(p, v, 0.05 + Math.random() * 0.07, FX.grainLife * (0.5 + Math.random() * 0.8), KIND_GRAIN, 1.6, 6.5);
-      }
-      // Soft powder clouds hanging behind the skis.
-      this.acc.cruise += FX.puffRate * pw * (0.25 + ratio) * (1 + carve) * dt;
-      while (this.acc.cruise >= 1) {
-        this.acc.cruise -= 1;
-        const p = pl.renderPos.clone().addScaledVector(back, 0.5 + Math.random() * 0.5).add(new THREE.Vector3((Math.random() - 0.5) * 0.5, 0.12, (Math.random() - 0.5) * 0.5));
-        const v = pl.velocity.clone().multiplyScalar(0.2).add(new THREE.Vector3((Math.random() - 0.5) * 0.5, 0.3 + Math.random() * 0.4, (Math.random() - 0.5) * 0.5)).addScaledVector(out, carve * 1.2);
-        this.spawn(p, v, 0.6 + Math.random() * 0.7, FX.cruiseLife * (0.6 + Math.random() * 0.6), KIND_PUFF, 1.4, 0.25);
-      }
-    }
-    // Carving: a sheet of snow thrown out of the turn.
-    if (ground && carve > 0.3 && pl.speed > 4) {
-      this.acc.carve += FX.carveRate * (carve - 0.25) * dt * (0.5 + pw * 0.8);
-      while (this.acc.carve >= 1) {
-        this.acc.carve -= 1;
-        const dir = out.clone().multiplyScalar(0.9).addScaledVector(back, 0.4 + Math.random() * 0.4).add(new THREE.Vector3(0, 0.4 + Math.random() * 0.5, 0)).normalize();
-        const v = dir.multiplyScalar(FX.carveSpeed * (0.4 + Math.random() * 0.5)).addScaledVector(pl.velocity, 0.4);
-        const p = pl.renderPos.clone().addScaledVector(out, 0.15).addScaledVector(fwd, (Math.random() - 0.5) * 1.0).add(new THREE.Vector3(0, 0.06, 0));
-        this.spawn(p, v, 0.12 + Math.random() * 0.14, FX.carveLife * (0.7 + Math.random() * 0.6), KIND_WEDGE, 1.8, 6.0);
-      }
-    }
-    // Tier 3 — braking: continuous fan while scrubbing speed hard.
-    if (ground && pl.brake > 0.5 && pl.speed > 6) {
-      this.acc.brake += 70 * pl.brake * ratio * dt;
-      if (this.acc.brake >= 1) { const c = Math.floor(this.acc.brake); this.acc.brake -= c; this.brakeFan(c); }
-    }
+    // Snow spray from whatever is touching the snow.
+    if (ground) {
+      const contacts = this.contactSource ? this.contactSource() : contactsFromSkis(pl, this._contacts);
+      this.spray.emit(contacts, dt, { powder: pl.powder ?? 0.5, normal: pl.groundNormal });
+    } else this.spray.emit([], dt);
+    this.spray.update(dt);
+
     // Proximity speed lines: close shaves (and top speed) stream white lines past the camera.
     const near = pl.nearDist !== undefined && pl.nearDist < FX.nearMissRadius ? 1 - pl.nearDist / FX.nearMissRadius : 0;
-    this.acc.lines += (near * 140 + Math.max(0, ratio - 0.85) * 120) * dt;
+    this.acc.lines += near * 90 * dt;   // close shaves only (no top-speed streaks in the realistic look)
     if (camera && this.acc.lines >= 1) {
       const cf = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
       const cr = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
@@ -210,11 +184,9 @@ export class FXManager {
         const r = 1.6 + Math.random() * 2.6;
         const p = camera.position.clone().addScaledVector(cf, 8 + Math.random() * 14).addScaledVector(cr, Math.cos(a) * r).addScaledVector(cu, Math.sin(a) * r * 0.7);
         const v = cf.clone().multiplyScalar(-(40 + Math.random() * 30)).addScaledVector(pl.velocity, 0.9);
-        this.spawn(p, v, 0.9 + Math.random() * 0.6, FX.speedLineLife, KIND_LINE, 0, 0);
+        this.spawnLine(p, v, 0.9 + Math.random() * 0.6, FX.speedLineLife);
       }
     }
-
-    // Simulate & upload
     let count = 0;
     const ip = this.iPos.array, iv = this.iVel.array, id = this.iData.array;
     for (let i = 0; i < this.n; i++) {
@@ -222,32 +194,34 @@ export class FXManager {
       this.life[i] -= dt;
       if (this.life[i] <= 0) continue;
       const k3 = i * 3;
-      const d = Math.exp(-this.drag[i] * dt);
-      this.vel[k3 + 1] -= this.grav[i] * dt;
-      this.vel[k3] *= d; this.vel[k3 + 1] *= d; this.vel[k3 + 2] *= d;
       this.pos[k3] += this.vel[k3] * dt; this.pos[k3 + 1] += this.vel[k3 + 1] * dt; this.pos[k3 + 2] += this.vel[k3 + 2] * dt;
       const t = 1 - this.life[i] / this.max[i];
-      const kind = this.kind[i];
-      const size = kind === KIND_PUFF ? this.size0[i] * (0.5 + t * 1.2) : this.size0[i] * (1 - t * 0.5);
-      let alpha = kind === KIND_LINE ? 0.55 * Math.sin(t * Math.PI) : (kind === KIND_PUFF ? 0.42 : 0.85) * (1 - t) * Math.min(1, t * 10);
-      if (kind === KIND_GRAIN) alpha = (1 - t * t) * (0.55 + 0.45 * Math.sin(i * 12.9898 + this.time * 31.0));
       const o = count * 3;
       ip[o] = this.pos[k3]; ip[o + 1] = this.pos[k3 + 1]; ip[o + 2] = this.pos[k3 + 2];
       iv[o] = this.vel[k3]; iv[o + 1] = this.vel[k3 + 1]; iv[o + 2] = this.vel[k3 + 2];
-      id[o] = size; id[o + 1] = alpha; id[o + 2] = kind;
+      id[o] = this.size0[i]; id[o + 1] = 0.06 * Math.sin(t * Math.PI); id[o + 2] = KIND_LINE;
       count++;
     }
     this.geo.instanceCount = count;
     for (const a of [this.iPos, this.iVel, this.iData]) { a.clearUpdateRanges(); a.addUpdateRange(0, count * 3); a.needsUpdate = true; }
 
-    // Persistent tracks: two crisp ski grooves inside a shallow trough pushed through the powder.
+    // Persistent tracks: two grooves inside a trough pushed through the powder. Strength = depth:
+    // deep and soft in powder, a shallow scratch on hardpack.
     if (pl.state === State.CRASH) this.track.stamp('body', pl.renderPos, pl.heading, 1.2, 1);
     else if (ground) {
       const h = pl.heading, pwr = pl.powder ?? 1;
       const wedge = pl.brake;
-      for (const sk of [-1, 1]) {
-        const at = pl.renderPos.clone().addScaledVector(side, sk * (FX.skiSpacing * 0.5 + wedge * 0.1));
-        this.track.stamp(sk < 0 ? 'L' : 'R', at, h + sk * wedge * 0.28, FX.trackWidth + wedge * 0.12, 1.0);
+      const depth = 0.22 + 0.78 * pwr;
+      if (pl.equipment?.type === 'snowboard') {
+        // One wide groove: the board's waist, smeared wider as it skids across the fall line.
+        const waist = pl.equipment.spec?.waist ?? 0.25;
+        const w = waist + Math.abs(Math.sin(pl.skidAngle || 0)) * 0.6 + (pl.skid || 0) * 0.15;
+        this.track.stamp('L', pl.renderPos, h, w, depth);
+      } else {
+        for (const sk of [-1, 1]) {
+          const at = pl.renderPos.clone().addScaledVector(side, sk * (FX.skiSpacing * 0.5 + wedge * 0.1));
+          this.track.stamp(sk < 0 ? 'L' : 'R', at, h + sk * wedge * 0.28, FX.trackWidth + wedge * 0.12 + (pl.skid || 0) * 0.15, depth);
+        }
       }
       if (pwr > 0.2) this.track.stamp('plow', pl.renderPos, h, FX.plowWidth, FX.plowStrength * pwr);
     }
@@ -376,4 +350,3 @@ class TrackMap {
   }
 }
 
-void PHYSICS;

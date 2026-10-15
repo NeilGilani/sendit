@@ -2,11 +2,24 @@
 // The palette, sun and atmosphere come from scene.js (the scene file).
 import * as THREE from 'three';
 import { ART } from './config.js';
-import { LIGHTING, OUTLINE, sunDirection, lightingUniforms, fogParsFragmentGLSL, fogFragmentGLSL } from './scene.js';
+import { LIGHTING, OUTLINE, sunDirection } from './scene.js';
+import { sunColor, skyIrradiance, groundIrradiance, fogParsFragmentGLSL, fogFragmentGLSL } from './gfx/atmosphere.js';
 
 export const SUN_DIR = sunDirection();
-export const SUN_COLOR = new THREE.Color(LIGHTING.sunColor);
-export const SUN_INTENSITY = LIGHTING.sunIntensity;
+export const SUN_COLOR = sunColor();
+export const SUN_INTENSITY = 1.0;
+
+/** Global lighting uniforms (linear HDR, Lambert units: colour = irradiance / π). */
+export function lightingUniforms() {
+  return {
+    uSunCol: { value: sunColor() },
+    uSkyAmb: { value: skyIrradiance() },
+    uGroundAmb: { value: groundIrradiance() },
+    uLightWrap: { value: LIGHTING.lightWrap },
+    uAOFloor: { value: LIGHTING.aoFloor },
+    uExposure: { value: 1.0 },
+  };
+}
 
 const c3 = (a) => new THREE.Color(a[0], a[1], a[2]);
 
@@ -15,7 +28,7 @@ export const globals = {
   sunMaskTex: { value: null },       // baked mountain shadows (r) + sky visibility (g)
   terrainSize: { value: 6000 },
   uSunDir: { value: SUN_DIR.clone() },
-  uSunLum: { value: SUN_INTENSITY * (0.2126 * SUN_COLOR.r + 0.7152 * SUN_COLOR.g + 0.0722 * SUN_COLOR.b) },
+  uSunLum: { value: 0.2126 * SUN_COLOR.r + 0.7152 * SUN_COLOR.g + 0.0722 * SUN_COLOR.b },
   uTime: { value: 0 },
   ...lightingUniforms(),
   uResolution: { value: new THREE.Vector2(1280, 720) },   // CSS px, for screen-space outlines
@@ -137,14 +150,12 @@ ${opts.frag || ''}`)
     vec3 sky = mix(uGroundAmb, uSkyAmb, nW.y * 0.5 + 0.5) * occl;
     vec3 light = uSunCol * wrapD * shadow + sky;
     ${opts.band || ''}
-    vec3 col = diffuseColor.rgb * light;
-    col = 1.0 - exp(-col * uExposure);
-    col += toonAdd;
+    vec3 col = diffuseColor.rgb * light + toonAdd;
     // Fresnel rim light (strongest when backlit).
     vec3 V = normalize(vViewPosition);
     float fres = pow(1.0 - clamp(dot(normal, V), 0.0, 1.0), ${ART.rimPower.toFixed(2)});
     float back = 0.35 + 0.65 * clamp(dot(-V, sunV) * 0.5 + 0.5, 0.0, 1.0);
-    col += uRimColor * fres * uRim * ${ART.rimStrength.toFixed(2)} * back * shadow;
+    col += uRimColor * uSunCol * fres * uRim * ${(ART.rimStrength * LIGHTING.rimScale).toFixed(3)} * back * shadow;
     col += toonSparkle * vec3(1.0, 0.98, 0.92);
     col += toonEmissive * (1.0 + uEmissiveBoost);
     outgoingLight = col;
@@ -162,6 +173,7 @@ ${opts.frag || ''}`)
 export function outlineMaterial(px = OUTLINE.px, color = OUTLINE.color) {
   const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(color), side: THREE.BackSide });
   m.name = 'outline';
+  if (px <= 0) m.visible = false;   // realistic look: no ink lines
   m.onBeforeCompile = (shader) => {
     shader.uniforms.uResolution = globals.uResolution;
     shader.uniforms.uOutlinePx = { value: px };

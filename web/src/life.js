@@ -222,7 +222,7 @@ export class Life {
       this.smokeT -= dt;
       if (this.smokeT <= 0) {
         this.smokeT = 0.35;
-        this.fx.spawn(this.chimney.clone(), new THREE.Vector3(0.4 + Math.random() * 0.3, 1.2 + Math.random() * 0.5, Math.random() * 0.3), 0.9 + Math.random() * 0.6, 5, 0, 0.25, -0.12);
+        this.fx.smoke?.(this.chimney.clone());
       }
     }
     // Birds wheel above the rider.

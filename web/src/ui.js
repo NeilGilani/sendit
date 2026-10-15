@@ -1,23 +1,37 @@
-// Minimal, elegant HTML UI: menu over the flyover, fading HUD, soft score notes, hints, pause,
-// settings, credits (rendered from CREDITS.md) and the fade curtain.
-import { game, Mode, on, emit, settings, setSetting } from './state.js';
+// HTML UI: screens (loading, lobby, pause) with modal overlays (settings, credits), the fading
+// HUD, soft score notes, big popups, hints and the fade curtain. Menu navigation works with mouse,
+// keyboard (arrows / Enter / Esc) and gamepad (d-pad / stick, A, B, LB/RB, Start).
+//
+// The lobby (lobby/Lobby.js) is the "lobby" screen; UI only shows/hides it and routes input to it.
+import { game, Mode, on, settings, setSetting } from './state.js';
 import { State } from './player.js';
 import { HUD } from './config.js';
-import { bestFor, flakesFound, fmtTime, CHALLENGE } from './activities.js';
+import { moveFocus, focusFirst, handleArrowKey, nudgeRange } from './lobby/nav.js';
+import { fmtTime } from './activities.js';
 
 const $ = (id) => document.getElementById(id);
+const BASES = ['loading', 'lobby', 'pause'];
+const MODALS = ['settings', 'credits', 'results'];
 
 export class UI {
   constructor(handlers) {
     this.h = handlers;
-    this.screens = ['loading', 'menu', 'pause', 'settings', 'credits', 'mountains', 'results'].reduce((o, k) => ((o[k] = $(k)), o), {});
+    this.screens = [...BASES, ...MODALS].reduce((o, k) => ((o[k] = $(k)), o), {});
     this.hud = $('hud');
     this.fadeEl = $('fade');
-    this.settingsFrom = 'menu';
+    this.base = 'loading';
+    this.modal = null;
+    this.modalReturnFocus = null;
+    this.lobby = null;
+    this.input = null;
     this.idle = 0;
     this.hudAlpha = 0;
     document.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => this.act(b.dataset.act)));
     this.bindSettings();
+    addEventListener('keydown', (e) => {
+      const root = this.activeRoot();
+      if (root) handleArrowKey(e, root);
+    });
     on('score', ({ label, points }) => this.note(label, points));
     on('hint', (t) => this.hint(t));
     on('liftBoarded', (name) => { $('liftlabel').textContent = `${name}  ·  hold W / RT to hurry`; });
@@ -28,41 +42,144 @@ export class UI {
     on('countdown', (n) => this.pop(n > 0 ? String(n) : 'GO!', n > 0 ? 'cyan' : 'gold'));
     on('gate', ({ pass }) => { if (!pass) this.pop('MISSED GATE  +2s', 'pink', true); });
     on('flake', ({ found, total }) => this.pop(`❄ ${found} / ${total}`, 'gold', true));
-    on('comboBanked', ({ banked, mult }) => { if (mult > 1) this.pop(`+${banked}  ×${mult.toFixed(2).replace(/\.?0+$/, '')}`, 'cyan', true); });
+    on('comboBanked', ({ banked, mult }) => { if (mult > 1) this.pop(`+${banked}  ×${trimNum(mult)}`, 'cyan', true); });
     on('combo', () => { const c = $('comboHud'); c.classList.remove('pulse'); void c.offsetWidth; c.classList.add('pulse'); setTimeout(() => c.classList.remove('pulse'), 150); });
     on('crashed', (kind) => this.pop(['YARD SALE!', 'SNOW ANGEL!', 'FACEPLANT!', 'TREE HUGGER!'][kind === 'tree' ? 3 : Math.floor(Math.random() * 3)], 'pink'));
+  }
+
+  /** Connect the lobby and the input controller (after both exist). */
+  attach({ lobby, input }) {
+    this.lobby = lobby;
+    this.input = input;
   }
 
   act(a) {
     switch (a) {
       case 'ride': this.h.ride(); break;
-      case 'challenge': this.h.challenge(); break;
-      case 'retry': this.h.retry(); break;
-      case 'zen': this.h.zen(); break;
+      case 'retry': this.closeModal(false); this.h.retry(); break;
+      case 'zen': this.closeModal(false); this.h.zen(); break;
       case 'restart': this.h.restart(); break;
-      case 'settings': this.settingsFrom = game.mode === Mode.PAUSED ? 'pause' : 'menu'; this.show('settings'); break;
-      case 'credits': this.loadCredits(); this.show('credits'); break;
-      case 'mountains': this.loadMountains(); this.show('mountains'); break;
+      case 'settings': this.openModal('settings'); break;
+      case 'credits': this.showCredits(); break;
       case 'resume': this.h.resume(); break;
       case 'top': this.h.resume(); this.h.top(); break;
       case 'menu': this.h.menu(); break;
-      case 'back': this.show(game.mode === Mode.PAUSED ? 'pause' : 'menu'); break;
+      case 'back': this.closeModal(); break;
     }
   }
 
-  show(name) {
-    for (const [k, el] of Object.entries(this.screens)) el.classList.toggle('hidden', k !== name);
-    const riding = name === null;
-    this.hud.classList.toggle('hidden', !riding);
-    if (name && this.screens[name]) this.screens[name].querySelector('button')?.focus({ preventScroll: true });
+  // ------------------------------------------------------------------ screens
+  /** Base screen: 'loading' | 'lobby' | 'pause' | null (riding → HUD). Closes any modal. */
+  showBase(name) {
+    this.closeModal(false);
+    this.base = name;
+    this.screens.pause.classList.toggle('hidden', name !== 'pause');   // 'loading' fades itself out (doneLoading)
+    if (name === 'lobby') this.lobby?.show(); else this.lobby?.hide();
+    this.hud.classList.toggle('hidden', name !== null);
+    if (name === 'pause') focusFirst(this.screens.pause);
+    if (name === null) document.activeElement?.blur?.();
+  }
+
+  openModal(name) {
+    if (!this.screens[name]) return;
+    this.modalReturnFocus = document.activeElement;
+    if (this.modal) this.screens[this.modal].classList.add('hidden');
+    this.modal = name;
+    this.screens[name].classList.remove('hidden');
+    focusFirst(this.screens[name]);
+  }
+
+  closeModal(restoreFocus = true) {
+    if (!this.modal) return false;
+    this.screens[this.modal].classList.add('hidden');
+    this.modal = null;
+    if (restoreFocus && this.modalReturnFocus?.isConnected) this.modalReturnFocus.focus({ preventScroll: true });
+    this.modalReturnFocus = null;
+    return true;
+  }
+
+  /** Esc / B: close the top-most overlay. Returns true when something was closed. */
+  back() {
+    if (this.modal === 'results') { this.closeModal(false); this.h.menu(); return true; }
+    return this.closeModal();
+  }
+
+  /** Element that keyboard/gamepad navigation acts on, or null while riding. */
+  activeRoot() {
+    if (this.modal) return this.screens[this.modal];
+    if (this.base === 'lobby') return this.screens.lobby;
+    if (this.base === 'pause') return this.screens.pause;
+    return null;
+  }
+
+  showCredits() { this.loadCredits(); this.openModal('credits'); }
+
+  /** Challenge HUD (timer, gates, best, combo) + snowflake counter, every frame. */
+  updateActivity(a) {
+    const riding = game.mode === Mode.RIDING || game.mode === Mode.LIFT;
+    const chal = a.mode === 'challenge' && riding && a.state !== 'idle';
+    $('chal').classList.toggle('hidden', !chal);
+    $('flakesHud').textContent = riding ? `❄ ${a.flakes}/${a.flakeTotal}` : '';
+    if (!chal) return;
+    $('timer').textContent = a.state === 'countdown' ? '0:00.00' : fmtTime(a.time);
+    $('gatesHud').textContent = `GATES ${a.gates}/${a.gateTotal}${a.penalty ? `  +${a.penalty}s` : ''}`;
+    $('bestHud').textContent = a.best ? `BEST ${fmtTime(a.best.time)}` : '';
+    const c = a.combo;
+    const txt = c ? `x${trimNum(c.mult)}  +${c.pts}` : (a.score ? `${a.score} PTS` : '');
+    if ($('comboHud').textContent !== txt) $('comboHud').textContent = txt;
+  }
+
+  /** Finish screen for a challenge run (a modal over the frozen finish). */
+  showResults(r) {
+    const el = $('resMedal');
+    el.className = `medal ${r.medal || ''}`;
+    el.textContent = r.medal ? r.medal[0].toUpperCase() : '';
+    $('resTitle').textContent = r.medal ? `${r.medal.toUpperCase()} MEDAL` : 'FINISH';
+    $('resTime').textContent = fmtTime(r.time);
+    const T = r.targets;
+    const rows = [
+      ['Best time', fmtTime(r.best.time), r.isBestTime],
+      ['Gates', `${r.gates}/${r.gateTotal}${r.penalty ? `  (+${r.penalty}s)` : ''}`],
+      ['Style score', `${r.score}`, r.isBestScore],
+      ['Snowflakes', `${r.flakes}/${r.flakeTotal}`],
+      ['Gold · Silver · Bronze', `${fmtTime(T.gold)} · ${fmtTime(T.silver)} · ${fmtTime(T.bronze)}`],
+    ];
+    $('resRows').innerHTML = rows.map(([k, v, n]) => `<div class="k">${k}</div><div class="v${n ? ' new' : ''}">${v}${n ? '  NEW!' : ''}</div>`).join('');
+    this.openModal('results');
   }
 
   refresh() {
-    if (game.mode === Mode.MENU) this.show('menu');
-    else if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) this.show(null);
+    if (game.mode === Mode.MENU) this.showBase('lobby');
+    else if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) this.showBase(null);
     else if (game.mode === Mode.PAUSED) {
       $('stats').textContent = `${(game.distance / 1000).toFixed(1)} km skied · ${game.smoothTurns} smooth turns · ${game.airTotal.toFixed(0)} s of air · score ${game.score}`;
-      this.show('pause');
+      this.showBase('pause');
+    }
+  }
+
+  // ------------------------------------------------------------------ gamepad menu navigation
+  navigate(dt) {
+    const root = this.activeRoot();
+    if (!root || !this.input) return;
+    for (const a of this.input.menuActions(dt)) {
+      if (!this.modal && this.base === 'lobby' && this.lobby?.onAction(a)) continue;
+      const el = document.activeElement;
+      const range = el instanceof HTMLInputElement && el.type === 'range' && root.contains(el);
+      switch (a) {
+        case 'up': case 'down': moveFocus(root, a); break;
+        case 'left': case 'right':
+          if (range) nudgeRange(el, a === 'left' ? -1 : 1);
+          else moveFocus(root, a);
+          break;
+        case 'accept':
+          if (root.contains(el) && el !== document.body && !range) el.click();
+          else if (!root.contains(el)) focusFirst(root);
+          break;
+        case 'back':
+          if (!this.back() && this.base === 'pause') this.h.resume();
+          break;
+        default:
+      }
     }
   }
 
@@ -85,6 +202,7 @@ export class UI {
     });
   }
 
+  // ------------------------------------------------------------------ HUD
   note(label, points) {
     if (game.mode !== Mode.RIDING && game.mode !== Mode.LIFT) return;
     const box = $('notes');
@@ -118,6 +236,7 @@ export class UI {
   }
 
   update(dt, skier) {
+    this.navigate(dt);
     const riding = game.mode === Mode.RIDING || game.mode === Mode.LIFT;
     if (skier.speed > 1 && skier.state !== State.LIFT) this.idle = 0; else this.idle += dt;
     const want = riding && this.idle < 3 ? 1 : 0;
@@ -148,89 +267,7 @@ export class UI {
     this.speedTier = next;
   }
 
-  /** Controller menu navigation: d-pad / stick moves focus spatially, A selects, B goes back. */
-  navigate(input) {
-    const name = Object.keys(this.screens).find((k) => k !== 'loading' && !this.screens[k].classList.contains('hidden'));
-    if (!name) return;
-    const root = this.screens[name];
-    const items = [...root.querySelectorAll('button, input[type=range], input[type=checkbox]')].filter((el) => el.offsetParent !== null);
-    if (!items.length) return;
-    let cur = items.includes(document.activeElement) ? document.activeElement : null;
-    const step = input.navStep;
-    if (step) {
-      if (!cur) { this.focusPad(items[0]); return; }
-      if (cur.type === 'range' && (step === 'left' || step === 'right')) {
-        const min = Number(cur.min || 0), max = Number(cur.max || 1);
-        const st = Number(cur.step) || (max - min) / 20;
-        cur.value = Math.min(max, Math.max(min, Number(cur.value) + (step === 'right' ? st : -st)));
-        cur.dispatchEvent(new Event('input', { bubbles: true }));
-        return;
-      }
-      const r = cur.getBoundingClientRect();
-      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-      const [dx, dy] = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[step];
-      let best = null, bs = Infinity;
-      for (const el of items) {
-        if (el === cur) continue;
-        const q = el.getBoundingClientRect();
-        const ex = q.left + q.width / 2 - cx, ey = q.top + q.height / 2 - cy;
-        const along = ex * dx + ey * dy;
-        if (along <= 4) continue;
-        const score = along + Math.abs(ex * dy - ey * dx) * 2.5;
-        if (score < bs) { bs = score; best = el; }
-      }
-      if (best) this.focusPad(best);
-    }
-    if (input.navConfirm()) {
-      const el = cur || items[0];
-      input.swallowA();
-      if (el.tagName === 'BUTTON' || el.type === 'checkbox') el.click();
-    }
-    if (input.navBack()) root.querySelector('[data-act="back"], [data-act="resume"]')?.click();
-  }
-
-  /** Challenge HUD + snowflake counter, every frame. */
-  updateActivity(a) {
-    const riding = game.mode === Mode.RIDING || game.mode === Mode.LIFT;
-    const chal = a.mode === 'challenge' && riding && a.state !== 'idle';
-    $('chal').classList.toggle('hidden', !chal);
-    $('flakesHud').textContent = riding ? `❄ ${a.flakes}/${a.flakeTotal}` : '';
-    if (!chal) return;
-    $('timer').textContent = a.state === 'countdown' ? '0:00.00' : fmtTime(a.time);
-    $('gatesHud').textContent = `GATES ${a.gates}/${a.gateTotal}${a.penalty ? `  +${a.penalty}s` : ''}`;
-    $('bestHud').textContent = a.best ? `BEST ${fmtTime(a.best.time)}` : '';
-    const c = a.combo;
-    const txt = c ? `x${c.mult.toFixed(2).replace(/\.?0+$/, '')}  +${c.pts}` : (a.score ? `${a.score} PTS` : '');
-    if ($('comboHud').textContent !== txt) $('comboHud').textContent = txt;
-  }
-
-  /** Finish screen for a challenge run. */
-  showResults(r) {
-    const el = $('resMedal');
-    el.className = `medal ${r.medal || ''}`;
-    el.textContent = r.medal ? r.medal[0].toUpperCase() : '';
-    $('resTitle').textContent = r.medal ? `${r.medal.toUpperCase()} MEDAL` : 'FINISH';
-    $('resTime').textContent = fmtTime(r.time);
-    const T = r.targets;
-    const rows = [
-      ['Best time', fmtTime(r.best.time), r.isBestTime],
-      ['Gates', `${r.gates}/${r.gateTotal}${r.penalty ? `  (+${r.penalty}s)` : ''}`],
-      ['Style score', `${r.score}`, r.isBestScore],
-      ['Snowflakes', `${r.flakes}/${r.flakeTotal}`],
-      ['Gold · Silver · Bronze', `${fmtTime(T.gold)} · ${fmtTime(T.silver)} · ${fmtTime(T.bronze)}`],
-    ];
-    $('resRows').innerHTML = rows.map(([k, v, n]) => `<div class="k">${k}</div><div class="v${n ? ' new' : ''}">${v}${n ? '  NEW!' : ''}</div>`).join('');
-    this.show('results');
-  }
-
-  focusPad(el) {
-    document.querySelectorAll('.pad-focus').forEach((e) => e.classList.remove('pad-focus'));
-    el.classList.add('pad-focus');
-    emit('uiMove');
-    el.focus({ preventScroll: true });
-    el.scrollIntoView({ block: 'nearest' });
-  }
-
+  // ------------------------------------------------------------------ settings + credits
   bindSettings() {
     const root = this.screens.settings;
     root.querySelectorAll('input[type=range]').forEach((el) => {
@@ -247,59 +284,14 @@ export class UI {
         } else setSetting(k, el.checked);
       });
     });
+    document.addEventListener('fullscreenchange', () => {
+      const fs = root.querySelector('input[data-key=fullscreen]');
+      if (fs) fs.checked = !!document.fullscreenElement;
+    });
     const seg = root.querySelector('.seg');
     const mark = () => seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', Number(b.dataset.v) === settings.quality));
     seg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { setSetting('quality', Number(b.dataset.v)); mark(); }));
     mark();
-  }
-
-  /** Menu subtitle for the loaded mountain. */
-  setMountain(course) {
-    const el = $('mountainName');
-    if (!el) return;
-    el.textContent = course.meta
-      ? `${course.name} · ${course.meta.region} — ${course.run.name} (${course.run.drop} m vertical)`
-      : 'Valcrest Gully · hand-built powder run';
-  }
-
-  /** Mountain picker: the hand-built gully + real Lake Tahoe mountains (each with up to 3 runs). */
-  async loadMountains() {
-    const list = $('mountainList');
-    if (this._mountains) return;
-    this._mountains = true;
-    let index = [];
-    try { index = await (await fetch('/resorts/index.json')).json(); } catch { /* no data built */ }
-    const go = (resort, run) => {
-      setSetting('resort', resort); setSetting('run', run);
-      const q = new URLSearchParams(location.search);
-      q.delete('kicker'); q.delete('at');
-      if (resort) { q.set('resort', resort); q.set('run', run); } else { q.delete('resort'); q.delete('run'); }
-      location.search = q.toString();
-    };
-    const card = (title, sub, runs) => {
-      const box = document.createElement('div');
-      box.className = 'mountain';
-      box.innerHTML = `<div class="m-title">${title}</div><div class="m-sub">${sub}</div>`;
-      const row = document.createElement('div');
-      row.className = 'm-runs';
-      for (const r of runs) {
-        const b = document.createElement('button');
-        b.innerHTML = `${r.label}<small>${r.meta}</small>`;
-        b.addEventListener('click', r.go);
-        row.appendChild(b);
-      }
-      box.appendChild(row);
-      list.appendChild(box);
-    };
-    const extra = (key) => {
-      const b = bestFor(key), f = flakesFound(key);
-      const medal = b?.medal ? `<span class="best">${{ gold: '● gold', silver: '● silver', bronze: '● bronze' }[b.medal]}</span> · ` : '';
-      return `${medal}${b ? `best ${fmtTime(b.time)} · ` : ''}❄ ${f}/${CHALLENGE.flakes}`;
-    };
-    card('Valcrest Gully', 'Hand-built powder gully · jumps, pillows and drops', [{ label: 'Ride the gully', meta: `2.5 km · ${extra('gully')}`, go: () => go('', 0) }]);
-    for (const m of index) {
-      card(m.name, m.region, m.runs.map((r, i) => ({ label: r.name, meta: `${r.drop} m vertical · ${(r.length / 1000).toFixed(1)} km · ${extra(`${m.id}.${i}`)}`, go: () => go(m.id, i) })));
-    }
   }
 
   async loadCredits() {
@@ -331,3 +323,5 @@ function markdown(md) {
   if (list) out.push('</ul>');
   return out.join('\n');
 }
+
+function trimNum(x) { return x.toFixed(2).replace(/\.?0+$/, ''); }

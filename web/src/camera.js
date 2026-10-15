@@ -42,7 +42,7 @@ export class CameraController {
   snap() {
     this.pos.copy(this.player.renderPos).add(new THREE.Vector3(0, C.height, 0));
     this.vel = [0, 0, 0];
-    this.yaw = this.player.heading;
+    this.yaw = this.player.heading + ((this.player.travelSign ?? 1) < 0 ? Math.PI : 0);
     this.lookYaw = 0; this.lookPitch = 0; this.side = 0;
   }
 
@@ -92,9 +92,12 @@ export class CameraController {
 
     const speed = s.speed;
     const air = s.state === State.AIR;
-    let wantYaw = s.heading;
+    // Follow the direction of travel: the nose, or the tail when riding switch. During a slide /
+    // hockey stop the gear turns ~90° across the path, so hold the current framing instead.
+    const travelYaw = s.heading + ((s.travelSign ?? 1) < 0 ? Math.PI : 0);
+    let wantYaw = (s.stop ?? 0) > 0.3 && s.state === State.GROUNDED ? this.yaw : travelYaw;
     if (speed > 2.5 && s.state !== State.CRASH) {
-      wantYaw = lerpAngle(s.heading, Math.atan2(-s.velocity.x, -s.velocity.z), clamp((speed - 2.5) / 4, 0, 1));
+      wantYaw = lerpAngle(wantYaw, Math.atan2(-s.velocity.x, -s.velocity.z), clamp((speed - 2.5) / 4, 0, 1));
     }
     this.yaw = lerpAngle(this.yaw, wantYaw, 1 - Math.exp(-(air ? 1.0 : 3.2) * dt));
 
