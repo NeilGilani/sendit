@@ -111,9 +111,9 @@ export class SprayEmitter {
           float sunVis = (muv.x < 0.0 || muv.y < 0.0 || muv.x > 1.0 || muv.y > 1.0) ? 1.0 : texture2D(sunMaskTex, muv).r;
           vec3 V = normalize(iPos.xyz - cameraPosition);
           float mu = dot(V, uSunDir);
-          float phase = mix(1.0, hg(uPhase.x, mu) / hg(uPhase.x, 0.0), uPhase.y);
+          float phase = min(mix(1.0, hg(uPhase.x, mu) / hg(uPhase.x, 0.0), uPhase.y), 2.6);
           // Dense parts self-shadow; thin mist scatters forward the most.
-          float selfSh = mix(1.0, 0.55, dens);
+          float selfSh = mix(1.0, 0.45, dens);
           if (kind > 1.5 && kind < 2.5) { phase = 0.8 + 0.6 * max(-mu, 0.0); selfSh = 1.0; }     // chunks: diffuse clumps
           vLit = uSunCol * sunVis * phase * selfSh * uPhase.z;
           vAmb = uSky * uPhase.z;
@@ -306,7 +306,7 @@ export class SprayEmitter {
       const r = Math.random();
       if (r < 0.45) this.spawn(K_SHEET, p, v, 0.08 + Math.random() * 0.12, 0.6 + Math.random() * 0.5, { dens: 0.6 });
       else if (r < 0.65) this.spawn(K_CHUNK, p, v, 0.015 + Math.random() * 0.04, 0.7 + Math.random() * 0.5);
-      else this.spawn(K_MIST, p, v.multiplyScalar(0.5), (0.35 + Math.random() * 0.5) * (0.6 + powder), SPRAY.mistLife * (0.6 + Math.random() * 0.6), { dens: 0.35, grow: 2.0 + powder * 1.5 });
+      else this.spawn(K_MIST, p, v.multiplyScalar(0.5), (0.25 + Math.random() * 0.35) * (0.6 + powder * 0.6), SPRAY.mistLife * (0.5 + Math.random() * 0.5), { dens: 0.45, grow: 1.2 + powder });
     }
   }
 

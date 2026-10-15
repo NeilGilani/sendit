@@ -156,9 +156,9 @@ export const SNOWFALL = {
 // ------------------------------------------------------------------ SNOW SPRAY (gfx/spray.js)
 export const SPRAY = {
   maxParticles: 9000,
-  sheetRate: 900,                // rooster-tail streaks / s per contact at full intensity
+  sheetRate: 650,                // rooster-tail streaks / s per contact at full intensity
   sheetLife: 0.7,
-  sheetAlpha: 0.42,
+  sheetAlpha: 0.32,
   chunkRate: 140,                // clumps / chips per s
   glintRate: 160,                // glittering crystals per s
   mistRate: 45,                  // powder-cloud puffs per s per contact
@@ -166,7 +166,7 @@ export const SPRAY = {
   mistAlpha: 0.17,
   inherit: 0.55,                 // share of the contact's velocity the snow keeps
   sluffRate: 110,                // loose snow released per s on steep powder (slides downhill)
-  stopBurst: 260,                // particles in a hard-stop fan
+  stopBurst: 170,                // particles in a hard-stop fan
   forwardG: 0.45,                // Henyey-Greenstein g: backlit spray glows
   forwardMix: 0.5,
   albedo: 0.92,

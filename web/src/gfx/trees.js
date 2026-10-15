@@ -125,7 +125,7 @@ function crownGeometry(kind, lod, seed) {
   const rnd = mulberry32(seed);
   const H = TREES.height;
   const parts = [trunkGeo(H * 0.92, 0.2, 0.03, lod === 0 ? 7 : 5)];
-  const whorls = lod === 0 ? 24 : 12;
+  const whorls = lod === 0 ? 24 : 10;
   const per = lod === 0 ? 6 : 5;
   const segs = 2;
   const wMul = lod === 0 ? 1 : 1.45;
@@ -137,7 +137,7 @@ function crownGeometry(kind, lod, seed) {
     for (let b = 0; b < per; b++) {
       const yaw = (b / per) * Math.PI * 2 + w * 0.9 + rnd() * 0.5;
       const droop = (kind === 0 ? 0.42 : 0.18) * (0.7 + 0.6 * (1 - t)) + rnd() * 0.1;
-      const card = branchGeo(L * (0.85 + rnd() * 0.3), L * 0.78 * wMul, droop, kind === 0 ? 0.12 : 0.05, segs, (w + b) % 2, kind === 0 || lod === 0);
+      const card = branchGeo(L * (0.85 + rnd() * 0.3), L * 0.78 * wMul, droop, kind === 0 ? 0.12 : 0.05, segs, (w + b) % 2, lod === 0);
       card.rotateX((rnd() - 0.5) * 0.35);
       // Spruce: lower branches sweep down, the top ones reach up; fir branches stay level.
       card.rotateZ(kind === 0 ? (t > 0.8 ? 0.25 : -(0.12 + 0.3 * (1 - t))) + (rnd() - 0.5) * 0.15 : 0.06 + (rnd() - 0.5) * 0.12);
@@ -344,7 +344,8 @@ export class TreeSystem {
       const im = new THREE.InstancedMesh(this.geos[kind][lod], this.mats.near, cap);
       im.count = 0;
       im.frustumCulled = false;
-      im.castShadow = true; im.receiveShadow = true;
+      // Only the near pool (which covers the rider's shadow box) casts shadows.
+      im.castShadow = lod === 'lod0'; im.receiveShadow = true;
       im.name = `Trees_${lod}_${kind}`;
       this.group.add(im);
       this.pools.push({ im, lod, kind, cap });
