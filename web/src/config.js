@@ -17,6 +17,8 @@ export const PHYSICS = {
   holdStillSlope: 0.002,      // 1 − n.y below this counts as flat (≈ 3.6°)
   normalRadius: 1.4,          // m terrain normal sampling (park features use a fine upstream normal)
   takeoffGap: 0.3,
+  liftOffGrip: 1.25,          // natural air: leave the snow when the crest needs > this × g·cos θ of downward pull
+  liftOffMin: 0.06,           // m/s per step of separation below which the rider just stays on (no micro-hops)
   terrainImpactLoss: 0.5,     // share of an abrupt impact into the terrain (beyond smoothFollow) lost as speed
   smoothFollow: 0.25,         // m/s per step of normal velocity absorbed loss-free (smooth rolls and dips)
   lipPopBonus: 1.0,           // pop multiplier on a kicker lip (1 = a plain ollie; the pop already rides the ramp's launch angle)

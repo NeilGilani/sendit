@@ -225,6 +225,15 @@ export class Player {
       np.y = gh;
       const n2 = this.normalAt(np.x, np.z, _v);
       const into = this.velocity.dot(n2);
+      // Convex terrain (drop lips, rollers, the crest of a bump): the snow falls away faster than
+      // gravity can pull the rider onto it — v·n'/dt > g·n'.y, i.e. v²κ > g·cos θ — so they leave it.
+      // liftOffGrip > 1 is the legs absorbing a little (riders suck up small crests).
+      if (into > P.liftOffMin && into / dt > P.gravity * n2.y * P.liftOffGrip && this.speed > 5) {
+        this.position.copy(np);
+        this.enterAir(false);
+        this.trackProgress(dt);
+        return;
+      }
       if (into < 0) {
         const mag = this.velocity.length();
         // Follow the terrain: rotate the velocity onto the new surface (keeps speed; a dip costs a little).
