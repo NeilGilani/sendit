@@ -57,12 +57,16 @@ createEquipmentModel('ski', { id: 'park', graphic: { top: 0xff3355, pattern: 'st
     - `position` sits on the biting edge. `depth` is how far the gear sits below the powder surface; add it to `position.y` for a point on the surface.
   - The objects are reused from frame to frame, so copy anything you need to keep.
   - The outside ski carries up to 85% of the load in a hard turn. On the board, the load moves toward the nose or tail when pressing, and toward the tail in powder.
+- **Rider outside gameplay** (lobby, shop): `import { Rider, standInPlayer } from './rider.js'`, then `new Rider(standInPlayer('snowboard', 'park', 'goofy'))` and `await rider.load(loader)`.
+  - The rider stands in a relaxed stance at `rider.player.renderPos`.
+  - Call `rider.setEquipment(type, variant)`, `rider.player.setStance(s)` and `rider.update(dt, camera)` as usual.
+  - Its swaps never touch the in-game rider: each rider only follows its own player's `equipmentChanged` events.
 - **URL parameters:**
   - `?equip=ski|snowboard` (skis are the default).
   - `?variant=<id>`.
   - `?stance=regular|goofy`.
 - **Debug key:** **E** toggles skis and snowboard in-game. The handler is one line in `main.js`.
-- **Event** `equipmentChanged` `{ type, variant, spec, stance }` on the `state.js` bus.
+- **Event** `equipmentChanged` `{ type, variant, spec, stance, player }` on the `state.js` bus.
 - **Other events:**
   - New: `takeoff` `{ popped, switch, type }`.
   - `landed` now also carries `{ switch, result: 'clean'|'stumble'|'slide', trick }`.

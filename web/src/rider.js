@@ -27,6 +27,7 @@ const BA = ANIM.board;
 export class Rider {
   constructor(player) {
     this.player = player;
+    if (player && !player.rider) player.rider = this;
     this.root = new THREE.Group();
     this.root.name = 'Rider';
     this.chatter = new THREE.Group();      // high-speed rumble
@@ -51,7 +52,7 @@ export class Rider {
     on('jumped', () => { this.snapT = 0; this.snapSign = this.player.dyn?._popEnd === 'nose' ? -1 : 1; });
     this.snapT = 10; this.snapSign = 1;
     on('equipmentChanged', (e) => {
-      if (!this.model) return;
+      if (!this.model || (e.player && e.player !== this.player)) return;   // only our own player's gear
       const cur = this.equip;
       if (!cur || cur.type !== e.type || cur.variant !== e.variant || cur.stance !== e.stance || cur.spec !== e.spec) this.buildEquipment(e.type, e.spec, e.stance);
     });
@@ -641,6 +642,31 @@ export class Rider {
     });
     void pl;
   }
+}
+
+/**
+ * A stand-in for the physics Player so a Rider can be shown outside gameplay (lobby, shop, menus):
+ *   const rider = new Rider(standInPlayer('snowboard', 'park', 'goofy'));
+ *   await rider.load(loader); scene.add(rider.root);
+ *   rider.setEquipment('ski', 'slalom'); rider.player.setStance('goofy'); rider.update(dt, camera);
+ * It stands still in a relaxed stance on flat snow at the origin (move rider.root, or player.renderPos).
+ */
+export function standInPlayer(type = 'ski', variant, stance = 'regular') {
+  const pl = {
+    state: State.GROUNDED, renderPos: new THREE.Vector3(), renderOrient: new THREE.Quaternion(), heading: 0,
+    velocity: new THREE.Vector3(), groundNormal: new THREE.Vector3(0, 1, 0), speed: 0, speedRatio: 0,
+    sink: 0, powder: 0, tuck: 0, squat: 0, brake: 0, grab: 0, grabName: null, windup: 0, liftT: 0, stumbleT: 0,
+    plow: 0, stop: 0, press: 0, butter: 0, travelSign: 1, gearLatAccel: 0, latAccel: 0, edgeAngle: 0, skidAngle: 0,
+    turnInput: 0, spinRate: 0, landingEvent: 0, landingVy: 0, _ctrl: { up: 0 }, dyn: null, stance,
+    setEquipment(t, v) {
+      const tt = normalizeType(t);
+      this.equipment = { type: tt, variant: getEquipmentSpec(tt, v).id, spec: getEquipmentSpec(tt, v) };
+      return this.equipment;
+    },
+    setStance(s) { this.stance = s === 'goofy' ? 'goofy' : 'regular'; if (this.rider) this.rider.buildEquipment(this.equipment.type, this.equipment.spec, this.stance); },
+  };
+  pl.setEquipment(type, variant);
+  return pl;
 }
 
 const pos = (m) => new THREE.Vector3().setFromMatrixPosition(m);

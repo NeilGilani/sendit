@@ -88,14 +88,14 @@ export class Player {
     }
     this.equipment = { type: t, variant: spec.id, spec, handling };
     this.plow = 0; this.stop = 0; this.press = 0; this.butter = 0; this.grab = 0;
-    emit('equipmentChanged', { type: t, variant: spec.id, spec, stance: this.stance });
+    emit('equipmentChanged', { type: t, variant: spec.id, spec, stance: this.stance, player: this });
     return this.equipment;
   }
 
   /** Snowboard stance: 'regular' (left foot forward) or 'goofy'. */
   setStance(stance) {
     this.stance = stance === 'goofy' ? 'goofy' : 'regular';
-    emit('equipmentChanged', { type: this.equipment.type, variant: this.equipment.variant, spec: this.equipment.spec, stance: this.stance });
+    emit('equipmentChanged', { type: this.equipment.type, variant: this.equipment.variant, spec: this.equipment.spec, stance: this.stance, player: this });
   }
 
   get isSwitch() { return this.travelSign < 0; }
