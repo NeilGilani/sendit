@@ -20,6 +20,11 @@ import * as THREE from 'three';
 import { PHYSICS as P } from '../config.js';
 import { clamp, lerp, smoothstep, angleDiff, lerpAngle, approach, DEG } from './math.js';
 
+const wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const mod2Pi = (a) => ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+/** "", "Double ", "Triple "… for n whole flips. */
+export const flipCount = (n) => (n <= 1 ? '' : n === 2 ? 'Double ' : n === 3 ? 'Triple ' : `${n}x `);
+
 const _f = new THREE.Vector3(), _t = new THREE.Vector3(), _r = new THREE.Vector3(), _v0 = new THREE.Vector3(), _a = new THREE.Vector3();
 
 /** Unit nose direction for `yaw`, projected on the slope plane with normal n. */
@@ -43,6 +48,8 @@ export class EdgePhysics {
     this.velYawRate = 0;      // rad/s path curvature · speed (drives lean)
     this.charge = 0;          // 0..1 pop charge (squat)
     this.charging = false;
+    this.press = 0;           // −1 tail … +1 nose (loading for a pop doubles as a press)
+    this.butter = 0;          // 0..1 butter engagement (press + steer when slow)
     this.takeoff = null;      // trick bookkeeping for the current air
     this.dbg = {};            // last step's deceleration terms (m/s²), see ground()
   }
@@ -78,11 +85,13 @@ export class EdgePhysics {
       steer = Math.sign(steer) * Math.min(1, P.digitalSteerStart + this._holdT / P.digitalSteerRamp * (1 - P.digitalSteerStart));
     } else { this._holdT = 0; this._holdSign = 0; }
     pl.turnInput += (steer - pl.turnInput) * (1 - Math.exp(-(C.steerResponse ?? P.steerResponse) * pl.handling * dt));
-    pl.brake += (ctrl.brake - pl.brake) * (1 - Math.exp(-6 * dt));
+    // S while charging a pop is a backflip preload, not a brake.
+    const brakeIn = this.charging ? 0 : ctrl.brake;
+    pl.brake += (brakeIn - pl.brake) * (1 - Math.exp(-6 * dt));
     const anyDir = Math.abs(ctrl.steer) > 0.1 || ctrl.brake > 0.1;
     this._noInputT = anyDir ? 0 : (this._noInputT || 0) + dt;
     const auto = this._noInputT > P.autoTuckDelay && pl.speedRatio > P.autoTuckSpeedRatio ? 1 : 0;
-    const want = Math.max(ctrl.tuck, this.tuckFromUp(ctrl), auto) * (1 - ctrl.brake);
+    const want = Math.max(ctrl.tuck, this.tuckFromUp(ctrl), auto) * (1 - brakeIn);
     pl.tuck += (want - pl.tuck) * (1 - Math.exp(-3.5 * dt));
     let fire = false;
     if (ctrl.active && grounded) {
@@ -91,6 +100,10 @@ export class EdgePhysics {
         this.charging = true;
         this.charge = Math.min(1, this.charge + dt / C.chargeTime);
       } else if (this.charging) { this.charging = false; fire = true; }
+    } else if (ctrl.active && this._lateT > 0 && this.charging) {
+      // Late pop ("coyote time"): the snow fell away under a loaded rider; releasing now still pops.
+      this._lateT -= dt;
+      if (!ctrl.jump) { this.charging = false; fire = true; }
     } else this.charging = false;
     if (!this.charging && !fire) this.charge = Math.max(0, this.charge - dt * 6);
     pl.squat = this.charge;
@@ -102,8 +115,49 @@ export class EdgePhysics {
   }
 
   tuckFromUp(ctrl) { return ctrl.up; }
-  onChargeStart() {}
+  /** Space alone loads the tail (ollie); W + Space loads the nose (nollie). */
+  onChargeStart(ctrl) { this._popEnd = ctrl.up > 0.3 ? 'nose' : 'tail'; }
   onControl() {}
+
+  /**
+   * Nose / tail press while charging a pop; steering on top of it at low speed is a butter (the gear
+   * pivots on the pressed end with the base flat). Tunables: butterRate, butterMaxSpeed, butterDrag.
+   */
+  pressAndButter(dt, ctrl, grounded) {
+    const pl = this.pl, C = this.C;
+    // Flip preload (Steep / Shredders): S held while charging winds up a backflip off the tail.
+    const loading = (grounded || this._lateT > 0) && this.charging;
+    this.flipLoad = approach(this.flipLoad || 0, loading && ctrl.brake > 0.3 ? 1 : 0, dt / (this.charging ? 0.35 : 0.1));
+    pl.flipLoad = this.flipLoad;
+    const pressT = grounded && this.charging ? (this._popEnd === 'nose' ? 1 : -1) * (0.4 + 0.6 * this.charge) : 0;
+    this.press += (pressT - this.press) * (1 - Math.exp(-10 * dt));
+    const canButter = grounded && this.charging && pl.speed < C.butterMaxSpeed;
+    const wantButter = canButter && Math.abs(ctrl.steer) > 0.2 ? 1 : 0;
+    this.butter += (wantButter - this.butter) * (1 - Math.exp(-(wantButter ? 10 : 6) * dt));
+    pl.press = this.press; pl.butter = this.butter;
+  }
+
+  /** Ground-mode overrides for a butter (or the extra pivot of a plain press). */
+  butterModes(m) {
+    const C = this.C;
+    if (this.butter > 0.02) {
+      // Butter: base flat, the gear pivots on the pressed end; the path barely follows.
+      m.edge = 0;
+      m.yaw = this.steer * C.butterRate * this.butterScale() * this.H.pivot * this.butter;
+      m.pivotMul = 1 - this.butter;
+      m.gripMul = 1 - this.butter * 0.85;
+      m.effMul = 1 - this.butter * 0.7;
+      m.skidMul = 1 - this.butter * 0.8;   // flat base slides, edges don't scrape
+      // Pivot on the pressed end: tail press → the centre swings with the nose, nose press → opposite.
+      m.pivotOffset = -Math.sign(this.press || -1) * this.spec.length * 0.33 * this.butter;
+      m.noAlign = true;
+    } else if (Math.abs(this.press) > 0.05) {
+      m.pivotMul = 1 + Math.abs(this.press) * 0.3;
+    }
+    return m;
+  }
+
+  butterScale() { return 1; }
 
   // ------------------------------------------------------------------ ground
   /** Integrates one grounded step. `v` (tangent velocity, modified in place), `gTan` slope gravity. */
@@ -132,7 +186,9 @@ export class EdgePhysics {
     // --- 1. target edge angle: the rider rolls toward steer · maxEdge at the edge-switch rate
     const s = this.steer = clamp(pl.turnInput, -1, 1) * (pl.stumbleT > 0 ? P.stumbleHandling : 1);
     const side = Math.sign(s) || Math.sign(this.edge) || 1;
-    const thMax = this.maxEdge(side) * (1 - 0.4 * pl.tuck);
+    // Edge angle ≈ body inclination + angulation, and inclination needs a turn force to lean against
+    // (tan φ = a_lat / g): slow riders can't tip onto a high edge, so slow turns are skidded pivots.
+    const thMax = Math.min(this.maxEdge(side) * (1 - 0.4 * pl.tuck), this.speedEdgeLimit(speed, side, surfGrip));
     let edgeT = s * thMax;
     const mode = this.modes(dt, ctx) || {};
     if (mode.edge !== undefined) edgeT = mode.edge;
@@ -248,24 +304,60 @@ export class EdgePhysics {
 
   stopMu() { return this.C.stopMu ?? this.C.skidMu; }
 
+  /**
+   * Largest edge angle θ the rider can hold at `speed`: θ ≤ φ(θ) + angulation, where φ = atan(a/g)
+   * is the lean supported by the carve at θ (a = v² / (R_eff·cos θ), capped by grip). Bisection.
+   */
+  speedEdgeLimit(speed, side, surfGrip) {
+    const C = this.C, g = P.gravity;
+    const ang = (C.angulation ?? 25) * DEG, top = this.maxEdge(side);
+    const rEff = this.sidecut(side) * (1 + C.speedRadius * smoothstep(C.speedRadiusV[0], C.speedRadiusV[1], speed));
+    const aCap = this.latG(side) * g * surfGrip * this.H.grip;
+    const ok = (th) => th <= Math.atan(Math.min(speed * speed / (rEff * Math.cos(th)), aCap) / g) + ang;
+    if (ok(top)) return top;
+    let lo = ang, hi = top;
+    for (let i = 0; i < 10; i++) { const m = (lo + hi) / 2; if (ok(m)) lo = m; else hi = m; }
+    return lo;
+  }
+
   // ------------------------------------------------------------------ air
   pop() {
     const C = this.C, H = this.H;
     const v = (C.popMin + (C.popMax - C.popMin) * this.charge) * H.pop;
-    return v;
+    return this._popEnd === 'nose' && C.nollie ? v * C.nollie : v;   // the nose is shorter / softer than the tail
   }
 
   /** Called by Player.enterAir — trick bookkeeping. */
   takeoffInfo(popped) {
     const pl = this.pl;
-    this.takeoff = { switch: this.travel < 0, popped, spin: 0, grabT: 0, grab: null, end: this._popEnd || 'tail' };
+    // Rolled off a crest while loaded: keep the charge (and preload / wind-up) for a late pop.
+    const late = !popped && this.charging;
+    const keep = late ? { charge: this.charge, flipLoad: this.flipLoad, windup: this.windup } : null;
+    this._lateT = late ? P.latePopTime : 0;
+    this.takeoff = { switch: this.travel < 0, popped, spin: 0, flip: 0, grabT: 0, grab: null, end: this._popEnd || 'tail' };
+    pl.flip = 0; pl.flipRate = 0;
+    // A preloaded backflip leaves the lip already rotating and commits to the flip.
+    this._flipCommit = popped && (this.flipLoad || 0) > 0.25;
+    if (this._flipCommit) pl.flipRate = this.flipLoad * this.C.flipPreload;
+    this.flipLoad = 0; pl.flipLoad = 0;
+    // W / S already held at take-off (tuck, brake, nollie) don't start a flip until pressed again.
+    const c = pl._ctrl || {};
+    this._flipLock = { up: (c.up || 0) > 0.2, brake: (c.brake || 0) > 0.2 };
+    // Rolling off a crest / lip without popping: the turn held from the ground is carving, not a spin
+    // — it only spins once steer is let go and pressed again (popped jumps spin straight away).
+    this._spinLock = !popped && Math.abs(c.steer || 0) > 0.2 ? Math.sign(c.steer) : 0;
     // Pre-wind: carry part of the ground rotation into the air.
     pl.spinRate = -this.yawRate * this.C.prewind;
     if (popped) pl.spinRate += -(this.windup || 0) * this.C.windupSpin * this.H.spin;
     const cap = this.C.spinRateMax * this.H.spin;
     pl.spinRate = clamp(pl.spinRate, -cap, cap);
+    // Spinning out of a butter pre-winds the spin.
+    if (this.butter > 0.3) pl.spinRate += -this.yawRate * 0.4;
+    this.takeoff.end = popped ? this._popEnd : null;
     this.windup = 0; pl.windup = 0; pl.grabName = null;
     this.charge = 0; this.charging = false; pl.squat = 0;
+    this.butter = 0; this.press = 0;
+    if (keep) { Object.assign(this, keep); this.charging = true; pl.squat = this.charge; }
   }
 
   air(dt, ctrl) {
@@ -273,7 +365,8 @@ export class EdgePhysics {
     const max = C.spinRateMax * this.H.spin * (1 - pl.grab * 0.15);
     const tLand = this.timeToLand();
     let target = 0, resp = C.spinResponse;
-    if (ctrl.active && Math.abs(ctrl.steer) > 0.2) target = -ctrl.steer * max;
+    if (this._spinLock && (Math.abs(ctrl.steer) < 0.2 || Math.sign(ctrl.steer) !== this._spinLock)) this._spinLock = 0;
+    if (ctrl.active && Math.abs(ctrl.steer) > 0.2 && !this._spinLock) target = -ctrl.steer * max;
     else if (pl.airTime > 0.1) {
       // Stick released: within spinCheckAngle of a rideable alignment (nose, or tail if allowed, along
       // the path) settle onto it — checking the rotation if it just went past; farther away, momentum
@@ -297,6 +390,7 @@ export class EdgePhysics {
     pl.heading += pl.spinRate * dt;
     if (this.takeoff) this.takeoff.spin += pl.spinRate * dt;
     const grabbing = ctrl.active && ctrl.tuck > 0.5 && pl.airTime > 0.12;
+    this.flipStep(dt, ctrl, grabbing, tLand);
     pl.grab += ((grabbing ? 1 : 0) - pl.grab) * (1 - Math.exp(-(grabbing ? 12 : 8) * dt));
     if (this.takeoff && pl.grab > 0.7) { this.takeoff.grabT += dt; this.takeoff.grab ||= this.grabName(); pl.grabName = this.takeoff.grab; }
     if (!grabbing && pl.grab < 0.3) pl.grabName = null;
@@ -321,13 +415,81 @@ export class EdgePhysics {
     this.stop = 0;
   }
 
+  /**
+   * Flips about the gear's lateral axis (W = front, S = back; + flip = backflip, the leading end up).
+   * A flip is a commitment: let go of the stick far from upright and momentum carries it on to the
+   * next upright, timed to arrive by touchdown when it can; within flipSettle of upright the rider
+   * spots the landing and opens up. Combined with a spin this reads as a cork / rodeo / misty.
+   */
+  flipStep(dt, ctrl, grabbing, tLand) {
+    const pl = this.pl, C = this.C;
+    const max = C.flipRateMax * Math.sqrt(this.H.spin) * (1 - pl.grab * 0.1);
+    const L = this._flipLock || (this._flipLock = {});
+    if (ctrl.up < 0.2) L.up = false;
+    if (ctrl.brake < 0.2) L.brake = false;
+    // No flip from a little hop (a tuck tapped over a crest): starting one needs real air ahead.
+    const canStart = Math.abs(pl.flip) > 0.3 || tLand > C.flipMinAir;
+    const raw = ctrl.active && !grabbing && pl.airTime > 0.08 && canStart ? (L.brake ? 0 : ctrl.brake) - (L.up ? 0 : ctrl.up) : 0;
+    // Wide dead zone: a stick pushed a little off-axis while spinning shouldn't start a flip (keys = full rate).
+    const input = Math.sign(raw) * clamp((Math.abs(raw) - 0.4) / 0.6, 0, 1);
+    const rem = wrapPi(pl.flip);                       // signed distance from upright
+    // A preloaded take-off is committed through its first half turn (then momentum carries it anyway).
+    if (Math.abs(pl.flip) >= Math.PI) this._flipCommit = false;
+    const starting = this._flipCommit && Math.abs(pl.flip) < Math.PI;
+    let target = 0, resp = C.flipResponse;
+    if (Math.abs(input) > 0.2) target = input * max;
+    else if (!starting && (Math.abs(rem) < 50 * DEG || Math.abs(pl.flipRate) < 0.6)) {
+      target = clamp(-rem / Math.max(tLand, 0.15), -max * 0.7, max * 0.7);
+      resp = 6;
+    } else {
+      const dir = Math.sign(pl.flipRate);
+      const ahead = dir > 0 ? Math.PI * 2 - mod2Pi(pl.flip) : mod2Pi(pl.flip);
+      target = dir * clamp(ahead / Math.max(tLand, 0.15), 1.2, max);
+      resp = 3;
+    }
+    pl.flipRate += (target - pl.flipRate) * (1 - Math.exp(-resp * dt));
+    pl.flip += pl.flipRate * dt;
+    if (this.takeoff) this.takeoff.flip = pl.flip;
+  }
+
+  /** Pitch landing check: { dev (deg from upright), flips (whole rotations), back (bool), result }. */
+  landFlip() {
+    const pl = this.pl, C = this.C;
+    const dev = Math.abs(wrapPi(pl.flip || 0)) / DEG;
+    const flips = Math.round(Math.abs(pl.flip || 0) / (Math.PI * 2));
+    const result = dev <= C.flipLandClean ? 'clean' : dev <= C.flipLandStumble ? 'stumble' : 'crash';
+    return { dev, flips, back: (pl.flip || 0) > 0, result };
+  }
+
   /** Predicted seconds until touchdown (ballistic, flat ground under the rider). */
   timeToLand() {
-    const pl = this.pl;
-    if (!pl.terrain) return 0.6;
-    const h = Math.max(0, pl.position.y - pl.terrain.getHeight(pl.position.x, pl.position.z));
-    const vy = pl.velocity.y, g = P.gravity;
-    return (vy + Math.sqrt(Math.max(0, vy * vy + 2 * g * h))) / g;
+    // March the ballistic path against the real terrain (a drop or a downhill landing is longer than
+    // the height above the snow right below suggests).
+    const pl = this.pl, T = pl.terrain;
+    if (!T) return 0.6;
+    const g = P.gravity, h = 0.04;
+    let x = pl.position.x, y = pl.position.y, z = pl.position.z, vy = pl.velocity.y;
+    const vx = pl.velocity.x, vz = pl.velocity.z;
+    for (let t = h; t <= 3; t += h) {
+      vy -= g * h; x += vx * h; y += vy * h; z += vz * h;
+      if (y <= T.getHeight(x, z)) return t;
+    }
+    return 3;
+  }
+
+  /** Late pop (coyote time): add the loaded wind-up / preload to the air already under way. */
+  latePop() {
+    const pl = this.pl, C = this.C, t = this.takeoff;
+    if (t) { t.popped = true; t.end = this._popEnd; }
+    const cap = C.spinRateMax * this.H.spin;
+    pl.spinRate = clamp(pl.spinRate - (this.windup || 0) * C.windupSpin * this.H.spin, -cap, cap);
+    if ((this.flipLoad || 0) > 0.25 && Math.abs(pl.flip) < 0.3) {
+      this._flipCommit = true;
+      pl.flipRate = Math.max(pl.flipRate, this.flipLoad * C.flipPreload);
+    }
+    this.windup = 0; pl.windup = 0; this.flipLoad = 0; pl.flipLoad = 0;
+    this.charge = 0; this.charging = false; pl.squat = 0; this._lateT = 0;
+    this._spinLock = 0;   // a deliberate pop: the held turn spins
   }
 
   grabName() { return 'Grab'; }

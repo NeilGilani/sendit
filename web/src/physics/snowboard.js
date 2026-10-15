@@ -9,14 +9,12 @@
 //   • nose float in powder (setback + rocker), weaker one-foot skate on the flat
 // Tunables: PHYSICS.snowboard in config.js.
 import { PHYSICS as P } from '../config.js';
-import { EdgePhysics } from './edge.js';
+import { EdgePhysics, flipCount } from './edge.js';
 import { clamp, smoothstep, angleDiff, DEG } from './math.js';
 
 export class SnowboardPhysics extends EdgePhysics {
   constructor(player, spec, handling) {
     super(player, spec, handling, P.snowboard);
-    this.press = 0;           // −1 tail … +1 nose
-    this.butter = 0;          // 0..1 butter engagement
   }
 
   get type() { return 'snowboard'; }
@@ -41,18 +39,11 @@ export class SnowboardPhysics extends EdgePhysics {
   /** W: one-foot skate when slow, a low crouch at speed (never while loading a nollie). */
   tuckFromUp(ctrl) { return this.charging ? 0 : ctrl.up * 0.7 * smoothstep(this.C.pushMaxSpeed - 1, this.C.pushMaxSpeed + 1, this.pl.speed); }
 
-  onChargeStart(ctrl) { this._popEnd = ctrl.up > 0.3 ? 'nose' : 'tail'; }
-
   onControl(dt, ctrl, grounded) {
-    const pl = this.pl, C = this.C;
-    // Nose / tail press: loading for a pop doubles as a press for butters.
-    const pressT = grounded && this.charging ? (this._popEnd === 'nose' ? 1 : -1) * (0.4 + 0.6 * this.charge) : 0;
-    this.press += (pressT - this.press) * (1 - Math.exp(-10 * dt));
-    const canButter = grounded && this.charging && pl.speed < C.butterMaxSpeed;
-    const wantButter = canButter && Math.abs(ctrl.steer) > 0.2 ? 1 : 0;
-    this.butter += (wantButter - this.butter) * (1 - Math.exp(-(wantButter ? 10 : 6) * dt));
+    const pl = this.pl;
+    this.pressAndButter(dt, ctrl, grounded);
     // Slide stop: heel side by default; toe side when steering toward the toes.
-    const b = grounded ? ctrl.brake : 0;
+    const b = grounded && !this.charging ? ctrl.brake : 0;   // S while charging preloads a backflip instead
     const wantStop = b > 0.3 && (pl.speed > 1.0 || this.stop > 0.3);
     if (wantStop && this.stop < 0.05) {
       const toward = Math.sign(ctrl.steer);
@@ -77,20 +68,7 @@ export class SnowboardPhysics extends EdgePhysics {
       m.gripMul = 1 - this.stop * 0.95;
       m.effMul = 1 - this.stop;
       m.noAlign = true;
-    } else if (this.butter > 0.02) {
-      // Butter: base flat, the board pivots on the pressed end; the path barely follows.
-      m.edge = 0;
-      m.yaw = this.steer * C.butterRate * this.H.pivot * this.butter;
-      m.pivotMul = 1 - this.butter;
-      m.gripMul = 1 - this.butter * 0.85;
-      m.effMul = 1 - this.butter * 0.7;
-      m.skidMul = 1 - this.butter * 0.8;   // flat base slides, edges don't scrape
-      // Pivot on the pressed end: tail press → the centre swings with the nose, nose press → opposite.
-      m.pivotOffset = -Math.sign(this.press || -1) * this.spec.length * 0.33 * this.butter;
-      m.noAlign = true;
-    } else if (Math.abs(this.press) > 0.05) {
-      m.pivotMul = 1 + Math.abs(this.press) * 0.3;
-    }
+    } else this.butterModes(m);
     return m;
   }
 
@@ -98,18 +76,9 @@ export class SnowboardPhysics extends EdgePhysics {
 
   stopMu() { return this.stopSide === this.toeSide ? this.C.stopMuToe : this.C.stopMuHeel; }
 
-  pop() {
-    const v = super.pop();
-    return this._popEnd === 'nose' ? v * this.C.nollie : v;
-  }
-
   takeoffInfo(popped) {
-    const butterSpin = this.butter > 0.3 ? -this.yawRate * 0.4 : 0;
     super.takeoffInfo(popped);
-    this.pl.spinRate += butterSpin;
     this.takeoff.toeSide = this.toeSide;
-    this.takeoff.end = popped ? this._popEnd : null;
-    this.butter = 0; this.press = 0;
   }
 
   grabName() {
@@ -133,16 +102,23 @@ export class SnowboardPhysics extends EdgePhysics {
     return { result, switch: sw, dev };
   }
 
-  trickLabel(t, spins) {
+  trickLabel(t, spins, flip) {
     const parts = [];
-    if (t.switch) parts.push('Switch');
-    if (t.end === 'nose' && spins < 1) parts.push('Nollie');
-    else if (t.end === 'nose') parts.push('Nollie');
-    if (spins >= 1) {
-      // Frontside: the toe side (chest) swings toward the direction of travel first.
-      const fs = Math.sign(t.spin) === t.toeSide;
-      parts.push(`${fs ? 'FS' : 'BS'} ${spins * 180}`);
-    } else if (t.end === 'tail' && !t.grab) parts.push('Ollie');
+    // Frontside: the toe side (chest) swings toward the direction of travel first.
+    const fs = Math.sign(t.spin) === t.toeSide;
+    // Switch frontside spins are "Cab" (half-cab for a 180), named after Steve Caballero.
+    const cab = t.switch && fs && spins >= 1 && !(flip?.flips >= 1 && spins < 2);
+    if (t.switch && !cab) parts.push('Switch');
+    if (t.end === 'nose') parts.push('Nollie');
+    const side = cab ? (spins === 1 ? 'Half-Cab' : 'Cab') : fs ? 'FS' : 'BS';
+    if (flip?.flips >= 1) {
+      // Wildcat = backflip over the tail, Tamedog = frontflip off the nose (toe-heel axis). With a spin:
+      // a single backflip is a rodeo, more are corks; a frontflip with a spin is a misty.
+      const n = flipCount(flip.flips);
+      if (spins >= 2) parts.push(`${side} ${flip.back ? (flip.flips === 1 ? 'Rodeo' : `${n}Cork`) : `${n}Misty`} ${spins * 180}`);
+      else parts.push(`${n}${flip.back ? 'Wildcat' : 'Tamedog'}`);
+    } else if (spins >= 1) parts.push(side === 'Half-Cab' ? 'Half-Cab' : `${side} ${spins * 180}`);
+    else if (t.end === 'tail' && !t.grab) parts.push('Ollie');
     if (t.grab && t.grabT > 0.25) parts.push(t.grab);
     return parts.join(' ');
   }

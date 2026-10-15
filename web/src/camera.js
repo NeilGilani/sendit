@@ -29,6 +29,9 @@ export class CameraController {
     this.menuRadius = clamp(Math.hypot(to.x, to.z) * 0.8, 1300, 2400);
     this.wasMenu = true;
     this.intro = 1;
+    const camParam = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('cam') : null;
+    if (typeof window !== 'undefined') window.__cam = this;   // debug handle (inspect view)
+    if (camParam) this.inspect = { yaw: { side: 90, front: 180, back: 0, top: 0 }[camParam] ?? (Number(camParam) || 0), height: camParam === 'top' ? 3 : 0.9 };
     on('landed', ({ impact }) => this.addTrauma(Math.max(0, impact - 4) * C.landTrauma));
     on('crashed', () => { this.addTrauma(C.crashTrauma); this.snapT = 0.6; });
     on('hardBrake', () => { this.snapT = 0.35; this.addTrauma(0.12); });
@@ -67,6 +70,25 @@ export class CameraController {
     if (this.fpWas) { this.fpWas = false; this.snap(); }
     this.setNear(0.25);
     this.follow(dt);
+    if (this.inspect) this.inspectView();
+  }
+
+  /**
+   * Debug close-up for tuning the rider (not used in play): `cam.inspect = { yaw, dist, height }`
+   * or `?cam=side|front|back|top|<yawDeg>`. Yaw in degrees around the rider, relative to the travel
+   * direction (0 = behind, 90 = the rider's right side).
+   */
+  inspectView() {
+    const s = this.player, o = this.inspect;
+    const travel = s.heading + ((s.travelSign ?? 1) < 0 ? Math.PI : 0);
+    const yaw = travel + THREE.MathUtils.degToRad(o.yaw ?? 90);
+    const d = o.dist ?? 3.2, h = o.height ?? 0.9;
+    const c = s.renderPos.clone().add(new THREE.Vector3(0, 0.75, 0));
+    this.camera.position.set(c.x + Math.sin(yaw) * d, c.y + h, c.z + Math.cos(yaw) * d);
+    this.camera.lookAt(c);
+    this.camera.fov = o.fov ?? 40;
+    this.setNear(0.05);
+    this.camera.updateProjectionMatrix();
   }
 
   flyover(dt) {

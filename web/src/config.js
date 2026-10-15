@@ -7,7 +7,7 @@
 export const PHYSICS = {
   gravity: 9.81,
   maxVelocity: 15,            // m/s — default speed ratio reference (each equipment type has its own below)
-  softCapDrag: 0.12,          // extra drag above the equipment's maxVelocity keeps things arcade but bounded
+  softCapDrag: 0.06,          // extra drag above the equipment's maxVelocity keeps things arcade but bounded
   frictionGroomed: 0.028,     // glide μ by surface (the course "powder" blends toward groomed via powderDepth)
   frictionPowder: 0.07,
   frictionRock: 0.12,
@@ -17,9 +17,13 @@ export const PHYSICS = {
   holdStillSlope: 0.002,      // 1 − n.y below this counts as flat (≈ 3.6°)
   normalRadius: 1.4,          // m terrain normal sampling (park features use a fine upstream normal)
   takeoffGap: 0.3,
+  liftOffGrip: 1.25,          // natural air: leave the snow when the crest needs > this × g·cos θ of downward pull
+  liftOffAbsorb: 0.8,         // … × (1 + this · charge): crouching (charging a pop) soaks up crests
+  liftOffMin: 0.06,
+  latePopTime: 0.15,          // s after rolling off a crest while loaded that releasing still pops (coyote time)           // m/s per step of separation below which the rider just stays on (no micro-hops)
   terrainImpactLoss: 0.5,     // share of an abrupt impact into the terrain (beyond smoothFollow) lost as speed
   smoothFollow: 0.25,         // m/s per step of normal velocity absorbed loss-free (smooth rolls and dips)
-  lipPopBonus: 1.7,           // pop multiplier when popping on a kicker (vs an ollie on the flat)
+  lipPopBonus: 1.0,           // pop multiplier on a kicker lip (1 = a plain ollie; the pop already rides the ramp's launch angle)
   airDrag: 0.006,
   landAssistTime: 0.25,       // s before touchdown when a released stick lets the gear settle onto its path …
   landAssistAngle: 14,        // … if it's within this many degrees (SSX-style auto-righting)
@@ -27,6 +31,7 @@ export const PHYSICS = {
   // Landing / crashes (yaw tolerances are per equipment type below)
   stumbleTime: 1.0,
   stumbleHandling: 0.6,       // handling multiplier while stumbling (−40%)
+  hardLanding: 12.5,          // m/s into the slope: above this a clean landing becomes a stumble (knees buckle)
   crashImpact: 18,            // m/s into the slope
   treeCrashSpeed: 9,
   tumbleTime: 1.4,
@@ -57,6 +62,7 @@ export const PHYSICS = {
     edgeSwitchTime: 0.3,      // s full edge → full edge (short turns 0.25)
     edgeResponse: 14,         // 1/s first-order lean response on top of the rate limit
     engage: [3, 22],          // deg — edge angle range over which the gear decambers into its sidecut arc
+    angulation: 26,           // deg the knees / hips add beyond the body's lean: max edge ≈ lean + this (slow = low edge)
     latG: 1.8,                // sustained lateral g before the edges let go
     speedRadius: 0.6, speedRadiusV: [8, 18],  // effective sidecut ×(1+0.6) from 8 → 18 m/s (long arcs at speed)
     carveAssist: 0.85,        // share of over-demand (beyond grip) that just widens the arc instead of skidding
@@ -81,13 +87,17 @@ export const PHYSICS = {
     stopMu: 0.5,              // ≈6.5 m/s² at 90° together with drag
     stopEdge: 32,             // deg edge set during the stop
     pushAccel: 4.0, pushMaxSpeed: 8.5,   // poling / skating
-    dragUpright: 0.0115, dragTuck: 0.0062,
+    // Butter: Space (tail) or W+Space (nose) press + steer when slow → pivot on the pressed tips/tails.
+    butterRate: 2.6, butterMaxSpeed: 11, butterDrag: 0.9, butterNonTwin: 0.6, nollie: 0.9,
+    dragUpright: 0.0135, dragTuck: 0.0055,   // CdA ratio ≈2.5: the tuck is worth ≈+20% top speed (16 → 20 m/s on 25°)
     // Powder: sink depth slow→fast (m), planing speed, plough drag a = k·depth·v, bog decel below planing.
     powderFloat: 1.0, sinkSlow: 0.22, sinkFast: 0.08, powderBog: 7, powderDrag: 0.3, powderBogDecel: 0.12, powderSteer: 0.7,
     // Air
     popMin: 1.9, popMax: 3.5, chargeTime: 0.4,    // m/s vertical pop (tap → full charge)
     spinRateMax: 6.4, spinResponse: 7, prewind: 0.45,
     windupSpin: 2.6,          // rad/s of spin added at take-off by a full wind-up (steer while charging)
+    // Flips (W = frontflip, S = backflip in the air): rate, response, and the pitch tolerance at touchdown.
+    flipRateMax: 5.6, flipResponse: 5, flipLandClean: 22, flipLandStumble: 42, flipPreload: 4.2, flipMinAir: 0.45,
     landClean: 15, landStumble: 30, landCrash: 38, // deg yaw between ski and path
     switchLand: 30,           // deg — backwards landings within this are "switch" (twin tips clean)
   },
@@ -98,6 +108,7 @@ export const PHYSICS = {
     edgeSwitchTime: 0.42, heelToToe: 0.3, toeToHeel: 0.4,   // s full edge to full edge (rate limit; with the lean response ≈0.38 / 0.46 s)
     edgeResponse: 9,
     engage: [3, 24],
+    angulation: 24,           // deg beyond the lean (ankles / knees); slow riders can't get high on edge
     latGToe: 1.6, latGHeel: 1.45,
     sidecutToe: 1.0, sidecutHeel: 0.95,     // × spec sidecut (heel side bends a touch tighter)
     speedRadius: 1.5, speedRadiusV: [6, 16],
@@ -110,13 +121,15 @@ export const PHYSICS = {
     // Slide stop: rotate the board ~90° across the path on the heel (or toe) edge.
     stopAngle: 86, stopTurnRate: 6, stopMuHeel: 0.42, stopMuToe: 0.33, stopEdgeHeel: 30, stopEdgeToe: 34,
     pushAccel: 2.4, pushMaxSpeed: 4.5,       // one-foot skate
-    dragUpright: 0.0125, dragTuck: 0.0088,   // a board rider can only crouch, not tuck
+    dragUpright: 0.014, dragTuck: 0.0085,    // a board rider can only crouch, not tuck (≈+14%: 16 → 18.5 m/s on 25°)
     powderFloat: 1.6, sinkSlow: 0.12, sinkFast: 0.04, powderBog: 4.5, powderDrag: 0.25, powderBogDecel: 0.12, powderSteer: 0.9,
     // Butter: press nose / tail while charging and steer → pivot on the flexed end, base flat.
     butterRate: 3.4, butterMaxSpeed: 13, butterDrag: 0.8,
     // Air
     popMin: 2.2, popMax: 4.0, nollie: 0.88, chargeTime: 0.45,
     spinRateMax: 7.6, spinResponse: 7.5, prewind: 0.55, windupSpin: 3.2,
+    // Flips (W = tamedog / front, S = wildcat / back, over the toe-heel axis), pitch tolerance at touchdown.
+    flipRateMax: 5.9, flipResponse: 5, flipLandClean: 22, flipLandStumble: 42, flipPreload: 4.4, flipMinAir: 0.45,
     landClean: 15, landStumble: 45, landSlide: 82, // deg yaw from the nearest board end to the path (sideways = hard slide)
   },
 };
@@ -145,8 +158,15 @@ export const ANIM = {
   maxGearEdge: 1.05,          // rad visual edge angle cap
   angulation: 0.75,           // share of (edge − lean) the ski rider takes up in the spine (upright upper body)
   polePlantTime: 0.38,        // s a pole touch lasts (triggered on edge changes)
+  skiPressPitch: 0.14,        // rad the skis pitch up while pressing the tails / tips (butters, ollie load)
+  skiPressShift: 0.09,        // m hips over the pressed end
+  skiPopSnap: 0.3,            // rad the tips snap up at the pop
+  flipLoadArch: 0.45,         // rad the upper body arches back while preloading a backflip (S while charging)
+  flipPivot: 0.85,
+  flipTuckLift: 0.14,         // m the feet pull up toward the hips while flipping            // m above the feet the rider flips about (centre of mass)
+  gearSinkVisual: 0.15,       // share of the physics powder sink shown (the snow reads as packed, so the gear rides on top)
   board: {
-    crouch: 0.12,             // m pelvis drop at rest (riders stand lower than skiers)
+    crouch: 0.17,             // m pelvis drop at rest (riders stand lower than skiers)
     crouchSpeed: 0.08,        // extra drop at speed
     shoulderOpen: 0.42,       // rad shoulders open toward the nose
     hipOpen: 0.16,            // rad hips open toward the nose
@@ -159,6 +179,7 @@ export const ANIM = {
     popSnap: 0.38,            // rad the free end snaps up at an ollie / nollie, settling in ~0.3 s
     airTuck: 0.18,            // m board pulled up toward the hips in the air
     grabTuck: 0.3,            // m extra pull-up while grabbing
+    handDragEdge: [0.72, 0.95],   // rad visual edge angle range over which the inside hand reaches the snow
   },
 };
 

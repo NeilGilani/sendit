@@ -14,6 +14,7 @@ import { getEquipmentSpec, deriveHandling, normalizeType } from './equipment/reg
 
 export const State = { FROZEN: 0, GROUNDED: 1, AIR: 2, CRASH: 3, LIFT: 4 };
 const UP = new THREE.Vector3(0, 1, 0);
+const _X = new THREE.Vector3(1, 0, 0), _qf = new THREE.Quaternion();
 const _n = new THREE.Vector3(), _v = new THREE.Vector3(), _t1 = new THREE.Vector3(), _t2 = new THREE.Vector3();
 
 export class Player {
@@ -60,6 +61,10 @@ export class Player {
     this.carveQuality = 1;            // 1 = clean carve, → 0 washing out / skidding
     this.plow = 0; this.stop = 0; this.stopSide = 1; this.stopToe = false;
     this.press = 0; this.butter = 0; this.grab = 0; this.windup = 0; this.grabName = null;
+    this.flip = 0; this.flipRate = 0;   // rad about the gear's lateral axis in the air (+ = backflip), rad/s
+    // Drawn flip (signed about the gear's +X, i.e. flip · travelSign, plus a residual that settles after
+    // touchdown). `orient` stays the un-flipped base; renderOrient = base · Rx(renderFlip).
+    this.visFlip = 0; this.flipSettle = 0; this.prevFlip = 0; this.renderFlip = 0;
     this._ctrl = { steer: 0, brake: 0, up: 0, jump: false, tuck: 0, active: false };
     this.setEquipment('ski');
   }
@@ -78,9 +83,12 @@ export class Player {
     this.dyn = t === 'snowboard' ? new SnowboardPhysics(this, spec, handling) : new SkiPhysics(this, spec, handling);
     if (prev) {
       this.dyn.edge = prev.edge;
+      // Mid-air swaps keep the trick going (bookkeeping, flip commitment, input locks).
+      for (const k of ['takeoff', '_flipCommit', '_spinLock', '_flipLock']) this.dyn[k] = prev[k];
       // New gear goes on facing the direction of travel (a switch rider swaps to forward-facing gear).
       if (prev.travel < 0) {
         this.heading += Math.PI;
+        this.flip = -this.flip; this.flipRate = -this.flipRate;   // keep the drawn flip (flip · travel) continuous
         groundQuat(this.groundNormal, this.heading, this.orient);
         this.prevOrient.copy(this.orient); this.renderOrient.copy(this.orient);
         this.travelSign = 1;   // edge angles are relative to travel, so they carry over unchanged
@@ -116,6 +124,7 @@ export class Player {
     this.airTime = 0; this.squat = 0; this.stumbleT = 0;
     this.dyn.charge = 0; this.dyn.charging = false; this.dyn.travel = 1; this.dyn.edge = 0; this.dyn.stop = 0;
     this.travelSign = 1; this.edgeAngle = 0; this.skidAngle = 0; this.latAccel = 0;
+    this.flip = 0; this.flipRate = 0; this.visFlip = 0; this.flipSettle = 0; this.prevFlip = 0; this.renderFlip = 0;
     this._safe = [[this.position.clone(), yaw]];
     this.snapRender();
   }
@@ -123,6 +132,8 @@ export class Player {
   snapRender() {
     this.prevPos.copy(this.position); this.renderPos.copy(this.position);
     this.prevOrient.copy(this.orient); this.renderOrient.copy(this.orient);
+    this.prevFlip = this.renderFlip = this.visFlip;
+    if (this.visFlip) this.renderOrient.multiply(_qf.setFromAxisAngle(_X, this.visFlip));
   }
 
   startRiding() {
@@ -135,7 +146,8 @@ export class Player {
     this.simulated = true;            // riders fall back to pose-only cues for players that never step (lobby previews)
     this.prevPos.copy(this.position);
     this.prevOrient.copy(this.orient);
-    if (this.state === State.FROZEN) return;
+    this.prevFlip = this.visFlip;
+    if (this.state === State.FROZEN || this.debugFreeze) return;   // debugFreeze: hold a pose for inspection
     this.readInput(dt);
     switch (this.state) {
       case State.GROUNDED: this.groundStep(dt); break;
@@ -152,6 +164,8 @@ export class Player {
   interpolate(alpha) {
     this.renderPos.lerpVectors(this.prevPos, this.position, alpha);
     this.renderOrient.slerpQuaternions(this.prevOrient, this.orient, alpha);
+    this.renderFlip = this.prevFlip + (this.visFlip - this.prevFlip) * alpha;
+    if (this.renderFlip) this.renderOrient.multiply(_qf.setFromAxisAngle(_X, this.renderFlip));
   }
 
   readInput(dt) {
@@ -168,7 +182,7 @@ export class Player {
     }
     if (this.script) this.script(c, this);   // headless tests / demos can drive the controls
     // Hard brake: a fan of snow + camera FoV snap.
-    if (c.brake > 0.6 && this._prevBrakeIn <= 0.6 && this.speed > 10 && this.state === State.GROUNDED) emit('hardBrake', this.speed);
+    if (c.brake > 0.6 && this._prevBrakeIn <= 0.6 && this.speed > 10 && this.state === State.GROUNDED && !this.dyn.charging) emit('hardBrake', this.speed);
     this._prevBrakeIn = c.brake;
     if (this.dyn.control(dt, c, this.state === State.GROUNDED)) this.jump();
   }
@@ -219,6 +233,17 @@ export class Player {
       np.y = gh;
       const n2 = this.normalAt(np.x, np.z, _v);
       const into = this.velocity.dot(n2);
+      // Convex terrain (drop lips, rollers, the crest of a bump): the snow falls away faster than
+      // gravity can pull the rider onto it — v·n'/dt > g·n'.y, i.e. v²κ > g·cos θ — so they leave it.
+      // liftOffGrip > 1 is the legs absorbing a little (riders suck up small crests).
+      // A rider crouched to pop (charging) absorbs crests: hold to stay low, release on the crest to boost.
+      const grip = P.liftOffGrip * (1 + P.liftOffAbsorb * this.dyn.charge);
+      if (into > P.liftOffMin && into / dt > P.gravity * n2.y * grip && this.speed > 5) {
+        this.position.copy(np);
+        this.enterAir(false);
+        this.trackProgress(dt);
+        return;
+      }
       if (into < 0) {
         const mag = this.velocity.length();
         // Follow the terrain: rotate the velocity onto the new surface (keeps speed; a dip costs a little).
@@ -233,7 +258,8 @@ export class Player {
   }
 
   jump() {
-    if (this.state !== State.GROUNDED) return;
+    const late = this.state === State.AIR && this.dyn._lateT > 0;
+    if (this.state !== State.GROUNDED && !late) return;
     const depth = this.dyn.charge;
     // Popping off a kicker / roller lip springs much higher than an ollie on the flat (arcade bonus).
     const T = this.terrain;
@@ -243,6 +269,12 @@ export class Player {
     this.lastLip = lip;
     this.lastPop = pop;
     this.velocity.addScaledVector(this.groundNormal, pop);
+    if (late) {
+      // Late pop off a crest: already airborne, so re-run the take-off bookkeeping as a popped jump.
+      emit('jumped', depth);
+      this.dyn.latePop();
+      return;
+    }
     this.position.addScaledVector(this.groundNormal, 0.06);
     emit('jumped', depth);
     this.enterAir(true);
@@ -287,9 +319,24 @@ export class Player {
     const spins = Math.round(Math.abs(this._spinTotal) / Math.PI);  // 180s
     const slow = this.velocity.length() < 1.5;
     const ev = slow ? { result: 'clean', switch: this.isSwitch, dev: 0 } : this.dyn.land(devNose);
+    // Pitch: a flip has to come round to (near) upright; the worse of yaw and pitch decides.
+    const fl = this.dyn.landFlip();
+    if (fl.result === 'crash') ev.result = 'crash';
+    else if (fl.result === 'stumble' && ev.result === 'clean') ev.result = 'stumble';
+    ev.flipDev = fl.dev;
+    if (impact > P.hardLanding && ev.result === 'clean') ev.result = 'stumble';
     const t = this.dyn.takeoff || { switch: false, spin: 0 };
     this.grab = 0;
-    if (impact > P.crashImpact || ev.result === 'crash') { this.crash('landing'); return; }
+    // The leftover pitch (within the landing tolerance) settles visually over a few frames.
+    this.flipSettle = Math.atan2(Math.sin(this.flip), Math.cos(this.flip)) * this.travelSign;
+    this.flip = 0; this.flipRate = 0;
+    if (impact > P.crashImpact || ev.result === 'crash') {
+      // Why it went wrong (for UI / tuning): too hard, or yaw / pitch out of line.
+      const reason = impact > P.crashImpact ? 'impact' : fl.result === 'crash' ? 'pitch' : 'yaw';
+      this.lastCrash = { reason, impact, dev: ev.dev, flipDev: fl.dev, air: this.airTime, spins, flips: fl.flips };
+      this.crash('landing');
+      return;
+    }
     this.dyn.travel = ev.switch ? -1 : 1;
     this.travelSign = this.dyn.travel;
     this.state = State.GROUNDED;
@@ -301,22 +348,24 @@ export class Player {
       this.velocity.multiplyScalar(ev.result === 'slide' ? 0.62 : 0.82);
       emit('stumble', ev.result);
     }
-    const perfect = ev.dev < 8 && this.airTime > 0.6;
-    const trick = this.dyn.trickLabel(t, spins);
-    this.lastLanding = { ...ev, impact, air: this.airTime, spins, trick };
+    const perfect = clean && ev.dev < 8 && fl.dev < 10 && this.airTime > 0.6;
+    const trick = this.dyn.trickLabel(t, spins, fl);
+    this.lastLanding = { ...ev, impact, air: this.airTime, spins, flips: fl.flips, trick };
     emit('landed', { impact, air: this.airTime, clean, perfect, switch: ev.switch, result: ev.result, trick });
     if (clean && (this.airTime > 0.7 || (trick && this.airTime > 0.35))) {
       let label = trick || `Air ${this.airTime.toFixed(1)}s`;
       if (perfect) label = `Perfect ${label}`;
       game.airTotal += this.airTime;
       const grabPts = t.grab && t.grabT > 0.25 ? 40 + Math.floor(t.grabT * 60) : 0;
-      addScore(label, Math.floor(this.airTime * 80) + spins * 90 + grabPts + (t.switch ? 30 : 0) + (perfect ? 50 : 0));
+      addScore(label, Math.floor(this.airTime * 80) + spins * 90 + fl.flips * 150 + grabPts + (t.switch ? 30 : 0) + (perfect ? 50 : 0));
     }
     this.airTime = 0;
   }
 
   crash(kind) {
     this.state = State.CRASH; this.crashT = 0; this._crashStage = 0;
+    if (this.flip) this.flipSettle = Math.atan2(Math.sin(this.flip), Math.cos(this.flip)) * this.travelSign;
+    this.flip = 0; this.flipRate = 0;
     emit('crashed', kind);
   }
 
@@ -468,6 +517,10 @@ export class Player {
   }
 
   applyOrient(dt) {
+    // Flips rotate about the gear's lateral axis (+X); + flip lifts the leading end (nose, or tail when switch).
+    this.flipSettle *= Math.exp(-14 * dt);
+    if (Math.abs(this.flipSettle) < 1e-3) this.flipSettle = 0;
+    this.visFlip = this.flip * this.travelSign + this.flipSettle;
     if (this.state === State.LIFT) { this.orient.setFromAxisAngle(UP, this.heading); return; }
     const n = this.state === State.AIR ? _v.set(0, 1, 0).lerp(this.groundNormal, 0.3).normalize() : this.groundNormal;
     const target = groundQuat(n, this.heading, new THREE.Quaternion());

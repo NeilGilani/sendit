@@ -6,9 +6,8 @@
 //   deriveHandling(type, spec)        physics multipliers derived from the geometry (pop, float, grip…)
 //   createEquipmentModel(type, variant, opts)  → THREE.Group (see models.js)
 //   normalizeType('board') → 'snowboard'
+//   validateSpec(type, spec)          → [] or a list of problems (missing / out-of-range fields)
 import { SKI_VARIANTS, SNOWBOARD_VARIANTS } from './specs.js';
-
-
 
 export const EQUIPMENT_TYPES = ['ski', 'snowboard'];
 export const DEFAULT_TYPE = 'ski';
@@ -23,13 +22,21 @@ export function normalizeType(type) {
   return DEFAULT_TYPE;
 }
 
+/** Nested groups a partial spec can override field by field (e.g. `{ profile: { type: 'rocker' } }`). */
+const NESTED = ['graphic', 'profile', 'kick', 'stance'];
+function mergeSpec(base, over) {
+  const out = { ...base, ...over };
+  for (const k of NESTED) if (base[k] || over[k]) out[k] = { ...(base[k] || {}), ...(over[k] || {}) };
+  return out;
+}
+
 /** Resolve a spec: `variant` may be an id, a full spec object, or a partial override `{ id?, ...fields }`. */
 export function getEquipmentSpec(type, variant) {
   const t = normalizeType(type);
   const table = REGISTRY[t];
   if (variant && typeof variant === 'object') {
     const base = table[variant.id] || table[DEFAULT_VARIANT[t]];
-    return Object.freeze({ ...base, ...variant, graphic: { ...base.graphic, ...(variant.graphic || {}) }, type: t });
+    return Object.freeze({ ...mergeSpec(base, variant), type: t });
   }
   const s = table[variant] || table[DEFAULT_VARIANT[t]];
   return Object.freeze({ ...s, type: t });
@@ -43,8 +50,40 @@ export function registerVariant(type, spec) {
   if (!spec?.id) throw new Error('registerVariant: spec.id required');
   const t = normalizeType(type);
   const base = REGISTRY[t][DEFAULT_VARIANT[t]];
-  REGISTRY[t][spec.id] = { ...base, ...spec, graphic: { ...base.graphic, ...(spec.graphic || {}) } };
+  const merged = mergeSpec(base, spec);
+  const problems = validateSpec(t, merged);
+  if (problems.length && typeof console !== 'undefined') console.warn(`registerVariant(${t}, ${spec.id}):`, problems.join('; '));
+  REGISTRY[t][spec.id] = merged;
   return REGISTRY[t][spec.id];
+}
+
+/**
+ * Sanity-check a (merged) spec before it reaches the physics: every number finite and inside a
+ * plausible real-world range. Returns a list of human-readable problems ([] = fine).
+ */
+export function validateSpec(type, spec) {
+  const t = normalizeType(type), out = [];
+  const num = (path, v, lo, hi) => {
+    if (typeof v !== 'number' || !Number.isFinite(v)) out.push(`${path} missing or not a number`);
+    else if (v < lo || v > hi) out.push(`${path} = ${v} outside ${lo}…${hi}`);
+  };
+  num('length', spec.length, t === 'ski' ? 0.9 : 1.0, t === 'ski' ? 2.15 : 1.9);
+  num('tip', spec.tip, 0.06, 0.36); num('waist', spec.waist, 0.05, 0.32); num('tail', spec.tail, 0.06, 0.36);
+  if (spec.waist > Math.min(spec.tip, spec.tail)) out.push('waist wider than tip / tail (no sidecut)');
+  num('sidecutRadius', spec.sidecutRadius, t === 'ski' ? 8 : 5, t === 'ski' ? 45 : 16);
+  num('flex', spec.flex, 0, 1); num('torsion', spec.torsion, 0, 1);
+  num('mass', spec.mass, 0.8, 9);
+  num('setback', spec.setback ?? 0, -0.1, 0.15);
+  const pr = spec.profile || {};
+  if (!['camber', 'rocker', 'hybrid', 'flat'].includes(pr.type)) out.push(`profile.type '${pr.type}' unknown`);
+  num('profile.camber', pr.camber, 0, 0.02); num('profile.noseRocker', pr.noseRocker, 0, 0.4); num('profile.tailRocker', pr.tailRocker, 0, 0.4);
+  num('kick.nose', spec.kick?.nose, 0, 0.2); num('kick.tail', spec.kick?.tail, 0, 0.2);
+  if (t === 'snowboard') {
+    num('stance.width', spec.stance?.width, 0.35, 0.7);
+    num('stance.front', spec.stance?.front, -45, 45); num('stance.back', spec.stance?.back, -45, 45);
+  }
+  if (!spec.id || !spec.name) out.push('id and name required');
+  return out;
 }
 
 /**
@@ -61,7 +100,9 @@ export function deriveHandling(type, spec) {
   const refCamberPop = { camber: 1.06, hybrid: 1.0, flat: 0.96, rocker: 0.92 }[ref.profile.type] ?? 1;
   const effEdge = (s) => s.length * (1 - (s.profile.noseRocker + s.profile.tailRocker) * 0.8);
   const swing = (s) => s.mass * s.length * s.length;
-  return {
+  // Clamped so an odd catalogue entry can't make the physics silly (or NaN): ~±40% around the reference.
+  const c = (v, lo, hi, fallback = 1) => (Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback);
+  const h = {
     sidecutRadius: spec.sidecutRadius,
     // Edge hold at high edge angles: torsionally stiff, long effective edges bite harder.
     grip: (0.75 + 0.25 * spec.torsion / ref.torsion) * Math.sqrt(effEdge(spec) / effEdge(ref)),
@@ -76,5 +117,11 @@ export function deriveHandling(type, spec) {
     // Spin response from swing weight (shorter / lighter spins quicker).
     spin: Math.pow(swing(ref) / swing(spec), 0.25),
     twin: !!spec.twin,
+  };
+  return {
+    ...h,
+    sidecutRadius: c(h.sidecutRadius, t === 'ski' ? 8 : 5, t === 'ski' ? 45 : 16, ref.sidecutRadius),
+    grip: c(h.grip, 0.6, 1.45), pop: c(h.pop, 0.6, 1.4), pivot: c(h.pivot, 0.5, 1.8),
+    stability: c(h.stability, 0.6, 1.5), float: c(h.float, 0.5, 2.5), spin: c(h.spin, 0.7, 1.35),
   };
 }

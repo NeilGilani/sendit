@@ -2,7 +2,7 @@
 // sidecut), rotary steering for skidded turns, snowplough below plowSpeed, hockey stop above it,
 // a proper aero tuck and pole pushes on the flat. Tunables: PHYSICS.ski in config.js.
 import { PHYSICS as P } from '../config.js';
-import { EdgePhysics } from './edge.js';
+import { EdgePhysics, flipCount } from './edge.js';
 import { clamp, smoothstep, angleDiff, DEG } from './math.js';
 
 export class SkiPhysics extends EdgePhysics {
@@ -13,13 +13,17 @@ export class SkiPhysics extends EdgePhysics {
 
   get type() { return 'ski'; }
 
-  /** W: double-pole / skate below push speed, tuck above it. */
-  tuckFromUp(ctrl) { return ctrl.up * smoothstep(this.C.pushMaxSpeed - 1.5, this.C.pushMaxSpeed + 0.5, this.pl.speed); }
+  /** W: double-pole / skate below push speed, tuck above it (not while loading a nose press / nollie). */
+  tuckFromUp(ctrl) { return this.charging ? 0 : ctrl.up * smoothstep(this.C.pushMaxSpeed - 1.5, this.C.pushMaxSpeed + 0.5, this.pl.speed); }
+
+  /** Directional skis butter stiffly; twin tips (park) are made for it. */
+  butterScale() { return this.H.twin ? 1 : this.C.butterNonTwin; }
 
   onControl(dt, ctrl, grounded) {
     const pl = this.pl, C = this.C;
+    this.pressAndButter(dt, ctrl, grounded);
     // Snowplough (pizza) when slow, hockey stop when fast. Hysteresis keeps a stop going until slow.
-    const b = grounded ? ctrl.brake : 0;
+    const b = grounded && !this.charging ? ctrl.brake : 0;   // S while charging preloads a backflip instead
     const wantStop = b > 0.3 && (pl.speed > C.plowSpeed || (this.stop > 0.3 && pl.speed > 1.2));
     if (wantStop && this.stop < 0.05) {
       // Stop toward the steer side, else toward the side the skis already point, else uphill.
@@ -56,13 +60,13 @@ export class SkiPhysics extends EdgePhysics {
     if (this.plow > 0.05) {
       m.pivotMul = 1 - (1 - C.plowTurn) * this.plow;
       if (m.edge === undefined) m.edge = this.edge * (1 - this.plow * 0.6);
-    }
+    } else if (!(this.stop > 0.02)) this.butterModes(m);
     return m;
   }
 
   extraDecel(ctx) {
     // Wedge: both inside edges push snow; strongest when slow.
-    return this.plow * this.C.plowDecel * (0.6 + 0.4 * smoothstep(0, 3, ctx.speed));
+    return this.plow * this.C.plowDecel * (0.6 + 0.4 * smoothstep(0, 3, ctx.speed)) + this.butter * this.C.butterDrag;
   }
 
   stopMu() { return this.C.stopMu; }
@@ -85,10 +89,17 @@ export class SkiPhysics extends EdgePhysics {
     return { result: 'crash', switch: false, dev: dn };
   }
 
-  trickLabel(t, spins) {
+  trickLabel(t, spins, flip) {
     const parts = [];
     if (t.switch) parts.push('Switch');
-    if (spins >= 1) parts.push(`${t.spin > 0 ? 'Left' : 'Right'} ${spins * 180}`);
+    if (t.end === 'nose' && (spins >= 1 || flip?.flips >= 1)) parts.push('Nollie');
+    const dir = t.spin > 0 ? 'Left' : 'Right';
+    if (flip?.flips >= 1) {
+      // Off-axis: a backflip with a spin is a cork, a frontflip with a spin a misty.
+      const n = flipCount(flip.flips);
+      if (spins >= 2) parts.push(`${dir} ${n}${flip.back ? 'Cork' : 'Misty'} ${spins * 180}`);
+      else parts.push(`${n}${flip.back ? 'Backflip' : 'Frontflip'}`);
+    } else if (spins >= 1) parts.push(`${dir} ${spins * 180}`);
     if (t.grab && t.grabT > 0.25) parts.push(t.grab);
     return parts.join(' ');
   }

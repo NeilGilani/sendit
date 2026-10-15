@@ -21,7 +21,7 @@ import { createEquipmentModel, disposeEquipmentModel, poleGeometry } from './equ
 import { getEquipmentSpec, normalizeType } from './equipment/registry.js';
 
 const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
-const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4();
+const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4(), _v1 = new THREE.Vector3();
 const BA = ANIM.board;
 
 export class Rider {
@@ -200,8 +200,18 @@ export class Rider {
     p.t += dt;
     this.snapT += dt;
     this.root.position.copy(pl.renderPos);
-    this.root.position.y -= pl.sink * (this.fp ? 0.45 : 1);   // deep powder swallows the gear when slow (less in first person)
+    // Deep powder swallows the gear a little when slow (less in first person).
+    this.sinkVis = (pl.sink || 0) * ANIM.gearSinkVisual * (this.fp ? 0.45 : 1);
+    this.root.position.y -= this.sinkVis;
     this.root.quaternion.copy(pl.renderOrient);
+    // Flips turn about the centre of mass (≈ hip height), not the feet.
+    const fl = pl.renderFlip || 0;   // signed about the gear's +X, already in renderOrient
+    if (fl) {
+      const c = _v1.set(0, ANIM.flipPivot, 0);
+      const full = c.clone().applyQuaternion(pl.renderOrient);
+      const base = c.applyQuaternion(_q.copy(pl.renderOrient).multiply(_q2.setFromAxisAngle(X, -fl)));
+      this.root.position.add(base.sub(full));
+    }
     const st = pl.state;
     const ground = st === State.GROUNDED, air = st === State.AIR, sit = st === State.LIFT, crashed = st === State.CRASH;
     const ratio = pl.speedRatio;
@@ -210,7 +220,7 @@ export class Rider {
 
     // --- layer drivers
     let crouchT = 0.45 + ratio * 0.15 + pl.tuck * 0.45 + pl.squat * 0.55 + pl.brake * 0.15;
-    if (air) crouchT = 0.35 + pl.grab * 0.5;
+    if (air) crouchT = 0.35 + pl.grab * 0.5 + Math.min(1, Math.abs(pl.flipRate || 0) / 3) * 0.4;
     p.crouch += (Math.min(1, crouchT) - p.crouch) * k(10);
     p.tuck += ((ground ? pl.tuck : 0) - p.tuck) * k(ANIM.tuckResponse);
     p.air += ((air ? 1 : 0) - p.air) * k(5);
@@ -220,7 +230,10 @@ export class Rider {
     p.plow += ((ground ? pl.plow : 0) - p.plow) * k(8);
     p.stop += ((ground ? pl.stop : 0) - p.stop) * k(8);
     p.press += ((ground ? pl.press : 0) - p.press) * k(12);
+    p.flipLoad = (p.flipLoad || 0) + (((ground ? pl.flipLoad : 0) || 0) - (p.flipLoad || 0)) * k(10);
     p.grab += ((air ? pl.grab : 0) - p.grab) * k(14);
+    // Flipping: knees pulled up, hands in toward the shins (a tuck spins faster and reads as a flip).
+    p.flipTuck = (p.flipTuck || 0) + ((air ? THREE.MathUtils.clamp(Math.abs(pl.flipRate || 0) / 3.5, 0, 1) * (1 - pl.grab) : 0) - (p.flipTuck || 0)) * k(8);
     p.stanceYaw += (this.stanceYawTarget() * (1 - p.sit) - p.stanceYaw) * k(10);
     // Look direction along the bord: +1 toward the nose, −1 toward the tail (switch).
     p.look += (pl.travelSign - p.look) * k(5);
@@ -239,6 +252,10 @@ export class Rider {
     const edgeSideToe = Math.sign(p.edge) === toeX ? 1 : 0;
     p.toe += ((board ? Math.abs(p.lean) / ANIM.maxLean * edgeSideToe : 0) - p.toe) * k(8);
     p.heel += ((board ? Math.abs(p.lean) / ANIM.maxLean * (1 - edgeSideToe) : 0) - p.heel) * k(8);
+    // Deep, fast carves: the inside hand trails in the snow (board: front hand toe side, rear hand heel side).
+    const dragT = ground && board ? THREE.MathUtils.smoothstep(Math.abs(p.edge), BA.handDragEdge[0], BA.handDragEdge[1])
+      * THREE.MathUtils.smoothstep(pl.speed, 6, 9) * (1 - (pl.stop || 0)) * (1 - (pl.butter || 0)) : 0;
+    p.drag = (p.drag || 0) + (dragT - (p.drag || 0)) * k(6);
     // Upper body leads the turn (rotation-led on a board, anticipation on skis).
     // Wind-up: while loading a pop and steering, the shoulders counter-rotate against the coming spin.
     // The upper body leads edge changes: follow the raw input (ahead of the smoothed edge) by ~0.1 s.
@@ -320,11 +337,15 @@ export class Rider {
     p.plant[0] = Math.max(0, p.plant[0] - dt / ANIM.polePlantTime);
     p.plant[1] = Math.max(0, p.plant[1] - dt / ANIM.polePlantTime);
     // Skis parallel under the boots, wedged into a snowplough, lifted with the feet in the air.
-    const lift = 0.0 + p.air * 0.12 + p.grab * 0.1;
+    // Press (butters / ollie load): the skis pitch about the pressed tails or tips, the pop snaps them.
+    const snap = this.snapT < 0.5 ? this.snapSign * ANIM.skiPopSnap * Math.exp(-9 * this.snapT) * Math.min(1, this.snapT * 25) : 0;
+    p.pitch += ((-p.press * ANIM.skiPressPitch + snap) - p.pitch) * (this.snapT < 0.5 ? 0.6 : 0.3);
+    this.skiPitchLift = Math.abs(Math.sin(p.pitch)) * this.equip.spec.length * 0.4;
+    const lift = 0.0 + p.air * 0.12 + p.grab * 0.1 + p.flipTuck * ANIM.flipTuckLift + this.skiPitchLift;
     const wide = ANIM.skiStance + p.plow * 0.1;
     const [L, R] = this.skis;
-    L.position.set(-wide, lift, 0.0); L.rotation.set(0, -p.plow * 0.28, gearRoll * -1, 'YXZ');
-    R.position.set(wide, lift, 0.0); R.rotation.set(0, p.plow * 0.28, gearRoll * -1, 'YXZ');
+    L.position.set(-wide, lift, 0.0); L.rotation.set(p.pitch, -p.plow * 0.28, gearRoll * -1, 'YXZ');
+    R.position.set(wide, lift, 0.0); R.rotation.set(p.pitch, p.plow * 0.28, gearRoll * -1, 'YXZ');
     // In the air with a grab, cross the skis a little (Japan / mute flavour).
     if (p.grab > 0.01) { L.rotation.y += p.grab * 0.25; R.rotation.y -= p.grab * 0.1; }
     // Inner edge stays on the snow: pivot the roll about the edge.
@@ -337,7 +358,7 @@ export class Rider {
 
   placeBoard(gearRoll) {
     const p = this.p, B = this.board, spec = this.equip.spec;
-    const lift = p.air * BA.airTuck + p.grab * BA.grabTuck;
+    const lift = p.air * BA.airTuck + p.grab * BA.grabTuck + p.flipTuck * ANIM.flipTuckLift;
     // Board flex while pressing: tail press lifts the nose and vice versa; the pop snaps the free end up.
     const snap = this.snapT < 0.5 ? this.snapSign * BA.popSnap * Math.exp(-9 * this.snapT) * Math.min(1, this.snapT * 25) : 0;
     const pitch = -p.press * BA.pressPitch + snap + this.player.powder * 0.04 * (1 - this.player.speedRatio);
@@ -396,7 +417,7 @@ export class Rider {
         const hw = this.equip.spec.waist * 0.5;
         ski.localToWorld(tmp.set(eSide * hw, 0, 0));
         c.position.copy(tmp); c.direction.copy(dir); c.normal.copy(n);
-        c.edgeAngle = edge; c.load = ground ? loads[i] : 0; c.speed = pl.speed; c.grounded = ground; c.depth = pl.sink;
+        c.edgeAngle = edge; c.load = ground ? loads[i] : 0; c.speed = pl.speed; c.grounded = ground; c.depth = this.sinkVis;
       });
     } else {
       const spec = this.equip.spec;
@@ -409,7 +430,7 @@ export class Rider {
         const c = this.contacts[i];
         this.board.localToWorld(tmp.set(eSide * hw, 0, z));
         c.position.copy(tmp); c.direction.copy(dir); c.normal.copy(n);
-        c.edgeAngle = edge; c.load = ground ? Math.max(0, loads[i]) : 0; c.speed = pl.speed; c.grounded = ground; c.depth = pl.sink;
+        c.edgeAngle = edge; c.load = ground ? Math.max(0, loads[i]) : 0; c.speed = pl.speed; c.grounded = ground; c.depth = this.sinkVis;
       });
     }
   }
@@ -503,9 +524,10 @@ export class Rider {
     const angul = (p.edge - p.lean) * ANIM.angulation * (1 - p.air);
     // Hockey stop / skid: upper body keeps facing down the path while the skis pivot across it.
     const counter = (pl.state === State.GROUNDED ? pl.skidAngle : 0) * 0.75 + p.lead * 0.12;
-    const off = new THREE.Vector3(-angul * 0.12, -drop * ns - p.crash * 0.5, -p.crouch * 0.06 * ns - p.stop * 0.05);
+    // Pressing shifts the hips over the pressed end (tails: back, tips: forward).
+    const off = new THREE.Vector3(-angul * 0.12, -drop * ns - p.crash * 0.5, -p.crouch * 0.06 * ns - p.stop * 0.05 + p.press * ANIM.skiPressShift * ns);
     const twist = p.twist * ns;
-    let bend = THREE.MathUtils.degToRad(10 + p.crouch * 16 + p.tuck * 30) * (1 - p.air * 0.3);
+    let bend = THREE.MathUtils.degToRad(10 + p.crouch * 16 + p.tuck * 30) * (1 - p.air * 0.3) - p.flipLoad * ANIM.flipLoadArch;
     bend -= THREE.MathUtils.degToRad(12) * p.sit;
     const wob = p.stumble * Math.sin(p.t * 9) * 0.25;
     // Riding switch (twin tips): twist the torso and look back over the shoulder down the path.
@@ -515,7 +537,7 @@ export class Rider {
     for (const side of [1, -1]) {
       // Armature +X is the rider's left (visual −X): match the ski's lift so the boots stay clipped in.
       const lx = -side * (ANIM.skiStance + p.plow * 0.1);
-      const ankle = new THREE.Vector3(side * (ANIM.skiStance + p.plow * 0.1), this.ankleH + p.air * 0.12 + p.grab * 0.1 + lx * Math.tan(p.lean), 0.0);
+      const ankle = new THREE.Vector3(side * (ANIM.skiStance + p.plow * 0.1), this.ankleH + p.air * 0.12 + p.grab * 0.1 + p.flipTuck * ANIM.flipTuckLift + (this.skiPitchLift || 0) + lx * Math.tan(p.lean), 0.0);
       // Feet point down the skis; tips pinch together in a snowplough.
       this.leg(side, ankle, new THREE.Vector3(side * 0.12, 0, 1), -side * p.plow * 0.28);
       this.armSki(side, pl);
@@ -526,7 +548,7 @@ export class Rider {
     const p = this.p, st = this.equip.spec.stance;
     const ns = 1 - p.sit;
     const nx = this.equip.stance === 'goofy' ? -1 : 1;   // armature X of the board nose
-    const lift = p.air * BA.airTuck + p.grab * BA.grabTuck;
+    const lift = p.air * BA.airTuck + p.grab * BA.grabTuck + p.flipTuck * ANIM.flipTuckLift;
     const drop = BA.crouch + p.crouch * 0.14 + pl.speedRatio * BA.crouchSpeed * (1 - p.air) + p.grab * 0.08;
     const off = new THREE.Vector3(
       nx * p.press * BA.pressShift - nx * 0.02,
@@ -543,7 +565,8 @@ export class Rider {
     const sk = p.skate || 0;
     off.x += nx * 0.08 * sk;                                  // weight over the front foot while skating
     const spineTwist = (nx * (BA.shoulderOpen - BA.hipOpen) + lead + nx * 0.45 * sk) * ns;
-    const bend = (0.1 + p.crouch * 0.2 - p.toe * 0.04 + p.heel * 0.12 + p.grab * 0.26) * ns;
+    // A preloaded backflip arches the chest up and back (the shoulders throw first).
+    const bend = (0.1 + p.crouch * 0.2 - p.toe * 0.04 + p.heel * 0.12 + p.grab * 0.26) * ns - p.flipLoad * ANIM.flipLoadArch;
     // Head: look down the direction of travel (nose, or over the back shoulder when switch).
     const headYaw = (nx * p.look * BA.headTurn - nx * BA.shoulderOpen - lead - nx * 0.5 * sk) * ns;
     this.trunk(off, hipYaw + nx * 0.3 * sk, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist, wob - p.lean * 0.15, headYaw, -(hipPitch + bend) * 0.6);
@@ -648,8 +671,9 @@ export class Rider {
     // Double-pole push: reach forward and up, then plant and drive the hands back past the hips.
     const ph = p.pushPhase || 0, reachF = ph < 0.4 ? ph / 0.4 : 1 - (ph - 0.4) / 0.6;
     const upP = V(side * 0.3, -0.75 + reachF * 0.45, -0.25 + reachF * 1.0), loP = V(side * 0.1, -0.5 + reachF * 0.3, 0.2 + reachF * 0.7);
-    let u = upS.lerp(upP, p.push).lerp(upT, p.tuck).lerp(upA, p.air * (1 - g)).lerp(upG, g);
-    let l = loS.lerp(loP, p.push).lerp(loT, p.tuck).lerp(loA, p.air * (1 - g)).lerp(loG, g);
+    const upF = V(side * 0.3, -0.55, 0.65), loF = V(-side * 0.05, -0.45, 0.9);   // flip tuck: hands to the shins
+    let u = upS.lerp(upP, p.push).lerp(upT, p.tuck).lerp(upA, p.air * (1 - g)).lerp(upF, p.flipTuck).lerp(upG, g);
+    let l = loS.lerp(loP, p.push).lerp(loT, p.tuck).lerp(loA, p.air * (1 - g)).lerp(loF, p.flipTuck).lerp(loG, g);
     [u, l] = this.armOverlays(side, u, l);
     this.armAim(side, u, l);
     // First person: turn the gloves into a pole grip (palms in, knuckles forward).
@@ -674,6 +698,23 @@ export class Rider {
     const sw = Math.sin(p.t * 3.1 + side) * 0.1;
     u.lerp(V(fx * 0.9, 0.05 + sw, 0.25), p.air * 0.8);
     l.lerp(V(fx * 0.8, 0.2, 0.35), p.air * 0.8);
+    u.lerp(V(fx * 0.3, -0.55, 0.65), p.flipTuck);    // flip tuck: hands in toward the shins
+    l.lerp(V(-fx * 0.05, -0.45, 0.9), p.flipTuck);
+    // Hand drag on deep carves: toe side the front hand reaches down to the snow in front of the toes,
+    // heel side the rear hand trails behind the heels.
+    const drag = p.drag || 0;
+    if (drag > 0.01) {
+      const toeCarve = p.toe >= p.heel;
+      if (front === toeCarve) {
+        const B = this.bones, s = side > 0 ? '_l' : '_r';
+        this.inherit(B['clavicle' + s]); this.inherit(B['upperarm' + s]);
+        const sh = pos(this.g(B['upperarm' + s]));
+        const target = toeCarve ? V(nx * 0.25, this.ankleH + 0.02, 0.65) : V(-nx * 0.35, this.ankleH - 0.15, -0.72);
+        const d = target.sub(sh).normalize();
+        u.lerp(d.clone().add(V(0, 0.25, 0)).normalize(), drag);
+        l.lerp(d, drag);
+      }
+    }
     // Grabs: Indy = rear hand, toe edge between the feet; Melon = front hand, heel edge; Nose / Tail.
     const name = pl.grabName || 'Indy';
     const grabFront = name === 'Melon' || name === 'Nose grab';
