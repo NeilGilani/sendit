@@ -27,7 +27,7 @@ export const PHYSICS = {
   takeoffGap: 0.3,
   // Jump: hold to squat, release to pop. Impulse scales with squat depth.
   chargeTime: 0.6,
-  jumpMin: 3.0,
+  jumpMin: 3.0,               // legacy (pre-equipment) pop — see PHYSICS.ski / .snowboard popMin/popMax
   jumpMax: 8.0,
   airDrag: 0.006,
   spinRateMax: 5.5,           // rad/s
@@ -52,6 +52,79 @@ export const PHYSICS = {
   turnScrub: 0.16,            // speed lost turning in powder (1/s per unit of carve)
   liftRideSeconds: 45,
   liftBoardSpeed: 8,
+
+  // ---------------------------------------------------------------- equipment physics
+  // Shared carve / skid model (physics/edge.js), numbers from docs/equipment-research.md:
+  //   edge angle follows the steer input (edge-switch time), carve radius R = sidecut · cos(edge),
+  //   lateral grip capped at latG, beyond it the path widens and the edges skid (decel μ_side·g·sin β).
+  //   Per-model multipliers (grip, pop, float, pivot, spin) come from the equipment spec.
+  ski: {
+    maxVelocity: 15,          // speed ratio reference (HUD / FX / camera); soft cap starts here
+    steerResponse: 14,        // 1/s input smoothing (the edge roll rate does the rest)
+    maxEdge: 68,              // deg — carving edge angle at full input
+    edgeSwitchTime: 0.3,      // s full edge → full edge (short turns 0.25)
+    edgeResponse: 14,         // 1/s first-order lean response on top of the rate limit
+    engage: [3, 14],          // deg — edge angle range over which the sidecut starts to bend the path
+    latG: 1.8,                // sustained lateral g before the edges let go
+    speedRadius: 0.6, speedRadiusV: [8, 18],  // effective sidecut ×(1+0.6) from 8 → 18 m/s (long arcs at speed)
+    carveAssist: 0.85,        // share of over-demand (beyond grip) that just widens the arc instead of skidding
+    gripRate: 11,             // 1/s lateral velocity decay on an engaged edge
+    flatGrip: 0.35,           // share of grip with a flat base (sideslips)
+    carveEff: 0.985,          // share of redirected lateral energy kept in a clean carve
+    skidEff: 0.55,            // … in a skid
+    skidMu: 0.55,             // μ_side: skid decel = μ·g·sin β
+    trackBeta: [6, 28],       // deg — skid angle range where the sidecut stops steering the path
+    pivotRate: 2.1,           // rad/s rotary steering at low speed (skidded turns)
+    pivotHigh: 0.22,          // share of the pivot left at speed
+    pivotFade: [3, 13],       // m/s fade range
+    betaMax: 22,              // deg — pivot fades as the skid angle approaches this
+    selfAlign: 2.2,           // 1/s skis track their own path when the rider stops steering
+    // Braking: snowplough below plowSpeed, hockey stop above.
+    plowSpeed: 6.5,
+    plowDecel: 2.2,           // m/s² at full wedge
+    plowTurn: 0.75,           // steering share while ploughing
+    stopAngle: 82,            // deg the skis pivot across the path
+    stopTurnRate: 7,          // rad/s pivot into the stop
+    stopMu: 0.5,              // ≈6.5 m/s² at 90° together with drag
+    stopEdge: 32,             // deg edge set during the stop
+    pushAccel: 4.0, pushMaxSpeed: 8.5,   // poling / skating
+    dragUpright: 0.0115, dragTuck: 0.0062,
+    // Powder: sink depth slow→fast (m), planing speed, plough drag a = k·depth·v, bog decel below planing.
+    powderFloat: 1.0, sinkSlow: 0.22, sinkFast: 0.08, powderBog: 7, powderDrag: 0.3, powderBogDecel: 0.12, powderSteer: 0.7,
+    // Air
+    popMin: 1.9, popMax: 3.5, chargeTime: 0.4,    // m/s vertical pop (tap → full charge)
+    spinRateMax: 6.4, spinResponse: 7, prewind: 0.45,
+    landClean: 15, landStumble: 30, landCrash: 38, // deg yaw between ski and path
+    switchLand: 30,           // deg — backwards landings within this are "switch" (twin tips clean)
+  },
+  snowboard: {
+    maxVelocity: 14.5,
+    steerResponse: 11,
+    maxEdgeToe: 64, maxEdgeHeel: 55,
+    edgeSwitchTime: 0.42, heelToToe: 0.38, toeToHeel: 0.46,
+    edgeResponse: 7,
+    engage: [3, 13],
+    latGToe: 1.6, latGHeel: 1.45,
+    sidecutToe: 1.0, sidecutHeel: 0.95,     // × spec sidecut (heel side bends a touch tighter)
+    speedRadius: 1.5, speedRadiusV: [6, 16],
+    carveAssist: 0.85,
+    gripRate: 10, flatGrip: 0.25,
+    carveEff: 0.985, skidEff: 0.5, skidMu: 0.5,
+    trackBeta: [7, 30],
+    pivotRate: 2.5, pivotHigh: 0.25, pivotFade: [2.5, 12], betaMax: 26,
+    selfAlign: 2.0,
+    // Slide stop: rotate the board ~90° across the path on the heel (or toe) edge.
+    stopAngle: 86, stopTurnRate: 6, stopMuHeel: 0.42, stopMuToe: 0.33, stopEdgeHeel: 30, stopEdgeToe: 34,
+    pushAccel: 2.4, pushMaxSpeed: 4.5,       // one-foot skate
+    dragUpright: 0.0125, dragTuck: 0.0088,   // a board rider can only crouch, not tuck
+    powderFloat: 1.6, sinkSlow: 0.12, sinkFast: 0.04, powderBog: 4.5, powderDrag: 0.25, powderBogDecel: 0.12, powderSteer: 0.9,
+    // Butter: press nose / tail while charging and steer → pivot on the flexed end, base flat.
+    butterRate: 3.4, butterMaxSpeed: 13, butterDrag: 0.8,
+    // Air
+    popMin: 2.2, popMax: 4.0, nollie: 0.88, chargeTime: 0.45,
+    spinRateMax: 7.6, spinResponse: 7.5, prewind: 0.55,
+    landClean: 15, landStumble: 45, landSlide: 75, // deg yaw from the nearest board end to the path
+  },
 };
 
 // ------------------------------------------------------------------ Rider animation ("juice")
@@ -72,6 +145,26 @@ export const ANIM = {
   hipLean: 0.35,              // rad of mid-air hip lean toward travel/camera
   tuckResponse: 3.5,
   flailSpeed: 14,             // arm flail oscillation speed
+  // Lean = atan(lateral force / g) in the equipment frame (carves, stops), capped for readability;
+  // the gear itself rolls to the physics edge angle, the difference is angulation (hips / knees).
+  maxLean: 0.8,               // rad body inclination cap
+  maxGearEdge: 1.05,          // rad visual edge angle cap
+  angulation: 0.75,           // share of (edge − lean) the ski rider takes up in the spine (upright upper body)
+  polePlantTime: 0.38,        // s a pole touch lasts (triggered on edge changes)
+  board: {
+    crouch: 0.16,             // m pelvis drop at rest (riders stand lower than skiers)
+    crouchSpeed: 0.08,        // extra drop at speed
+    shoulderOpen: 0.42,       // rad shoulders open toward the nose
+    hipOpen: 0.16,            // rad hips open toward the nose
+    headTurn: 1.3,            // rad total head yaw toward the direction of travel
+    turnLead: 0.35,           // rad upper-body rotation leading into the turn
+    heelSit: 0.1,             // m hips back/down on the heel edge
+    toeDrive: 0.07,           // m knees/hips forward on the toe edge
+    pressShift: 0.11,         // m pelvis shift toward the pressed end (ollie / nollie / butter)
+    pressPitch: 0.16,         // rad board flex / nose-lift while pressing
+    airTuck: 0.18,            // m board pulled up toward the hips in the air
+    grabTuck: 0.3,            // m extra pull-up while grabbing
+  },
 };
 
 // ------------------------------------------------------------------ CameraController

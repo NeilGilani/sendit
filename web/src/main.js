@@ -146,6 +146,8 @@ async function boot() {
   ui.loading(0.88, 'Waxing the board…');
   player = new Player(terrain, scatter, lifts, input);
   player.fade = (b, d) => ui.fade(b, d);
+  player.setEquipment(params.get('equip') || 'ski', params.get('variant') || undefined);   // ?equip=ski|snowboard
+  if (params.has('stance')) player.setStance(params.get('stance'));                       // ?stance=regular|goofy
   rider = new Rider(player);
   await rider.load(loader);
   scene.add(rider.root);
@@ -169,7 +171,7 @@ async function boot() {
   ui.fade(false, 2.0);
   if (params.has('ride')) startRide(true);
   else { setMode(Mode.MENU); ui.refresh(); }
-  window.__sendit = { fx, course, player, terrain, camera, game, scene, renderer, features, scatter };
+  window.__sendit = { fx, course, player, rider, terrain, camera, game, scene, renderer, features, scatter };
 }
 
 function setupPost() {
@@ -277,6 +279,7 @@ function frame(now) {
   last = now;
   if (!composer) return;
   input.poll();
+  if (input.pressed.has('KeyE') && rider) rider.setEquipment(player.equipment.type === 'ski' ? 'snowboard' : 'ski');   // debug: swap gear
   if (input.justPressed('pause')) {
     if (game.mode === Mode.PAUSED) resume();
     else if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) pause();
