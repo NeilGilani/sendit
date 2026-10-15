@@ -60,7 +60,7 @@ export const SNOW = {
   corduroy: 1.0,                 // groomed pistes
   trackDepth: 0.26,              // metres: deepest powder trench
   trackLip: 0.55,                // pushed-up snow beside a trench
-  trackDark: 0.45,               // cavity darkening at the bottom of deep trenches
+  trackDark: 0.3,                // cavity darkening at the bottom of deep trenches
   forest: '#1b2620',             // far forest tone
 };
 
