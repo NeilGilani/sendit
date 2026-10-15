@@ -27,6 +27,8 @@ const c3 = (a) => new THREE.Color(a[0], a[1], a[2]);
 export const globals = {
   sunMaskTex: { value: null },       // baked mountain shadows (r) + sky visibility (g)
   terrainSize: { value: 6000 },
+  sunMaskMidTex: { value: null },    // same, over the mid-detail ring (gfx: MIDTERRAIN)
+  midSize: { value: 0 },             // metres per side of that mask (0 = none)
   uSunDir: { value: SUN_DIR.clone() },
   uSunLum: { value: 0.2126 * SUN_COLOR.r + 0.7152 * SUN_COLOR.g + 0.0722 * SUN_COLOR.b },
   uTime: { value: 0 },
@@ -69,10 +71,17 @@ export function patchShaderChunks() {
 export const SUN_MASK_GLSL = /* glsl */`
 uniform sampler2D sunMaskTex;
 uniform float terrainSize;
+uniform sampler2D sunMaskMidTex;
+uniform float midSize;
 vec2 sunMaskAt(vec3 wp) {
   vec2 uv = (wp.xz + terrainSize * 0.5) / terrainSize;
-  if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return vec2(1.0);
-  return texture2D(sunMaskTex, uv).rg;
+  float e = max(abs(uv.x - 0.5), abs(uv.y - 0.5)) * 2.0;      // 1 at the tile edge
+  vec2 tile = e < 1.0 ? texture2D(sunMaskTex, uv).rg : vec2(1.0);
+  if (midSize <= 0.0) return tile;
+  vec2 mv = (wp.xz + midSize * 0.5) / midSize;
+  if (mv.x < 0.0 || mv.y < 0.0 || mv.x > 1.0 || mv.y > 1.0) return vec2(1.0);
+  vec2 mid = texture2D(sunMaskMidTex, mv).rg;
+  return mix(tile, mid, smoothstep(0.97, 1.0, e));
 }
 `;
 

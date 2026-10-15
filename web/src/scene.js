@@ -12,8 +12,9 @@ import * as THREE from 'three';
 
 // ------------------------------------------------------------------ LIGHTING (linear HDR)
 export const LIGHTING = {
-  sunElevation: 40,              // degrees — long readable shadows, every lump has a lit and a shaded side
-  sunBearing: 163,               // degrees from north — SSE: keeps ~85 % of the gully floor sunlit, light from behind-left
+  sunElevation: 42,              // degrees — long readable shadows, every lump has a lit and a shaded side
+  sunBearing: 170,               // degrees from north — S by E: with the surrounding peaks (mid ring) casting
+                                 // shadows, ~91 % of the gully floor and the whole start stay sunlit
   sunWhiten: 0.45,               // pull the transmitted sun colour toward white
   sunBoost: 1.0,                 // multipliers on the colours derived from the atmosphere model
   skyBoost: 1.0,                 // single scattering underestimates the sky; artistic lift
@@ -70,7 +71,11 @@ export const ROCK = {
   light: '#8a8580',
   rust: '#7a5a3c',               // iron staining streaks
   strataScale: 6.0,              // metres between ledge bands on cliffs
-  ledgeSnow: 0.1,                // more → more snow sitting on ledges
+  ledgeSnow: 0.0,                // more → more snow sitting on ledges / facet tops
+  blockBig: 16,                  // metres: fracture blocks (tilted facets with dark joints)
+  blockMid: 5,
+  blockSmall: 1.6,
+  photoTile: 3.2,                // metres per repeat of the CC0 rock photo detail
   exposeSlope: 0.4,              // 1 − n.y where snow starts to slide off (≈ 53°)
   exposeSoft: 0.08,
 };
@@ -129,6 +134,17 @@ export const CORNICES = {
 };
 
 // ------------------------------------------------------------------ DISTANT RANGES (terrain.js buildRing)
+// Mid-detail terrain: a 10 m grid from the course height function around the playable tile, so the
+// valley walls and nearby peaks have real relief (the 30 km backdrop is only ~94 m), plus a baked
+// mountain-shadow / sky-visibility mask over the same area.
+export const MIDTERRAIN = {
+  half: 6000,                    // metres from the centre (square)
+  spacing: 10,                   // metres per sample
+  chunkCells: 100,               // cells per chunk side (1 km)
+  lodDist: [1400, 3200],         // metres: 10 m grid → 20 m → 40 m (scaled by quality)
+  maskRes: 2048,                 // baked sun mask texels per side (≈ 6 m)
+};
+
 export const RING = {
   inner: 12000,                  // metres from the centre where the ring starts (beyond the backdrop)
   depth: 23000,
@@ -287,6 +303,7 @@ export const COURSE = {
   ledges: 9,                     // rock-ledge relief on the walls
   valleySideSlope: 0.4,          // rise per metre beyond the walls
   mountainHeight: 1100,
+  sideRibs: 70,                  // metres of spur / gully relief on the outer valley sides (visual)
   horn: { x: -2300, z: -10600, peak: 4450, slope: 1.12, twist: 0.5 },
 };
 

@@ -4,7 +4,7 @@
 // backdrop. Answers height/normal/surface queries; park features add to the height field.
 import * as THREE from 'three';
 import { globals, toonMaterial, SUN_DIR } from './world.js';
-import { RING } from './scene.js';
+import { RING, MIDTERRAIN } from './scene.js';
 import { snowUniforms, SNOW_COMMON_PARS, SNOW_PARS_GLSL, SNOW_FRAG_GLSL, SNOW_BAND_GLSL, FAR_SNOW_FRAG_GLSL } from './gfx/snow.js';
 
 const CHUNK = 128;
@@ -25,6 +25,7 @@ export class Terrain {
     const d = await course.generate(onProgress);
     this.course = course;
     this.ingest(d.meta, d.heights, d.normals, d.splat, d.far);
+    await this.buildMidHeights(course);
   }
 
   /** Real-world data files (kept for reference builds). */
@@ -71,50 +72,99 @@ export class Terrain {
     this.heightTex.needsUpdate = true;
   }
 
-  /** Bake mountain shadows (R) and sky visibility (G) on the GPU. Sun is static at golden hour. */
+  /**
+   * Mid-detail heights (MIDTERRAIN): a 10 m grid from the course's height function over ±6 km.
+   * Inside the playable tile it copies the tile's own heights so both shadow bakes agree.
+   */
+  async buildMidHeights(course) {
+    const M = MIDTERRAIN;
+    const fn = course.natural ? (x, z) => course.natural(x, z) : (x, z) => course.height(x, z);
+    const n = Math.round((2 * M.half) / M.spacing) + 1;
+    const h = new Float32Array(n * n);
+    for (let j = 0; j < n; j++) {
+      const z = -M.half + j * M.spacing;
+      for (let i = 0; i < n; i++) {
+        const x = -M.half + i * M.spacing;
+        h[j * n + i] = this.isInside(x, z) ? this.baseHeight(x, z) : fn(x, z);
+      }
+      if ((j & 127) === 0) await new Promise((r) => setTimeout(r, 0));
+    }
+    this.mid = { half: M.half, sp: M.spacing, n, h };
+    this.midTex = new THREE.DataTexture(h, n, n, THREE.RedFormat, THREE.FloatType);
+    this.midTex.minFilter = this.midTex.magFilter = THREE.NearestFilter;
+    this.midTex.unpackAlignment = 1;
+    this.midTex.needsUpdate = true;
+  }
+
+  midHeight(x, z) {
+    const m = this.mid;
+    const fx = Math.min(Math.max((x + m.half) / m.sp, 0), m.n - 1.001), fz = Math.min(Math.max((z + m.half) / m.sp, 0), m.n - 1.001);
+    const i = fx | 0, j = fz | 0, tx = fx - i, tz = fz - j, r = j * m.n + i, H = m.h;
+    return (H[r] * (1 - tx) + H[r + 1] * tx) * (1 - tz) + (H[r + m.n] * (1 - tx) + H[r + m.n + 1] * tx) * tz;
+  }
+
+  /** Bake mountain shadows (R) and sky visibility (G) on the GPU, for the tile and the mid ring. */
   bakeSunMask(renderer) {
-    const size = 1024;
-    const rt = new THREE.WebGLRenderTarget(size, size, { type: THREE.UnsignedByteType, magFilter: THREE.LinearFilter, minFilter: THREE.LinearFilter });
+    this.sunMask = this.bakeMask(renderer, 1024, this.size, 4.0, 6.0);
+    globals.sunMaskTex.value = this.sunMask.texture;
+    if (this.mid) {
+      const size = this.mid.half * 2;
+      this.sunMaskMid = this.bakeMask(renderer, MIDTERRAIN.maskRes, size, 12.0, 15.0);
+      globals.sunMaskMidTex.value = this.sunMaskMid.texture;
+      globals.midSize.value = size;
+    }
+  }
+
+  bakeMask(renderer, res, outSize, t0, s0) {
+    const rt = new THREE.WebGLRenderTarget(res, res, { type: THREE.UnsignedByteType, magFilter: THREE.LinearFilter, minFilter: THREE.LinearFilter });
+    const mid = this.mid;
     const mat = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
       uniforms: {
         hmap: { value: this.heightTex }, size: { value: this.size }, res: { value: this.res },
         spacing: { value: this.spacing }, sunDir: { value: SUN_DIR },
+        mmap: { value: this.midTex ?? this.heightTex }, msize: { value: mid ? mid.half * 2 : 0 },
+        mres: { value: mid ? mid.n : 2 }, mspacing: { value: mid ? mid.sp : 1 },
+        outSize: { value: outSize }, t0: { value: t0 }, s0: { value: s0 },
       },
       vertexShader: 'out vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
       fragmentShader: /* glsl */`
         precision highp float;
         in vec2 vUv; out vec4 outColor;
         uniform sampler2D hmap; uniform float size; uniform float res; uniform float spacing; uniform vec3 sunDir;
-        float H(vec2 xz) {
-          vec2 f = (xz + size * 0.5) / spacing;
-          ivec2 i = ivec2(clamp(floor(f), vec2(0.0), vec2(res - 2.0)));
+        uniform sampler2D mmap; uniform float msize; uniform float mres; uniform float mspacing;
+        uniform float outSize; uniform float t0; uniform float s0;
+        float grid(sampler2D tx, vec2 xz, float sz, float rs, float sp) {
+          vec2 f = (xz + sz * 0.5) / sp;
+          ivec2 i = ivec2(clamp(floor(f), vec2(0.0), vec2(rs - 2.0)));
           vec2 t = clamp(f - vec2(i), 0.0, 1.0);
-          float a = texelFetch(hmap, i, 0).r, b = texelFetch(hmap, i + ivec2(1, 0), 0).r;
-          float c = texelFetch(hmap, i + ivec2(0, 1), 0).r, d = texelFetch(hmap, i + ivec2(1, 1), 0).r;
+          float a = texelFetch(tx, i, 0).r, b = texelFetch(tx, i + ivec2(1, 0), 0).r;
+          float c = texelFetch(tx, i + ivec2(0, 1), 0).r, d = texelFetch(tx, i + ivec2(1, 1), 0).r;
           return mix(mix(a, b, t.x), mix(c, d, t.x), t.y);
         }
-        bool inside(vec2 p) { return abs(p.x) < size * 0.5 && abs(p.y) < size * 0.5; }
+        bool inTile(vec2 p) { return abs(p.x) < size * 0.5 && abs(p.y) < size * 0.5; }
+        bool inside(vec2 p) { return inTile(p) || (abs(p.x) < msize * 0.5 && abs(p.y) < msize * 0.5); }
+        float H(vec2 p) { return inTile(p) ? grid(hmap, p, size, res, spacing) : grid(mmap, p, msize, mres, mspacing); }
         void main() {
-          vec2 xz = vUv * size - size * 0.5;
+          vec2 xz = vUv * outSize - outSize * 0.5;
           float h0 = H(xz) + 1.0;
           vec2 d = normalize(sunDir.xz);
           float tanE = sunDir.y / length(sunDir.xz);
           float vis = 1.0;
-          float t = 4.0;
-          for (int i = 0; i < 220; i++) {
+          float t = t0;
+          for (int i = 0; i < 240; i++) {
             vec2 p = xz + d * t;
             if (!inside(p)) break;
             float diff = (h0 + t * tanE - H(p)) / t;
             vis = min(vis, smoothstep(-0.012, 0.012, diff));
-            t += 2.0 + t * 0.028;
+            t += t0 * 0.5 + t * 0.028;
           }
           float occ = 0.0;
           for (int k = 0; k < 8; k++) {
             float a = float(k) * 0.785398;
             vec2 dd = vec2(cos(a), sin(a));
             float m = 0.0;
-            float s = 6.0;
+            float s = s0;
             for (int j = 0; j < 14; j++) {
               vec2 p = xz + dd * s;
               if (inside(p)) m = max(m, (H(p) - h0) / s);
@@ -136,8 +186,7 @@ export class Terrain {
     renderer.setRenderTarget(prev);
     quad.geometry.dispose();
     mat.dispose();
-    this.sunMask = rt;
-    globals.sunMaskTex.value = rt.texture;
+    return rt;
   }
 
   buildMaterials(tex) {
@@ -169,6 +218,7 @@ export class Terrain {
       name: 'terrainFarSnow', uniforms: { ...farU, noiseTex: { value: tex.noise } },
       fragPars: SNOW_COMMON_PARS + 'vec3 tN;', frag: FAR_SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
     });
+    this.farMaterial.defines = { ROCK_FAR: 1 };
     const prevFar = this.farMaterial.onBeforeCompile;
     this.farMaterial.onBeforeCompile = (shader, r) => {
       prevFar(shader, r);
@@ -205,7 +255,74 @@ export class Terrain {
         this.chunks.push(mesh);
       }
     }
+    this.buildMid();
     this.buildFar();
+  }
+
+  /** Mid-detail ring: chunks of the 10 m grid with 3 LODs and skirts; sinks inside the tile. */
+  buildMid() {
+    this.midChunks = [];
+    if (!this.mid) return;
+    const m = this.mid, C = MIDTERRAIN.chunkCells;
+    const per = Math.ceil((m.n - 1) / C);
+    this.midIndices = [];
+    for (let lod = 0; lod < 3; lod++) {
+      const n = C >> lod, w = n + 3;
+      const idx = new Uint32Array((w - 1) * (w - 1) * 6);
+      let k = 0;
+      for (let j = 0; j < w - 1; j++) for (let i = 0; i < w - 1; i++) {
+        const a = j * w + i, b = a + 1, c = a + w, d = c + 1;
+        idx[k++] = a; idx[k++] = c; idx[k++] = b; idx[k++] = b; idx[k++] = c; idx[k++] = d;
+      }
+      this.midIndices.push(new THREE.BufferAttribute(idx, 1));
+    }
+    this.midCache = new Map();
+    this.midLodDistances ??= MIDTERRAIN.lodDist.slice();
+    for (let cz = 0; cz < per; cz++) for (let cx = 0; cx < per; cx++) {
+      const x0 = -m.half + cx * C * m.sp, z0 = -m.half + cz * C * m.sp, x1 = x0 + C * m.sp, z1 = z0 + C * m.sp;
+      // Entirely inside the tile (with a margin): never visible.
+      if (x0 > -this.half + 80 && x1 < this.half - 80 && z0 > -this.half + 80 && z1 < this.half - 80) continue;
+      const mesh = new THREE.Mesh(this.midGeometry(cx, cz, 2), this.farMaterial);
+      mesh.userData = { cx, cz, lod: 2, cxw: (x0 + x1) / 2, czw: (z0 + z1) / 2 };
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.name = 'MidTerrain';
+      this.group.add(mesh);
+      this.midChunks.push(mesh);
+    }
+  }
+
+  midGeometry(cx, cz, lod) {
+    const key = `${cx}_${cz}_${lod}`;
+    if (this.midCache.has(key)) return this.midCache.get(key);
+    const m = this.mid, C = MIDTERRAIN.chunkCells;
+    const n = C >> lod, step = 1 << lod, w = n + 3;
+    const pos = new Float32Array(w * w * 3), nor = new Float32Array(w * w * 3);
+    const H = (i, j) => m.h[Math.min(m.n - 1, Math.max(0, j)) * m.n + Math.min(m.n - 1, Math.max(0, i))];
+    const th = this.half;
+    let k = 0;
+    for (let j = -1; j <= n + 1; j++) for (let i = -1; i <= n + 1; i++) {
+      const ci = Math.min(Math.max(i, 0), n), cj = Math.min(Math.max(j, 0), n);
+      const gi = Math.min(cx * C + ci * step, m.n - 1), gj = Math.min(cz * C + cj * step, m.n - 1);
+      const x = -m.half + gi * m.sp, z = -m.half + gj * m.sp;
+      let y = H(gi, gj);
+      // Sink under the playable tile (its own skirts close the seam).
+      const inside = 1 - smooth(th - 60, th - 4, Math.max(Math.abs(x), Math.abs(z)));
+      y -= inside * 40;
+      if (i !== ci || j !== cj) y -= 8 + 10 * lod;
+      pos[k] = x; pos[k + 1] = y; pos[k + 2] = z;
+      const nx = H(gi - 1, gj) - H(gi + 1, gj), ny = 2 * m.sp, nz = H(gi, gj - 1) - H(gi, gj + 1);
+      const l = Math.hypot(nx, ny, nz);
+      nor[k] = nx / l; nor[k + 1] = ny / l; nor[k + 2] = nz / l;
+      k += 3;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    g.setIndex(this.midIndices[lod]);
+    g.computeBoundingSphere();
+    this.midCache.set(key, g);
+    return g;
   }
 
   chunkGeometry(cx, cz, lod) {
@@ -263,10 +380,11 @@ export class Terrain {
     for (let j = 0; j <= n; j++) {
       for (let i = 0; i <= n; i++) {
         const x = -fsize / 2 + i * step, z = -fsize / 2 + j * step;
-        const inside = 1 - smooth(this.half - 160, this.half - 30, Math.max(Math.abs(x), Math.abs(z)));
+        const inner = this.mid ? this.mid.half - 150 : this.half;     // sink under the mid ring / tile
+        const inside = 1 - smooth(inner - 160, inner - 30, Math.max(Math.abs(x), Math.abs(z)));
         // Outer rim sinks away so the backdrop never ends in a hard box edge (the sky's ranges take over).
         const rim = smooth(fsize / 2 - 4000, fsize / 2, Math.max(Math.abs(x), Math.abs(z)));
-        const y = H(x, z) - inside * 90 - 2;
+        const y = H(x, z) - inside * (this.mid ? 160 : 90) - 2;
         pos[k++] = x; pos[k++] = y + (m.far_min_height - 900 - y) * rim; pos[k++] = z;
       }
     }
@@ -352,6 +470,7 @@ export class Terrain {
   setQuality(q) {
     const s = [0.6, 1.0, 1.5][q];
     this.lodDistances = [280 * s, 600 * s, 1200 * s, 2400 * s];
+    this.midLodDistances = MIDTERRAIN.lodDist.map((d) => d * s);
     if (this.material) {
       // Quality tiers: low = no glints / plain normal-mapped tracks / no fine wind detail;
       // medium = everything but parallax tracks; high = parallax trenches.
@@ -385,6 +504,19 @@ export class Terrain {
       mesh.geometry = this.chunkGeometry(cx, cz, lod);
       if (mesh.userData.lod < 3 && this.cache.has(old)) { this.cache.get(old).dispose(); this.cache.delete(old); }
       mesh.userData.lod = lod;
+    }
+    // Mid ring LOD (cheap to build: ~4k vertices a chunk).
+    if (this.midChunks) {
+      let mb = Math.max(2, budget + 2);
+      for (const mesh of this.midChunks) {
+        const u = mesh.userData;
+        const d = Math.max(0, Math.hypot(u.cxw - camPos.x, u.czw - camPos.z) - MIDTERRAIN.chunkCells * this.mid.sp * 0.5);
+        const lod = d < this.midLodDistances[0] ? 0 : d < this.midLodDistances[1] ? 1 : 2;
+        if (lod === u.lod) continue;
+        if (!this.midCache.has(`${u.cx}_${u.cz}_${lod}`) && mb-- <= 0) continue;
+        mesh.geometry = this.midGeometry(u.cx, u.cz, lod);
+        u.lod = lod;
+      }
     }
   }
 

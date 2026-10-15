@@ -156,6 +156,10 @@ export class Course {
         h += v * P.valleySideSlope
           + A * P.mountainHeight * ridged(x / 3000 + 3.1, z / 3000 + 7.7, 4)
           + smooth(v / 300) * 260 * (fbm(x / 800, z / 800, 3) - 0.5);
+        // Visual relief only (well away from the riding line): spurs and gullies running down the
+        // valley sides, so the big faces are not smooth slabs.
+        const R = smooth((v - 120) / 500);
+        if (R > 0 && P.sideRibs) h += R * P.sideRibs * (ridged(x / 650 + 1.3, z / 170 + 4.1, 3) - 0.45);
       }
     }
     // Berms / side hits just inside the floor edges.
