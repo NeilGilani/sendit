@@ -27,6 +27,8 @@ export class Player {
     this.squat = 0;                   // 0..1 pre-jump compression
     this.carve = 0;
     this.skid = 0;
+    this.sink = 0;                    // metres the skis sit below the powder surface (visual)
+    this.powder = 0;                  // 0..1 how deep / soft the snow underfoot is
     this.airTime = 0;
     this.spinRate = 0;
     this.crashT = 0;
@@ -169,6 +171,13 @@ export class Player {
     decel += (P.dragUpright + (P.dragTuck - P.dragUpright) * this.tuck) * sp * sp;
     decel += P.softCapDrag * Math.max(0, sp - P.maxVelocity) ** 2;
     decel += this.brake * P.brakeDecel;
+    // Sugary powder: carving through deep snow scrubs speed; slow skis sink, fast skis plane up.
+    const pw = clamp(S.y + S.w, 0, 1);
+    this.powder = pw;
+    decel += P.turnScrub * Math.abs(this.carve) * sp * pw;
+    const plane = clamp((sp - P.planeSpeed[0]) / (P.planeSpeed[1] - P.planeSpeed[0]), 0, 1);
+    const sinkT = pw * (P.powderSink + (P.powderSinkFast - P.powderSink) * plane * plane * (3 - 2 * plane));
+    this.sink += (sinkT - this.sink) * (1 - Math.exp(-4 * dt));
     if (sp > 1e-4) v.multiplyScalar(Math.max(0, sp - decel * dt) / sp);
     if (v.length() < 0.35 && (1 - n.y < P.holdStillSlope || this.brake > 0.6) && !(this.controllable() && this.input.strength('speedUp') > 0.3)) v.set(0, 0, 0);
 
@@ -215,6 +224,7 @@ export class Player {
     this._spinTotal += this.spinRate * dt;
     this.turnVelocity = this.spinRate;
     this.carve *= Math.exp(-3 * dt);
+    this.sink *= Math.exp(-8 * dt);
     this.skid *= Math.exp(-4 * dt);
     this.airTime += dt;
     this.speed = this.velocity.length();

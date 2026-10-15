@@ -1,14 +1,17 @@
-// The rider: stylized snowboarder built on the CC0 Quaternius humanoid. Cel-shaded suit with neon
-// trims that light up with speed and tricks, Fresnel rim light, inverted-hull outlines, and fully
+// The rider: stylized skier built on the CC0 Quaternius humanoid. Suit with neon trims that light
+// up with speed and air, Fresnel rim light, a thin outline, two skis and poles, and fully
 // procedural animation layers:
-//   • edge-dig roll  (targetMeshRoll = turnInput · maxRollAngle · velocityRatio, lerped)
-//   • pre-jump squat (Y down to −25 %, X/Z up for volume) + deeper knee bend
-//   • aerodynamic tuck, mid-air hip lean toward travel, flailing arms while stumbling
-//   • landing squash & stretch (damped sine, 2–3 bounces), high-speed board chatter
+//   • carve lean     (targetMeshRoll = turnInput · maxRollAngle · velocityRatio, lerped)
+//   • athletic stance: knees forward, hips back, hands forward holding the poles
+//   • snowplow wedge when braking, racer tuck with poles under the arms
+//   • pre-jump squat, mid-air hip lean, flailing arms while stumbling
+//   • sinking into deep powder when slow, planing up with speed
+//   • landing squash & stretch (damped sine, 2–3 bounces), high-speed chatter
 import * as THREE from 'three';
 import { State } from './player.js';
 import { ANIM, ART, PHYSICS } from './config.js';
 import { chairGeo } from './lifts.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toonMaterial, outlineMaterial, mulberry32 } from './world.js';
 
 const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
@@ -35,7 +38,7 @@ export class Rider {
   async load(loader) {
     const gltf = await loader.loadAsync('/models/skier/skier.gltf');
     this.model = new THREE.Group();
-    this.model.rotation.y = Math.PI / 2;   // rider faces the toe side; board nose = −Z
+    this.model.rotation.y = Math.PI;       // rider faces down the skis (−Z)
     this.model.add(gltf.scene);
     this.body.add(this.model);
     const outlines = [];
@@ -85,13 +88,20 @@ export class Rider {
   }
 
   buildGear() {
-    // Board along the root's Z axis (nose = −Z), neon edges.
-    this.board = new THREE.Mesh(boardGeometry(), boardMaterial());
-    this.board.castShadow = true;
-    this.boardOutline = new THREE.Mesh(this.board.geometry, outlineMaterial());
-    this.board.add(this.boardOutline);
-    this.visual.add(this.board);
-    this.boardMat = this.board.material;
+    // Two skis along the root's Z axis (tips = −Z) with neon edges, thin outline.
+    this.skiMat = skiMaterial();
+    const sg = skiGeometry();
+    this.skis = [0, 1].map(() => {
+      const ski = new THREE.Mesh(sg, this.skiMat);
+      ski.castShadow = true;
+      ski.add(new THREE.Mesh(sg, outlineMaterial(1.0)));
+      this.visual.add(ski);
+      return ski;
+    });
+    // Poles: placed every frame from the hands (see placePoles).
+    const pg = poleGeometry();
+    const pm = toonMaterial({ name: 'pole', vertexColors: true, rim: 0.4 });
+    this.poles = [0, 1].map(() => { const m = new THREE.Mesh(pg, pm); m.castShadow = true; this.visual.add(m); return m; });
     // Lift chair (personal seat while riding up).
     const cg = chairGeo();
     this.chair = new THREE.Mesh(cg, cg.userData.materials);
@@ -119,6 +129,7 @@ export class Rider {
     if (!this.model) return;
     p.t += dt;
     this.root.position.copy(pl.renderPos);
+    this.root.position.y -= pl.sink;   // deep powder swallows the skis when slow
     this.root.quaternion.copy(pl.renderOrient);
     const st = pl.state;
     const ground = st === State.GROUNDED, air = st === State.AIR, sit = st === State.LIFT, crashed = st === State.CRASH;
@@ -143,7 +154,8 @@ export class Rider {
     const vy = pl.velocity.y;
     const hipT = air ? THREE.MathUtils.clamp(-vy / 12, -1, 1) * ANIM.hipLean : 0;
     p.hip += (hipT - p.hip) * k(4);
-    p.twist += ((air ? 0.55 : 0.32 + p.tuck * 0.15) - p.twist) * k(4);
+    p.twist += ((air ? 0.12 : 0) - p.twist) * k(4);
+    p.plow = (p.plow || 0) + ((ground ? pl.brake : 0) - (p.plow || 0)) * k(6);
 
     this.visual.quaternion.setFromAxisAngle(Z, p.roll + p.crashRoll * 0.0)
       .multiply(new THREE.Quaternion().setFromAxisAngle(X, p.crashRoll * 0.6))
@@ -174,14 +186,16 @@ export class Rider {
     const glowT = ratio * 1.2 + (air ? 1.4 : 0) + pl.tuck * 0.5;
     this.neon += (glowT - this.neon) * k(4);
     if (this.suit) this.suit.userData.uniforms.uEmissiveBoost.value = this.neon * 1.6;
-    this.boardMat.userData.uniforms.uEmissiveBoost.value = this.neon * 2.0;
+    this.skiMat.userData.uniforms.uEmissiveBoost.value = this.neon * 1.6;
 
     this.chair.visible = sit;
-    this.board.visible = true;
-    this.board.position.set(0, 0.035, 0);
-    this.board.rotation.set(sit ? 0.5 : 0, 0, 0);
-    if (sit) this.board.position.set(0, -0.45, -0.35);
+    // Skis: parallel under the boots, wedged into a snowplow when braking, lifted with the feet in the air.
+    const lift = 0.025 + p.air * 0.12;
+    const wide = ANIM.skiStance + p.plow * 0.1;
+    this.skis[0].position.set(-wide, lift, 0.02); this.skis[0].rotation.set(0, -p.plow * 0.28, 0);
+    this.skis[1].position.set(wide, lift, 0.02); this.skis[1].rotation.set(0, p.plow * 0.28, 0);
     this.pose(pl);
+    this.placePoles(pl);
     void camera;
   }
 
@@ -232,7 +246,7 @@ export class Rider {
     for (const [b, r] of this.restLocal) { b.position.copy(r.p); b.quaternion.copy(r.q); b.scale.copy(r.s); }
     this.G.clear();
     this.G.set(B.root, this.restLocal.get(B.root).m.clone());
-    // Armature space: +Z = toe side (rider faces), +X = rider's left = board nose.
+    // Armature space: +Z = forward (rider faces down the skis), +X = rider's left.
     const drop = p.crouch * 0.38 + p.tuck * 0.1;
     const hipPitch = THREE.MathUtils.degToRad(10 + p.crouch * 22 + p.tuck * 22) * (1 - p.sit);
     const rp = this.restGlobal.get(B.pelvis);
@@ -255,9 +269,28 @@ export class Rider {
     this.inherit(B.neck_01);
     this.rotateGlobal(B.neck_01, new THREE.Quaternion().setFromAxisAngle(X, -(hipPitch * 0.55 + bend) * 0.5));
     this.inherit(B.Head);
-    // Look down the hill (toward the nose).
-    this.rotateGlobal(B.Head, new THREE.Quaternion().setFromAxisAngle(Y, 0.55 * (1 - p.sit)).multiply(new THREE.Quaternion().setFromAxisAngle(X, -(hipPitch * 0.55 + bend) * 0.35)));
+    // Eyes down the fall line.
+    this.rotateGlobal(B.Head, new THREE.Quaternion().setFromAxisAngle(X, -(hipPitch * 0.55 + bend) * 0.45));
     for (const side of [1, -1]) { this.leg(side); this.arm(side, pl); }
+  }
+
+  /** Poles from the gloves down to the snow: trailing behind while skiing, tucked under the arms in a tuck. */
+  placePoles(pl) {
+    const p = this.p;
+    this.root.updateMatrixWorld(true);
+    const hand = new THREE.Vector3(), dir = new THREE.Vector3(), q = new THREE.Quaternion();
+    const down = new THREE.Vector3(0, -1, 0);
+    [['hand_l', -1], ['hand_r', 1]].forEach(([name, sx], i) => {
+      this.bones[name].getWorldPosition(hand);
+      this.visual.worldToLocal(hand);
+      const plant = Math.max(0, pl.turnInput * sx) * Math.max(0, Math.sin(p.t * 3.0)) * 0.6;   // inside pole swings forward on turns
+      dir.set(sx * 0.16, -1, 0.42 - plant).normalize();
+      dir.lerp(new THREE.Vector3(sx * 0.08, -0.3, 1).normalize(), p.tuck).normalize();
+      dir.lerp(new THREE.Vector3(sx * 0.6, -0.4, 0.3).normalize(), p.air * 0.5).normalize();
+      this.poles[i].position.copy(hand);
+      this.poles[i].quaternion.copy(q.setFromUnitVectors(down, dir));
+      this.poles[i].visible = p.sit < 0.5;
+    });
   }
 
   leg(side) {
@@ -265,15 +298,15 @@ export class Rider {
     const thigh = B['thigh' + s], calf = B['calf' + s], foot = B['foot' + s];
     this.inherit(thigh);
     const hip = pos(this.g(thigh));
-    // Feet bound to the board: left foot toward the nose (+X), right toward the tail.
-    let ankle = new THREE.Vector3(side * 0.27, this.ankleH + p.air * 0.2, 0.02);
+    // Boots clipped into the skis: hip-width apart, wider in a snowplow.
+    let ankle = new THREE.Vector3(side * (ANIM.skiStance + p.plow * 0.1), this.ankleH + p.air * 0.12, 0.0);
     ankle.lerp(hip.clone().add(new THREE.Vector3(side * 0.12, -0.5, 0.42)), p.sit);
     ankle.lerp(hip.clone().add(new THREE.Vector3(side * 0.25, -0.75, 0.25)), p.crash);
     const l1 = this.restLocal.get(calf).p.length(), l2 = this.restLocal.get(foot).p.length();
     const to = ankle.clone().sub(hip);
     const d = Math.min(Math.max(to.length(), 0.05), l1 + l2 - 0.002);
     const dir = to.normalize();
-    const pole = new THREE.Vector3(side * 0.35, 0, 1);
+    const pole = new THREE.Vector3(side * 0.12, 0, 1);   // knees forward over the ski tips
     pole.addScaledVector(dir, -pole.dot(dir)).normalize();
     const cosA = Math.min(1, Math.max(-1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d)));
     const axis = new THREE.Vector3().crossVectors(dir, pole).normalize();
@@ -283,8 +316,8 @@ export class Rider {
     this.aim(calf, foot, ankle.clone().sub(pos(this.g(calf))));
     this.inherit(foot);
     const rf = this.restGlobal.get(foot);
-    // Feet point across the board (toward the toe edge), like real bindings.
-    const fq = new THREE.Quaternion().setFromAxisAngle(Y, side * 0.25).multiply(new THREE.Quaternion().setFromRotationMatrix(rf));
+    // Feet point down the skis; tips pinch together in a snowplow.
+    const fq = new THREE.Quaternion().setFromAxisAngle(Y, -side * p.plow * 0.28).multiply(new THREE.Quaternion().setFromRotationMatrix(rf));
     this.setGlobal(foot, new THREE.Matrix4().compose(pos(this.g(foot)), fq, scl(rf)));
   }
 
@@ -294,11 +327,11 @@ export class Rider {
     this.inherit(B['clavicle' + s]);
     this.inherit(upper);
     const V = (x, y, z) => new THREE.Vector3(x, y, z);
-    // Riding: arms relaxed out over the board for balance (lead arm toward the nose).
-    const lead = side > 0 ? 1 : 0.6;
-    const sway = Math.sin(p.t * 1.3 + side) * 0.05;
-    const upS = V(side * 0.75 * lead, -0.62 - pl.turnInput * side * 0.2, 0.25 + sway), loS = V(side * 0.7, -0.3, 0.45);
-    const upT = V(side * 0.2, -0.65, 0.75), loT = V(-side * 0.25, 0.2, 0.9);
+    // Skiing: hands forward and a little out, as if holding the poles; the inside hand reaches on turns.
+    const reach = Math.max(0, pl.turnInput * -side) * 0.25;
+    const sway = Math.sin(p.t * 1.3 + side) * 0.04;
+    const upS = V(side * 0.32, -0.8, 0.42 + reach + sway), loS = V(side * 0.12, -0.15, 1.0);
+    const upT = V(side * 0.18, -0.55, 0.7), loT = V(-side * 0.15, 0.05, 1.0);
     const upA = V(side, 0.15 + Math.sin(p.t * 3.1 + side) * 0.12, 0.2), loA = V(side, 0.35, 0.25);
     const fl = p.t * ANIM.flailSpeed;
     const upF = V(side * 0.7, 0.6 + Math.sin(fl + side * 2) * 0.6, Math.cos(fl * 1.3 + side) * 0.8);
@@ -347,46 +380,50 @@ function suitMaterial(src) {
   return m;
 }
 
-function boardGeometry() {
-  const L = 1.56, W = 0.29, r = 0.14;
-  const shape = new THREE.Shape();
-  shape.moveTo(-W / 2, -L / 2 + r);
-  shape.quadraticCurveTo(-W / 2, -L / 2, 0, -L / 2);
-  shape.quadraticCurveTo(W / 2, -L / 2, W / 2, -L / 2 + r);
-  shape.lineTo(W / 2 * 0.9, 0);
-  shape.lineTo(W / 2, L / 2 - r);
-  shape.quadraticCurveTo(W / 2, L / 2, 0, L / 2);
-  shape.quadraticCurveTo(-W / 2, L / 2, -W / 2, L / 2 - r);
-  shape.lineTo(-W / 2 * 0.9, 0);
-  shape.closePath();
-  const g = new THREE.ExtrudeGeometry(shape, { depth: 0.022, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 2, curveSegments: 10 });
-  g.rotateX(-Math.PI / 2);          // shape Y → −Z (board length along Z), thickness up
+/** One ski along Z (tip = −Z): slim, tapered, tip and tail turned up. */
+function skiGeometry() {
+  const L = 1.68, W = 0.085;
+  const g = new THREE.BoxGeometry(W, 0.018, L, 1, 1, 40);
   const pos = g.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const z = pos.getZ(i);
-    const t = Math.max(0, Math.abs(z) - L / 2 + 0.24) / 0.24;
-    pos.setY(i, pos.getY(i) + t * t * 0.07);   // kicked nose & tail
+    const tip = Math.max(0, -z - (L / 2 - 0.26)) / 0.26;     // front 26 cm
+    const tail = Math.max(0, z - (L / 2 - 0.1)) / 0.1;       // back 10 cm
+    pos.setY(i, pos.getY(i) + tip * tip * 0.09 + tail * tail * 0.025);
+    const waist = 1 - 0.12 * Math.cos((z / L) * Math.PI) - tip * 0.35;
+    pos.setX(i, pos.getX(i) * waist);
   }
   g.computeVertexNormals();
   return g;
 }
 
-function boardMaterial() {
+function skiMaterial() {
   return toonMaterial({
-    name: 'board', rim: 0.6,
+    name: 'ski', rim: 0.6,
     vertPars: 'varying vec3 vB;', vert: 'vB = position;',
     fragPars: 'varying vec3 vB; uniform vec3 uNeon; uniform vec3 uNeon2;',
     frag: /* glsl */`
       {
-        float top = step(0.02, vB.y);
-        vec3 base = mix(vec3(0.1, 0.08, 0.3), vec3(1.0, 0.82, 0.25), step(0.5, fract(vB.z * 2.2)) * top * 0.0);
-        float stripe = smoothstep(0.02, 0.0, abs(vB.x - sin(vB.z * 5.0) * 0.06)) * top;
-        float edge = smoothstep(0.125, 0.14, abs(vB.x));
-        diffuseColor.rgb = mix(base, vec3(1.0), stripe * 0.5);
-        toonEmissive = uNeon * edge * 1.5 + uNeon2 * stripe * 1.2;
+        float top = step(0.0, vB.y);
+        vec3 base = mix(vec3(0.08, 0.07, 0.22), vec3(0.98, 0.97, 1.0), top);
+        float stripe = smoothstep(0.012, 0.0, abs(vB.x)) * top;
+        float edge = smoothstep(0.034, 0.042, abs(vB.x));
+        diffuseColor.rgb = mix(base, vec3(1.0, 0.3, 0.55), stripe);
+        toonEmissive = uNeon * edge * 1.2 + uNeon2 * stripe * 0.8;
       }`,
     uniforms: { uNeon: { value: new THREE.Color(...ART.neonColor) }, uNeon2: { value: new THREE.Color(...ART.neonColor2) } },
   });
+}
+
+/** Ski pole hanging from the grip (origin) along −Y: grip, shaft, basket. */
+function poleGeometry() {
+  const parts = [];
+  const paint = (g, c) => { const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set(c, i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
+  const grip = new THREE.CylinderGeometry(0.018, 0.016, 0.14, 8); grip.translate(0, -0.03, 0);
+  const shaft = new THREE.CylinderGeometry(0.008, 0.007, 1.12, 6); shaft.translate(0, -0.6, 0);
+  const basket = new THREE.CylinderGeometry(0.045, 0.045, 0.012, 10); basket.translate(0, -1.06, 0);
+  parts.push(paint(grip, [0.04, 0.04, 0.08]), paint(shaft, [1.0, 0.24, 0.5]), paint(basket, [0.04, 0.04, 0.08]));
+  return mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)));
 }
 
 void PHYSICS;

@@ -169,7 +169,7 @@ async function boot() {
   ui.fade(false, 2.0);
   if (params.has('ride')) startRide(true);
   else { setMode(Mode.MENU); ui.refresh(); }
-  window.__sendit = { course, player, terrain, camera, game, scene, renderer, features, scatter };
+  window.__sendit = { fx, course, player, terrain, camera, game, scene, renderer, features, scatter };
 }
 
 function setupPost() {

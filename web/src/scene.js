@@ -160,7 +160,7 @@ export const COURSE = {
   finishT: 2330,                 // run complete here (metres down the fall line)
   // Fall-line gradient profile: [length m, gradient deg] from the start. Flats before steeps =
   // natural kickers; the drops below sit at the top of steep pitches so landings are smooth.
-  profile: [[60, 6], [200, 15], [170, 9], [220, 20], [120, 11], [240, 18], [150, 8], [250, 22],
+  profile: [[60, 10], [200, 15], [170, 9], [220, 20], [120, 11], [240, 18], [150, 8], [250, 22],
     [150, 10], [300, 17], [150, 7], [250, 19], [200, 9], [1500, 10], [3000, 5], [20000, 1]],
   behindGradient: 30,            // degrees — the bowl rising behind the start
   drops: [[430, 3.0], [770, 3.5], [1160, 4.0], [1560, 3.5], [2010, 4.5]],   // [t, height m]

@@ -7,7 +7,7 @@ import { State } from './player.js';
 import { globals } from './world.js';
 import { on } from './state.js';
 
-const KIND_PUFF = 0, KIND_WEDGE = 1, KIND_LINE = 2;
+const KIND_PUFF = 0, KIND_WEDGE = 1, KIND_LINE = 2, KIND_GRAIN = 3;
 
 export class FXManager {
   constructor(player, renderer, scene) {
@@ -24,7 +24,7 @@ export class FXManager {
     this.drag = new Float32Array(n);
     this.grav = new Float32Array(n);
     this.next = 0;
-    this.acc = { cruise: 0, carve: 0, brake: 0, lines: 0 };
+    this.acc = { cruise: 0, carve: 0, brake: 0, lines: 0, grain: 0 };
 
     // Instanced camera-facing quads; wedges and lines stretch along their screen-space velocity.
     const geo = new THREE.InstancedBufferGeometry();
@@ -51,8 +51,9 @@ export class FXManager {
           vec3 vv = (viewMatrix * vec4(iVel, 0.0)).xyz;
           vec2 dir = length(vv.xy) > 1e-3 ? normalize(vv.xy) : vec2(0.0, 1.0);
           vec2 perp = vec2(-dir.y, dir.x);
-          float stretch = vKind < 0.5 ? 1.0 : (vKind < 1.5 ? 1.0 + min(length(vv) * 0.09, 2.5) : 1.0 + min(length(vv) * 0.12, 10.0));
-          float thin = vKind < 1.5 ? 1.0 : 0.04;
+          bool isLine = abs(vKind - 2.0) < 0.5, isGrain = vKind > 2.5;
+          float stretch = vKind < 0.5 ? 1.0 : (isGrain ? 1.0 + min(length(vv) * 0.05, 1.2) : (vKind < 1.5 ? 1.0 + min(length(vv) * 0.09, 2.5) : 1.0 + min(length(vv) * 0.12, 10.0)));
+          float thin = isLine ? 0.04 : 1.0;
           vec2 off = dir * position.y * size * stretch + perp * position.x * size * thin * (vKind > 0.5 && vKind < 1.5 ? 0.55 : 1.0);
           c.xy += off;
           vShade = 0.5 + 0.5 * dot(normalize(vec3(position.xy, 0.6)), normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz));
@@ -63,13 +64,14 @@ export class FXManager {
         uniform vec3 uLit; uniform vec3 uShade;
         void main() {
           float a;
-          if (vKind < 0.5) a = smoothstep(1.0, 0.3, length(vQ));                       // soft puff
+          if (vKind > 2.5) a = smoothstep(1.0, 0.15, length(vQ));                      // sugar grain
+          else if (vKind < 0.5) a = smoothstep(1.0, 0.3, length(vQ));                  // soft puff
           else if (vKind < 1.5) a = smoothstep(1.0, 0.6, abs(vQ.x) + max(vQ.y, 0.0) * 0.8) * smoothstep(-1.0, -0.6, vQ.y); // wedge
           else a = smoothstep(1.0, 0.0, abs(vQ.x)) * (1.0 - abs(vQ.y));              // speed line
           a *= vA;
           if (a < 0.01) discard;
           // Two-tone cel shading on snow particles; lines are pure white.
-          vec3 col = vKind > 1.5 ? vec3(1.0) : mix(uShade, uLit, step(0.45, vShade));
+          vec3 col = vKind > 2.5 ? mix(uLit, vec3(1.15), vA) : (vKind > 1.5 ? vec3(1.0) : mix(uShade, uLit, smoothstep(0.3, 0.6, vShade)));
           gl_FragColor = vec4(col, a);
         }`,
     });
@@ -131,6 +133,7 @@ export class FXManager {
   }
 
   update(dt, camera) {
+    this.time = (this.time || 0) + dt;
     const pl = this.player;
     const ground = pl.state === State.GROUNDED;
     const ratio = pl.speedRatio;
@@ -139,27 +142,39 @@ export class FXManager {
     const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
     const powder = pl.surface.y + pl.surface.w * 0.6 + pl.surface.x * 0.35;
 
-    // Tier 1 — cruising: low-density, long-lived fog trailing the board.
-    if (ground && pl.speed > 6) {
-      this.acc.cruise += FX.cruiseRate * ratio * dt * (0.5 + powder);
+    const pw = pl.powder ?? powder;
+    const carve = Math.abs(pl.turnInput) * Math.min(1, pl.speed / 8);
+    const out = side.clone().multiplyScalar(-Math.sign(pl.turnInput || 1));
+    // Sugar spray: a constant stream of fine glittering grains kicked up off both skis.
+    if (ground && pl.speed > 1.2) {
+      this.acc.grain += FX.grainRate * (0.2 + ratio) * (0.35 + pw * 0.65) * (1 + carve * 2.2) * dt;
+      while (this.acc.grain >= 1) {
+        this.acc.grain -= 1;
+        const sk = Math.random() < 0.5 ? -1 : 1;
+        const p = pl.renderPos.clone().addScaledVector(side, sk * 0.13).addScaledVector(back, 0.3 + Math.random() * 0.6)
+          .add(new THREE.Vector3((Math.random() - 0.5) * 0.15, 0.04, (Math.random() - 0.5) * 0.15));
+        const v = back.clone().multiplyScalar(0.6 + Math.random() * 1.8).add(new THREE.Vector3((Math.random() - 0.5) * 1.3, 1.2 + Math.random() * 2.2 * (0.4 + pw), (Math.random() - 0.5) * 1.3))
+          .addScaledVector(out, carve * (1.5 + Math.random() * 3.5)).addScaledVector(pl.velocity, 0.35);
+        this.spawn(p, v, 0.05 + Math.random() * 0.07, FX.grainLife * (0.5 + Math.random() * 0.8), KIND_GRAIN, 1.6, 6.5);
+      }
+      // Soft powder clouds hanging behind the skis.
+      this.acc.cruise += FX.puffRate * pw * (0.25 + ratio) * (1 + carve) * dt;
       while (this.acc.cruise >= 1) {
         this.acc.cruise -= 1;
-        const p = pl.renderPos.clone().addScaledVector(back, 0.6).add(new THREE.Vector3((Math.random() - 0.5) * 0.6, 0.15, (Math.random() - 0.5) * 0.6));
-        const v = pl.velocity.clone().multiplyScalar(0.25).add(new THREE.Vector3((Math.random() - 0.5) * 0.6, 0.4 + Math.random() * 0.5, (Math.random() - 0.5) * 0.6));
-        this.spawn(p, v, 0.7 + Math.random() * 0.8, FX.cruiseLife * (0.7 + Math.random() * 0.6), KIND_PUFF, 1.2, 0.3);
+        const p = pl.renderPos.clone().addScaledVector(back, 0.5 + Math.random() * 0.5).add(new THREE.Vector3((Math.random() - 0.5) * 0.5, 0.12, (Math.random() - 0.5) * 0.5));
+        const v = pl.velocity.clone().multiplyScalar(0.2).add(new THREE.Vector3((Math.random() - 0.5) * 0.5, 0.3 + Math.random() * 0.4, (Math.random() - 0.5) * 0.5)).addScaledVector(out, carve * 1.2);
+        this.spawn(p, v, 0.6 + Math.random() * 0.7, FX.cruiseLife * (0.6 + Math.random() * 0.6), KIND_PUFF, 1.4, 0.25);
       }
     }
-    // Tier 2 — carving: sharp high-velocity wedges shooting out opposite to the turn.
-    const carve = Math.abs(pl.turnInput) * ratio;
-    if (ground && carve > 0.25) {
-      this.acc.carve += FX.carveRate * (carve - 0.2) * dt * (0.5 + powder * 0.8);
-      const out = side.clone().multiplyScalar(-Math.sign(pl.turnInput));
+    // Carving: a sheet of snow thrown out of the turn.
+    if (ground && carve > 0.3 && pl.speed > 4) {
+      this.acc.carve += FX.carveRate * (carve - 0.25) * dt * (0.5 + pw * 0.8);
       while (this.acc.carve >= 1) {
         this.acc.carve -= 1;
-        const dir = out.clone().multiplyScalar(0.9).addScaledVector(back, 0.5 + Math.random() * 0.4).add(new THREE.Vector3(0, 0.35 + Math.random() * 0.45, 0)).normalize();
-        const v = dir.multiplyScalar(FX.carveSpeed * (0.6 + Math.random() * 0.6)).addScaledVector(pl.velocity, 0.45);
-        const p = pl.renderPos.clone().addScaledVector(out, 0.15).addScaledVector(fwd, (Math.random() - 0.5) * 1.2).add(new THREE.Vector3(0, 0.08, 0));
-        this.spawn(p, v, 0.18 + Math.random() * 0.22, FX.carveLife * (0.7 + Math.random() * 0.6), KIND_WEDGE, 1.8, 6.0);
+        const dir = out.clone().multiplyScalar(0.9).addScaledVector(back, 0.4 + Math.random() * 0.4).add(new THREE.Vector3(0, 0.4 + Math.random() * 0.5, 0)).normalize();
+        const v = dir.multiplyScalar(FX.carveSpeed * (0.4 + Math.random() * 0.5)).addScaledVector(pl.velocity, 0.4);
+        const p = pl.renderPos.clone().addScaledVector(out, 0.15).addScaledVector(fwd, (Math.random() - 0.5) * 1.0).add(new THREE.Vector3(0, 0.06, 0));
+        this.spawn(p, v, 0.12 + Math.random() * 0.14, FX.carveLife * (0.7 + Math.random() * 0.6), KIND_WEDGE, 1.8, 6.0);
       }
     }
     // Tier 3 — braking: continuous fan while scrubbing speed hard.
@@ -199,7 +214,8 @@ export class FXManager {
       const t = 1 - this.life[i] / this.max[i];
       const kind = this.kind[i];
       const size = kind === KIND_PUFF ? this.size0[i] * (0.5 + t * 1.2) : this.size0[i] * (1 - t * 0.5);
-      const alpha = kind === KIND_LINE ? 0.55 * Math.sin(t * Math.PI) : (kind === KIND_PUFF ? 0.38 : 0.85) * (1 - t) * Math.min(1, t * 10);
+      let alpha = kind === KIND_LINE ? 0.55 * Math.sin(t * Math.PI) : (kind === KIND_PUFF ? 0.42 : 0.85) * (1 - t) * Math.min(1, t * 10);
+      if (kind === KIND_GRAIN) alpha = (1 - t * t) * (0.55 + 0.45 * Math.sin(i * 12.9898 + this.time * 31.0));
       const o = count * 3;
       ip[o] = this.pos[k3]; ip[o + 1] = this.pos[k3 + 1]; ip[o + 2] = this.pos[k3 + 2];
       iv[o] = this.vel[k3]; iv[o + 1] = this.vel[k3 + 1]; iv[o + 2] = this.vel[k3 + 2];
@@ -209,8 +225,17 @@ export class FXManager {
     this.geo.instanceCount = count;
     for (const a of [this.iPos, this.iVel, this.iData]) { a.clearUpdateRanges(); a.addUpdateRange(0, count * 3); a.needsUpdate = true; }
 
-    // Persistent tracks: stamp the board's footprint while it touches the snow.
-    if (ground || pl.state === State.CRASH) this.track.stamp(pl.renderPos, pl.heading, pl.state === State.CRASH ? 1.2 : FX.trackWidth, 0.6 + pl.skid * 0.4);
+    // Persistent tracks: two crisp ski grooves inside a shallow trough pushed through the powder.
+    if (pl.state === State.CRASH) this.track.stamp('body', pl.renderPos, pl.heading, 1.2, 1);
+    else if (ground) {
+      const h = pl.heading, pwr = pl.powder ?? 1;
+      const wedge = pl.brake;
+      for (const sk of [-1, 1]) {
+        const at = pl.renderPos.clone().addScaledVector(side, sk * (FX.skiSpacing * 0.5 + wedge * 0.1));
+        this.track.stamp(sk < 0 ? 'L' : 'R', at, h + sk * wedge * 0.28, FX.trackWidth + wedge * 0.12, 1.0);
+      }
+      if (pwr > 0.2) this.track.stamp('plow', pl.renderPos, h, FX.plowWidth, FX.plowStrength * pwr);
+    }
     this.track.flush(pl.renderPos);
   }
 }
@@ -232,8 +257,8 @@ class TrackMap {
     const stampGeo = new THREE.InstancedBufferGeometry();
     stampGeo.setAttribute('position', new THREE.Float32BufferAttribute([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], 3));
     stampGeo.setIndex([0, 1, 2, 0, 2, 3]);
-    this.iStamp = new THREE.InstancedBufferAttribute(new Float32Array(256 * 4), 4).setUsage(THREE.DynamicDrawUsage); // x, z, heading, width
-    this.iStr = new THREE.InstancedBufferAttribute(new Float32Array(256 * 2), 2).setUsage(THREE.DynamicDrawUsage);   // length, strength
+    this.iStamp = new THREE.InstancedBufferAttribute(new Float32Array(512 * 4), 4).setUsage(THREE.DynamicDrawUsage); // x, z, heading, width
+    this.iStr = new THREE.InstancedBufferAttribute(new Float32Array(512 * 2), 2).setUsage(THREE.DynamicDrawUsage);   // length, strength
     stampGeo.setAttribute('iStamp', this.iStamp);
     stampGeo.setAttribute('iStr', this.iStr);
     this.stampGeo = stampGeo;
@@ -241,6 +266,7 @@ class TrackMap {
     const stampMat = new THREE.ShaderMaterial({
       uniforms: { region: this.region },
       depthTest: false, depthWrite: false, transparent: true,
+      side: THREE.DoubleSide,   // the world-xz → texture mapping mirrors the quads
       blending: THREE.CustomBlending, blendEquation: THREE.MaxEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
       vertexShader: /* glsl */`
         attribute vec4 iStamp; attribute vec2 iStr; uniform vec3 region; varying vec2 vQ; varying float vS;
@@ -253,7 +279,7 @@ class TrackMap {
         }`,
       fragmentShader: /* glsl */`
         varying vec2 vQ; varying float vS;
-        void main() { float a = smoothstep(1.0, 0.55, abs(vQ.x)) * smoothstep(1.0, 0.7, abs(vQ.y)); gl_FragColor = vec4(vec3(a * vS), 1.0); }`,
+        void main() { float a = smoothstep(1.0, 0.4, abs(vQ.x)) * smoothstep(1.0, 0.85, abs(vQ.y)); gl_FragColor = vec4(vec3(a * vS), 1.0); }`,
     });
     this.stampMesh = new THREE.Mesh(stampGeo, stampMat);
     this.stampMesh.frustumCulled = false;
@@ -283,13 +309,17 @@ class TrackMap {
     r.setRenderTarget(prev);
   }
 
-  stamp(p, heading, width, strength) {
+  stamp(key, p, heading, width, strength) {
     const cur = new THREE.Vector2(p.x, p.z);
-    if (this.last && this.last.distanceTo(cur) < 0.15) return;
-    const len = this.last ? Math.min(this.last.distanceTo(cur) + 0.6, 3) : 0.8;
-    const mid = this.last ? this.last.clone().add(cur).multiplyScalar(0.5) : cur;
-    this.last = cur;
-    if (this.stamps.length < 256) this.stamps.push([mid.x, mid.y, heading, width, len, strength]);
+    this.lastBy = this.lastBy || {};
+    const last = this.lastBy[key];
+    if (last && last.distanceTo(cur) < 0.12) return;
+    const len = last && last.distanceTo(cur) < 4 ? last.distanceTo(cur) + 0.45 : 0.5;
+    const mid = last && last.distanceTo(cur) < 4 ? last.clone().add(cur).multiplyScalar(0.5) : cur;
+    // Orient along the path the ski actually travelled (not its heading) so skidded turns stay smooth.
+    if (last && last.distanceTo(cur) < 4) heading = Math.atan2(-(cur.x - last.x), -(cur.y - last.y));
+    this.lastBy[key] = cur;
+    if (this.stamps.length < 512) this.stamps.push([mid.x, mid.y, heading, width, len, strength]);
   }
 
   flush(p) {
