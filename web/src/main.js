@@ -22,7 +22,7 @@ import { CameraController } from './camera.js';
 import { FXManager } from './fx.js';
 import { SoundScape } from './audio.js';
 import { UI } from './ui.js';
-import { Input } from './input.js';
+import { Input, PAD } from './input.js';
 import { game, Mode, setMode, on, settings, resetScore, emit } from './state.js';
 
 patchShaderChunks();
@@ -268,6 +268,20 @@ document.addEventListener('pointerlockchange', () => {
 });
 canvas.addEventListener('click', () => { if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) input.lock(); });
 
+/** Controller rumble: landings, crashes, close shaves, pops, hard stops and a light buzz while carving. */
+on('landed', ({ impact }) => input.rumble(Math.min(1, impact / 14), 0.45, 90 + impact * 8));
+on('crashed', () => input.rumble(1, 0.8, 380));
+on('nearMiss', () => input.rumble(0, 0.55, 70));
+on('jumped', () => input.rumble(0.15, 0.3, 60));
+on('hardBrake', () => input.rumble(0.3, 0.6, 200));
+let rumbleT = 0;
+function rumbleCarve(dt) {
+  rumbleT -= dt;
+  if (rumbleT > 0 || game.mode !== Mode.RIDING || player.state !== State.GROUNDED) return;
+  const carve = Math.abs(player.turnInput) * player.speedRatio;
+  if (carve > 0.35) { input.rumble(0, 0.12 + carve * 0.18, 120); rumbleT = 0.11; }
+}
+
 /** Crossing the finish: celebrate, then fade back to the top for another lap. */
 let finishing = false;
 function checkFinish() {
@@ -287,7 +301,9 @@ function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   if (!composer) return;
-  input.poll();
+  input.poll(dt);
+  ui.navigate(input);
+  if (game.mode === Mode.MENU && (input.btnPressed(PAD.START))) startRide();
   if (input.justPressed('pause')) {
     if (game.mode === Mode.PAUSED) resume();
     else if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) pause();
@@ -313,6 +329,7 @@ function frame(now) {
   sound.update(dt, camera);
   ui.update(dt, player);
   checkFinish();
+  rumbleCarve(dt);
   // Wind streaks fade in near top speed.
   const riding = game.mode === Mode.RIDING;
   const wantWind = riding ? THREE.MathUtils.smoothstep(player.speedRatio, HUD.windStreakFrom, HUD.windStreakFull) : 0;

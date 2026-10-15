@@ -19,7 +19,7 @@ export class UI {
     this.bindSettings();
     on('score', ({ label, points }) => this.note(label, points));
     on('hint', (t) => this.hint(t));
-    on('liftBoarded', (name) => { $('liftlabel').textContent = `${name}  ·  hold W to hurry`; });
+    on('liftBoarded', (name) => { $('liftlabel').textContent = `${name}  ·  hold W / RT to hurry`; });
     on('mode', () => this.refresh());
     on('landed', ({ perfect }) => { if (perfect) this.pop('PERFECT!', 'gold'); });
     on('stumble', () => this.pop('WOBBLE!', 'pink'));
@@ -136,6 +136,54 @@ export class UI {
       el.classList.add('bump');
     }
     this.speedTier = next;
+  }
+
+  /** Controller menu navigation: d-pad / stick moves focus spatially, A selects, B goes back. */
+  navigate(input) {
+    const name = Object.keys(this.screens).find((k) => k !== 'loading' && !this.screens[k].classList.contains('hidden'));
+    if (!name) return;
+    const root = this.screens[name];
+    const items = [...root.querySelectorAll('button, input[type=range], input[type=checkbox]')].filter((el) => el.offsetParent !== null);
+    if (!items.length) return;
+    let cur = items.includes(document.activeElement) ? document.activeElement : null;
+    const step = input.navStep;
+    if (step) {
+      if (!cur) { this.focusPad(items[0]); return; }
+      if (cur.type === 'range' && (step === 'left' || step === 'right')) {
+        const min = Number(cur.min || 0), max = Number(cur.max || 1);
+        const st = Number(cur.step) || (max - min) / 20;
+        cur.value = Math.min(max, Math.max(min, Number(cur.value) + (step === 'right' ? st : -st)));
+        cur.dispatchEvent(new Event('input', { bubbles: true }));
+        return;
+      }
+      const r = cur.getBoundingClientRect();
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      const [dx, dy] = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[step];
+      let best = null, bs = Infinity;
+      for (const el of items) {
+        if (el === cur) continue;
+        const q = el.getBoundingClientRect();
+        const ex = q.left + q.width / 2 - cx, ey = q.top + q.height / 2 - cy;
+        const along = ex * dx + ey * dy;
+        if (along <= 4) continue;
+        const score = along + Math.abs(ex * dy - ey * dx) * 2.5;
+        if (score < bs) { bs = score; best = el; }
+      }
+      if (best) this.focusPad(best);
+    }
+    if (input.navConfirm()) {
+      const el = cur || items[0];
+      input.swallowA();
+      if (el.tagName === 'BUTTON' || el.type === 'checkbox') el.click();
+    }
+    if (input.navBack()) root.querySelector('[data-act="back"], [data-act="resume"]')?.click();
+  }
+
+  focusPad(el) {
+    document.querySelectorAll('.pad-focus').forEach((e) => e.classList.remove('pad-focus'));
+    el.classList.add('pad-focus');
+    el.focus({ preventScroll: true });
+    el.scrollIntoView({ block: 'nearest' });
   }
 
   bindSettings() {
