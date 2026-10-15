@@ -113,7 +113,7 @@ vec3 rockAlbedo(vec2 uv, float far) {
   float beds = texture2D(noiseTex, vec2(uv.x * 0.004, uv.y * 0.045) + 0.1).r;      // layering along the face
   float streak = texture2D(noiseTex, vec2(uv.x * 0.11, uv.y * 0.007) + 0.4).g;    // water-stain streaks (vertical)
   vec3 c = mix(uRockA, uRockB, smoothstep(0.25, 0.8, b1 * 0.5 + beds * 0.5 + (b2 - 0.5) * 0.5));
-  c = mix(c, uRockC, smoothstep(0.66, 0.85, b1 + (beds - 0.5) * 0.3) * 0.5);
+  c = mix(c, uRockC, smoothstep(0.7, 0.88, b1 + (beds - 0.5) * 0.3) * 0.35);
   c *= mix(1.0, 0.62, smoothstep(0.55, 0.8, streak) * 0.8 * (1.0 - far * 0.7));
   c *= 0.82 + 0.3 * b3;
   return c;
@@ -157,6 +157,16 @@ export const SNOW_FRAG_GLSL = /* glsl */`
   vec4 s4 = texture2D(splatTex, tUV(xz));
   vec3 s = s4.rgb;
   float dist = length(vW - cameraPosition);
+  {
+    // Buttresses, ribs and gullies on steep ground (25–80 m) that the 1.25 m height grid smooths
+    // away: breaks up long uniform walls and drives where snow sticks below.
+    float steepF = smoothstep(0.2, 0.4, 1.0 - N.y) * 0.8;
+    if (steepF > 0.0) {
+      vec2 q = xz + vW.y * 0.6;
+      vec2 gA = noiseGrad(q, 0.009, 3.0, 0) * 6.0;
+      N = normalize(N - vec3(gA.x, 0.0, gA.y) * steepF);
+    }
+  }
   float farF = smoothstep(220.0, 900.0, dist);
   float midF = smoothstep(40.0, 160.0, dist);
   vec3 Vd = (vW - cameraPosition) / max(dist, 1e-3);
