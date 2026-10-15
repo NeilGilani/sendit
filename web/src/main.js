@@ -214,7 +214,7 @@ function applyQuality() {
   const q = settings.quality;
   const dpr = Math.min(devicePixelRatio || 1, 2);
   renderer.setPixelRatio([Math.min(dpr, 1) * 0.75, Math.min(dpr, 1.5), dpr][q]);
-  sky.setShadowBox([40, 60, 85][q], [1024, 2048, 4096][q]);
+  sky.setShadowBox([40, 60, 85][q], [1024, 2048, 3072][q]);
   post.setQuality(q);
   terrain.setQuality(q);
   scatter.setQuality(q);

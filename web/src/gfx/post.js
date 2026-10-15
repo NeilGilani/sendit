@@ -216,8 +216,10 @@ export class PostStack {
   }
 
   setQuality(q) {
+    // AO is the single most expensive pass on integrated GPUs: always half resolution (it is a soft,
+    // low-frequency term anyway), Medium sampling on high quality, Low on medium.
     this.ao.enabled = q > 0;
-    if (q > 0) this.ao.setQualityMode(q === 2 ? 'High' : 'Medium');
+    if (q > 0) { this.ao.setQualityMode(q === 2 ? 'Medium' : 'Low'); this.ao.configuration.halfRes = true; }
     this.bloom.intensity = POST.bloom.intensity * (q === 0 ? 0.7 : 1);
     this.grade.uniforms.get('glare').value = q === 0 ? 0 : POST.glare;
     this.grade.uniforms.get('flare').value = q === 2 ? POST.flare : 0;

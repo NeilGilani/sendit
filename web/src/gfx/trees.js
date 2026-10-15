@@ -133,7 +133,7 @@ function crownGeometry(kind, lod, seed) {
   const rnd = mulberry32(seed);
   const H = TREES.height;
   const parts = [trunkGeo(H * 0.92, 0.2, 0.03, lod === 0 ? 7 : 5)];
-  const whorls = lod === 0 ? 24 : 10;
+  const whorls = lod === 0 ? 19 : 10;
   const per = lod === 0 ? 6 : 5;
   const segs = 2;
   const wMul = lod === 0 ? 1 : 1.45;
