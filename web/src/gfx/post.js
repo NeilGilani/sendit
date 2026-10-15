@@ -209,6 +209,7 @@ export class PostStack {
     this.composer = composer;
     this.ao = ao;
     this._v = new THREE.Vector3();
+    if (typeof window !== 'undefined') window.__post = this;   // debug handle
   }
 
   setQuality(q) {
