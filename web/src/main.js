@@ -53,7 +53,7 @@ const ui = new UI({ ride: () => startRide(), resume: () => resume(), top: () => 
 
 let course, snowfall, terrain, sky, scatter, lifts, features, player, rider, cam, fx, sound, composer, post;
 let currentMap = null;          // { map, variant, course } from the map registry
-let stage = null, lobby = null, stageReady = null, gearSupported = false;
+let stage = null, lobby = null, stageReady = null;
 installRideTracker({ getMapId: () => currentMap?.map.id ?? 'unknown' });
 
 async function boot() {
@@ -186,7 +186,7 @@ function ensureStage() {
  * the equipped catalog item's model (profileStore.gearModel), unless ?variant= overrides it.
  */
 function applyGameEquipment(type) {
-  gearSupported = applyEquipment({ rider, player }, type, gearVariant ?? profileStore.gearModel(type)) === 'native' || type === 'skis';
+  applyEquipment({ rider, player }, type, gearVariant ?? profileStore.gearModel(type));
 }
 
 // Loadout changes (lobby toggle, other tabs, profile sync) reach the preview and the game rider.
@@ -260,7 +260,6 @@ async function startRide(instant = false) {
   ui.refresh();
   emit('rideStarted', { mapId: currentMap.map.id, equipment: profileStore.equipment });
   if (!instant) ui.fade(false, 0.9);
-  if (!gearSupported) setTimeout(() => emit('hint', 'Snowboards are coming soon · riding skis for now'), 1600);
   busy = false;
 }
 

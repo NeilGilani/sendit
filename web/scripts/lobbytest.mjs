@@ -80,7 +80,7 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await page.waitForFunction(() => window.__sendit.stage.pl?.equipment?.type === 'snowboard' && window.__sendit.stage.gearMode === 'native', null, { timeout: T });
   s = await state(page);
   ok(s.equipment === 'snowboard' && s.stored.loadout.equipment === 'snowboard', 'snowboard selected and saved');
-  ok(!(await page.isVisible('.eq-badge')), 'real snowboard: no placeholder badge');
+  ok((await state(page)).gear === 'native', 'real snowboard on the preview rider (rider.setEquipment)');
   await shot(page, 't1_snowboard');
 
   await page.reload();

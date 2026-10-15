@@ -1,49 +1,55 @@
 # Sendit lobby: the skeleton
 
-The lobby is the first screen after loading. It shows your rider on a snowy turntable you can
-rotate, a tab bar, one panel, your profile chip, the selected map and the **Ride** button. Only
-**Equipment** (Skis / Snowboard) is a real feature today. Every other area is a stub or registry that
-later work plugs into: character customization, maps, multiplayer, leaderboards, profile and
-settings.
+The lobby is the first screen after loading. Your rider stands on a snow plinth a little way down
+the selected map's run, **inside the real game world**: same terrain, trees, sky, sun, shadows and
+post stack as a ride. You can rotate them like a turntable. Around the rider sit a tab bar, one
+panel, your profile chip, the selected map and the **Ride** button. Only **Equipment** (Skis /
+Snowboard) is a real feature today. Every other area is a stub or registry that later work plugs
+into: character customization, maps, multiplayer, leaderboards, profile and settings.
 
 ```
-npm --prefix web run dev          → http://localhost:5173/        (lobby)
-                                    http://localhost:5173/?ride   (skip straight into a ride)
-node web/scripts/lobbytest.mjs http://localhost:5173/             (end-to-end check, ~1 min)
-node web/scripts/unittest.mjs                                     (data layer: profile, catalog, leaderboard, maps)
-node web/scripts/lobbyshot.mjs http://localhost:5173/ out.png 2 "tab:maps"   (screenshot)
+npm --prefix web run dev                → http://localhost:5173/        (lobby)
+                                          http://localhost:5173/?ride   (skip straight into a ride)
+GPU=1 node web/scripts/lobbytest.mjs http://localhost:5173/   (end-to-end check, ~30 s on a GPU)
+node web/scripts/unittest.mjs                                  (data layer: profile, catalog, leaderboard, maps, lobby spot)
+GPU=1 node web/scripts/lobbyshot.mjs http://localhost:5173/ out.png 2 "tab:maps"   (screenshot)
 ```
+
+`GPU=1` runs headless Chromium on the real GPU (ANGLE D3D11). Without it the scripts use SwiftShader,
+which is very slow with the full world behind the lobby (minutes per run, frame-counted waits).
 
 ## Architecture
 
 ```
-main.js ── boot: loadMap(resolveMapSelection()) → world → Lobby + LobbyStage
+main.js ── boot: loadMap(resolveMapSelection()) → world → LobbyStage at lobbySpot() + Lobby
    │        flow: lobby ──Ride──▶ riding ──Esc──▶ pause ──Back to lobby──▶ lobby
-   │        frame(): in the lobby only the stage is simulated and rendered (world frozen)
+   │        frame(): the world always renders. In the lobby the stage drives the world camera, the
+   │                 game rider is hidden and frozen at the start, and the sun's shadow box
+   │                 centres on the plinth.
    │
    ├─ ui.js            screens: loading · lobby · pause (+ settings / credits overlays), HUD,
    │                   menu navigation for keyboard (arrows) and gamepad (d-pad, A, B, LB/RB, Start)
-   ├─ input.js         + menuActions() (gamepad with key repeat), last-used device → 'inputDevice'
+   ├─ input.js         gameplay mapping + menuActions() (gamepad with key repeat), last-used device → 'inputDevice'
    ├─ state.js         Mode (LOBBY = MENU), event bus (on → unsubscribe, once, off), settings
    │
    ├─ lobby/
    │   ├─ Lobby.js            controller: DOM, tab lifecycle, layout → stage framing, keys, toasts
-   │   ├─ stage.js            LobbyStage: own scene/camera/post, turntable, preview Rider, shots
+   │   ├─ stage.js            LobbyStage: plinth + preview Rider in the world scene, turntable,
+   │   │                      camera shots, activate()/deactivate() camera ownership
    │   ├─ tabs.js             registerLobbyTab registry
    │   ├─ tabs/*.js           equipment (real), character, maps, multiplayer, leaderboards,
    │   │                      profile, settings (minimal / coming soon)
-   │   ├─ equipmentBridge.js  optional calls into the snowboard work (see below)
-   │   ├─ placeholderBoard.js labelled PLACEHOLDER snowboard (until the real one exists)
+   │   ├─ equipmentBridge.js  the two optional calls into rider.js / player.js (see below)
    │   ├─ nav.js              spatial focus navigation (lobby, pause, settings, credits)
-   │   ├─ config.js           lobby tunables: palette, camera SHOTS, turntable feel
+   │   ├─ config.js           lobby tunables: plinth, neon, camera SHOTS, turntable feel, hero angles
    │   └─ lobby.css, icons.js
    ├─ profile/
    │   ├─ schema.js           versioned profile + MIGRATIONS + sanitize()
-   │   ├─ store.js            profileStore: load/save/migrate, loadout, map, stats, unlocks
-   │   ├─ catalog.js          item catalog: CATEGORIES, SLOTS, EQUIPMENT_TYPES, STATS, items
+   │   ├─ store.js            profileStore: load/save/migrate, loadout, gearModel(), map, stats, unlocks
+   │   ├─ catalog.js          item catalog: CATEGORIES, SLOTS, EQUIPMENT_TYPES, STATS, items, gearModel()
    │   └─ tracker.js          ride events → profile stats + leaderboard submit
    ├─ maps/
-   │   ├─ registry.js         registerMap, resolveMapSelection, loadMap (with fallback)
+   │   ├─ registry.js         registerMap, resolveMapSelection, loadMap (with fallback), lobbySpot
    │   └─ builtin.js          valcrest-gully (default), lake-tahoe (real mountains, variants)
    └─ services/
        ├─ index.js            services locator + provideService(name, impl)
@@ -54,20 +60,32 @@ main.js ── boot: loadMap(resolveMapSelection()) → world → Lobby + LobbyS
 ```
 
 **Data flow for a gear change:** Equipment tab → `profileStore.setEquipment('snowboard')` → saves
-the profile → emits `loadout` → main.js tells the stage (`stage.setEquipment`, which plays a hop and
-swaps at the top) and the game rider (`applyEquipment`). Tabs never touch 3D objects directly, so a
-future Character tab only has to call `profileStore.equip(itemId, variantId)`.
+the profile → emits `loadout` → main.js tells the stage (`stage.setEquipment(type, { variant })`,
+which plays a hop and swaps at the top) and the game rider (`applyGameEquipment`). `variant` is
+`profileStore.gearModel(type)`: the equipment model of the equipped catalog item. Tabs never touch
+3D objects directly, so a future gear picker only has to call `profileStore.equip(itemId, variantId)`.
 
-**Rendering:** the stage has its own scene, camera, lights and a small post stack (bloom, vignette,
-SMAA) on the shared `WebGLRenderer`. While the lobby is visible, `frame()` skips the world
-entirely. Toon materials read a few world globals (`uSunDir`, baked `sunMaskTex`, `uWater`), so
-`LobbyStage.render()` swaps in stage values and restores them afterwards. If the stage fails to
-build, the lobby UI still works over the world's menu flyover.
+**Rendering:** the stage owns a group (plinth + preview rider) that it adds to the world scene. While
+the lobby is visible, `stage.update()` animates the rider and places the world camera; `frame()`
+skips the ride camera controller and renders the world as usual (terrain, trees, sky, shadows,
+post). The plinth uses the game's snow optics (`gfx/snow.js` band shader). On **Ride** the stage
+hands the camera back (`deactivate()` clears the lens shift) and the ride intro sweeps on from the
+lobby camera. Because the world has been rendering all along, its shaders and textures are warm,
+so a ride starts without a black frame. If the stage fails to build, the lobby UI still works over
+the menu flyover.
+
+**Where the lobby stands:** `lobbySpot(map, course, terrain)` (maps/registry.js). Default: 40 m
+(`LOBBY_ALONG`) down `course.path`, past the start banner, with the camera looking within ±0.6 rad
+of the fall line toward the most open view (where the terrain ahead drops furthest). A map can
+override it with `lobby({ course, terrain, spawn }) → { x, z, heading }`. The plinth top sits just
+above the highest snow under it and its skirt reaches into the slope.
 
 **Framing:** `Lobby.layout()` measures the free screen area (right of the panel on wide screens,
 above the bottom sheet on narrow ones). `LobbyStage` then sets the camera distance so the subject
 fits that area and uses a lens shift (`setViewOffset`) to centre it there. Each tab picks a camera
 shot (`full`, `gear`, `portrait`, `wide` in `lobby/config.js`), and the camera eases between them.
+The turntable rests at a per-gear hero angle (`TURNTABLE.heroYaw`): 3/4 front for skis, toe side
+(chest) for a snowboard.
 
 ### Events (state.js bus)
 
@@ -82,7 +100,7 @@ shot (`full`, `gear`, `portrait`, `wide` in `lobby/config.js`), and the camera e
 | `rideRecorded` | `{ score, …, runs, duration, mapId, rank, isNewBest }` | profile/tracker.js |
 | `inputDevice` | `'keyboard' \| 'mouse' \| 'gamepad' \| 'touch'` | input.js |
 | `lobbyTabs` | `{ id }` | tab registry changes |
-| `lobbyGearMode` | `'native' \| 'builtin' \| 'module' \| 'placeholder'` | stage |
+| `lobbyGearMode` | `'native' \| 'builtin' \| 'unsupported'` | stage |
 | `service` | `{ name, impl }` | provideService |
 
 ### Profile schema (v1, localStorage `sendit.profile`)
@@ -133,10 +151,12 @@ registerMap({
   thumbnail: '/maps/north-bowl.jpg', order: 2,
   load: async ({ variant, onProgress }) => new NorthBowlCourse(),   // Course-compatible object
   // optional: variants: async () => [{ id, group, name, meta, value }], describe: (variant, course) => '…'
+  // optional: lobby: ({ course, terrain, spawn }) => ({ x, z, heading }),   // where the lobby plinth stands
 });
 ```
 The Maps tab lists it. Picking it saves `profile.map` and reloads, because maps are built during
-boot. `?map=<id>` loads one directly. A map that fails to load falls back to `valcrest-gully`.
+boot. `?map=<id>` loads one directly. A map that fails to load falls back to `valcrest-gully`. The
+lobby stands on the new map automatically (see "Where the lobby stands").
 
 ### Add a catalog item
 ```js
@@ -146,11 +166,19 @@ registerItem({
   variants: [{ id: 'orange', name: 'Orange', colors: { base: '#ff7a2f', accent: '#1b1446' } }],
   stats: {}, unlock: { type: 'distance', value: 50000 },   // or 'default' | 'score' | 'runs' | 'locked'
 });
+// Gear: point it at a model from src/equipment/specs.js and the preview + game rider will ride it.
+registerItem({
+  id: 'board-jibworks-butter', name: 'Jibworks Butter 152', slot: 'board', brand: 'Jibworks',
+  stats: { speed: 5, carve: 5, pop: 8, stability: 4 }, unlock: { type: 'score', value: 5000 },
+  model: { kind: 'equipment', ref: 'park' },
+});
 ```
 Slots: helmet, goggles, jacket, gloves, pants (outfit) and skis, poles, board, bindings (gear). The
 first `unlock: default` item per slot goes into fresh loadouts. `unlockState(item, profile)` gives
-`{ unlocked, progress, label }`, and `profileStore.equip()` refuses locked items. Rendering an item
-is the rider's job: `item.model` (`{ kind, ref }`) is a hint for it.
+`{ unlocked, progress, label }`, and `profileStore.equip()` refuses locked items. For gear,
+`catalog.gearModel(item)` / `profileStore.gearModel(type)` turn the primary slot's item into the
+model id passed to `setEquipment`. Outfit items are data only for now: the suit colours in rider.js
+do not read them yet.
 
 ### Swap in a real service
 ```js
@@ -162,28 +190,24 @@ Implement the base class in `services/<name>.js` (`NetworkService`, `Leaderboard
 `IdentityService`). Callers only use `services.<name>`. The Leaderboards and Multiplayer tabs
 re-render on the `service` event.
 
-## Snowboard integration (rider.js / player.js / src/equipment/ belong to the snowboard work)
+## Snowboard / equipment integration (rider.js, player.js, src/equipment/ are not lobby files)
 
-All calls go through `web/src/lobby/equipmentBridge.js` and are optional:
+The snowboard work is merged, so the lobby uses the real models and physics. All calls go through
+`web/src/lobby/equipmentBridge.js` and stay optional:
 
 | call | where | when |
 |---|---|---|
-| `rider.setEquipment?.(type)` | preview rider (stage.js) and game rider (main.js) | at boot, on every `loadout` change, at ride start |
-| `player.setEquipment?.(type)` | preview player and game player | same |
-| `createEquipmentModel(type, variant)` | any `web/src/equipment/*.js` that exports it (found with `import.meta.glob`) | only if `rider.setEquipment` is missing and the type is `snowboard`; the returned Object3D is added to `rider.visual` in place of the skis |
+| `player.setEquipment?.(type, variant)` | preview player (stage.js), game player (main.js) | at boot, on every `loadout` change, at ride start |
+| `rider.setEquipment?.(type, variant)` | preview rider (stage.js), game rider (main.js) | same |
 
-`type` is `'skis'` or `'snowboard'`. `variant` is currently `null`; later it will be the catalog
-variant. Today neither API exists, so:
-- **Lobby preview:** hides `rider.skis` / `rider.poles` and shows `lobby/placeholderBoard.js`
-  (hazard-striped "PLACEHOLDER" top sheet, strap bindings), with a "Placeholder model" badge and a
-  note in the Equipment tab.
-- **In a ride:** the rider still uses skis, and a hint says "Snowboards are coming soon · riding
-  skis for now".
+`type` is `'skis'` or `'snowboard'` (rider/player normalise `'skis'` to `'ski'`). `variant` is the
+equipped catalog item's model id (`profileStore.gearModel(type)`, e.g. `'allmountain'`). In the
+game, `?variant=<id>` overrides it and `?equip=ski|snowboard` writes the profile so the lobby
+agrees. If `rider.setEquipment` ever goes missing, the preview keeps its skis and the Equipment tab
+says the board preview is unavailable (`gearMode = 'unsupported'`).
 
-When `rider.setEquipment` lands, the bridge reports `'native'`: the placeholder, badge, note and hint
-all go away with no lobby changes. The preview rider is a real `Player` with a flat stub terrain,
-so any field the snowboard rig reads from the player exists. It runs `State.GROUNDED` with
-`speed = 1.4`, a gentle `turnInput` sway, and `squat` / `AIR` / `landingEvent` for the swap hop.
+The earlier placeholder board and `createEquipmentModel` auto-discovery were removed once the real
+snowboard landed.
 
 ## Controls in the lobby
 
@@ -203,14 +227,16 @@ Hint glyphs follow the last-used device (`body.device-*`).
 
 ## Known issues / limits
 
-- The snowboard preview is a placeholder and rides still use skis until `rider.setEquipment`
-  exists (see above). The placeholder rider keeps the ski stance on the board.
+- The lobby renders the full world (it costs about as much GPU as riding). The quality setting
+  applies to it as in a ride.
 - Switching maps reloads the page, because maps are built at boot.
+- The lobby spot heuristic is generic. On an unusual map the view might face a wall; give that map
+  a `lobby()` hook.
+- Snowboard stance (regular / goofy) is not in the profile yet. The preview and rides use the
+  rider's default (`?stance=goofy` still works in a ride).
 - Character, Multiplayer and global leaderboards are "coming soon" stubs. Leaderboards are per
-  browser (`LocalLeaderboard`).
+  browser (`LocalLeaderboard`). Outfit catalog items do not change the suit yet.
 - Starting a ride with the gamepad can't take pointer lock (browsers need a mouse or keyboard
   gesture). Mouse look starts after the first click; the gamepad's right stick works anyway.
-- Software WebGL (headless tests) renders the lobby at about 3 fps. Timing-based checks in
-  `lobbytest.mjs` count frames, not milliseconds.
 - `?ride` builds the lobby stage only on the first return to the lobby, which adds a short wait
   during that fade.

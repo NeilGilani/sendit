@@ -15,15 +15,14 @@
 //   attachPointer(el)            drag to rotate, wheel / pinch to zoom, double-click to reset
 //   update(dt) · resize(w, h)    per frame (camera + animation) · window size
 //   focusPoint                   world position the sun's shadow box should centre on
-//   gearMode                     'native' | 'builtin' | 'module' | 'placeholder' (what is shown)
+//   gearMode                     'native' (rider.setEquipment did it) | 'builtin' | 'unsupported'
 import * as THREE from 'three';
 import { Rider } from '../rider.js';
 import { Player, State } from '../player.js';
 import { toonMaterial, damp, makeNoiseTexture } from '../world.js';
 import { snowUniforms, SNOW_COMMON_PARS, SNOW_BAND_GLSL } from '../gfx/snow.js';
 import { STAGE, SHOTS, CAMERA, TURNTABLE } from './config.js';
-import { applyEquipment, loadEquipmentFactory } from './equipmentBridge.js';
-import { createPlaceholderBoard } from './placeholderBoard.js';
+import { applyEquipment } from './equipmentBridge.js';
 
 const TAU = Math.PI * 2;
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -59,8 +58,7 @@ export class LobbyStage {
     this.hopT = null;
     this.equipment = 'skis';
     this.gearMode = 'builtin';
-    this.onGearMode = null;          // callback(mode) — the lobby shows a "placeholder" badge
-    this._gearToken = 0;
+    this.onGearMode = null;          // callback(mode) — the Equipment tab notes an unsupported board
     this.active = false;
     this.ready = false;
     this._target = new THREE.Vector3();
@@ -234,46 +232,16 @@ export class LobbyStage {
     this.equipment = type;
     if (!animate) this.yaw = this.heroYaw();
     else if (changed && !this.dragging && Math.abs(this.yawVel) < 0.05) this.idle = TURNTABLE.returnDelay;   // ease to the new hero angle
-    const token = ++this._gearToken;
-    const swap = () => this.applyGear(type, token, variant);
-    if (animate && this.ready) this.hop(swap); else return swap();
-    return Promise.resolve();
+    const swap = () => this.applyGear(type, variant);
+    if (animate && this.ready) this.hop(swap); else swap();
   }
 
-  async applyGear(type, token, variant) {
+  /** Swap the preview rider's gear (rider.js builds the model from src/equipment). */
+  applyGear(type, variant) {
     if (!this.rider?.model) return;
-    if (applyEquipment({ rider: this.rider, player: this.pl }, type, variant) === 'native') {
-      this.clearBoard();
-      return this.setGearMode('native');
-    }
-    if (type !== 'snowboard') {
-      this.clearBoard();
-      this.setSkis(true);
-      return this.setGearMode('builtin');
-    }
-    // Fallback when the rider cannot swap gear itself: src/equipment's createEquipmentModel, else the placeholder.
-    let model = null;
-    const factory = await loadEquipmentFactory();
-    if (factory) {
-      try { model = await factory('snowboard', null); } catch (e) { console.warn('[lobby] createEquipmentModel failed', e); }
-    }
-    if (token !== this._gearToken) return;   // a newer toggle won
-    this.clearBoard();
-    this.board = model || createPlaceholderBoard();
-    this.rider.visual.add(this.board);
-    this.setSkis(false);
-    this.setGearMode(model ? 'module' : 'placeholder');
-  }
-
-  clearBoard() {
-    if (!this.board) return;
-    this.board.removeFromParent();
-    this.board = null;
-  }
-
-  setSkis(v) {
-    for (const s of this.rider.skis || []) s.visible = v;
-    for (const p of this.rider.poles || []) p.visible = v;
+    const ok = applyEquipment({ rider: this.rider, player: this.pl }, type, variant) === 'native';
+    // Without rider.setEquipment the rig keeps its built-in skis: fine for skis, not for a board.
+    this.setGearMode(ok ? 'native' : type === 'skis' ? 'builtin' : 'unsupported');
   }
 
   setGearMode(mode) {
@@ -409,11 +377,6 @@ export class LobbyStage {
       pl.squat = Math.max(0, pl.squat - dt * 6);
     }
     this.rider.update(dt, this.camera);
-    if (this.board) {
-      this.setSkis(false);                     // rider.update re-shows the poles every frame
-      const ski = this.rider.skis?.[0];
-      if (ski) this.board.position.y = ski.position.y - 0.025;   // follow the feet (they lift in the air)
-    }
   }
 
   updateCamera(dt) {

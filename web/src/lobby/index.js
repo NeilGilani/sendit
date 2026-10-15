@@ -12,4 +12,4 @@ import './tabs/settings.js';
 export { Lobby } from './Lobby.js';
 export { LobbyStage } from './stage.js';
 export { registerLobbyTab, unregisterLobbyTab, listLobbyTabs, getLobbyTab } from './tabs.js';
-export { applyEquipment, loadEquipmentFactory, riderSupportsEquipment } from './equipmentBridge.js';
+export { applyEquipment, riderSupportsEquipment } from './equipmentBridge.js';
