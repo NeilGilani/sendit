@@ -206,7 +206,7 @@ export const SNOW_FRAG_GLSL = /* glsl */`
 
   // ---- snow normal: drifts → sastrugi → ripples → corduroy → grain
   vec3 Ns = N;
-  float detailFade = 1.0 - farF;
+  float detailFade = (1.0 - farF) * smoothstep(0.5, 0.8, N.y);   // xz-projected detail would stretch on steep faces
   if (detailFade > 0.0) {
     // Soft drifts / pillows (metres).
     vec2 g1 = noiseGrad(xz, 0.011, 1.6, 0) * 7.0 + noiseGrad(xz, 0.052, 0.4, 0) * 1.3;
