@@ -13,11 +13,15 @@ export class SkiPhysics extends EdgePhysics {
 
   get type() { return 'ski'; }
 
-  /** W: double-pole / skate below push speed, tuck above it. */
-  tuckFromUp(ctrl) { return ctrl.up * smoothstep(this.C.pushMaxSpeed - 1.5, this.C.pushMaxSpeed + 0.5, this.pl.speed); }
+  /** W: double-pole / skate below push speed, tuck above it (not while loading a nose press / nollie). */
+  tuckFromUp(ctrl) { return this.charging ? 0 : ctrl.up * smoothstep(this.C.pushMaxSpeed - 1.5, this.C.pushMaxSpeed + 0.5, this.pl.speed); }
+
+  /** Directional skis butter stiffly; twin tips (park) are made for it. */
+  butterScale() { return this.H.twin ? 1 : this.C.butterNonTwin; }
 
   onControl(dt, ctrl, grounded) {
     const pl = this.pl, C = this.C;
+    this.pressAndButter(dt, ctrl, grounded);
     // Snowplough (pizza) when slow, hockey stop when fast. Hysteresis keeps a stop going until slow.
     const b = grounded ? ctrl.brake : 0;
     const wantStop = b > 0.3 && (pl.speed > C.plowSpeed || (this.stop > 0.3 && pl.speed > 1.2));
@@ -56,13 +60,13 @@ export class SkiPhysics extends EdgePhysics {
     if (this.plow > 0.05) {
       m.pivotMul = 1 - (1 - C.plowTurn) * this.plow;
       if (m.edge === undefined) m.edge = this.edge * (1 - this.plow * 0.6);
-    }
+    } else if (!(this.stop > 0.02)) this.butterModes(m);
     return m;
   }
 
   extraDecel(ctx) {
     // Wedge: both inside edges push snow; strongest when slow.
-    return this.plow * this.C.plowDecel * (0.6 + 0.4 * smoothstep(0, 3, ctx.speed));
+    return this.plow * this.C.plowDecel * (0.6 + 0.4 * smoothstep(0, 3, ctx.speed)) + this.butter * this.C.butterDrag;
   }
 
   stopMu() { return this.C.stopMu; }
@@ -88,6 +92,7 @@ export class SkiPhysics extends EdgePhysics {
   trickLabel(t, spins, flip) {
     const parts = [];
     if (t.switch) parts.push('Switch');
+    if (t.end === 'nose' && (spins >= 1 || flip?.flips >= 1)) parts.push('Nollie');
     const dir = t.spin > 0 ? 'Left' : 'Right';
     if (flip?.flips >= 1) {
       // Off-axis: a backflip with a spin is a cork, a frontflip with a spin a misty.

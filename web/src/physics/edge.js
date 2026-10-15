@@ -48,6 +48,8 @@ export class EdgePhysics {
     this.velYawRate = 0;      // rad/s path curvature · speed (drives lean)
     this.charge = 0;          // 0..1 pop charge (squat)
     this.charging = false;
+    this.press = 0;           // −1 tail … +1 nose (loading for a pop doubles as a press)
+    this.butter = 0;          // 0..1 butter engagement (press + steer when slow)
     this.takeoff = null;      // trick bookkeeping for the current air
     this.dbg = {};            // last step's deceleration terms (m/s²), see ground()
   }
@@ -107,8 +109,45 @@ export class EdgePhysics {
   }
 
   tuckFromUp(ctrl) { return ctrl.up; }
-  onChargeStart() {}
+  /** Space alone loads the tail (ollie); W + Space loads the nose (nollie). */
+  onChargeStart(ctrl) { this._popEnd = ctrl.up > 0.3 ? 'nose' : 'tail'; }
   onControl() {}
+
+  /**
+   * Nose / tail press while charging a pop; steering on top of it at low speed is a butter (the gear
+   * pivots on the pressed end with the base flat). Tunables: butterRate, butterMaxSpeed, butterDrag.
+   */
+  pressAndButter(dt, ctrl, grounded) {
+    const pl = this.pl, C = this.C;
+    const pressT = grounded && this.charging ? (this._popEnd === 'nose' ? 1 : -1) * (0.4 + 0.6 * this.charge) : 0;
+    this.press += (pressT - this.press) * (1 - Math.exp(-10 * dt));
+    const canButter = grounded && this.charging && pl.speed < C.butterMaxSpeed;
+    const wantButter = canButter && Math.abs(ctrl.steer) > 0.2 ? 1 : 0;
+    this.butter += (wantButter - this.butter) * (1 - Math.exp(-(wantButter ? 10 : 6) * dt));
+    pl.press = this.press; pl.butter = this.butter;
+  }
+
+  /** Ground-mode overrides for a butter (or the extra pivot of a plain press). */
+  butterModes(m) {
+    const C = this.C;
+    if (this.butter > 0.02) {
+      // Butter: base flat, the gear pivots on the pressed end; the path barely follows.
+      m.edge = 0;
+      m.yaw = this.steer * C.butterRate * this.butterScale() * this.H.pivot * this.butter;
+      m.pivotMul = 1 - this.butter;
+      m.gripMul = 1 - this.butter * 0.85;
+      m.effMul = 1 - this.butter * 0.7;
+      m.skidMul = 1 - this.butter * 0.8;   // flat base slides, edges don't scrape
+      // Pivot on the pressed end: tail press → the centre swings with the nose, nose press → opposite.
+      m.pivotOffset = -Math.sign(this.press || -1) * this.spec.length * 0.33 * this.butter;
+      m.noAlign = true;
+    } else if (Math.abs(this.press) > 0.05) {
+      m.pivotMul = 1 + Math.abs(this.press) * 0.3;
+    }
+    return m;
+  }
+
+  butterScale() { return 1; }
 
   // ------------------------------------------------------------------ ground
   /** Integrates one grounded step. `v` (tangent velocity, modified in place), `gTan` slope gravity. */
@@ -257,7 +296,7 @@ export class EdgePhysics {
   pop() {
     const C = this.C, H = this.H;
     const v = (C.popMin + (C.popMax - C.popMin) * this.charge) * H.pop;
-    return v;
+    return this._popEnd === 'nose' && C.nollie ? v * C.nollie : v;   // the nose is shorter / softer than the tail
   }
 
   /** Called by Player.enterAir — trick bookkeeping. */
@@ -273,8 +312,12 @@ export class EdgePhysics {
     if (popped) pl.spinRate += -(this.windup || 0) * this.C.windupSpin * this.H.spin;
     const cap = this.C.spinRateMax * this.H.spin;
     pl.spinRate = clamp(pl.spinRate, -cap, cap);
+    // Spinning out of a butter pre-winds the spin.
+    if (this.butter > 0.3) pl.spinRate += -this.yawRate * 0.4;
+    this.takeoff.end = popped ? this._popEnd : null;
     this.windup = 0; pl.windup = 0; pl.grabName = null;
     this.charge = 0; this.charging = false; pl.squat = 0;
+    this.butter = 0; this.press = 0;
   }
 
   air(dt, ctrl) {

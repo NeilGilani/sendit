@@ -330,11 +330,15 @@ export class Rider {
     p.plant[0] = Math.max(0, p.plant[0] - dt / ANIM.polePlantTime);
     p.plant[1] = Math.max(0, p.plant[1] - dt / ANIM.polePlantTime);
     // Skis parallel under the boots, wedged into a snowplough, lifted with the feet in the air.
-    const lift = 0.0 + p.air * 0.12 + p.grab * 0.1;
+    // Press (butters / ollie load): the skis pitch about the pressed tails or tips, the pop snaps them.
+    const snap = this.snapT < 0.5 ? this.snapSign * ANIM.skiPopSnap * Math.exp(-9 * this.snapT) * Math.min(1, this.snapT * 25) : 0;
+    p.pitch += ((-p.press * ANIM.skiPressPitch + snap) - p.pitch) * (this.snapT < 0.5 ? 0.6 : 0.3);
+    this.skiPitchLift = Math.abs(Math.sin(p.pitch)) * this.equip.spec.length * 0.4;
+    const lift = 0.0 + p.air * 0.12 + p.grab * 0.1 + this.skiPitchLift;
     const wide = ANIM.skiStance + p.plow * 0.1;
     const [L, R] = this.skis;
-    L.position.set(-wide, lift, 0.0); L.rotation.set(0, -p.plow * 0.28, gearRoll * -1, 'YXZ');
-    R.position.set(wide, lift, 0.0); R.rotation.set(0, p.plow * 0.28, gearRoll * -1, 'YXZ');
+    L.position.set(-wide, lift, 0.0); L.rotation.set(p.pitch, -p.plow * 0.28, gearRoll * -1, 'YXZ');
+    R.position.set(wide, lift, 0.0); R.rotation.set(p.pitch, p.plow * 0.28, gearRoll * -1, 'YXZ');
     // In the air with a grab, cross the skis a little (Japan / mute flavour).
     if (p.grab > 0.01) { L.rotation.y += p.grab * 0.25; R.rotation.y -= p.grab * 0.1; }
     // Inner edge stays on the snow: pivot the roll about the edge.
@@ -513,7 +517,8 @@ export class Rider {
     const angul = (p.edge - p.lean) * ANIM.angulation * (1 - p.air);
     // Hockey stop / skid: upper body keeps facing down the path while the skis pivot across it.
     const counter = (pl.state === State.GROUNDED ? pl.skidAngle : 0) * 0.75 + p.lead * 0.12;
-    const off = new THREE.Vector3(-angul * 0.12, -drop * ns - p.crash * 0.5, -p.crouch * 0.06 * ns - p.stop * 0.05);
+    // Pressing shifts the hips over the pressed end (tails: back, tips: forward).
+    const off = new THREE.Vector3(-angul * 0.12, -drop * ns - p.crash * 0.5, -p.crouch * 0.06 * ns - p.stop * 0.05 + p.press * ANIM.skiPressShift * ns);
     const twist = p.twist * ns;
     let bend = THREE.MathUtils.degToRad(10 + p.crouch * 16 + p.tuck * 30) * (1 - p.air * 0.3);
     bend -= THREE.MathUtils.degToRad(12) * p.sit;
@@ -525,7 +530,7 @@ export class Rider {
     for (const side of [1, -1]) {
       // Armature +X is the rider's left (visual −X): match the ski's lift so the boots stay clipped in.
       const lx = -side * (ANIM.skiStance + p.plow * 0.1);
-      const ankle = new THREE.Vector3(side * (ANIM.skiStance + p.plow * 0.1), this.ankleH + p.air * 0.12 + p.grab * 0.1 + lx * Math.tan(p.lean), 0.0);
+      const ankle = new THREE.Vector3(side * (ANIM.skiStance + p.plow * 0.1), this.ankleH + p.air * 0.12 + p.grab * 0.1 + (this.skiPitchLift || 0) + lx * Math.tan(p.lean), 0.0);
       // Feet point down the skis; tips pinch together in a snowplough.
       this.leg(side, ankle, new THREE.Vector3(side * 0.12, 0, 1), -side * p.plow * 0.28);
       this.armSki(side, pl);

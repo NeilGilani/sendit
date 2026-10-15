@@ -228,7 +228,9 @@ export class Player {
       // Convex terrain (drop lips, rollers, the crest of a bump): the snow falls away faster than
       // gravity can pull the rider onto it — v·n'/dt > g·n'.y, i.e. v²κ > g·cos θ — so they leave it.
       // liftOffGrip > 1 is the legs absorbing a little (riders suck up small crests).
-      if (into > P.liftOffMin && into / dt > P.gravity * n2.y * P.liftOffGrip && this.speed > 5) {
+      // A rider crouched to pop (charging) absorbs crests: hold to stay low, release on the crest to boost.
+      const grip = P.liftOffGrip * (1 + P.liftOffAbsorb * this.dyn.charge);
+      if (into > P.liftOffMin && into / dt > P.gravity * n2.y * grip && this.speed > 5) {
         this.position.copy(np);
         this.enterAir(false);
         this.trackProgress(dt);

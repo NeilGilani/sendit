@@ -18,6 +18,7 @@ export const PHYSICS = {
   normalRadius: 1.4,          // m terrain normal sampling (park features use a fine upstream normal)
   takeoffGap: 0.3,
   liftOffGrip: 1.25,          // natural air: leave the snow when the crest needs > this × g·cos θ of downward pull
+  liftOffAbsorb: 0.8,         // … × (1 + this · charge): crouching (charging a pop) soaks up crests
   liftOffMin: 0.06,           // m/s per step of separation below which the rider just stays on (no micro-hops)
   terrainImpactLoss: 0.5,     // share of an abrupt impact into the terrain (beyond smoothFollow) lost as speed
   smoothFollow: 0.25,         // m/s per step of normal velocity absorbed loss-free (smooth rolls and dips)
@@ -84,6 +85,8 @@ export const PHYSICS = {
     stopMu: 0.5,              // ≈6.5 m/s² at 90° together with drag
     stopEdge: 32,             // deg edge set during the stop
     pushAccel: 4.0, pushMaxSpeed: 8.5,   // poling / skating
+    // Butter: Space (tail) or W+Space (nose) press + steer when slow → pivot on the pressed tips/tails.
+    butterRate: 2.6, butterMaxSpeed: 11, butterDrag: 0.9, butterNonTwin: 0.6, nollie: 0.9,
     dragUpright: 0.0135, dragTuck: 0.0055,   // CdA ratio ≈2.5: the tuck is worth ≈+20% top speed (16 → 20 m/s on 25°)
     // Powder: sink depth slow→fast (m), planing speed, plough drag a = k·depth·v, bog decel below planing.
     powderFloat: 1.0, sinkSlow: 0.22, sinkFast: 0.08, powderBog: 7, powderDrag: 0.3, powderBogDecel: 0.12, powderSteer: 0.7,
@@ -152,6 +155,9 @@ export const ANIM = {
   maxGearEdge: 1.05,          // rad visual edge angle cap
   angulation: 0.75,           // share of (edge − lean) the ski rider takes up in the spine (upright upper body)
   polePlantTime: 0.38,        // s a pole touch lasts (triggered on edge changes)
+  skiPressPitch: 0.14,        // rad the skis pitch up while pressing the tails / tips (butters, ollie load)
+  skiPressShift: 0.09,        // m hips over the pressed end
+  skiPopSnap: 0.3,            // rad the tips snap up at the pop
   flipPivot: 0.85,            // m above the feet the rider flips about (centre of mass)
   gearSinkVisual: 0.15,       // share of the physics powder sink shown (the snow reads as packed, so the gear rides on top)
   board: {
