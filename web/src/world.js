@@ -111,6 +111,7 @@ uniform vec3 uSunCol; uniform vec3 uSkyAmb; uniform vec3 uGroundAmb; uniform flo
 uniform vec3 uRimColor; uniform float uRim; uniform float uEmissiveBoost;
 float skyVis = 1.0;
 float toonSparkle = 0.0;
+vec3 toonAdd = vec3(0.0);   // added after the exposure curve (specular / sheen)
 vec3 toonEmissive = vec3(0.0);
 float toonDeepBias = 0.0;
 ${SUN_MASK_GLSL}
@@ -137,6 +138,7 @@ ${opts.frag || ''}`)
     ${opts.band || ''}
     vec3 col = diffuseColor.rgb * light;
     col = 1.0 - exp(-col * uExposure);
+    col += toonAdd;
     // Fresnel rim light (strongest when backlit).
     vec3 V = normalize(vViewPosition);
     float fres = pow(1.0 - clamp(dot(normal, V), 0.0, 1.0), ${ART.rimPower.toFixed(2)});

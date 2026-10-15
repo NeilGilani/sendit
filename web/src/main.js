@@ -10,6 +10,7 @@ import { patchShaderChunks, globals, makeNoiseTexture } from './world.js';
 import { HUD } from './config.js';
 import { ATMOSPHERE, col, createSnowfall } from './scene.js';
 import { Terrain } from './terrain.js';
+import { Course } from './course.js';
 import { Sky } from './sky.js';
 import { Scatter } from './scatter.js';
 import { Lifts } from './lifts.js';
@@ -43,7 +44,7 @@ camera.position.set(0, 4000, 0);
 const input = new Input(canvas);
 const ui = new UI({ ride: () => startRide(), resume: () => resume(), top: () => player.resetToTop(), menu: () => toMenu() });
 
-let snowfall, terrain, sky, scatter, lifts, features, player, rider, cam, fx, sound, composer, aoPass, bloom, wind;
+let course, snowfall, terrain, sky, scatter, lifts, features, player, rider, cam, fx, sound, composer, aoPass, bloom, wind;
 
 /**
  * Speed wind: smooth, organic, tapered alpha streaks that live only in the four screen corners and
@@ -102,19 +103,15 @@ class WindEffect extends Effect {
 async function boot() {
   const loader = new GLTFLoader();
   terrain = new Terrain();
-  await terrain.load('/terrain/', (p) => ui.loading(p * 0.5, 'Reading the mountain…'));
-  const [scatterData, liftData, pistes] = await Promise.all([
-    fetch('/terrain/scatter.json').then((r) => r.json()),
-    fetch('/terrain/lifts.json').then((r) => r.json()),
-    fetch('/terrain/pistes.json').then((r) => r.json()),
-  ]);
+  course = new Course();
+  await terrain.generate(course, (p) => ui.loading(p * 0.45, 'Carving the gully…'));
   if (params.has('at')) {
     const [x, z, h] = params.get('at').split(',').map(Number);
     terrain.meta.spawn = { position: [x, 0, z], heading: h || 0 };
   }
   ui.loading(0.45, 'Shaping jumps and pillows…');
   features = new Features(terrain);
-  features.plan(pistes);
+  features.plan(course);
   ui.loading(0.5, 'Painting the snow…');
   terrain.bakeSunMask(renderer);
   terrain.buildMaterials({ noise: makeNoiseTexture(512, 11) });
@@ -127,7 +124,7 @@ async function boot() {
 
   ui.loading(0.62, 'Planting pines…');
   scatter = new Scatter(terrain);
-  await scatter.load(loader, scatterData);
+  await scatter.load(loader, { trees: [], rocks: [] });
   scene.add(scatter.group);
   ui.loading(0.75, 'Building the park…');
   features.build();
@@ -143,7 +140,7 @@ async function boot() {
     terrain.meta.spawn = { position: [p0.x, 0, p0.y], heading: Math.atan2(-k.f.x, -k.f.y) };
   }
   lifts = new Lifts(terrain);
-  lifts.build(liftData);
+  lifts.build([]);   // the hand-built course has no lifts: finish → back to the top
   scene.add(lifts.group);
 
   ui.loading(0.88, 'Waxing the board…');
@@ -165,13 +162,14 @@ async function boot() {
   on('settings', ({ key }) => { if (key === 'quality') applyQuality(); });
   addEventListener('resize', onResize);
   onResize();
+  terrain.update(terrain.getSpawn().position, Infinity);   // full detail around the start before the first frame
   renderer.compile(scene, camera);
   ui.loading(1, '');
   ui.doneLoading();
   ui.fade(false, 2.0);
   if (params.has('ride')) startRide(true);
   else { setMode(Mode.MENU); ui.refresh(); }
-  window.__sendit = { player, terrain, camera, game, scene, renderer, features, scatter };
+  window.__sendit = { course, player, terrain, camera, game, scene, renderer, features, scatter };
 }
 
 function setupPost() {
@@ -259,6 +257,17 @@ document.addEventListener('pointerlockchange', () => {
 });
 canvas.addEventListener('click', () => { if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) input.lock(); });
 
+/** Crossing the finish: celebrate, then fade back to the top for another lap. */
+let finishing = false;
+function checkFinish() {
+  if (finishing || game.mode !== Mode.RIDING || player.state === State.FROZEN) return;
+  if (course.tAt(player.position.z) < course.P.finishT) return;
+  finishing = true;
+  ui.pop('RUN COMPLETE!', 'gold');
+  emit('runComplete');
+  setTimeout(() => { player.resetToTop(); setTimeout(() => { finishing = false; }, 1500); }, 1400);
+}
+
 // ---------------------------------------------------------------- loop (fixed 60 Hz physics, interpolated render)
 const STEP = 1 / 60;
 let acc = 0, last = performance.now(), time = 0;
@@ -292,6 +301,7 @@ function frame(now) {
   if (!paused) fx.update(dt, camera);
   sound.update(dt, camera);
   ui.update(dt, player);
+  checkFinish();
   // Wind streaks fade in near top speed.
   const riding = game.mode === Mode.RIDING;
   const wantWind = riding ? THREE.MathUtils.smoothstep(player.speedRatio, HUD.windStreakFrom, HUD.windStreakFull) : 0;

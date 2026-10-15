@@ -104,7 +104,7 @@ export const FX = {
   speedLineLife: 0.45,
   trackMapSize: 2048,         // persistent track render texture (px)
   trackMapMeters: 140,        // world metres covered by the track map
-  trackWidth: 0.34,           // metres (board)
+  trackWidth: 0.55,           // metres — wide, deep powder trench
 };
 
 // ------------------------------------------------------------------ Art style (materials)

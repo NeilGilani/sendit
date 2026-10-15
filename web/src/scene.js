@@ -10,16 +10,16 @@ import * as THREE from 'three';
 
 // ------------------------------------------------------------------ LIGHTING
 export const LIGHTING = {
-  sunElevation: 30,              // degrees — mid-morning: soft long shadows, every bump reads
-  sunBearing: 300,               // degrees from north — front-side light: the run's slopes catch the sun
+  sunElevation: 40,              // degrees — every lump has a lit and a shaded side
+  sunBearing: 230,              // degrees from north — side light across the north-running gully
   sunColor: '#fff6ea',           // warm white
   sunIntensity: 3.0,             // three.js light intensity (only the shadow ratio is used by snow)
-  sunStrength: 1.45,             // shader sun strength (linear, before the soft exposure curve)
-  skyAmbient: '#9badcc',         // cool sky fill (gives the blue shade)
+  sunStrength: 1.2,              // shader sun strength (linear, before the soft exposure curve)
+  skyAmbient: '#a9bbd8',         // cool sky fill (gives the blue shade)
   groundAmbient: '#b8bcc6',      // bright snow bounce from below
   lightWrap: 0.3,                // soft wrap-around diffuse
   aoFloor: 0.55,                 // baked terrain AO: how dark fully occluded spots get
-  exposure: 1.8,                 // soft highlight roll-off: col = 1 - exp(-col * exposure)
+  exposure: 1.35,                // soft highlight roll-off: col = 1 - exp(-col * exposure)
   hemiIntensity: 0.6,            // three.js hemisphere fill for non-custom materials
   shadowBias: -0.0004,
   shadowNormalBias: 0.45,
@@ -28,17 +28,22 @@ export const LIGHTING = {
 
 // ------------------------------------------------------------------ SNOW (soft powder)
 export const SNOW = {
-  albedo: 0.93,
-  subsurface: '#5f86c4',         // cyan-blue glow that bleeds into the shade
-  subsurfaceStrength: 0.22,
-  microNormalStrength: 0.75,     // powder dimples / wind crust
-  microTile: 2.4,                // metres per micro-normal tile (+ a finer octave)
-  microFadeDistance: 140,
-  driftStrength: 26,             // broad soft wind drifts
-  trackDepth: 4.0,               // how strongly carved tracks bend the normal
-  sparkle: 1.1,
-  rock: '#7a4a33',               // warm brown rock
-  rockLight: '#9a6544',
+  // Clean, smooth "clay" snow: shape comes from geometry only — no grain, no noise textures.
+  albedo: 0.95,
+  shade: '#b6cff6',              // clean light-blue shade (sky fill on snow)
+  shadeStrength: 1.0,
+  subsurface: '#79b4ff',         // cyan glow where sunlight fades into shadow
+  subsurfaceStrength: 0.4, 
+  wrap: 0.2,                     // light scattering through the snow (soft terminator)
+  specular: 0.16,                // soft satin highlight
+  specularPower: 22,
+  sheen: 0.14,                   // bright grazing-angle sheen
+  driftStrength: 10,             // very soft, very broad wind sculpting
+  trackDepth: 6.0,               // carved trenches: how hard the groove bends the light
+  trackShade: 0.5,               // how much the inside of a trench falls into shade
+  sparkle: 0.8,                  // rare tiny glints
+  rock: '#6e4634',               // warm brown rock
+  rockLight: '#8c5c40',
   forest: '#22413a',             // far forest tone
 };
 
@@ -55,8 +60,8 @@ export const ATMOSPHERE = {
   aerialMax: 0.93,
   mistColor: '#e6ecf3',          // soft valley haze
   mistDeepColor: '#cfd9e7',
-  mistTop: 2350,
-  mistBottom: 1700,
+  mistTop: 1950,
+  mistBottom: 1350,
   mistDensity: 1 / 650,
   mistMaxOpacity: 0.85,
   ridgeColors: ['#dfe6f0', '#cfd9e8', '#bfcde0', '#b0c0d8'],   // hazy horizon ranges, far → near
@@ -88,11 +93,11 @@ export const SPAWN = {
   treeThinFrom: 3150,
   treeMaxSlope: 34,
   treeClusterScale: 0.0075,
-  treeClusterThreshold: 0.48,
+  treeClusterThreshold: 0.4,
   treeDensity: 0.72,
   treeMax: 24000,
   treeScale: [0.55, 1.35],
-  runCorridor: 22,
+  runCorridor: 15,
   pisteClear: 0.3,
   rockClusterStep: 22,
   rockClusterChance: 0.3,
@@ -104,13 +109,13 @@ export const SPAWN = {
   iceShardsPerCluster: [0, 0],
   iceTint: '#bfe6ff',
   fenceOffset: 16,
-  fenceFrom: 30,
-  fenceTo: 900,
+  fenceFrom: 0,
+  fenceTo: 0,   
   fenceSpacing: 2.6,
   fenceHeight: 1.15,
   ridgeFenceStep: 34,
   ridgeFenceProminence: 1.6,
-  ridgeFenceMax: 50,
+  ridgeFenceMax: 24,
   ridgeFencePosts: 7,
   woodColor: '#6b4428',
   pineGreens: ['#0f2e27', '#143a30'],
@@ -139,6 +144,38 @@ export const JUMPS = {
   pillowOffset: [4, 15],
   freePillows: 260,              // extra pillows scattered off-piste around the run
   freePillowRegion: 420,
+};
+
+// ------------------------------------------------------------------ THE COURSE (hand-built world)
+// One height function builds everything: a winding powder gully with rock walls, natural drops
+// and berms, a long valley beyond the finish, surrounding peaks and a horn on the horizon.
+// t = metres down the fall line (world z decreases as t grows; the run heads toward -z).
+export const COURSE = {
+  tileSize: 2560,                // metres — high-res playable tile
+  tileRes: 2049,                 // samples per side (1.25 m spacing)
+  farSize: 30000,                // metres — low-res backdrop
+  farRes: 512,
+  startZ: 1190,                  // world z of the start gate
+  topElevation: 2650,            // metres at the start
+  finishT: 2330,                 // run complete here (metres down the fall line)
+  // Fall-line gradient profile: [length m, gradient deg] from the start. Flats before steeps =
+  // natural kickers; the drops below sit at the top of steep pitches so landings are smooth.
+  profile: [[60, 6], [200, 15], [170, 9], [220, 20], [120, 11], [240, 18], [150, 8], [250, 22],
+    [150, 10], [300, 17], [150, 7], [250, 19], [200, 9], [1500, 10], [3000, 5], [20000, 1]],
+  behindGradient: 30,            // degrees — the bowl rising behind the start
+  drops: [[430, 3.0], [770, 3.5], [1160, 4.0], [1560, 3.5], [2010, 4.5]],   // [t, height m]
+  meander: [[110, 330, 0.3], [40, 140, 1.7], [18, 61, 0.9]],   // [amplitude m, wavelength/2π m, phase]
+  floorHalfWidth: [30, 12, 6],   // base ± two wobble amplitudes (metres)
+  floorDepth: 3.5,               // the floor is a gentle half-pipe this deep at its edges
+  wallHeight: [[30, 22], [40, 30]],   // left / right: [base, variation] metres
+  wallWidth: [18, 46],           // metres from wall foot to wall top (steep → cliff, wide → bank)
+  bermHeight: 2.6,               // side hits along the floor edges (where they appear)
+  lumps: 3.2,                    // metres of soft rolling lumps everywhere
+  fineLumps: 0.2,               // keep tiny: the snow should read smooth and clean
+  ledges: 9,                     // rock-ledge relief on the walls
+  valleySideSlope: 0.4,          // rise per metre beyond the walls
+  mountainHeight: 1100,
+  horn: { x: -2300, z: -10600, peak: 4450, slope: 1.12, twist: 0.5 },
 };
 
 // ------------------------------------------------------------------ helpers
@@ -181,7 +218,7 @@ export function setupLighting(scene) {
   return { sun, hemi, target };
 }
 
-/** Tileable powder normal map (soft dimples + crust grain), generated once. RGB = (x, z, y). */
+/** Tileable normal map (soft dimples + crust grain), generated once. RGB = (x, z, y). Unused by the clean snow look. */
 export function makeMicroNormalTexture(size = 512, seed = 31) {
   let s = seed >>> 0;
   const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
@@ -223,33 +260,31 @@ export function makeMicroNormalTexture(size = 512, seed = 31) {
 }
 
 // ------------------------------------------------------------------ SNOW TERRAIN SHADER
-export function snowUniforms(microTex = null) {
+export function snowUniforms() {
   return {
     uSnowAlbedo: { value: SNOW.albedo },
+    uSnowShade: { value: col(SNOW.shade).multiplyScalar(SNOW.shadeStrength) },
     uSnowSSS: { value: col(SNOW.subsurface).multiplyScalar(SNOW.subsurfaceStrength) },
+    uSnowLook: { value: new THREE.Vector4(SNOW.wrap, SNOW.specular, SNOW.specularPower, SNOW.sheen) },
     uRockCol: { value: col(SNOW.rock) },
     uRockLight: { value: col(SNOW.rockLight) },
     uForestCol: { value: col(SNOW.forest) },
-    uMicro: { value: new THREE.Vector4(SNOW.microTile, SNOW.microFadeDistance, SNOW.driftStrength, SNOW.microNormalStrength) },
-    uTrackDepth: { value: SNOW.trackDepth },
-    microTex: { value: microTex },
+    uSnowShape: { value: new THREE.Vector3(SNOW.driftStrength, SNOW.trackDepth, SNOW.trackShade) },
   };
 }
 
 /** Declarations for the snow light model (fragment). */
 export const SNOW_BAND_PARS = /* glsl */`
-uniform float uSnowAlbedo; uniform vec3 uSnowSSS;
+uniform float uSnowAlbedo; uniform vec3 uSnowShade; uniform vec3 uSnowSSS; uniform vec4 uSnowLook;
 uniform vec3 uRockCol; uniform vec3 uRockLight; uniform vec3 uForestCol;
-uniform vec4 uMicro;        // x tile metres, y fade distance, z drift strength, w micro strength
-uniform float uTrackDepth;
-float tMicro = 0.0;         // micro-normal sun delta (powder dimples)
-float tRock = 0.0;          // rock / forest coverage (no subsurface there)
-float tTrack = 0.0;         // carved track depth
+uniform vec3 uSnowShape;    // x drift strength, y track depth, z track shade
+float tRock = 0.0;          // rock / forest coverage (no snow optics there)
+float tTrack = 0.0;         // carved trench depth
 `;
 
 /** Terrain-only declarations + helpers (fragment). */
 export const SNOW_PARS_GLSL = /* glsl */`
-uniform sampler2D normalTex; uniform sampler2D splatTex; uniform sampler2D noiseTex; uniform sampler2D microTex;
+uniform sampler2D normalTex; uniform sampler2D splatTex; uniform sampler2D noiseTex;
 uniform float sparkle; uniform float terrainRes; uniform float terrainSpacing;
 uniform sampler2D uTrackMap; uniform vec3 uTrackRegion;
 vec3 tN;
@@ -260,14 +295,9 @@ float trackAt(vec2 xz) {
   if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return 0.0;
   return texture2D(uTrackMap, uv).r;
 }
-vec3 microN(vec2 xz) {
-  vec3 a = texture2D(microTex, xz / uMicro.x).xzy * 2.0 - 1.0;
-  vec3 b = texture2D(microTex, xz / (uMicro.x * 0.3) + 0.37).xzy * 2.0 - 1.0;
-  return vec3(a.x + b.x * 0.5, 0.0, a.z + b.z * 0.5);
-}
 `;
 
-/** Albedo, normals (landform + drifts + tracks + powder), sparkle. Runs after map_fragment. */
+/** Albedo + normals (smooth landform, soft drifts, carved trenches) + glints. After map_fragment. */
 export const SNOW_FRAG_GLSL = /* glsl */`
 {
   vec2 uv = tUV(vW.xz);
@@ -277,56 +307,41 @@ export const SNOW_FRAG_GLSL = /* glsl */`
   float dist = length(vW - cameraPosition);
   float m2 = texture2D(noiseTex, vW.xz * 0.0093 + 0.37).r;
   float m3 = texture2D(noiseTex, vW.xz * 0.06 + 0.71).g;
-  float groomed = smoothstep(0.25, 0.75, s.r);
   float farF = smoothstep(250.0, 1200.0, dist);
 
-  // Warm brown rock where the slope is too steep to hold snow; snow loads every ledge.
+  // Warm brown rock outcrops on the steepest faces; snow clings to every ledge.
   float flatness = smoothstep(0.62, 0.86, N.y + (m3 - 0.5) * 0.12 * (1.0 - farF));
   float rock = clamp(smoothstep(0.3, 0.58, s.g + (m2 - 0.5) * 0.45 * s.g) * (1.0 - flatness * 0.92), 0.0, 1.0);
-  float strata = mix(texture2D(noiseTex, vec2(vW.y * 0.03 + m2, vW.x * 0.002 + vW.z * 0.002)).b, 0.45, farF);
-  vec3 rockCol = mix(uRockCol, uRockLight, smoothstep(0.45, 0.65, strata)) * mix(0.85, 1.1, m3);
-  rock *= 1.0 - smoothstep(0.68, 0.76, N.y + (m3 - 0.5) * 0.3 * (1.0 - farF)) * step(0.4, strata);
+  float blot = mix(texture2D(noiseTex, vec2(vW.x + vW.y, vW.z - vW.y) * 0.035).r, 0.5, farF);
+  float crack = mix(texture2D(noiseTex, vec2(vW.x - vW.y, vW.z + vW.y) * 0.11).b, 0.5, farF);
+  vec3 rockCol = mix(uRockCol, uRockLight, smoothstep(0.4, 0.62, blot)) * mix(0.7, 1.08, smoothstep(0.25, 0.6, crack));
+  rock *= 1.0 - smoothstep(0.6, 0.68, N.y + (m3 - 0.5) * 0.35 * (1.0 - farF));
+  float outcrop = texture2D(noiseTex, vec2(vW.x + vW.y * 0.5, vW.z - vW.y * 0.5) * 0.0045 + 0.3).r;
+  rock *= smoothstep(0.5, 0.58, outcrop + (m2 - 0.5) * 0.15);
 
-  // Soft wind drifts (snow only).
-  vec2 q1 = vW.xz * 0.011 + vec2(0.13, 0.7);
+  // Very broad, very soft wind sculpting (no grain anywhere).
+  vec2 q1 = vW.xz * 0.006 + vec2(0.13, 0.7);
   float d0 = texture2D(noiseTex, q1).r;
-  vec2 dg = vec2(texture2D(noiseTex, q1 + vec2(0.003, 0.0)).r - d0, texture2D(noiseTex, q1 + vec2(0.0, 0.003)).r - d0);
-  vec2 q2 = vW.xz * 0.04 + vec2(0.4, 0.2);
-  float r0 = texture2D(noiseTex, q2).g;
-  vec2 rg = vec2(texture2D(noiseTex, q2 + vec2(0.004, 0.0)).g - r0, texture2D(noiseTex, q2 + vec2(0.0, 0.004)).g - r0);
-  float sculpt = (1.0 - groomed * 0.75) * (1.0 - rock);
-  float nearD = 1.0 - smoothstep(80.0, 500.0, dist);
-  N = normalize(N - vec3(dg.x, 0.0, dg.y) * uMicro.z * sculpt - vec3(rg.x, 0.0, rg.y) * 4.0 * nearD * sculpt);
+  vec2 dg = vec2(texture2D(noiseTex, q1 + vec2(0.004, 0.0)).r - d0, texture2D(noiseTex, q1 + vec2(0.0, 0.004)).r - d0);
+  N = normalize(N - vec3(dg.x, 0.0, dg.y) * uSnowShape.x * (1.0 - rock));
 
-  // Persistent carved powder tracks: a real groove (lit wall / shaded wall).
+  // Carved trenches: the walls of the groove catch / lose the light.
   float tr = trackAt(vW.xz);
-  float trx = trackAt(vW.xz + vec2(0.07, 0.0)) - trackAt(vW.xz - vec2(0.07, 0.0));
-  float trz = trackAt(vW.xz + vec2(0.0, 0.07)) - trackAt(vW.xz - vec2(0.0, 0.07));
-  N = normalize(N + vec3(trx, 0.0, trz) * uTrackDepth);
-
-  // Powder dimples / crust: soft micro-shading up close.
-  float microFade = 1.0 - smoothstep(uMicro.y * 0.35, uMicro.y, dist);
-  vec3 mN = microN(vW.xz) * uMicro.w * microFade * (1.0 - groomed * 0.6) * (1.0 - rock);
-  tMicro = dot(normalize(N + mN), uSunDir) - dot(N, uSunDir);
-
-  // Groomed corduroy, very subtle.
-  vec2 fall = normalize(N.xz + vec2(1e-4));
-  float u = dot(vW.xz, vec2(-fall.y, fall.x));
-  float ribs = smoothstep(0.38, 0.5, abs(fract(u / 0.55) - 0.5)) * groomed * (1.0 - smoothstep(10.0, 40.0, dist));
-  tMicro -= ribs * 0.05;
+  float trx = trackAt(vW.xz + vec2(0.08, 0.0)) - trackAt(vW.xz - vec2(0.08, 0.0));
+  float trz = trackAt(vW.xz + vec2(0.0, 0.08)) - trackAt(vW.xz - vec2(0.0, 0.08));
+  N = normalize(N + vec3(trx, 0.0, trz) * uSnowShape.y);
 
   diffuseColor.rgb = mix(vec3(uSnowAlbedo), rockCol, rock);
   tN = N;
   tRock = rock;
   tTrack = tr;
 
-  // Soft glitter: tiny round glints on sunlit powder that twinkle as you move.
-  vec3 cell = floor(vW * 10.0);
-  vec3 vq = floor(normalize(vW - cameraPosition) * 16.0);
-  vec3 fr = fract(vW * 10.0) - 0.5;
-  float dot1 = max(1.0 - length(fr) * 6.0, 0.0);
-  float glint = step(0.97, hash13(cell)) * step(0.6, hash13(cell + vq * 7.13)) * dot1
-              * (1.0 - smoothstep(12.0, 55.0, dist)) * (1.0 - rock) * (1.0 - tr);
+  // Rare tiny glints on sunlit snow, twinkling as the camera moves.
+  vec3 cell = floor(vW * 12.0);
+  vec3 vq = floor(normalize(vW - cameraPosition) * 18.0);
+  vec3 fr = fract(vW * 12.0) - 0.5;
+  float glint = step(0.985, hash13(cell)) * step(0.55, hash13(cell + vq * 7.13)) * max(1.0 - length(fr) * 5.0, 0.0)
+              * (1.0 - smoothstep(10.0, 40.0, dist)) * (1.0 - rock) * (1.0 - tr);
   toonSparkle = glint * sparkle * sunMaskAt(vW).r * max(dot(N, uSunDir), 0.0);
 }
 `;
@@ -338,7 +353,7 @@ export const FAR_SNOW_FRAG_GLSL = /* glsl */`
   float m = texture2D(noiseTex, vW.xz * 0.0004).r;
   float m2 = texture2D(noiseTex, vW.xz * 0.003 + 0.5).r;
   float slope = 1.0 - N.y;
-  float rock = smoothstep(0.32, 0.46, slope + (m2 - 0.5) * 0.2);
+  float rock = smoothstep(0.36, 0.5, slope + (m2 - 0.5) * 0.2);
   float forest = (1.0 - smoothstep(1950.0, 2250.0, vW.y + (m - 0.5) * 300.0)) * (1.0 - rock) * smoothstep(0.03, 0.12, slope);
   diffuseColor.rgb = mix(mix(vec3(uSnowAlbedo), uForestCol, forest * 0.85), uRockCol, rock);
   tRock = max(rock, forest);
@@ -346,17 +361,28 @@ export const FAR_SNOW_FRAG_GLSL = /* glsl */`
 `;
 
 /**
- * Snow light model (runs inside the soft-shading block of world.js, which provides ndl, shadow,
- * wrapD, occl, sky and light). Adds powder micro-shading, groove occlusion and a cool subsurface
- * glow that bleeds into the shade.
+ * Snow optics (runs inside world.js's soft-shading block, which provides ndl, shadow, occl, sky,
+ * light, sunV and toonAdd). Clean clay-like snow: scattered sun with a soft terminator, a clean
+ * light-blue shade, a cyan subsurface glow along shadow edges, satin highlight and grazing sheen.
  */
 export const SNOW_BAND_GLSL = /* glsl */`
 {
-  float wm = clamp((ndl + tMicro + uLightWrap) / (1.0 + uLightWrap), 0.0, 1.0);
+  float snow = 1.0 - tRock;
+  float wrapS = mix(uLightWrap, uSnowLook.x, snow);
+  float wm = clamp((ndl + wrapS) / (1.0 + wrapS), 0.0, 1.0);
+  float trench = 1.0 - tTrack * uSnowShape.z;
   float sunVis = wm * shadow;
-  vec3 skyL = sky * (1.0 - tTrack * 0.3) * (1.0 + min(tMicro, 0.0) * 0.6);
-  vec3 sss = uSnowSSS * (1.0 - sunVis) * occl * (1.0 - tRock);
-  light = uSunCol * sunVis + skyL + sss;
+  vec3 shadeL = mix(sky, uSnowShade * sqrt(occl), snow) * trench;
+  // Subsurface: brightest just inside the shadow edge / terminator, fading into deep shade.
+  float edge = (1.0 - sunVis) * (0.35 + 0.65 * smoothstep(0.0, 0.5, wm));
+  vec3 sss = uSnowSSS * edge * occl * snow;
+  light = uSunCol * sunVis * trench + shadeL + sss;
+  // Satin highlight + grazing sheen (added after the exposure curve).
+  vec3 Vv = normalize(vViewPosition);
+  vec3 Hh = normalize(sunV + Vv);
+  float spec = pow(max(dot(normal, Hh), 0.0), uSnowLook.z) * uSnowLook.y * shadow;
+  float sheen = pow(1.0 - clamp(dot(normal, Vv), 0.0, 1.0), 5.0) * uSnowLook.w;
+  toonAdd += (vec3(1.0, 0.97, 0.92) * spec + vec3(0.88, 0.94, 1.0) * sheen * (0.45 + 0.55 * shadow)) * snow;
 }
 `;
 

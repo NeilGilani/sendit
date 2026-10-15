@@ -1,10 +1,10 @@
-// Real-mountain terrain: 2048² Copernicus heights, chunked CPU geometry with distance LOD and
-// skirts, the hard 3-band snow shader from scene.js (#fcfaf2 / #cbdcf7 / #313b73, micro-normal
-// shadows, sparkle, corduroy, persistent carved tracks), baked mountain shadows + sky AO and a
-// 30 km backdrop. Answers height/normal/surface queries; park features add to the height field.
+// Terrain: the hand-built course (course.js) on a 2049² / 1.25 m grid, chunked CPU geometry with
+// distance LOD and skirts, the clean clay-snow shader from scene.js (soft scattered light, blue
+// shade, subsurface glow, satin sheen, carved trenches), baked sun shadows + sky AO and a 30 km
+// backdrop. Answers height/normal/surface queries; park features add to the height field.
 import * as THREE from 'three';
 import { globals, toonMaterial, SUN_DIR } from './world.js';
-import { SNOW, snowUniforms, makeMicroNormalTexture, SNOW_BAND_PARS, SNOW_PARS_GLSL, SNOW_FRAG_GLSL, SNOW_BAND_GLSL, FAR_SNOW_FRAG_GLSL } from './scene.js';
+import { SNOW, snowUniforms, SNOW_BAND_PARS, SNOW_PARS_GLSL, SNOW_FRAG_GLSL, SNOW_BAND_GLSL, FAR_SNOW_FRAG_GLSL } from './scene.js';
 
 const CHUNK = 128;
 const LODS = 5;
@@ -15,13 +15,21 @@ export class Terrain {
     this.group.name = 'Terrain';
     this.chunks = [];
     this.cache = new Map();
-    this.lodDistances = [450, 1000, 2000, 3800];
+    this.lodDistances = [280, 600, 1200, 2400];
     this.features = null;     // optional { heightAt(x, z) -> number | null }
   }
 
+  /** Build from the hand-made course (course.js): heights, normals, splat and the far backdrop. */
+  async generate(course, onProgress = () => {}) {
+    const d = await course.generate(onProgress);
+    this.course = course;
+    this.ingest(d.meta, d.heights, d.normals, d.splat, d.far);
+  }
+
+  /** Real-world data files (kept for reference builds). */
   async load(base = '/terrain/', onProgress = () => {}) {
     const get = async (f) => { const r = await fetch(base + f); if (!r.ok) throw new Error(f); return r; };
-    this.meta = await (await get('terrain.json')).json();
+    const meta = await (await get('terrain.json')).json();
     onProgress(0.1);
     const [h, n, s, far] = await Promise.all([
       get('height_f32.bin').then((r) => r.arrayBuffer()),
@@ -30,16 +38,20 @@ export class Terrain {
       get('far_f32.bin').then((r) => r.arrayBuffer()),
     ]);
     onProgress(0.35);
-    const m = this.meta;
+    this.ingest(meta, new Float32Array(h), new Uint8Array(n), new Uint8Array(s), new Float32Array(far));
+  }
+
+  ingest(meta, heights, normals, splat3, far) {
+    this.meta = meta;
+    const m = meta;
     this.res = m.res;
     this.size = m.size_m;
     this.half = this.size / 2;
     this.spacing = m.spacing;
-    this.heights = new Float32Array(h);
-    this.normals = new Uint8Array(n);
-    const splat3 = new Uint8Array(s);
+    this.heights = heights;
+    this.normals = normals;
     this.splat = splat3;
-    this.far = new Float32Array(far);
+    this.far = far;
     this.perSide = Math.ceil((this.res - 1) / CHUNK);
     this.chunkSize = CHUNK * this.spacing;
     globals.terrainSize.value = this.size;
@@ -54,6 +66,7 @@ export class Terrain {
     this.normalTex = dataTex(this.normals, N, THREE.RGFormat, true);
     this.heightTex = new THREE.DataTexture(this.heights, N, N, THREE.RedFormat, THREE.FloatType);
     this.heightTex.minFilter = this.heightTex.magFilter = THREE.NearestFilter;
+    this.heightTex.unpackAlignment = 1;
     this.heightTex.needsUpdate = true;
   }
 
@@ -127,9 +140,8 @@ export class Terrain {
   }
 
   buildMaterials(tex) {
-    const micro = makeMicroNormalTexture(512, 31);
     const terrainUniforms = {
-      ...snowUniforms(micro),
+      ...snowUniforms(),
       normalTex: { value: this.normalTex }, splatTex: { value: this.splatTex }, noiseTex: { value: tex.noise },
       sparkle: { value: SNOW.sparkle }, terrainRes: { value: this.res }, terrainSpacing: { value: this.spacing },
     };
@@ -145,7 +157,7 @@ export class Terrain {
         .replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(tN, 0.0)).xyz);');
     };
     this.farMaterial = toonMaterial({
-      name: 'terrainFarSnow', uniforms: { ...snowUniforms(micro), noiseTex: { value: tex.noise } },
+      name: 'terrainFarSnow', uniforms: { ...snowUniforms(), noiseTex: { value: tex.noise } },
       fragPars: SNOW_BAND_PARS + 'uniform sampler2D noiseTex;', frag: FAR_SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
     });
   }
@@ -262,28 +274,32 @@ export class Terrain {
 
   setQuality(q) {
     const s = [0.6, 1.0, 1.5][q];
-    this.lodDistances = [450 * s, 1000 * s, 2000 * s, 3800 * s];
+    this.lodDistances = [280 * s, 600 * s, 1200 * s, 2400 * s];
     if (this.terrainUniforms) this.terrainUniforms.sparkle.value = q === 0 ? 0 : SNOW.sparkle;
     this._lastFocus = null;
   }
 
   /** Update chunk LODs around the camera; builds at most a few chunks per frame. */
-  update(camPos) {
-    let budget = 6;
+  /** Pick each chunk's LOD; new geometry is built nearest-first within a per-frame budget. */
+  update(camPos, budget = 6) {
+    const todo = [];
     for (const mesh of this.chunks) {
       const { cx, cz } = mesh.userData;
       const ccx = -this.half + (cx + 0.5) * this.chunkSize, ccz = -this.half + (cz + 0.5) * this.chunkSize;
       const d = Math.max(0, Math.hypot(ccx - camPos.x, ccz - camPos.z) - this.chunkSize * 0.5);
       let lod = LODS - 1;
       for (let l = 0; l < this.lodDistances.length; l++) if (d < this.lodDistances[l]) { lod = l; break; }
-      if (lod !== mesh.userData.lod) {
-        const key = `${cx}_${cz}_${lod}`;
-        if (!this.cache.has(key)) { if (budget-- <= 0) continue; }
-        const old = `${cx}_${cz}_${mesh.userData.lod}`;
-        mesh.geometry = this.chunkGeometry(cx, cz, lod);
-        if (mesh.userData.lod < 3 && this.cache.has(old)) { this.cache.get(old).dispose(); this.cache.delete(old); }
-        mesh.userData.lod = lod;
-      }
+      if (lod !== mesh.userData.lod) todo.push([d, mesh, lod]);
+    }
+    todo.sort((a, b) => a[0] - b[0]);
+    for (const [, mesh, lod] of todo) {
+      const { cx, cz } = mesh.userData;
+      const key = `${cx}_${cz}_${lod}`;
+      if (!this.cache.has(key)) { if (budget-- <= 0) continue; }
+      const old = `${cx}_${cz}_${mesh.userData.lod}`;
+      mesh.geometry = this.chunkGeometry(cx, cz, lod);
+      if (mesh.userData.lod < 3 && this.cache.has(old)) { this.cache.get(old).dispose(); this.cache.delete(old); }
+      mesh.userData.lod = lod;
     }
   }
 
@@ -331,8 +347,12 @@ export class Terrain {
     return { position: p, heading: s.heading };
   }
 
-  /** Highest summit (for the menu flyover). */
+  /** Menu flyover focus: above the middle of the course (or the highest summit for real data). */
   summit() {
+    if (this.course) {
+      const c = this.course.centre(this.course.P.finishT * 0.45);
+      return new THREE.Vector3(c.x, c.y + 650, c.z);
+    }
     let best = 0, bi = 0;
     for (let i = 0; i < this.heights.length; i += 7) if (this.heights[i] > best) { best = this.heights[i]; bi = i; }
     const N = this.res;
@@ -348,6 +368,7 @@ function dataTex(data, n, format, mips) {
   t.minFilter = mips ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
   t.generateMipmaps = mips;
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  t.unpackAlignment = 1;   // odd resolutions (2049) are not 4-byte aligned
   t.needsUpdate = true;
   return t;
 }

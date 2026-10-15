@@ -334,7 +334,7 @@ export class Player {
       if (Math.abs(p.x) > lim && p.x * this.velocity.x > 0) this.velocity.x = 0;
       if (Math.abs(p.z) > lim && p.z * this.velocity.z > 0) this.velocity.z = 0;
       p.x = clamp(p.x, -lim, lim); p.z = clamp(p.z, -lim, lim);
-      if (this._hintCool <= 0) { emit('hint', 'The valley ends here — turn back toward the lifts'); this._hintCool = 6; }
+      if (this._hintCool <= 0) { emit('hint', 'Edge of the mountain — head back into the gully'); this._hintCool = 6; }
     }
   }
 

@@ -29,27 +29,13 @@ export class Features {
    * rollers + snow pillows straight into the height field (so physics, normals, shadows and the
    * rendered snow all agree). Layout parameters: JUMPS in scene.js.
    */
-  plan(pistes) {
+  plan(course) {
     const T = this.terrain;
-    const spawn = T.getSpawn();
-    // The run the rider starts on: the piste passing closest to the spawn.
-    let best = null, bd = Infinity;
-    for (const p of pistes) {
-      for (const q of p.line) {
-        const d = Math.hypot(q[0] - spawn.position.x, q[2] - spawn.position.z);
-        if (d < bd) { bd = d; best = p; }
-      }
-    }
-    const line = best ? best.line.map((q) => new THREE.Vector2(q[0], q[2])) : [];
-    const sp2 = new THREE.Vector2(spawn.position.x, spawn.position.z);
-    let start = 0;
-    for (let i = 0; i < line.length; i++) if (line[i].distanceTo(sp2) < line[start].distanceTo(sp2)) start = i;
-    const path = line.slice(start);
-    if (path.length < 2) {
-      const f = new THREE.Vector2(-Math.sin(spawn.heading), -Math.cos(spawn.heading));
-      path.splice(0, path.length, sp2.clone(), sp2.clone().addScaledVector(f, 1500));
-    }
+    this.course = course;
+    const path = course.path;
     this.path = path;
+    // Keep man-made features clear of the course's natural drops.
+    const dropsAt = course.P.drops.map(([t]) => course.pathLength(t));
     let len = 0;
     for (let i = 0; i < path.length - 1; i++) len += path[i].distanceTo(path[i + 1]);
     this.runLength = len;
@@ -75,9 +61,10 @@ export class Features {
     // Signature park kickers (with crowds) near the top.
     for (const k of KICKERS) this.planKicker(at(k.at), 0, k, true);
     // Then a stream of features all the way down.
-    const end = Math.min(J.endAt, len - 40);
+    const end = Math.min(J.endAt, course.pathLength(course.P.finishT) - 60);
     for (let d = J.startAt; d < end; d += rr(J.spacing)) {
       if (KICKERS.some((k) => Math.abs(k.at - d) < 28)) continue;
+      if (dropsAt.some((q) => d > q - 45 && d < q + 30)) continue;
       const { p, dir } = at(d);
       const r = new THREE.Vector2(-dir.y, dir.x);
       const w = rnd();
@@ -176,6 +163,8 @@ export class Features {
     }
     const s0 = this.at(18);
     this.addBanner(s0.p, s0.dir);
+    const s1 = this.at(this.course.pathLength(this.course.P.finishT));
+    this.addBanner(s1.p, s1.dir);
     this.addFogPockets();
     this.buildSpectators();
     this.buildFlags();
