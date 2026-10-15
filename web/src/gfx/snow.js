@@ -334,6 +334,16 @@ export const FAR_SNOW_FRAG_GLSL = /* glsl */`
 {
   vec3 N = normalize(vWN);
   float dist = length(vW - cameraPosition);
+  // Relief the 58 m backdrop grid cannot hold: ridges, gullies and spurs from noise gradients.
+  {
+    vec2 q1 = vW.xz * 0.0011, q2 = vW.xz * 0.0047 + 0.3;
+    float a1 = texture2D(noiseTex, q1).b, a2 = texture2D(noiseTex, q2).r;
+    vec2 g1 = vec2(texture2D(noiseTex, q1 + vec2(0.002, 0.0)).b - a1, texture2D(noiseTex, q1 + vec2(0.0, 0.002)).b - a1) / 0.002 * 0.0011;
+    vec2 g2 = vec2(texture2D(noiseTex, q2 + vec2(0.003, 0.0)).r - a2, texture2D(noiseTex, q2 + vec2(0.0, 0.003)).r - a2) / 0.003 * 0.0047;
+    float steep = smoothstep(0.03, 0.25, 1.0 - N.y);
+    N = normalize(N - vec3(g1.x, 0.0, g1.y) * 170.0 * steep - vec3(g2.x, 0.0, g2.y) * 60.0 * steep);
+  }
+  tN = N;
   float m = texture2D(noiseTex, vW.xz * 0.0004).r;
   float m2 = texture2D(noiseTex, vW.xz * 0.003 + 0.5).r;
   float m3 = texture2D(noiseTex, vW.xz * 0.011 + 0.2).g;
@@ -341,7 +351,7 @@ export const FAR_SNOW_FRAG_GLSL = /* glsl */`
   float rock = smoothstep(uRockLook.z - 0.06, uRockLook.z + 0.06, slope + (m2 - 0.5) * 0.22 + (m3 - 0.5) * 0.12);
   // Gullies and couloirs hold snow even on steep faces (cheap: ridged noise down the slope).
   rock *= smoothstep(0.15, 0.45, texture2D(noiseTex, vW.xz * 0.0021 + vW.y * 0.0003).b + slope * 0.3);
-  float forest = (1.0 - smoothstep(2050.0, 2350.0, vW.y + (m - 0.5) * 300.0)) * (1.0 - rock) * smoothstep(0.03, 0.14, slope) * smoothstep(0.35, 0.55, m2 + 0.15);
+  float forest = (1.0 - smoothstep(2050.0, 2350.0, vW.y + (m - 0.5) * 300.0)) * (1.0 - rock) * (1.0 - smoothstep(7000.0, 9500.0, max(abs(vW.x), abs(vW.z)))) * smoothstep(0.03, 0.14, slope) * smoothstep(0.35, 0.55, m2 + 0.15);
   vec3 rc = rockAlbedo(abs(N.x) > abs(N.z) ? vW.zy : vW.xy, 1.0);
   vec3 sc = uSnowAlbedo * (0.94 + 0.06 * m2);
   diffuseColor.rgb = mix(mix(sc, uForestCol, forest * 0.9), rc, rock);

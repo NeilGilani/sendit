@@ -152,7 +152,9 @@ function bake() {
   hor.toward = horizon(0.35);      // a little off the sun so the disk's Mie peak does not dominate
   hor.side = horizon(Math.PI / 2);
   hor.away = horizon(Math.PI);
-  const sunT = sunTransmitted(sun).map((v) => v * S / Math.PI);   // irradiance / π (Lambert units)
+  let sunT = sunTransmitted(sun).map((v) => v * S / Math.PI);   // irradiance / π (Lambert units)
+  const sL = 0.2126 * sunT[0] + 0.7152 * sunT[1] + 0.0722 * sunT[2];
+  sunT = sunT.map((v) => v + (sL - v) * LIGHTING.sunWhiten);      // high-altitude sun is close to white
   const sinE = Math.sin(THREE.MathUtils.degToRad(LIGHTING.sunElevation));
   const ground = [0, 1, 2].map((c) => A.groundAlbedo[c] * (sunT[c] * sinE + irr[c] * LIGHTING.skyBoost));
   // Shade is lit by the sky AND by the sunlit slopes around it (terrain bounce neutralises the blue).

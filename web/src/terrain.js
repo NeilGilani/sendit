@@ -4,6 +4,7 @@
 // backdrop. Answers height/normal/surface queries; park features add to the height field.
 import * as THREE from 'three';
 import { globals, toonMaterial, SUN_DIR } from './world.js';
+import { RING } from './scene.js';
 import { snowUniforms, SNOW_COMMON_PARS, SNOW_PARS_GLSL, SNOW_FRAG_GLSL, SNOW_BAND_GLSL, FAR_SNOW_FRAG_GLSL } from './gfx/snow.js';
 
 const CHUNK = 128;
@@ -160,10 +161,16 @@ export class Terrain {
         .replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(tN, 0.0)).xyz);');
     };
     this.material.defines = { SNOW_TRACKS: 2, SNOW_SPARKLE: 1, SNOW_TREEMASK: 1 };
+
     this.farMaterial = toonMaterial({
       name: 'terrainFarSnow', uniforms: { ...snowUniforms(), noiseTex: { value: tex.noise } },
-      fragPars: SNOW_COMMON_PARS, frag: FAR_SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
-    });
+      fragPars: SNOW_COMMON_PARS + 'vec3 tN;', frag: FAR_SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
+    });    const prevFar = this.farMaterial.onBeforeCompile;
+    this.farMaterial.onBeforeCompile = (shader, r) => {
+      prevFar(shader, r);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(tN, 0.0)).xyz);');
+    };
   }
 
   build() {
@@ -273,6 +280,68 @@ export class Terrain {
     const mesh = new THREE.Mesh(g, this.farMaterial);
     mesh.receiveShadow = false;
     mesh.name = 'FarTerrain';
+    this.group.add(mesh);
+    this.buildRing();
+  }
+
+  /**
+   * Distant ranges: a polar ring of procedural ridged peaks beyond the 30 km backdrop, so the
+   * horizon is layered mountains dissolving into blue haze (aerial perspective does the layering).
+   */
+  buildRing() {
+    const m = this.meta;
+    const fsize = m.far_size_m, fres = m.far_res;
+    // Ranges sit around the resort's own altitude (the backdrop rim itself is sunk away).
+    const edge = m.spawn ? this.baseHeight(m.spawn.position[0], m.spawn.position[2]) : 2500;
+    const R = RING;
+    const inner = Math.max(R.inner, fsize / 2 - 3000), outer = Math.min(inner + R.depth, R.maxRadius);
+    const NA = R.segments, NR = R.rings;
+    const rnd = (i, j, seed) => {
+      let h = (i * 374761393 + j * 668265263 + seed * 982451653) | 0;
+      h = Math.imul(h ^ (h >>> 13), 1274126177);
+      return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+    };
+    const vn = (x, y, seed) => {
+      const i = Math.floor(x), j = Math.floor(y);
+      let fx = x - i, fy = y - j; fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+      const a = rnd(i, j, seed), b = rnd(i + 1, j, seed), c = rnd(i, j + 1, seed), d = rnd(i + 1, j + 1, seed);
+      return (a + (b - a) * fx) + ((c + (d - c) * fx) - (a + (b - a) * fx)) * fy;
+    };
+    const ridged = (x, y) => {
+      let a = 0, amp = 0.5, f = 1, tot = 0;
+      for (let k = 0; k < 6; k++) { const n = 1 - Math.abs(vn(x * f, y * f, 7 + k) * 2 - 1); a += n * n * amp; tot += amp; amp *= 0.5; f *= 2.05; }
+      return a / tot;
+    };
+    const pos = new Float32Array((NA + 1) * (NR + 1) * 3);
+    let k = 0;
+    for (let j = 0; j <= NR; j++) {
+      const t = Math.pow(j / NR, 1.35);
+      const r = inner + (outer - inner) * t;
+      for (let i = 0; i <= NA; i++) {
+        const az = (i / NA) * Math.PI * 2;
+        const x = Math.cos(az) * r, z = Math.sin(az) * r;
+        const env = 0.35 + 0.65 * smooth(0, 0.12, t) * (1 - 0.3 * t);
+        const big = vn(x / 14000, z / 14000, 3);                // massifs vs. lower ranges
+        const rg = ridged(x / R.scale, z / R.scale);
+        const h = edge - 600 + env * (R.base + R.height * Math.pow(rg, 1.5) * (0.45 + 0.9 * big));
+        pos[k++] = x; pos[k++] = h; pos[k++] = z;
+      }
+    }
+    const idx = new Uint32Array(NA * NR * 6);
+    k = 0;
+    for (let j = 0; j < NR; j++) for (let i = 0; i < NA; i++) {
+      const a = j * (NA + 1) + i;
+      idx[k++] = a; idx[k++] = a + 1; idx[k++] = a + NA + 1;
+      idx[k++] = a + 1; idx[k++] = a + NA + 2; idx[k++] = a + NA + 1;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.computeVertexNormals();
+    g.computeBoundingSphere();
+    const mesh = new THREE.Mesh(g, this.farMaterial);
+    mesh.name = 'DistantRanges';
+    mesh.frustumCulled = false;
     this.group.add(mesh);
   }
 

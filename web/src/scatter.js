@@ -9,6 +9,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { toonMaterial, outlineMaterial, mulberry32 } from './world.js';
 import { SPAWN, TREES, col } from './scene.js';
 import { TreeSystem } from './gfx/trees.js';
+import { buildCornices } from './gfx/cornices.js';
+import { snowUniforms, SNOW_COMMON_PARS, SNOW_BAND_GLSL } from './gfx/snow.js';
 
 const HASH = 16;
 const CELL = 750;
@@ -31,14 +33,13 @@ export class Scatter {
     const rnd = mulberry32(5);
     this.rnd = rnd;
     this.geos = {
-      rock: [rockGeometry(1, rnd), rockGeometry(2, rnd), rockGeometry(1, rnd)],
+      rock: [boulderGeometry(rnd), boulderGeometry(rnd), boulderGeometry(rnd)],
       ice: [iceGeometry(5, rnd), iceGeometry(6, rnd)],
       post: [postGeometry()],
       rail: [railGeometry()],
     };
     this.trees = new TreeSystem(this.group);
-    const rockMat = toonMaterial({ name: 'rock', vertexColors: true });
-    rockMat.flatShading = true;
+    const rockMat = boulderMaterial(this.terrain);
     const iceMat = toonMaterial({ name: 'ice', color: col(SPAWN.iceTint), rim: 1.0 });
     iceMat.flatShading = true;
     const woodMat = toonMaterial({ name: 'fence', vertexColors: true });
@@ -283,7 +284,9 @@ export class Scatter {
     this.flush();
     this.trees.build();
     this.buildTreeMask();
-    this.envStats = { trees, formations, fences: posts.length, crestSegs };
+    const corn = buildCornices(T, { minX, maxX, minZ, maxZ }, runDist, T.terrainUniforms?.noiseTex.value);
+    if (corn) this.group.add(corn);
+    this.envStats = { trees, formations, fences: posts.length, crestSegs, cornices: corn ? corn.userData.count : 0 };
   }
 
   /** Posts + two rails between consecutive posts, snow on top. */
@@ -387,7 +390,7 @@ export class Scatter {
   setQuality(q) {
     this.trees.setQuality(q);
     this.treeDistance = [1800, 3000, 4500][q];
-    this.rockDistance = [800, 1400, 2200][q];
+    this.rockDistance = [500, 900, 1400][q];
   }
 
   update(cam) {
@@ -419,7 +422,52 @@ function valueNoise2D(seed) {
   };
 }
 
-/** Chunky low-poly boulder with a snow cap and a few icy faces. */
+/** Natural boulder: subdivided sphere with multi-octave fractured displacement (smooth shaded). */
+function boulderGeometry(rnd) {
+  const g = new THREE.IcosahedronGeometry(1.3, 2);
+  const pos = g.attributes.position;
+  const seed = rnd() * 100;
+  // A few cutting planes give flat fractured faces; octave noise roughens them.
+  const planes = Array.from({ length: 5 }, () => {
+    const n = new THREE.Vector3(rnd() - 0.5, rnd() - 0.3, rnd() - 0.5).normalize();
+    return [n, 0.75 + rnd() * 0.35];
+  });
+  const v = new THREE.Vector3();
+  for (let k = 0; k < pos.count; k++) {
+    v.fromBufferAttribute(pos, k);
+    const d = v.clone().normalize();
+    let r = 1.3 * (1 + 0.14 * Math.sin(d.x * 3.1 + seed) * Math.cos(d.z * 2.7 + seed) + 0.07 * Math.sin(d.y * 7.3 + seed * 2) + 0.035 * Math.sin(d.x * 13.0 + d.z * 11.0 + seed));
+    for (const [n, c] of planes) { const t = d.dot(n); if (t * r > c * 1.3) r = (c * 1.3) / Math.max(t, 1e-3); }
+    v.copy(d).multiplyScalar(r);
+    v.y *= 0.8;
+    pos.setXYZ(k, v.x, v.y, v.z);
+  }
+  g.computeVertexNormals();
+  g.deleteAttribute('uv');
+  return g;
+}
+
+/** Boulder shading: grey rock (shared rock albedo) with a snow cap that follows the world normal. */
+function boulderMaterial(terrain) {
+  return toonMaterial({
+    name: 'boulder', uniforms: { ...snowUniforms(), noiseTex: { value: terrain.terrainUniforms?.noiseTex.value } },
+    fragPars: SNOW_COMMON_PARS,
+    frag: /* glsl */`
+    {
+      vec3 N = normalize(vWN);
+      vec2 uv = (abs(N.x) > abs(N.z) ? vW.zy : vW.xy) * 4.0;
+      vec3 rc = rockAlbedo(uv, 0.0);
+      float n = texture2D(noiseTex, vW.xz * 0.35 + vW.y * 0.2).g;
+      float snow = smoothstep(0.42, 0.72, N.y + (n - 0.5) * 0.45);
+      diffuseColor.rgb = mix(rc, uSnowAlbedo * 0.97, snow);
+      tRock = 1.0 - snow;
+      tGlintMask = 0.0;
+    }`,
+    band: SNOW_BAND_GLSL,
+  });
+}
+
+/** Chunky low-poly boulder with a snow cap and a few icy faces (legacy, unused). */
 function rockGeometry(detail, rnd) {
   const ico = new THREE.IcosahedronGeometry(1.3, detail);
   const g = ico.index ? ico.toNonIndexed() : ico;

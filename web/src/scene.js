@@ -14,6 +14,7 @@ import * as THREE from 'three';
 export const LIGHTING = {
   sunElevation: 38,              // degrees — long readable shadows, every lump has a lit and a shaded side
   sunBearing: 200,               // degrees from north — side / back light down the north-running gully
+  sunWhiten: 0.45,               // pull the transmitted sun colour toward white
   sunBoost: 1.0,                 // multipliers on the colours derived from the atmosphere model
   skyBoost: 1.0,                 // single scattering underestimates the sky; artistic lift
   terrainBounce: 0.3,           // share of the shade light that comes from sunlit slopes around
@@ -87,9 +88,9 @@ export const ATMOSPHERE = {
   // Aerial perspective (fog chunk): per-channel extinction through two exponential layers.
   aerialColor: '#ffffff',        // runtime tint on the inscatter colour (scene.fog.color)
   aerialDensity: 1.0,            // scene.fog.density = multiplier on the extinction below
-  airExtinction: [2.2e-5, 3.0e-5, 4.4e-5],
+  airExtinction: [3.9e-5, 4.7e-5, 5.9e-5],
   airHeight: 8000,
-  hazeExtinction: 1.6e-5,
+  hazeExtinction: 3.0e-5,
   hazeHeight: 1100,
   hazeBase: 2400,                // altitude where the haze layer has the density above
   hazeSunGlow: 0.05,             // forward-scattering glow of the haze toward the sun
@@ -106,6 +107,30 @@ export const ATMOSPHERE = {
   cirrus: 0.55,
   mistColor: '#e6ecf3',          // legacy (features.js fog pockets)
   mistDeepColor: '#cfd9e7',
+};
+
+// ------------------------------------------------------------------ CORNICES & WIND LIPS (gfx/cornices.js)
+export const CORNICES = {
+  step: 6,                       // metres between crest probes
+  max: 700,
+  minDrop: 5.5,                  // metres the snow must fall away within 9 m downwind
+  runClear: 18,                  // keep the run itself clean
+  spacing: 8,
+  length: [8, 16],               // metres along the crest
+  overhang: [1.2, 4.5],          // metres past the crest (small = wind lip, big = cornice)
+  thickness: [0.8, 2.6],
+};
+
+// ------------------------------------------------------------------ DISTANT RANGES (terrain.js buildRing)
+export const RING = {
+  inner: 12000,                  // metres from the centre where the ring starts (beyond the backdrop)
+  depth: 23000,
+  maxRadius: 37500,              // keep inside the camera far plane
+  segments: 512,
+  rings: 44,
+  scale: 7000,                   // metres per ridged-noise unit (peak spacing)
+  base: 500,                     // metres above the backdrop rim
+  height: 2300,                  // metres of peak relief
 };
 
 // ------------------------------------------------------------------ FALLING SNOW
@@ -176,10 +201,10 @@ export const SPAWN = {
   runCorridor: 15,
   pisteClear: 0.3,
   rockClusterStep: 22,
-  rockClusterChance: 0.3,
+  rockClusterChance: 0.14,
   rockMinSlope: 14,
   rockMaxSlope: 55,
-  rockPerCluster: [3, 8],
+  rockPerCluster: [2, 6],
   rockScale: [0.6, 2.8],
   rockColors: ['#5c5853', '#6f6a63', '#4b4844'],   // grey granite boulders
   iceShardsPerCluster: [0, 0],
