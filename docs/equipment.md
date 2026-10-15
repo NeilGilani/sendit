@@ -68,7 +68,7 @@ createEquipmentModel('ski', { id: 'park', graphic: { top: 0xff3355, pattern: 'st
   - `?equip=ski|snowboard` (skis are the default).
   - `?variant=<id>`.
   - `?stance=regular|goofy`.
-- **Debug key:** **E** toggles skis and snowboard in-game. The handler is one line in `main.js`.
+- **Debug key:** **E** toggles skis and snowboard while riding (not in menus: the lobby uses E to cycle tabs). The handler is one line in `main.js`.
 - **Event** `equipmentChanged` `{ type, variant, spec, stance, player }` on the `state.js` bus.
 - **Other events:**
   - New: `takeoff` `{ popped, switch, type }`.

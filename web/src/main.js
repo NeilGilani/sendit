@@ -279,7 +279,7 @@ function frame(now) {
   last = now;
   if (!composer) return;
   input.poll();
-  if (input.pressed.has('KeyE') && rider) rider.setEquipment(player.equipment.type === 'ski' ? 'snowboard' : 'ski');   // debug: swap gear
+  if (game.mode === Mode.RIDING && input.pressed.has('KeyE') && rider) rider.setEquipment(player.equipment.type === 'ski' ? 'snowboard' : 'ski');   // debug: swap gear while riding
   if (input.justPressed('pause')) {
     if (game.mode === Mode.PAUSED) resume();
     else if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) pause();
