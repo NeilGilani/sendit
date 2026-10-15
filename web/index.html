@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SENDIT — golden hour</title>
+  <title>SENDIT</title>
   <meta name="description" content="A peaceful skiing game on a real mountain at golden hour." />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f6c58e'/%3E%3Cstop offset='1' stop-color='%238fb3d9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='128' height='128' rx='24' fill='url(%23s)'/%3E%3Cpath d='M14 104 L52 40 L66 60 L80 30 L114 104 Z' fill='%23f4f7fb'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/src/style.css" />
@@ -18,20 +18,8 @@
     <div id="loadmsg" class="tiny"></div>
   </div>
 
-  <div id="menu" class="screen hidden">
-    <div class="vignette"></div>
-    <div class="panel-left">
-      <div class="title">SENDIT</div>
-      <div class="sub" id="mountainName">Valcrest Gully · hand-built powder run</div>
-      <nav>
-        <button data-act="ride" class="primary">Ride</button>
-        <button data-act="mountains">Mountains</button>
-        <button data-act="settings">Settings</button>
-        <button data-act="credits">Credits</button>
-      </nav>
-    </div>
-    <div class="foot">W glide · A/D carve · S brake · Shift tuck · hold Space to jump · R back to top · Esc pause · mouse to look</div>
-  </div>
+  <!-- The lobby (first screen after loading) is built by src/lobby/Lobby.js. -->
+  <div id="lobby" class="screen hidden"></div>
 
   <div id="hud" class="hidden">
     <div id="speed" class="tier0"><span id="kmh">0</span><small>KM/H</small></div>
@@ -49,12 +37,12 @@
         <button data-act="resume" class="primary">Resume</button>
         <button data-act="top">Back to the top</button>
         <button data-act="settings">Settings</button>
-        <button data-act="menu">Main menu</button>
+        <button data-act="menu">Back to lobby</button>
       </nav>
     </div>
   </div>
 
-  <div id="settings" class="screen hidden">
+  <div id="settings" class="screen modal hidden">
     <div class="vignette dim"></div>
     <div class="card">
       <h2>Settings</h2>
@@ -73,16 +61,7 @@
     </div>
   </div>
 
-  <div id="mountains" class="screen hidden">
-    <div class="vignette dim"></div>
-    <div class="card wide">
-      <h2>Mountains</h2>
-      <div id="mountainList" class="mountain-list"></div>
-      <button data-act="back">Back</button>
-    </div>
-  </div>
-
-  <div id="credits" class="screen hidden">
+  <div id="credits" class="screen modal hidden">
     <div class="vignette dim"></div>
     <div class="card wide">
       <div id="creditsText"></div>

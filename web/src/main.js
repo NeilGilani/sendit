@@ -10,8 +10,6 @@ import { patchShaderChunks, globals, makeNoiseTexture } from './world.js';
 import { HUD } from './config.js';
 import { ATMOSPHERE, col, createSnowfall } from './scene.js';
 import { Terrain } from './terrain.js';
-import { Course } from './course.js';
-import { RealCourse } from './realcourse.js';
 import { Sky } from './sky.js';
 import { Scatter } from './scatter.js';
 import { Lifts } from './lifts.js';
@@ -23,9 +21,16 @@ import { FXManager } from './fx.js';
 import { SoundScape } from './audio.js';
 import { UI } from './ui.js';
 import { Input } from './input.js';
-import { game, Mode, setMode, on, settings, resetScore, emit } from './state.js';
+import { game, Mode, setMode, on, settings, resetScore, emit, scoreSnapshot } from './state.js';
+import './maps/builtin.js';
+import { resolveMapSelection, loadMap, describeSelection } from './maps/registry.js';
+import { profileStore } from './profile/store.js';
+import { installRideTracker } from './profile/tracker.js';
+import { services } from './services/index.js';
+import { Lobby, LobbyStage, applyEquipment } from './lobby/index.js';
 
 patchShaderChunks();
+profileStore.load();
 
 const params = new URLSearchParams(location.search);
 if (params.has('quality')) settings.quality = Number(params.get('quality'));
@@ -46,6 +51,9 @@ const input = new Input(canvas);
 const ui = new UI({ ride: () => startRide(), resume: () => resume(), top: () => player.resetToTop(), menu: () => toMenu() });
 
 let course, snowfall, terrain, sky, scatter, lifts, features, player, rider, cam, fx, sound, composer, aoPass, bloom, wind;
+let currentMap = null;          // { map, variant, course } from the map registry
+let stage = null, lobby = null, stageReady = null, gearSupported = false;
+installRideTracker({ getMapId: () => currentMap?.map.id ?? 'unknown' });
 
 /**
  * Speed wind: smooth, organic, tapered alpha streaks that live only in the four screen corners and
@@ -104,16 +112,11 @@ class WindEffect extends Effect {
 async function boot() {
   const loader = new GLTFLoader();
   terrain = new Terrain();
-  // Which mountain: ?resort=<id>&run=<n> (real Lake Tahoe data) or the hand-built gully.
-  const resort = params.get('resort') || settings.resort || '';
-  const runIndex = Number(params.get('run') ?? settings.run ?? 0);
-  course = null;
-  if (resort) {
-    ui.loading(0.02, 'Fetching the mountain…');
-    course = await RealCourse.load(resort, runIndex).catch((e) => { console.warn('resort load failed', e); return null; });
-  }
-  if (!course) course = new Course();
-  ui.setMountain(course);
+  // Which map: URL (?map=<id>, ?resort=<id>&run=<n>) → the profile's saved choice → the default.
+  // Every map loads through the registry (maps/registry.js, maps/builtin.js).
+  ui.loading(0.02, 'Fetching the mountain…');
+  currentMap = await loadMap(resolveMapSelection(params, profileStore.profile));
+  course = currentMap.course;
   await terrain.generate(course, (p) => ui.loading(p * 0.45, course.meta ? `Shaping ${course.name}…` : 'Carving the gully…'));
   globals.uWater.value = course.water ?? -1e5;
   if (params.has('at')) {
@@ -160,9 +163,25 @@ async function boot() {
   rider = new Rider(player);
   await rider.load(loader);
   scene.add(rider.root);
+  applyGameEquipment(profileStore.equipment);
   const s = terrain.getSpawn();
   player.place(s.position, s.heading);
   player.state = State.FROZEN;
+
+  // The lobby: built now unless we go straight into a ride (?ride), then on first visit.
+  lobby = new Lobby({
+    root: document.getElementById('lobby'),
+    stage: (stage = new LobbyStage(renderer)),
+    input,
+    onRide: () => startRide(),
+    ui: { showCredits: () => ui.showCredits() },
+  });
+  lobby.setMapInfo({ ...currentMap, description: describeSelection(currentMap.map, currentMap.variant, course) });
+  ui.attach({ lobby, input });
+  if (!params.has('ride')) {
+    ui.loading(0.92, 'Setting up the lobby…');
+    await ensureStage();
+  }
 
   cam = new CameraController(camera, player, terrain, input);
   fx = new FXManager(player, renderer, scene);
@@ -180,8 +199,44 @@ async function boot() {
   ui.fade(false, 2.0);
   if (params.has('ride')) startRide(true);
   else { setMode(Mode.MENU); ui.refresh(); }
-  window.__sendit = { fx, course, player, terrain, camera, game, scene, renderer, features, scatter };
+  window.__sendit = {
+    fx, course, player, rider, terrain, camera, game, scene, renderer, features, scatter,
+    lobby, stage, profile: profileStore, services, map: currentMap, ui,
+  };
 }
+
+/** Build the lobby stage once (scene, preview rider, shaders). */
+function ensureStage() {
+  if (!stageReady) {
+    stageReady = stage.init(new GLTFLoader()).then(async () => {
+      await stage.setEquipment(profileStore.equipment, { animate: false });
+      stage.resize(innerWidth, innerHeight);
+      stage.compile();
+    });
+  }
+  return stageReady;
+}
+
+/** Give the in-game rider/player the profile's equipment (optional API, see lobby/equipmentBridge.js). */
+function applyGameEquipment(type) {
+  gearSupported = applyEquipment({ rider, player }, type) === 'native' || type === 'skis';
+}
+
+// Loadout changes (lobby toggle, other tabs, profile sync) reach the preview and the game rider.
+on('loadout', ({ equipment }) => {
+  if (stage?.ready) stage.setEquipment(equipment);
+  if (rider) applyGameEquipment(equipment);
+});
+
+// Lobby music/ambience: audio may only start after a user gesture.
+const unlockAudio = () => {
+  if (!sound) return;
+  sound.init().then(() => sound.resume()).catch(() => {});
+  removeEventListener('pointerdown', unlockAudio);
+  removeEventListener('keydown', unlockAudio);
+};
+addEventListener('pointerdown', unlockAudio);
+addEventListener('keydown', unlockAudio);
 
 function setupPost() {
   composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
@@ -218,22 +273,31 @@ function onResize() {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   composer?.setSize(w, h);
+  stage?.resize(w, h);
+  lobby?.layout();
 }
 
 // ---------------------------------------------------------------- flow
 let busy = false;
+/** Lobby → ride. `instant` (the ?ride URL param) skips the fade and the camera intro. */
 async function startRide(instant = false) {
-  if (busy) return;
+  if (busy || game.mode !== Mode.MENU) return;
   busy = true;
-  await sound.init().catch(() => {});
-  sound.resume();
-  if (!instant) input.lock();
+  sound.init().then(() => sound.resume()).catch(() => {});
+  if (!instant) {
+    input.lock();                // needs the click's user gesture, so before any await
+    await ui.fade(true, 0.35);
+    cam.update(0);               // put the world camera on its menu flyover: the intro sweeps from there
+  }
+  applyGameEquipment(profileStore.equipment);
   resetScore();
   player.startRiding();
   setMode(Mode.RIDING);
   if (!instant) cam.startIntro(); else cam.snap();
   ui.refresh();
-  emit('rideStarted');
+  emit('rideStarted', { mapId: currentMap.map.id, equipment: profileStore.equipment });
+  if (!instant) ui.fade(false, 0.9);
+  if (!gearSupported) setTimeout(() => emit('hint', 'Snowboards are coming soon · riding skis for now'), 1600);
   busy = false;
 }
 
@@ -252,14 +316,17 @@ function resume() {
   ui.refresh();
 }
 
+/** Ride (paused) → lobby. Records the ride (profile stats + leaderboard via profile/tracker.js). */
 async function toMenu() {
-  if (busy) return;
+  if (busy || game.mode === Mode.MENU) return;
   busy = true;
-  await ui.fade(true, 0.6);
+  input.unlock();
+  emit('rideEnded', scoreSnapshot());
+  await Promise.all([ui.fade(true, 0.5), ensureStage()]);
   player.state = State.FROZEN;
   setMode(Mode.MENU);
   ui.refresh();
-  ui.fade(false, 1.2);
+  ui.fade(false, 0.8);
   busy = false;
 }
 
@@ -289,8 +356,19 @@ function frame(now) {
   if (!composer) return;
   input.poll();
   if (input.justPressed('pause')) {
-    if (game.mode === Mode.PAUSED) resume();
+    if (ui.back()) { /* closed an overlay (settings / credits) */ }
+    else if (game.mode === Mode.PAUSED) resume();
     else if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) pause();
+  }
+  // Lobby: only the stage is simulated and rendered; the world waits, frozen.
+  if (game.mode === Mode.MENU && lobby?.visible && stage?.ready) {
+    lobby.update(dt);
+    stage.update(dt);
+    sound.update(dt, camera);
+    ui.update(dt, player);
+    input.endFrame();
+    stage.render(dt);
+    return;
   }
   const paused = game.mode === Mode.PAUSED;
   if (!paused) {

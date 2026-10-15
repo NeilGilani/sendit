@@ -1,22 +1,36 @@
-// Minimal, elegant HTML UI: menu over the flyover, fading HUD, soft score notes, hints, pause,
-// settings, credits (rendered from CREDITS.md) and the fade curtain.
+// HTML UI: screens (loading, lobby, pause) with modal overlays (settings, credits), the fading
+// HUD, soft score notes, big popups, hints and the fade curtain. Menu navigation works with mouse,
+// keyboard (arrows / Enter / Esc) and gamepad (d-pad / stick, A, B, LB/RB, Start).
+//
+// The lobby (lobby/Lobby.js) is the "lobby" screen; UI only shows/hides it and routes input to it.
 import { game, Mode, on, settings, setSetting } from './state.js';
 import { State } from './player.js';
 import { HUD } from './config.js';
+import { moveFocus, focusFirst, handleArrowKey, nudgeRange } from './lobby/nav.js';
 
 const $ = (id) => document.getElementById(id);
+const BASES = ['loading', 'lobby', 'pause'];
+const MODALS = ['settings', 'credits'];
 
 export class UI {
   constructor(handlers) {
     this.h = handlers;
-    this.screens = ['loading', 'menu', 'pause', 'settings', 'credits', 'mountains'].reduce((o, k) => ((o[k] = $(k)), o), {});
+    this.screens = [...BASES, ...MODALS].reduce((o, k) => ((o[k] = $(k)), o), {});
     this.hud = $('hud');
     this.fadeEl = $('fade');
-    this.settingsFrom = 'menu';
+    this.base = 'loading';
+    this.modal = null;
+    this.modalReturnFocus = null;
+    this.lobby = null;
+    this.input = null;
     this.idle = 0;
     this.hudAlpha = 0;
     document.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => this.act(b.dataset.act)));
     this.bindSettings();
+    addEventListener('keydown', (e) => {
+      const root = this.activeRoot();
+      if (root) handleArrowKey(e, root);
+    });
     on('score', ({ label, points }) => this.note(label, points));
     on('hint', (t) => this.hint(t));
     on('liftBoarded', (name) => { $('liftlabel').textContent = `${name}  ·  hold W to hurry`; });
@@ -27,32 +41,99 @@ export class UI {
     on('crashed', (kind) => this.pop(['YARD SALE!', 'SNOW ANGEL!', 'FACEPLANT!', 'TREE HUGGER!'][kind === 'tree' ? 3 : Math.floor(Math.random() * 3)], 'pink'));
   }
 
+  /** Connect the lobby and the input controller (after both exist). */
+  attach({ lobby, input }) {
+    this.lobby = lobby;
+    this.input = input;
+  }
+
   act(a) {
     switch (a) {
       case 'ride': this.h.ride(); break;
-      case 'settings': this.settingsFrom = game.mode === Mode.PAUSED ? 'pause' : 'menu'; this.show('settings'); break;
-      case 'credits': this.loadCredits(); this.show('credits'); break;
-      case 'mountains': this.loadMountains(); this.show('mountains'); break;
+      case 'settings': this.openModal('settings'); break;
+      case 'credits': this.showCredits(); break;
       case 'resume': this.h.resume(); break;
       case 'top': this.h.resume(); this.h.top(); break;
       case 'menu': this.h.menu(); break;
-      case 'back': this.show(game.mode === Mode.PAUSED ? 'pause' : 'menu'); break;
+      case 'back': this.closeModal(); break;
     }
   }
 
-  show(name) {
-    for (const [k, el] of Object.entries(this.screens)) el.classList.toggle('hidden', k !== name);
-    const riding = name === null;
-    this.hud.classList.toggle('hidden', !riding);
-    if (name && this.screens[name]) this.screens[name].querySelector('button')?.focus({ preventScroll: true });
+  // ------------------------------------------------------------------ screens
+  /** Base screen: 'loading' | 'lobby' | 'pause' | null (riding → HUD). Closes any modal. */
+  showBase(name) {
+    this.closeModal(false);
+    this.base = name;
+    this.screens.pause.classList.toggle('hidden', name !== 'pause');   // 'loading' fades itself out (doneLoading)
+    if (name === 'lobby') this.lobby?.show(); else this.lobby?.hide();
+    this.hud.classList.toggle('hidden', name !== null);
+    if (name === 'pause') focusFirst(this.screens.pause);
+    if (name === null) document.activeElement?.blur?.();
   }
 
+  openModal(name) {
+    if (!this.screens[name]) return;
+    this.modalReturnFocus = document.activeElement;
+    if (this.modal) this.screens[this.modal].classList.add('hidden');
+    this.modal = name;
+    this.screens[name].classList.remove('hidden');
+    focusFirst(this.screens[name]);
+  }
+
+  closeModal(restoreFocus = true) {
+    if (!this.modal) return false;
+    this.screens[this.modal].classList.add('hidden');
+    this.modal = null;
+    if (restoreFocus && this.modalReturnFocus?.isConnected) this.modalReturnFocus.focus({ preventScroll: true });
+    this.modalReturnFocus = null;
+    return true;
+  }
+
+  /** Esc / B: close the top-most overlay. Returns true when something was closed. */
+  back() { return this.closeModal(); }
+
+  /** Element that keyboard/gamepad navigation acts on, or null while riding. */
+  activeRoot() {
+    if (this.modal) return this.screens[this.modal];
+    if (this.base === 'lobby') return this.screens.lobby;
+    if (this.base === 'pause') return this.screens.pause;
+    return null;
+  }
+
+  showCredits() { this.loadCredits(); this.openModal('credits'); }
+
   refresh() {
-    if (game.mode === Mode.MENU) this.show('menu');
-    else if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) this.show(null);
+    if (game.mode === Mode.MENU) this.showBase('lobby');
+    else if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) this.showBase(null);
     else if (game.mode === Mode.PAUSED) {
       $('stats').textContent = `${(game.distance / 1000).toFixed(1)} km skied · ${game.smoothTurns} smooth turns · ${game.airTotal.toFixed(0)} s of air · score ${game.score}`;
-      this.show('pause');
+      this.showBase('pause');
+    }
+  }
+
+  // ------------------------------------------------------------------ gamepad menu navigation
+  navigate(dt) {
+    const root = this.activeRoot();
+    if (!root || !this.input) return;
+    for (const a of this.input.menuActions(dt)) {
+      if (!this.modal && this.base === 'lobby' && this.lobby?.onAction(a)) continue;
+      const el = document.activeElement;
+      const range = el instanceof HTMLInputElement && el.type === 'range' && root.contains(el);
+      switch (a) {
+        case 'up': case 'down': moveFocus(root, a); break;
+        case 'left': case 'right':
+          if (range) nudgeRange(el, a === 'left' ? -1 : 1);
+          else moveFocus(root, a);
+          break;
+        case 'accept':
+          if (root.contains(el) && el !== document.body && !range) el.click();
+          else if (!root.contains(el)) focusFirst(root);
+          break;
+        case 'back':
+          if (!this.back() && this.base === 'pause') this.h.resume();
+          break;
+        default:
+      }
     }
   }
 
@@ -75,6 +156,7 @@ export class UI {
     });
   }
 
+  // ------------------------------------------------------------------ HUD
   note(label, points) {
     if (game.mode !== Mode.RIDING && game.mode !== Mode.LIFT) return;
     const box = $('notes');
@@ -108,6 +190,7 @@ export class UI {
   }
 
   update(dt, skier) {
+    this.navigate(dt);
     const riding = game.mode === Mode.RIDING || game.mode === Mode.LIFT;
     if (skier.speed > 1 && skier.state !== State.LIFT) this.idle = 0; else this.idle += dt;
     const want = riding && this.idle < 3 ? 1 : 0;
@@ -138,6 +221,7 @@ export class UI {
     this.speedTier = next;
   }
 
+  // ------------------------------------------------------------------ settings + credits
   bindSettings() {
     const root = this.screens.settings;
     root.querySelectorAll('input[type=range]').forEach((el) => {
@@ -154,54 +238,14 @@ export class UI {
         } else setSetting(k, el.checked);
       });
     });
+    document.addEventListener('fullscreenchange', () => {
+      const fs = root.querySelector('input[data-key=fullscreen]');
+      if (fs) fs.checked = !!document.fullscreenElement;
+    });
     const seg = root.querySelector('.seg');
     const mark = () => seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', Number(b.dataset.v) === settings.quality));
     seg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { setSetting('quality', Number(b.dataset.v)); mark(); }));
     mark();
-  }
-
-  /** Menu subtitle for the loaded mountain. */
-  setMountain(course) {
-    const el = $('mountainName');
-    if (!el) return;
-    el.textContent = course.meta
-      ? `${course.name} · ${course.meta.region} — ${course.run.name} (${course.run.drop} m vertical)`
-      : 'Valcrest Gully · hand-built powder run';
-  }
-
-  /** Mountain picker: the hand-built gully + real Lake Tahoe mountains (each with up to 3 runs). */
-  async loadMountains() {
-    const list = $('mountainList');
-    if (this._mountains) return;
-    this._mountains = true;
-    let index = [];
-    try { index = await (await fetch('/resorts/index.json')).json(); } catch { /* no data built */ }
-    const go = (resort, run) => {
-      setSetting('resort', resort); setSetting('run', run);
-      const q = new URLSearchParams(location.search);
-      q.delete('kicker'); q.delete('at');
-      if (resort) { q.set('resort', resort); q.set('run', run); } else { q.delete('resort'); q.delete('run'); }
-      location.search = q.toString();
-    };
-    const card = (title, sub, runs) => {
-      const box = document.createElement('div');
-      box.className = 'mountain';
-      box.innerHTML = `<div class="m-title">${title}</div><div class="m-sub">${sub}</div>`;
-      const row = document.createElement('div');
-      row.className = 'm-runs';
-      for (const r of runs) {
-        const b = document.createElement('button');
-        b.innerHTML = `${r.label}<small>${r.meta}</small>`;
-        b.addEventListener('click', r.go);
-        row.appendChild(b);
-      }
-      box.appendChild(row);
-      list.appendChild(box);
-    };
-    card('Valcrest Gully', 'Hand-built powder gully · jumps, pillows and drops', [{ label: 'Ride the gully', meta: '2.5 km', go: () => go('', 0) }]);
-    for (const m of index) {
-      card(m.name, m.region, m.runs.map((r, i) => ({ label: r.name, meta: `${r.drop} m vertical · ${(r.length / 1000).toFixed(1)} km`, go: () => go(m.id, i) })));
-    }
   }
 
   async loadCredits() {
