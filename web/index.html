@@ -24,7 +24,8 @@
       <div class="title">SENDIT</div>
       <div class="sub" id="mountainName">Valcrest Gully · hand-built powder run</div>
       <nav>
-        <button data-act="ride" class="primary">Ride</button>
+        <button data-act="ride" class="primary">Zen ride</button>
+        <button data-act="challenge">Challenge</button>
         <button data-act="mountains">Mountains</button>
         <button data-act="settings">Settings</button>
         <button data-act="credits">Credits</button>
@@ -38,6 +39,12 @@
 
   <div id="hud" class="hidden">
     <div id="goggles"></div>
+    <div id="chal" class="hidden">
+      <div id="timer">0:00.00</div>
+      <div id="chalsub"><span id="gatesHud"></span><span id="bestHud"></span></div>
+      <div id="comboHud"></div>
+    </div>
+    <div id="flakesHud"></div>
     <div id="speed" class="tier0"><span id="kmh">0</span><small>KM/H</small></div>
     <div id="notes"></div>
     <div id="hint"></div>
@@ -51,6 +58,7 @@
       <div id="stats" class="sub"></div>
       <nav>
         <button data-act="resume" class="primary">Resume</button>
+        <button data-act="restart">Restart run</button>
         <button data-act="top">Back to the top</button>
         <button data-act="settings">Settings</button>
         <button data-act="menu">Main menu</button>
@@ -83,6 +91,22 @@
       <h2>Mountains</h2>
       <div id="mountainList" class="mountain-list"></div>
       <button data-act="back">Back</button>
+    </div>
+  </div>
+
+  <div id="results" class="screen hidden">
+    <div class="vignette dim"></div>
+    <div class="card results">
+      <div id="resMedal" class="medal"></div>
+      <h2 id="resTitle">Finish</h2>
+      <div id="resTime" class="res-time"></div>
+      <div id="resRows" class="res-rows"></div>
+      <nav class="res-nav">
+        <button data-act="retry" class="primary">Race again</button>
+        <button data-act="zen">Zen ride this run</button>
+        <button data-act="mountains">Mountains</button>
+        <button data-act="menu">Main menu</button>
+      </nav>
     </div>
   </div>
 

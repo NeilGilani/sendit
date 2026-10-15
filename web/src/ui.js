@@ -1,15 +1,16 @@
 // Minimal, elegant HTML UI: menu over the flyover, fading HUD, soft score notes, hints, pause,
 // settings, credits (rendered from CREDITS.md) and the fade curtain.
-import { game, Mode, on, settings, setSetting } from './state.js';
+import { game, Mode, on, emit, settings, setSetting } from './state.js';
 import { State } from './player.js';
 import { HUD } from './config.js';
+import { bestFor, flakesFound, fmtTime, CHALLENGE } from './activities.js';
 
 const $ = (id) => document.getElementById(id);
 
 export class UI {
   constructor(handlers) {
     this.h = handlers;
-    this.screens = ['loading', 'menu', 'pause', 'settings', 'credits', 'mountains'].reduce((o, k) => ((o[k] = $(k)), o), {});
+    this.screens = ['loading', 'menu', 'pause', 'settings', 'credits', 'mountains', 'results'].reduce((o, k) => ((o[k] = $(k)), o), {});
     this.hud = $('hud');
     this.fadeEl = $('fade');
     this.settingsFrom = 'menu';
@@ -24,12 +25,21 @@ export class UI {
     on('landed', ({ perfect }) => { if (perfect) this.pop('PERFECT!', 'gold'); });
     on('stumble', () => this.pop('WOBBLE!', 'pink'));
     on('nearMiss', () => this.pop('CLOSE SHAVE', 'cyan', true));
+    on('countdown', (n) => this.pop(n > 0 ? String(n) : 'GO!', n > 0 ? 'cyan' : 'gold'));
+    on('gate', ({ pass }) => { if (!pass) this.pop('MISSED GATE  +2s', 'pink', true); });
+    on('flake', ({ found, total }) => this.pop(`❄ ${found} / ${total}`, 'gold', true));
+    on('comboBanked', ({ banked, mult }) => { if (mult > 1) this.pop(`+${banked}  ×${mult.toFixed(2).replace(/\.?0+$/, '')}`, 'cyan', true); });
+    on('combo', () => { const c = $('comboHud'); c.classList.remove('pulse'); void c.offsetWidth; c.classList.add('pulse'); setTimeout(() => c.classList.remove('pulse'), 150); });
     on('crashed', (kind) => this.pop(['YARD SALE!', 'SNOW ANGEL!', 'FACEPLANT!', 'TREE HUGGER!'][kind === 'tree' ? 3 : Math.floor(Math.random() * 3)], 'pink'));
   }
 
   act(a) {
     switch (a) {
       case 'ride': this.h.ride(); break;
+      case 'challenge': this.h.challenge(); break;
+      case 'retry': this.h.retry(); break;
+      case 'zen': this.h.zen(); break;
+      case 'restart': this.h.restart(); break;
       case 'settings': this.settingsFrom = game.mode === Mode.PAUSED ? 'pause' : 'menu'; this.show('settings'); break;
       case 'credits': this.loadCredits(); this.show('credits'); break;
       case 'mountains': this.loadMountains(); this.show('mountains'); break;
@@ -179,9 +189,44 @@ export class UI {
     if (input.navBack()) root.querySelector('[data-act="back"], [data-act="resume"]')?.click();
   }
 
+  /** Challenge HUD + snowflake counter, every frame. */
+  updateActivity(a) {
+    const riding = game.mode === Mode.RIDING || game.mode === Mode.LIFT;
+    const chal = a.mode === 'challenge' && riding && a.state !== 'idle';
+    $('chal').classList.toggle('hidden', !chal);
+    $('flakesHud').textContent = riding ? `❄ ${a.flakes}/${a.flakeTotal}` : '';
+    if (!chal) return;
+    $('timer').textContent = a.state === 'countdown' ? '0:00.00' : fmtTime(a.time);
+    $('gatesHud').textContent = `GATES ${a.gates}/${a.gateTotal}${a.penalty ? `  +${a.penalty}s` : ''}`;
+    $('bestHud').textContent = a.best ? `BEST ${fmtTime(a.best.time)}` : '';
+    const c = a.combo;
+    const txt = c ? `x${c.mult.toFixed(2).replace(/\.?0+$/, '')}  +${c.pts}` : (a.score ? `${a.score} PTS` : '');
+    if ($('comboHud').textContent !== txt) $('comboHud').textContent = txt;
+  }
+
+  /** Finish screen for a challenge run. */
+  showResults(r) {
+    const el = $('resMedal');
+    el.className = `medal ${r.medal || ''}`;
+    el.textContent = r.medal ? r.medal[0].toUpperCase() : '';
+    $('resTitle').textContent = r.medal ? `${r.medal.toUpperCase()} MEDAL` : 'FINISH';
+    $('resTime').textContent = fmtTime(r.time);
+    const T = r.targets;
+    const rows = [
+      ['Best time', fmtTime(r.best.time), r.isBestTime],
+      ['Gates', `${r.gates}/${r.gateTotal}${r.penalty ? `  (+${r.penalty}s)` : ''}`],
+      ['Style score', `${r.score}`, r.isBestScore],
+      ['Snowflakes', `${r.flakes}/${r.flakeTotal}`],
+      ['Gold · Silver · Bronze', `${fmtTime(T.gold)} · ${fmtTime(T.silver)} · ${fmtTime(T.bronze)}`],
+    ];
+    $('resRows').innerHTML = rows.map(([k, v, n]) => `<div class="k">${k}</div><div class="v${n ? ' new' : ''}">${v}${n ? '  NEW!' : ''}</div>`).join('');
+    this.show('results');
+  }
+
   focusPad(el) {
     document.querySelectorAll('.pad-focus').forEach((e) => e.classList.remove('pad-focus'));
     el.classList.add('pad-focus');
+    emit('uiMove');
     el.focus({ preventScroll: true });
     el.scrollIntoView({ block: 'nearest' });
   }
@@ -246,9 +291,14 @@ export class UI {
       box.appendChild(row);
       list.appendChild(box);
     };
-    card('Valcrest Gully', 'Hand-built powder gully · jumps, pillows and drops', [{ label: 'Ride the gully', meta: '2.5 km', go: () => go('', 0) }]);
+    const extra = (key) => {
+      const b = bestFor(key), f = flakesFound(key);
+      const medal = b?.medal ? `<span class="best">${{ gold: '● gold', silver: '● silver', bronze: '● bronze' }[b.medal]}</span> · ` : '';
+      return `${medal}${b ? `best ${fmtTime(b.time)} · ` : ''}❄ ${f}/${CHALLENGE.flakes}`;
+    };
+    card('Valcrest Gully', 'Hand-built powder gully · jumps, pillows and drops', [{ label: 'Ride the gully', meta: `2.5 km · ${extra('gully')}`, go: () => go('', 0) }]);
     for (const m of index) {
-      card(m.name, m.region, m.runs.map((r, i) => ({ label: r.name, meta: `${r.drop} m vertical · ${(r.length / 1000).toFixed(1)} km`, go: () => go(m.id, i) })));
+      card(m.name, m.region, m.runs.map((r, i) => ({ label: r.name, meta: `${r.drop} m vertical · ${(r.length / 1000).toFixed(1)} km · ${extra(`${m.id}.${i}`)}`, go: () => go(m.id, i) })));
     }
   }
 

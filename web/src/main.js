@@ -12,6 +12,8 @@ import { ATMOSPHERE, col, createSnowfall } from './scene.js';
 import { Terrain } from './terrain.js';
 import { Course } from './course.js';
 import { RealCourse } from './realcourse.js';
+import { Activities } from './activities.js';
+import { Life } from './life.js';
 import { Sky } from './sky.js';
 import { Scatter } from './scatter.js';
 import { Lifts } from './lifts.js';
@@ -43,9 +45,16 @@ const camera = new THREE.PerspectiveCamera(66, innerWidth / innerHeight, 0.25, 4
 camera.position.set(0, 4000, 0);
 
 const input = new Input(canvas);
-const ui = new UI({ ride: () => startRide(), resume: () => resume(), top: () => player.resetToTop(), menu: () => toMenu() });
+const ui = new UI({
+  ride: () => startRide(false, 'zen'),
+  challenge: () => startRide(false, 'challenge'),
+  retry: () => startRide(true, 'challenge'),
+  zen: () => startRide(true, 'zen'),
+  restart: () => { resume(); startRide(true, activities?.mode || 'zen'); },
+  resume: () => resume(), top: () => player.resetToTop(), menu: () => toMenu(),
+});
 
-let course, snowfall, terrain, sky, scatter, lifts, features, player, rider, cam, fx, sound, composer, aoPass, bloom, wind;
+let activities, life, course, snowfall, terrain, sky, scatter, lifts, features, player, rider, cam, fx, sound, composer, aoPass, bloom, wind;
 
 /**
  * Speed wind: smooth, organic, tapered alpha streaks that live only in the four screen corners and
@@ -141,9 +150,6 @@ async function boot() {
   features.build();
   scene.add(features.group);
   for (const o of features.obstaclePoints || []) scatter.addObstacle(o[0], o[1], o[2], o[3]);
-  ui.loading(0.8, 'Growing the forest…');
-  scatter.addEnvironment(features.path || [], course);
-  console.log('[sendit] environment', JSON.stringify(scatter.envStats || {}));
   if (params.has('kicker')) {
     // Debug: start 40 m before a kicker, aimed at it.
     const k = features.kickers[Number(params.get('kicker'))] || features.kickers[0];
@@ -153,6 +159,13 @@ async function boot() {
   lifts = new Lifts(terrain);
   lifts.build(course.lifts || []);   // real mountains have their real lifts; the gully has none
   scene.add(lifts.group);
+  // Living mountain (skiers, chair passengers, lodge, birds) — before the forest so the lodge's clearing stays clear.
+  life = new Life({ scene, terrain, features, lifts, course, fx: null });
+  for (const o of life.terrainObstacles || []) scatter.addObstacle(o[0], o[1], o[2], o[3]);
+  scatter.clearings = life.clearings || [];
+  ui.loading(0.8, 'Growing the forest…');
+  scatter.addEnvironment(features.path || [], course);
+  console.log('[sendit] environment', JSON.stringify(scatter.envStats || {}));
 
   ui.loading(0.88, 'Waxing the board…');
   player = new Player(terrain, scatter, lifts, input);
@@ -167,6 +180,8 @@ async function boot() {
   cam = new CameraController(camera, player, terrain, input);
   cam.rider = rider;
   fx = new FXManager(player, renderer, scene);
+  life.fx = fx;
+  activities = new Activities({ scene, course, features, terrain, player, fx });
   sound = new SoundScape(player, terrain);
 
   setupPost();
@@ -179,9 +194,9 @@ async function boot() {
   ui.loading(1, '');
   ui.doneLoading();
   ui.fade(false, 2.0);
-  if (params.has('ride')) startRide(true);
+  if (params.has('ride') || params.has('challenge')) startRide(true, params.has('challenge') ? 'challenge' : 'zen');
   else { setMode(Mode.MENU); ui.refresh(); }
-  window.__sendit = { fx, course, player, terrain, camera, game, scene, renderer, features, scatter };
+  window.__sendit = { activities, life, fx, course, player, terrain, camera, game, scene, renderer, features, scatter };
 }
 
 function setupPost() {
@@ -223,7 +238,7 @@ function onResize() {
 
 // ---------------------------------------------------------------- flow
 let busy = false;
-async function startRide(instant = false) {
+async function startRide(instant = false, mode = 'zen') {
   if (busy) return;
   busy = true;
   await sound.init().catch(() => {});
@@ -234,12 +249,15 @@ async function startRide(instant = false) {
   setMode(Mode.RIDING);
   if (!instant) cam.startIntro(); else cam.snap();
   ui.refresh();
+  activities.start(mode);
+  finishing = false;
   emit('rideStarted');
   busy = false;
 }
 
 function pause() {
   if (game.mode !== Mode.RIDING && game.mode !== Mode.LIFT) return;
+  if (activities?.state === 'finished') return;   // results screen is up
   pause.resumeMode = game.mode;
   setMode(Mode.PAUSED);
   input.unlock();
@@ -289,6 +307,14 @@ function checkFinish() {
   if (finishing || game.mode !== Mode.RIDING || player.state === State.FROZEN) return;
   if (course.progress(player.position.x, player.position.z) < course.finishAt) return;
   finishing = true;
+  if (activities.mode === 'challenge') {
+    const res = activities.finish();
+    player.state = State.FROZEN;
+    input.unlock();
+    ui.pop('FINISH!', 'gold');
+    setTimeout(() => ui.showResults(res), 900);
+    return;
+  }
   ui.pop('RUN COMPLETE!', 'gold');
   emit('runComplete');
   setTimeout(() => { player.resetToTop(); setTimeout(() => { finishing = false; }, 1500); }, 1400);
@@ -331,8 +357,10 @@ function frame(now) {
   terrain.update(camera.position);
   scatter.update(camera.position);
   lifts.update(time, camera.position);
+  life.update(paused ? 0 : dt, time, player, camera.position);
   snowfall.update(camera, time, innerHeight);
-  if (!paused) fx.update(dt, camera);
+  if (!paused) { fx.update(dt, camera); activities.update(dt); }
+  ui.updateActivity(activities.hud());
   sound.update(dt, camera);
   ui.update(dt, player);
   checkFinish();

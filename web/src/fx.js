@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { FX, PHYSICS } from './config.js';
 import { State } from './player.js';
 import { globals } from './world.js';
-import { on } from './state.js';
+import { on, emit } from './state.js';
 
 const KIND_PUFF = 0, KIND_WEDGE = 1, KIND_LINE = 2, KIND_GRAIN = 3;
 
@@ -90,7 +90,10 @@ export class FXManager {
     });
     on('hardBrake', () => this.brakeFan(FX.brakeBurst));
     on('crashed', () => this.burst(this.player.renderPos, 90, 4, 1.4, 0.8));
-    on('nearMiss', () => { this.acc.lines += FX.speedLineCount * 0.25; });
+    on('nearMiss', (e) => {
+      this.acc.lines += FX.speedLineCount * 0.25;
+      if (e?.kind === 'tree') this.treePlop(e.x, e.z);
+    });
   }
 
   spawn(p, v, size, life, kind, drag = 2.0, grav = 2.5) {
@@ -118,6 +121,18 @@ export class FXManager {
       v.set(Math.cos(a) * speed, 0.6 + Math.random() * 1.2, Math.sin(a) * speed);
       this.spawn(at.clone().add(new THREE.Vector3(Math.cos(a) * 0.4, 0.15, Math.sin(a) * 0.4)), v.clone(), 0.35 + Math.random() * 0.3, 0.7 + Math.random() * 0.4, KIND_WEDGE, 4.5, 3.0);
     }
+  }
+
+  /** Snow sliding off a branch you brushed past: a clump of puffs tumbling down. */
+  treePlop(x, z) {
+    const T = this.player.terrain;
+    const y = T.getHeight(x, z) + 2.5 + Math.random() * 3;
+    for (let k = 0; k < 26; k++) {
+      const p = new THREE.Vector3(x + (Math.random() - 0.5) * 1.6, y + Math.random() * 1.2, z + (Math.random() - 0.5) * 1.6);
+      const v = new THREE.Vector3((Math.random() - 0.5) * 0.8, -0.2 - Math.random() * 0.6, (Math.random() - 0.5) * 0.8);
+      this.spawn(p, v, k < 8 ? 0.5 + Math.random() * 0.4 : 0.05 + Math.random() * 0.06, 1.2 + Math.random() * 0.8, k < 8 ? KIND_PUFF : KIND_GRAIN, 0.8, 3.5);
+    }
+    emit('treePlop', { x, y, z });
   }
 
   brakeFan(count) {

@@ -113,6 +113,32 @@ button.primary { border-left: 4px solid #2ff5d6; }
 .m-runs button small { display: block; font-size: 12px; font-style: normal; font-weight: 500; color: var(--dim); margin-top: 2px; }
 .m-runs button:hover { transform: none; border-color: #2ff5d6; }
 
+/* ---------- challenge HUD + results ---------- */
+#chal { position: absolute; left: 50%; top: 22px; transform: translateX(-50%); text-align: center; pointer-events: none; }
+#timer { font-family: "Arial Black", Impact, sans-serif; font-style: italic; font-weight: 900; font-size: 46px; color: #fcfaf2;
+  -webkit-text-stroke: 3px #141a3c; paint-order: stroke fill; text-shadow: 4px 4px 0 #141a3c; font-variant-numeric: tabular-nums; transform: skewX(-10deg); }
+#chalsub { display: flex; gap: 14px; justify-content: center; font-size: 14px; font-weight: 800; font-style: italic; color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6); letter-spacing: 0.04em; margin-top: 2px; }
+#bestHud { color: #2ff5d6; }
+#comboHud { margin-top: 8px; font-family: "Arial Black", Impact, sans-serif; font-style: italic; font-size: 26px; color: #ffd34d;
+  -webkit-text-stroke: 2px #141a3c; paint-order: stroke fill; text-shadow: 3px 3px 0 #141a3c; min-height: 34px; transition: transform .15s; }
+#comboHud.pulse { transform: scale(1.25); }
+#flakesHud { position: absolute; right: 26px; top: 22px; font-weight: 900; font-style: italic; font-size: 20px; color: #ffd34d;
+  -webkit-text-stroke: 1.5px #141a3c; paint-order: stroke fill; text-shadow: 2px 2px 0 #141a3c; pointer-events: none; }
+.card.results { text-align: center; }
+.medal { width: 92px; height: 92px; border-radius: 50%; margin: 0 auto 6px; display: none; box-shadow: 0 6px 0 rgba(20,26,60,0.6), inset 0 -8px 0 rgba(0,0,0,0.15);
+  font: 900 italic 30px "Arial Black", Impact, sans-serif; color: rgba(20,26,60,0.75); line-height: 92px; }
+.medal.gold { display: block; background: radial-gradient(circle at 35% 30%, #fff6c4, #ffd34d 45%, #c8901a); }
+.medal.silver { display: block; background: radial-gradient(circle at 35% 30%, #ffffff, #d6dce8 45%, #8d98ad); }
+.medal.bronze { display: block; background: radial-gradient(circle at 35% 30%, #ffe0c4, #d98c4e 45%, #8f5124); }
+.res-time { font: 900 italic 64px "Arial Black", Impact, sans-serif; color: #fcfaf2; -webkit-text-stroke: 3px #141a3c; paint-order: stroke fill;
+  text-shadow: 5px 5px 0 #141a3c; margin: 4px 0 10px; font-variant-numeric: tabular-nums; }
+.res-rows { display: grid; grid-template-columns: 1fr auto; gap: 6px 24px; text-align: left; margin: 0 auto 18px; max-width: 360px; font-size: 16px; }
+.res-rows .k { color: var(--dim); } .res-rows .v { font-weight: 800; font-style: italic; text-align: right; }
+.res-rows .v.new { color: #2ff5d6; }
+.res-nav { flex-direction: row; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.m-runs button .best { color: #ffd34d; }
+
 /* ---------- controller ---------- */
 body:not(.pad) .gp, body.pad .kb { display: none; }
 button.pad-focus { color: var(--ink); background: rgba(255,255,255,0.1); outline: 2px solid #2ff5d6; outline-offset: 2px; }

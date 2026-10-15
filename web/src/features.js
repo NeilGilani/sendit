@@ -162,9 +162,10 @@ export class Features {
       }
     }
     const s0 = this.at(18);
-    this.addBanner(s0.p, s0.dir);
+    const label = (this.course?.name || 'Valcrest Gully').toUpperCase();
+    this.addBanner(s0.p, s0.dir, `${label}  ·  SEND IT`);
     const s1 = this.at(this.course.finishAt);
-    this.addBanner(s1.p, s1.dir);
+    this.addBanner(s1.p, s1.dir, 'FINISH  ·  FINISH  ·  FINISH');
     this.addFogPockets();
     this.buildSpectators();
     this.buildFlags();
@@ -266,7 +267,7 @@ export class Features {
     this.obstaclePoints = this.flagPoles.map((f) => [f.x, f.z, 0.15, 'flag']);
   }
 
-  addBanner(p, dir) {
+  addBanner(p, dir, text) {
     const T = this.terrain;
     const r = new THREE.Vector2(-dir.y, dir.x);
     const width = 16;
@@ -284,7 +285,7 @@ export class Features {
     }
     const g = new THREE.PlaneGeometry(width, 1.6, 24, 4);
     const mat = toonMaterial({
-      name: 'banner', map: bannerTexture(), side: THREE.DoubleSide,
+      name: 'banner', map: bannerTexture(text), side: THREE.DoubleSide,
       vertPre: 'float edge = 1.0 - pow(abs(position.x) / 8.0, 2.0);\ntransformed.z += sin(position.x * 0.9 - uTime * 3.0) * 0.18 * edge;',
     });
     const banner = new THREE.Mesh(g, mat);
@@ -423,14 +424,14 @@ function brandTexture() {
   });
 }
 
-function bannerTexture() {
+function bannerTexture(text = 'SEND IT') {
   return canvasTex(1024, 104, (g, w, h) => {
     const grad = g.createLinearGradient(0, 0, w, 0);
     grad.addColorStop(0, '#1b1550'); grad.addColorStop(0.5, '#3b2a8c'); grad.addColorStop(1, '#1b1550');
     g.fillStyle = grad; g.fillRect(0, 0, w, h);
     g.fillStyle = '#2ff5d6'; g.fillRect(0, 0, w, 6); g.fillRect(0, h - 6, w, 6);
     g.fillStyle = '#ffffff'; g.font = 'bold italic 62px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText('VALCREST  ·  NORTHWAKE OPEN  ·  SEND IT', w / 2, h / 2 + 3);
+    g.fillText(text, w / 2, h / 2 + 3);
   });
 }
 

@@ -162,6 +162,14 @@ export class Player {
     v.copy(fwd).multiplyScalar(vf).addScaledVector(right, vl);
     this.skid += (clamp(Math.abs(vl) / Math.max(speed, 2) * 2 + this.brake * 0.8, 0, 1) - this.skid) * (1 - Math.exp(-6 * dt));
     this.carve += (clamp(this.turnInput * clamp(speed / 8, 0, 1), -1, 1) - this.carve) * (1 - Math.exp(-7 * dt));
+    // Carve chains: a committed carve held at speed scores when you release or switch edges.
+    const dirNow = Math.abs(this.turnInput) > 0.55 && speed > 6 ? Math.sign(this.turnInput) : 0;
+    if (dirNow && dirNow === this._carveDir) this._carveT = (this._carveT || 0) + dt;
+    else {
+      if ((this._carveT || 0) > 0.7) addScore(dirNow ? 'Linked carve' : 'Carve', 15 + Math.round(this._carveT * 12));
+      this._carveT = 0;
+      this._carveDir = dirNow;
+    }
     v.addScaledVector(gTan, dt);
     if (this.controllable() && this.input.strength('speedUp') > 0.3 && v.length() < P.pushMaxSpeed) v.addScaledVector(fwd, P.pushAccel * dt);
     const S = this.surface;
@@ -292,7 +300,7 @@ export class Player {
     emit('respawned');
   }
 
-  resetToTop() { if (!this._busy && this.state !== State.FROZEN) this.fadeThen(() => this.startRiding()); }
+  resetToTop() { if (!this._busy && this.state !== State.FROZEN) this.fadeThen(() => { this.startRiding(); emit('resetTop'); }); }
 
   async fadeThen(action) {
     this._busy = true;
@@ -331,7 +339,7 @@ export class Player {
       if (this._nearCool <= 0 && near.o !== this._lastNear) {
         this._lastNear = near.o;
         this._nearCool = 0.35;
-        emit('nearMiss', { dist: near.dist, kind: near.o[3] });
+        emit('nearMiss', { dist: near.dist, kind: near.o[3], x: near.o[0], z: near.o[1] });
         addScore('Close shave', 15);
       }
     } else this.nearDist = Infinity;

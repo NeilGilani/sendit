@@ -26,7 +26,7 @@ export class SoundScape {
     this.musicBus = c.createGain(); this.musicBus.connect(this.master);
     this.applyVolumes();
     on('settings', () => this.applyVolumes());
-    const names = [...LOOPS, 'music_golden_hour', 'land_soft', 'bird_1', 'bird_2', 'bird_3', 'bird_4'];
+    const names = [...LOOPS, 'music_golden_hour', 'music_upbeat', 'land_soft', 'bird_1', 'bird_2', 'bird_3', 'bird_4'];
     const bufs = await Promise.all(names.map((n) => this.load(n)));
     this.buf = Object.fromEntries(names.map((n, i) => [n, bufs[i]]));
     for (const n of LOOPS) {
@@ -37,6 +37,34 @@ export class SoundScape {
     }
     this.musicGain = c.createGain(); this.musicGain.gain.value = 0; this.musicGain.connect(this.musicBus);
     const m = c.createBufferSource(); m.buffer = this.buf.music_golden_hour; m.loop = true; m.connect(this.musicGain); m.start();
+    // Challenge runs get the upbeat track; Zen keeps the calm one.
+    this.upbeatGain = c.createGain(); this.upbeatGain.gain.value = 0; this.upbeatGain.connect(this.musicBus);
+    const u = c.createBufferSource(); u.buffer = this.buf.music_upbeat; u.loop = true; u.connect(this.upbeatGain); u.start();
+    this.track = 'zen';
+    this.upLevel = 0;
+    // Sugar crunch: a procedural granular layer — fine crystalline grains under the powder hiss.
+    const sr = c.sampleRate, len = sr * 2, sugar = c.createBuffer(1, len, sr), d = sugar.getChannelData(0);
+    let lp = 0, env = 0, next = 0;
+    for (let i = 0; i < len; i++) {
+      if (i >= next) { env = 0.5 + Math.random() * 0.5; next = i + Math.floor(sr * (0.004 + Math.random() * 0.018)); }
+      env *= 0.9965;
+      lp += (Math.random() * 2 - 1 - lp) * 0.55;
+      d[i] = lp * env;
+    }
+    const sg = c.createGain(); sg.gain.value = 0;
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 0.7;
+    const ss = c.createBufferSource(); ss.buffer = sugar; ss.loop = true; ss.connect(bp); bp.connect(sg); sg.connect(this.sfx); ss.start();
+    this.layers.sugar = { gain: sg, src: ss, level: 0 };
+    this.sugarFilter = bp;
+    on('activity', ({ type }) => { this.track = type; });
+    on('countdown', (n) => this.oneShot(n > 0 ? 'count_beep' : 'count_go', 0.6, 1));
+    on('gate', ({ pass }) => (pass ? this.oneShot('gate', 0.5, 0.95 + Math.random() * 0.1) : this.oneShot('combo_lost', 0.5, 0.8)));
+    on('flake', () => { this.oneShot('token', 0.7, 1); this.chime(); });
+    on('comboBanked', ({ mult }) => this.oneShot('combo_bank', 0.5, 0.9 + Math.min(mult, 5) * 0.06));
+    on('comboLost', () => this.oneShot('combo_lost', 0.45, 1));
+    on('runFinished', ({ medal }) => { this.oneShot('medal', 0.8, medal === 'gold' ? 1.12 : medal === 'silver' ? 1 : 0.9); });
+    on('treePlop', () => this.plop());
+    on('uiMove', () => this.oneShot('ui_click', 0.25, 1.1));
     this.musicStart = c.currentTime;
     this.musicLevel = 0;
     this.lastLoop = 0;
@@ -98,6 +126,29 @@ export class SoundScape {
     src.connect(g); g.connect(this.sfx); src.start();
   }
 
+  /** Soft pentatonic sparkle (snowflake pickup). */
+  chime() {
+    const c = this.ctx, t = c.currentTime;
+    [0, 4, 7, 12].forEach((semi, i) => {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'sine'; o.frequency.value = 880 * Math.pow(2, semi / 12);
+      g.gain.setValueAtTime(0, t + i * 0.06); g.gain.linearRampToValueAtTime(0.12, t + i * 0.06 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0005, t + i * 0.06 + 0.6);
+      o.connect(g); g.connect(this.sfx); o.start(t + i * 0.06); o.stop(t + i * 0.06 + 0.65);
+    });
+  }
+
+  /** Snow clump sliding off a branch: a soft low thud. */
+  plop() {
+    const c = this.ctx, t = c.currentTime, sr = c.sampleRate;
+    const b = c.createBuffer(1, Math.floor(sr * 0.4), sr), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (sr * 0.07));
+    const src = c.createBufferSource(); src.buffer = b;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 520;
+    const g = c.createGain(); g.gain.value = 0.55;
+    src.connect(lp); lp.connect(g); g.connect(this.sfx); src.start(t);
+  }
+
   thump(gain, rate) {
     const c = this.ctx;
     const src = c.createBufferSource(); src.buffer = this.buf.land_soft; src.playbackRate.value = rate;
@@ -117,7 +168,7 @@ export class SoundScape {
       turn = Math.min(1, Math.abs(s.carve) * 0.7 + s.skid * 0.6);
       air = s.state === State.AIR;
     }
-    const s01 = Math.min(1, speed / 20);
+    const s01 = Math.min(1, speed / 15);
     const moving = smooth(0.4, 5, speed);
     const onSnow = grounded && !paused ? 1 : 0;
     const level = moving * (0.3 + 0.7 * s01) * onSnow;
@@ -127,6 +178,10 @@ export class SoundScape {
     this.set('snow_carve', onSnow * moving * turn * (0.25 + 0.75 * s01) * 0.7, 0.25);
     this.set('wind_speed', paused ? 0 : Math.pow(s01, 1.4) * (air ? 0.95 : 0.75), 0.4);
     this.set('wind_ambient', paused ? 0.18 : 0.32, 1.2);
+    // Sugar crunch: louder in deep, soft snow and when sinking in; brighter with speed and carving.
+    const deep = menu ? 0 : Math.min(1, (s.powder ?? soft) * (0.5 + (s.sink || 0) * 3));
+    this.set('sugar', level * deep * (0.35 + turn * 0.6) * 0.9, 0.15);
+    this.sugarFilter.frequency.setTargetAtTime(1800 + 2200 * s01 + turn * 1200, c.currentTime, 0.2);
     this.layers.snow_powder.src.playbackRate.setTargetAtTime(0.92 + 0.2 * s01, c.currentTime, 0.3);
     this.layers.snow_groomed.src.playbackRate.setTargetAtTime(0.9 + 0.25 * s01, c.currentTime, 0.3);
     this.layers.wind_speed.src.playbackRate.setTargetAtTime(0.85 + 0.35 * s01, c.currentTime, 0.5);
@@ -139,7 +194,10 @@ export class SoundScape {
     if (this.musicRest > 0) { this.musicRest -= dt; target = 0; }
     const rate = target > this.musicLevel ? 0.25 : 0.18;
     this.musicLevel += Math.sign(target - this.musicLevel) * Math.min(Math.abs(target - this.musicLevel), rate * dt);
-    this.musicGain.gain.setTargetAtTime(this.musicLevel ** 1.6, c.currentTime, 0.1);
+    const up = this.track === 'challenge' && !menu ? 1 : 0;
+    this.upLevel += (up - this.upLevel) * Math.min(1, dt * 0.8);
+    this.musicGain.gain.setTargetAtTime(this.musicLevel ** 1.6 * (1 - this.upLevel), c.currentTime, 0.1);
+    this.upbeatGain.gain.setTargetAtTime((paused ? 0.45 : 0.75) * this.upLevel, c.currentTime, 0.1);
 
     // Listener follows the camera.
     const L = c.listener, p = camera.position, f = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);

@@ -66,6 +66,7 @@ export class RealCourse {
   }
 
   constructor(meta, dem, far, mask, runIndex) {
+    this.runIndex = runIndex;
     this.meta = meta;
     this.dem = dem; this.farGrid = far; this.mask = mask;
     this.run = meta.runs[Math.min(runIndex, meta.runs.length - 1)];

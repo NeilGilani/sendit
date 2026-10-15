@@ -173,6 +173,7 @@ export class Scatter {
         const rd = runDist(tx, tz);
         if (rd < S.runCorridor) continue;
         if (this.findObstacle({ x: tx, z: tz }, 1.2)) continue;
+        if ((this.clearings || []).some(([cx, cz, r]) => Math.hypot(tx - cx, tz - cz) < r)) continue;
         cands.push([tx, tz, thin, rd]);
       }
     }
@@ -207,6 +208,7 @@ export class Scatter {
         if (!steep && surf.z < 0.3) continue;
         if (surf.x > S.pisteClear) continue;
         if (runDist(cx, cz) < S.runCorridor + 4) continue;
+        if ((this.clearings || []).some(([qx, qz, r]) => Math.hypot(cx - qx, cz - qz) < r + 5)) continue;
         formations++;
         const count = S.rockPerCluster[0] + Math.floor(rnd() * (S.rockPerCluster[1] - S.rockPerCluster[0] + 1));
         for (let i = 0; i < count; i++) {
