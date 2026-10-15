@@ -8,12 +8,16 @@
 //   6. ?ride skips the lobby; pause → lobby still works (stage built lazily)
 //   7. legacy migration: old 'sendit.best' + settings.resort become a v1 profile
 // Fails on any console error / page error.
+// GPU=1 renders on the real GPU (ANGLE D3D11): the lobby shows the full world behind the rider, which
+// is very slow on SwiftShader (minutes per run), so prefer GPU=1 where a GPU is available.
 import { chromium } from '@playwright/test';
 
 const base = (process.argv[2] || 'http://localhost:5175/').replace(/\/?$/, '/');
 const shotDir = process.argv[3] || '';
 const browser = await chromium.launch({
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
+  args: process.env.GPU
+    ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required']
+    : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
 });
 const errors = [];
 let failures = 0;
@@ -42,14 +46,17 @@ const state = (page) => page.evaluate(() => {
     pause: !document.getElementById('pause').classList.contains('hidden'),
     hud: !document.getElementById('hud').classList.contains('hidden'),
     focus: document.activeElement?.className || document.activeElement?.tagName,
+    // The stage stands in the world scene and drives the world camera while the lobby is shown.
+    stageInWorld: s.stage.root?.parent === s.scene, stageShown: !!s.stage.root?.visible, stageActive: !!s.stage.active,
+    riderShown: !!s.rider.root.visible, viewOffset: !!s.camera.view?.enabled,
   };
 });
 /** Hold a mock gamepad button for a few frames. */
 async function padPress(page, i) {
   await page.evaluate((b) => { window.__padOn = true; window.__pad.buttons[b] = { pressed: true, value: 1 }; window.__f0 = window.__frames; }, i);
-  await page.waitForFunction(() => window.__frames - window.__f0 >= 3, null, { timeout: 60000 });
+  await page.waitForFunction(() => window.__frames - window.__f0 >= 3, null, { timeout: T });
   await page.evaluate((b) => { window.__pad.buttons[b] = { pressed: false, value: 0 }; window.__f0 = window.__frames; }, i);
-  await page.waitForFunction(() => window.__frames - window.__f0 >= 3, null, { timeout: 60000 });
+  await page.waitForFunction(() => window.__frames - window.__f0 >= 3, null, { timeout: T });
 }
 const countFrames = (page) => page.evaluate(() => { window.__frames = 0; const f = () => { window.__frames++; requestAnimationFrame(f); }; requestAnimationFrame(f); });
 const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: `${shotDir}/${name}.png`, timeout: T }); };
@@ -66,9 +73,11 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   ok(s.equipment === 'skis' && s.gear === 'native', 'default equipment is skis (native rider gear)');
   ok(s.stored?.version === 1, 'profile v1 written to localStorage');
   ok(/lb-ride/.test(s.focus), 'Ride button has focus');
+  ok(s.stageInWorld && s.stageShown && s.stageActive && !s.riderShown, 'lobby stage stands in the world (game rider hidden)');
+  ok(await page.evaluate(() => { const s = window.__sendit; return s.camera.position.distanceTo(s.stage.focusPoint) < 20; }), 'world camera frames the lobby stage');
 
   await page.click('.eq-opt[data-type=snowboard]');
-  await page.waitForFunction(() => window.__sendit.stage.pl?.equipment?.type === 'snowboard' && window.__sendit.stage.gearMode === 'native', null, { timeout: 60000 });
+  await page.waitForFunction(() => window.__sendit.stage.pl?.equipment?.type === 'snowboard' && window.__sendit.stage.gearMode === 'native', null, { timeout: T });
   s = await state(page);
   ok(s.equipment === 'snowboard' && s.stored.loadout.equipment === 'snowboard', 'snowboard selected and saved');
   ok(!(await page.isVisible('.eq-badge')), 'real snowboard: no placeholder badge');
@@ -79,7 +88,7 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await countFrames(page);
   s = await state(page);
   ok(s.equipment === 'snowboard', 'snowboard persists across reload');
-  await page.waitForFunction(() => window.__sendit.stage.pl?.equipment?.type === 'snowboard' && window.__sendit.stage.gearMode === 'native', null, { timeout: 60000 });
+  await page.waitForFunction(() => window.__sendit.stage.pl?.equipment?.type === 'snowboard' && window.__sendit.stage.gearMode === 'native', null, { timeout: T });
   ok(await page.getAttribute('.eq-opt[data-type=snowboard]', 'aria-pressed') === 'true', 'toggle shows the saved choice');
 
   // Keyboard: Q/E tabs, arrows move focus.
@@ -126,15 +135,17 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await page.waitForTimeout(2500);
   s = await state(page);
   ok(!s.lobby && s.hud, 'Ride starts a ride (HUD visible, lobby hidden)');
+  ok(!s.stageShown && !s.stageActive && s.riderShown && !s.viewOffset, 'ride hides the stage, shows the game rider, frees the camera');
   await shot(page, 't2_ride');
   await page.keyboard.press('Escape');
-  await page.waitForFunction(() => window.__sendit.game.mode === 2, null, { timeout: 60000 });
+  await page.waitForFunction(() => window.__sendit.game.mode === 2, null, { timeout: T });
   s = await state(page);
   ok(s.pause, 'Esc pauses');
   await page.click('#pause [data-act=menu]');
   await lobbyReady(page);
   s = await state(page);
   ok(s.mode === 0 && s.lobby && !s.pause, 'Back to lobby returns to the lobby');
+  ok(s.stageShown && s.stageActive && !s.riderShown, 'stage is back in the lobby');
   ok(s.rides === 1, 'the ride was recorded in the profile');
   await shot(page, 't3_back');
 
@@ -157,7 +168,7 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   ok(!s.stage, '?ride defers building the lobby stage');
   await page.waitForTimeout(1500);
   await page.keyboard.press('Escape');
-  await page.waitForFunction(() => window.__sendit.game.mode === 2, null, { timeout: 60000 });
+  await page.waitForFunction(() => window.__sendit.game.mode === 2, null, { timeout: T });
   await page.click('#pause [data-act=menu]');
   await lobbyReady(page);
   ok(true, 'pause → lobby works after ?ride');

@@ -148,5 +148,35 @@ await test('map registry: selection precedence and fallback', async () => {
   assert.throws(() => registry.registerMap({ id: 'x', name: 'X' }));
 });
 
+await test('map registry: lobby spot down the run, looking where the view opens up', () => {
+  // A run straight down −Z from z = 0; the valley below falls away to the east (+x) as well.
+  const terrain = {
+    getHeight: (x, z) => z * 0.3 - x * 0.3,
+    getSpawn: () => ({ position: { x: 0, z: 5 }, heading: 0 }),
+  };
+  const path = Array.from({ length: 40 }, (_, i) => ({ x: 0, y: -i * 8 }));
+  const s = registry.lobbySpot({ id: 'm' }, { path }, terrain);
+  assert.ok(Math.abs(s.x) < 1e-6 && Math.abs(s.z + registry.LOBBY_ALONG) < 1e-6, 'LOBBY_ALONG metres down the path');
+  assert.ok(s.heading < 0 && s.heading >= -0.61, `turns toward the open valley (${s.heading})`);
+  // No path: the spawn. A map's own lobby() wins; a broken one falls back.
+  assert.deepEqual(registry.lobbySpot({ id: 'm' }, {}, terrain), { x: 0, z: 5, heading: 0 });
+  assert.deepEqual(registry.lobbySpot({ id: 'm', lobby: () => ({ x: 7, z: 8, heading: 1 }) }, { path }, terrain), { x: 7, z: 8, heading: 1 });
+  const warn = console.warn; console.warn = () => {};
+  const bad = registry.lobbySpot({ id: 'm', lobby: () => { throw new Error('x'); } }, {}, terrain);
+  console.warn = warn;
+  assert.deepEqual(bad, { x: 0, z: 5, heading: 0 });
+});
+
+await test('catalog: gear items point at real equipment models', () => {
+  profileStore.reset();
+  assert.equal(catalog.gearModel(catalog.getItem('skis-northwake-carver')), 'allmountain');
+  assert.equal(catalog.gearModel(catalog.getItem('poles-northwake-alloy')), undefined, 'builtin parts have no model id');
+  assert.equal(profileStore.gearModel('snowboard'), 'allmountain');
+  catalog.registerItem({ id: 'test-board-park', name: 'Butter 152', slot: 'board', model: { kind: 'equipment', ref: 'park' } });
+  profileStore.equip('test-board-park');
+  assert.equal(profileStore.gearModel('snowboard'), 'park');
+  assert.equal(profileStore.gearModel('skis'), 'allmountain');
+});
+
 console.log(failed ? `\n${failed} failed, ${passed} passed` : `\nall ${passed} passed`);
 process.exit(failed ? 1 : 0);

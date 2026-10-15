@@ -8,7 +8,7 @@
 import { emit } from '../state.js';
 import { storage } from '../services/storage.js';
 import { PROFILE_KEY, migrateProfile, sanitize, defaultProfile } from './schema.js';
-import { SLOTS, EQUIPMENT_TYPES, getItem, getVariant, unlockState } from './catalog.js';
+import { SLOTS, EQUIPMENT_TYPES, getItem, getVariant, unlockState, gearModel } from './catalog.js';
 
 class ProfileStore {
   constructor(store) {
@@ -85,6 +85,11 @@ class ProfileStore {
   /** Slots used by the current equipment type, e.g. [{ slot:'skis', item, variant }, { slot:'poles', … }]. */
   activeGear(type = this.equipment) {
     return EQUIPMENT_TYPES[type].slots.map((slot) => ({ slot, ...this.equipped(slot) }));
+  }
+
+  /** The equipment model id of the primary gear item for a type (see catalog gearModel), or undefined. */
+  gearModel(type = this.equipment) {
+    return gearModel(this.equipped(EQUIPMENT_TYPES[type].primary)?.item);
   }
 
   /** Clothing slots in display order. */

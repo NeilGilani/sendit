@@ -2,51 +2,41 @@
 // the lobby owns its own numbers.
 
 export const STAGE = {
-  // Sky + horizon (matches the daylight palette in scene.js ATMOSPHERE).
-  skyZenith: '#5f94d6',
-  skyMid: '#a9c4e6',
-  skyHorizon: '#eef2f6',
-  sunGlow: '#fff3df',
-  ridgeColors: ['#e3e9f2', '#d3dcea', '#c3d0e3', '#b3c3db'],   // far → near
-  groundFadeNear: 16,            // m — snow fades into the horizon haze between these radii
-  groundFadeFar: 70,
+  // Snow plinth the rider stands on (at the map's lobby spot, see maps/registry.js lobbySpot()).
+  platformRadius: 1.55,           // m
+  plinthLift: 0.12,              // m the top sits above the highest snow under it
+  plinthBury: 0.6,               // m the skirt reaches below the lowest snow under it
 
-  // Key light (direction TOWARDS the light, world space; camera looks down −Z from +Z).
-  keyDir: [-0.55, 0.62, 0.56],
-  shadowHalf: 2.6,               // m — shadow box around the turntable
-  shadowMap: 2048,
-
-  // Turntable.
-  platformRadius: 1.9,
+  // Neon rim + ticks (HDR colours: > 1 blooms through the game's post stack).
   neon: '#2ff5d6',
   neon2: '#ff5fb0',
-
-  // Snowfall.
-  flakes: 700,
-  flakeBox: 14,                  // m
+  neonGlow: 2.6,
 };
 
 /**
  * Camera shots. A tab picks one by name (tab.shot); the camera eases between them.
- *   target  – look-at height (m)        pitch – degrees down
+ *   target  – look-at height above the plinth (m)        pitch – degrees down
  *   frame   – metres of subject height that should fill ~80 % of the free screen area
  */
 export const SHOTS = {
-  full: { target: 0.95, pitch: 4, frame: 3.0 },
-  gear: { target: 0.8, pitch: 6, frame: 2.75 },
-  portrait: { target: 1.3, pitch: 2, frame: 2.0 },
-  wide: { target: 1.1, pitch: 3, frame: 4.6 },
+  full: { target: 0.95, pitch: 5, frame: 3.0 },
+  gear: { target: 0.8, pitch: 7, frame: 2.75 },
+  portrait: { target: 1.3, pitch: 3, frame: 2.0 },
+  wide: { target: 2.2, pitch: 4, frame: 7 },       // Maps / Multiplayer: more of the mountain
 };
 
 export const CAMERA = {
   fov: 30,
+  near: 0.1,
+  groundClear: 0.6,              // m the camera keeps above the snow behind it
   minZoom: 0.7,                  // user zoom (wheel / pinch / triggers) multiplies the shot distance
   maxZoom: 1.45,
   shotEase: 3.2,                 // 1/s
 };
 
 export const TURNTABLE = {
-  heroYaw: Math.PI - 0.55,       // rest angle: a 3/4 view of the rider
+  // Rest angle per gear: a 3/4 view of the rider's front (a snowboarder faces the toe edge).
+  heroYaw: { skis: Math.PI - 0.55, snowboard: Math.PI + 0.85 },
   dragSpeed: 0.0085,             // rad per CSS px
   keySpeed: 2.4,                 // rad/s with A/D or the right stick
   friction: 4.0,                 // inertia decay (1/s)
