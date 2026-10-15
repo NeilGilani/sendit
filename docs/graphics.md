@@ -30,7 +30,7 @@ Compared screenshots against the round-2 research addendum in `docs/graphics-res
 | Tracks | `fx.js` TrackMap | Stamps are round-capped capsules in metres with a rounded cross-section, so successive stamps along a turn merge (MAX blend) into one smooth trench without tread-like ticks. The gradient stencil spans about 1.5 texels. |
 | Trees | `gfx/trees.js`, `TREES` | Needle fronds use a fishbone pattern (needles along side twigs, ragged with gaps). Snow on branches is a solid pillow with its own domed, lumpy normal, not a needle-shaped cut-out. Needle tips glow when backlit (`TREES.translucency`). The inner core is thinner and clumped. |
 | Lighting | `LIGHTING` | Sun elevation 32° (long shadows, as in Steep and photographers' hero sun). `skyBoost` 0.9 (shaded snow sits about 1.5–2 stops under sunlit). |
-| Tooling | `web/scripts/` | `gfxshots.mjs` gains `gcam` (camera height above ground). New `gfxperf.mjs` (cost per quality) and `gfxprofile.mjs` (cost breakdown). |
+| Tooling | `web/scripts/` | `gfxshots.mjs` gains `gcam` (camera height above ground). New `gfxperf.mjs` (GPU / CPU frame cost per quality), `gfxgpu.mjs` (GPU time per pass and draw) and `gfxcpu.mjs` (main-thread profile). |
 
 Spray contact API: unchanged. `main.js` already calls `fx.setContactSource(() => rider.getContactPoints())`. Skis and the board both emit through it (checked with `?equip=snowboard`).
 
@@ -47,6 +47,7 @@ All new tunables are in `web/src/scene.js` (the scene file). `config.js` is unto
 - `CLIFFS`: relief depth of the fall-line flutes sculpted into steep walls.
 - `CORNICES`, `RING` (distant ranges), `SNOWFALL`.
 - Post: `POST` at the top of `web/src/gfx/post.js` (exposure, tone map, grade, bloom, AO, glare, flare, goggles).
+- Performance / quality tiers: `PERF` in `web/src/gfx/perf.js` (render scale, shadows, AO, SMAA, terrain shader features, tree radii, spray budget).
 
 ## Spray contact-point API (for the snowboard)
 
@@ -79,23 +80,26 @@ spray.emit(contacts, dt, { powder, normal });
 
 ## Quality tiers (`?quality=0|1|2`)
 
-| | 0 (low) | 1 (medium) | 2 (high) |
+| | 0 (low) | 1 (medium, default) | 2 (high) |
 |---|---|---|---|
-| Render scale | 0.75 × min(dpr,1) | min(dpr,1.5) | dpr (≤2) |
+| Render scale | 0.75 × min(dpr,1) | min(dpr,1) | dpr (≤2) |
 | Shadow box / map | 40 m / 1024 | 60 m / 2048 | 85 m / 3072 |
-| N8AO (half resolution) | off | Low | Medium |
+| N8AO (half resolution) | off | off | Medium |
 | Snow glints | off | on | on |
 | Snow wind ripples / sastrugi / corduroy | off | on | on |
 | Track trenches | normal-mapped | normal-mapped | steep parallax |
-| Rock detail | one projection, one fracture scale | full | full |
-| Trees: full / mid LOD radius | 35 / 189 m | 49 / 260 m | 58 / 420 m |
+| Rock detail | one projection, one fracture scale | one projection, one fracture scale | full |
+| Trees: full / mid LOD radius | 35 / 126 m | 41 / 260 m | 58 / 420 m |
 | Far tree / boulder distance | 1800 / 500 m | 3000 / 900 m | 4500 / 1400 m |
 | Spray particle budget / mist | 35 % / 60 % | 65 % / 85 % | 100 % |
 | Sun glare / lens ghosts | off / off | on / off | on / on |
 | Spray shadows (dithered, in the sun shadow map) | off | on | on |
-| SMAA preset | Low | Medium | High |
+| SMAA preset | Low | Low | High |
 
-Terrain LOD distances scale as before (0.6 / 1.0 / 1.5).
+All of these live in one table: `PERF` in `web/src/gfx/perf.js`. Measurements and reasoning are in
+`docs/graphics-perf.md`.
+
+Terrain LOD distances scale 0.6 / 1.0 / 1.5.
 
 ## Debug and preview helpers
 
@@ -107,7 +111,7 @@ Terrain LOD distances scale as before (0.6 / 1.0 / 1.5).
 
 ## Known issues / not done
 
-- Performance (second pass, corrected): the earlier ~2 ms figures came from `requestAnimationFrame` deltas in headless Chromium, which don't measure GPU cost. `web/scripts/gfxperf.mjs` times a synchronous render through the full post stack plus a 1-pixel `readPixels`. On the Intel Arc 130V iGPU at 1600×900, with the GPU otherwise idle, the final build measures about **13 / 27 / 29 ms** on quality 0 / 1 / 2, so roughly 75 / 37 / 34 fps of headroom before vsync pipelining. Earlier runs while other sessions shared the GPU read 2–4× higher; compare numbers only within one run. `web/scripts/gfxprofile.mjs` interleaves variants to break the cost down. Full-resolution N8AO High was ~45 % of a high-quality frame and near frond trees ~25 %. AO now runs at half resolution (Low on q1, Medium on q2), the near-tree radius is 58 m, the mid-tree radius scales 0.45 / 0.62 / 1 by quality, and SMAA is Low / Medium / High. The terrain shader's fine detail is cheap (< 10 %). If a weaker GPU still struggles, the next levers are `TREES.midRadius`, the render scale on quality 1, and updating the shadow map on alternate frames.
+- Performance: see `docs/graphics-perf.md`. Earlier versions of this file claimed about 2 ms per frame, and later about 13 / 27 / 29 ms. The first came from headless `requestAnimationFrame` deltas, which don't measure GPU cost. The second came from an unpipelined render plus `readPixels`, which overstates the frame time. Measured with GPU timer queries on an Intel Arc 130V iGPU at 1600×900, the game is GPU-bound at about **9 / 14 / 22 ms per frame** on quality 0 / 1 / 2 (about 110 / 72 / 45 fps). The main thread costs about 5 ms.
 - Cornices are found procedurally on convex breaks and are visual only (no collision). The hand-built gully has few true crests, so they are sparse there.
 - Rock ledge bands follow world height. Very large faces can still show some banding at mid distance.
 - The rider and lifts still use `toonMaterial` (now HDR-lit). The neon emissive trims stay but read dimmer under the new exposure. The ink outline is off (`OUTLINE.px = 0`).
