@@ -72,7 +72,8 @@ export class EdgePhysics {
     // carve gently and holding commits; analog input passes straight through.
     let steer = ctrl.steer;
     if (Math.abs(steer) > 0.98) {
-      this._holdT = Math.sign(steer) === this._holdSign ? (this._holdT || 0) + dt : 0;
+      // Linking turns (straight from the other key) commits at once; pressing from neutral ramps.
+      this._holdT = Math.sign(steer) === this._holdSign ? (this._holdT || 0) + dt : (this._holdSign === -Math.sign(steer) ? P.digitalSteerRamp : 0);
       this._holdSign = Math.sign(steer);
       steer = Math.sign(steer) * Math.min(1, P.digitalSteerStart + this._holdT / P.digitalSteerRamp * (1 - P.digitalSteerStart));
     } else { this._holdT = 0; this._holdSign = 0; }
