@@ -79,8 +79,10 @@ Terrain LOD distances scale as before (0.6 / 1.0 / 1.5).
 ## Debug and preview helpers
 
 - URL params: `?tm=agx` (tone curve), `?exposure=0.62`, `?sun=bearing,elevation` (degrees), `?goggles=1` (amber goggle lens), plus the existing `?ride`, `?quality`, `?at`, `?kicker`.
+- `?shaderdebug` turns three.js shader log checks back on. They are off by default because reading program logs stalls on the first use of every program, and ANGLE/D3D11 prints a benign compiler warning for the third-party N8AO shader.
+- `window.__post` is the PostStack instance (debug).
 - `window.__gfxCam = [px,py,pz, tx,ty,tz, fov?]` or a function returning that array overrides the camera (honoured in `sky.js`). This is for screenshots.
-- `node web/scripts/gfxshots.mjs <url> <outDir> <views.json>` boots once in headless Chromium and captures many views (`cam`, `side` rider-relative camera, `keys`, `eval`, `wait`). Set `SUF=_x` to suffix the file names.
+- `node web/scripts/gfxshots.mjs <url> <outDir> <views.json>` boots once in headless Chromium and captures many views (`cam`, `side` rider-relative camera, `keys`, `eval`, `wait`). Set `SUF=_x` to suffix the file names. `GPU=1` renders on the real GPU through ANGLE/D3D11, which is much faster than SwiftShader on this machine; `clip` captures a sub-rectangle.
 
 ## Known issues / not done
 
