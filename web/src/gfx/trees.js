@@ -241,6 +241,16 @@ float tvn(vec3 p) {
              mix(mix(th1(n + 113.0), th1(n + 114.0), f.x), mix(th1(n + 170.0), th1(n + 171.0), f.x), f.y), f.z);
 }
 uniform vec3 uNeedle; uniform vec3 uNeedle2; uniform vec3 uBark; uniform vec3 uTreeSnow; uniform float uSnowLoad;
+float treeSnow = 0.0;
+`;
+// Snow pads are lit as if they faced the sky (rounded tops), whatever the frond card's tilt.
+const BAND = /* glsl */`
+  if (treeSnow > 0.0) {
+    vec3 nUp = normalize(mix(normal, (viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz, 0.65));
+    float nl = clamp((dot(nUp, sunV) + 0.25) / 1.25, 0.0, 1.0);
+    vec3 skyUp = mix(uGroundAmb, uSkyAmb, 0.85) * occl;
+    light = mix(light, uSunCol * nl * shadow + skyUp, treeSnow);
+  }
 `;
 const FRAG = /* glsl */`
 {
@@ -260,23 +270,35 @@ const FRAG = /* glsl */`
   bool shell = under > 2.5;
   vec3 col = bark ? uBark : (shell ? green * (under < 3.5 ? 0.7 : 1.0) : green * clamp(base.g / 0.03, 0.45, 1.5));
   if (under > 1.5) diffuseColor.a = 1.0;   // trunk / core / far shell are solid
-  // Snow: sits on the upper side of each branch (and the top of far shells), heavier per tree.
+  // Snow: pads and clumps on the upper side of each branch (thick near the twig, never on the needle
+  // fringe), heavier per tree; far shells get it on their upward faces.
   float load = uSnowLoad * (0.4 + 0.8 * fract(vSeed * 3.71));
   float n = tvn(vW * 2.3) * 0.65 + tvn(vW * 7.1) * 0.35;
-  float snow = 0.0;
+  float snow = 0.0, core = 0.0;
   if (!bark) {
     if (shell) {
       float sh = smoothstep(0.05, 0.75, vWN.y + (n - 0.5) * 0.6);
       snow = sh * smoothstep(0.15, 0.8, load) * (under < 3.5 ? 0.7 : 0.9);
+      core = snow * 0.5;
     } else if (under < 0.5 && gl_FrontFacing) {
-      // Along the branch: a ridge of snow over the twig, thinning toward the tips and the edges.
-      float across = abs(fract(vTUv.y * 2.0) - 0.5) * 2.0;
-      float along = smoothstep(0.0, 0.25, vTUv.x) * (1.0 - smoothstep(0.65, 1.0, vTUv.x));
-      snow = smoothstep(0.42, 0.68, load * (0.55 + 0.45 * along) * (1.15 - across * 0.6) + (n - 0.5) * 0.55);
+      float across = abs(fract(vTUv.y * 2.0) - 0.5) * 2.0;       // 0 on the twig, 1 at the card edge
+      float along = smoothstep(0.0, 0.2, vTUv.x) * (1.0 - smoothstep(0.55, 0.92, vTUv.x));
+      // Clumps along the branch (branch-local) and shared between neighbouring branches (world).
+      float cl = tvn(vec3(vTUv.x * 6.5, vTUv.y * 5.0, vSeed * 31.0 + vH * 3.0)) * 0.55 + tvn(vW * 1.7 + vSeed * 9.0) * 0.45;
+      float pad = load * (0.45 + 0.55 * along) * (1.25 - across * 1.1) + (cl - 0.5) * 1.2 + (n - 0.5) * 0.25;
+      snow = smoothstep(0.42, 0.5, pad);
+      core = smoothstep(0.46, 0.85, pad);
+      // Needles just outside a pad sit in its shadow.
+      col *= 1.0 - 0.45 * smoothstep(0.25, 0.42, pad) * (1.0 - snow);
+      // Snow fills the gaps between needles: pads are solid, not needle-shaped speckles.
+      diffuseColor.a = max(diffuseColor.a, smoothstep(0.5, 0.62, pad) * step(across, 0.62));
     }
   }
-  col = mix(col, uTreeSnow, snow);
-  col *= mix(vAO, 1.0, snow * 0.6);
+  treeSnow = snow;
+  // Rounded pillows: bright crowns, the curved-away edges go grey-blue.
+  vec3 sCol = uTreeSnow * mix(vec3(0.6, 0.66, 0.78), vec3(1.0), core);
+  col = mix(col, sCol, snow);
+  col *= mix(vAO, 1.0, snow * 0.75);
   diffuseColor.rgb = col;
   toonDeepBias = (1.0 - vAO) * 0.35 * (1.0 - snow);
 }
@@ -290,7 +312,7 @@ function treeMaterial(opts) {
       uBark: { value: new THREE.Color(TREES.bark) }, uTreeSnow: { value: new THREE.Color(TREES.snow) },
       uSnowLoad: { value: TREES.snowLoad }, uLodCenter: opts.lodCenter,
     },
-    vertPars: VERT_PARS, vertPre: VERT_PRE, fragPars: FRAG_PARS, frag: FRAG,
+    vertPars: VERT_PARS, vertPre: VERT_PRE, fragPars: FRAG_PARS, frag: FRAG, band: BAND,
   });
   if (opts.far) m.defines = { FAR_LOD: 1 };
   m.userData.far = !!opts.far;

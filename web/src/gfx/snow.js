@@ -381,24 +381,35 @@ export const SNOW_FRAG_GLSL = /* glsl */`
   if (dist < uTrackRegion.z * 0.5 + 10.0) {
     #if SNOW_TRACKS > 1
     if (dist < 45.0) {
-      // Steep parallax: march the view ray down into the trench height field.
+      // Parallax occlusion: march the view ray down into the trench height field, then refine the
+      // crossing with a short binary search (no stepped "contour" layers).
       float ndv = max(dot(-Vd, N), 0.18);
       vec2 perDepth = (Vd.xz - N.xz * dot(Vd, N)) / ndv;
-      float lay = 0.0;
+      float lo = 0.0, hi = -1.0;
       for (int i = 1; i <= 10; i++) {
         float d = float(i) / 10.0 * trD;
-        vec2 q = xz + perDepth * d;
-        if (trackAtLod(q) * trD < d) break;
-        tp = q; lay = d;
+        if (trackAtLod(xz + perDepth * d) * trD < d) { hi = d; break; }
+        lo = d;
       }
+      if (hi > 0.0) {
+        for (int k = 0; k < 4; k++) {
+          float m = 0.5 * (lo + hi);
+          if (trackAtLod(xz + perDepth * m) * trD < m) hi = m; else lo = m;
+        }
+        lo = 0.5 * (lo + hi);
+      }
+      tp = xz + perDepth * lo;
     }
     #endif
-    float e = 0.045, E = 0.28;
+    // Stencils grow with the pixel footprint: the track map has no mips, so distant grooves would
+    // otherwise alias into dashes.
+    float e = max(0.045, tFP * 0.75), E = max(0.28, tFP * 2.5);
     float t0 = trackAt(tp);
     float tx1 = trackAt(tp + vec2(e, 0.0)), tx0 = trackAt(tp - vec2(e, 0.0));
     float tz1 = trackAt(tp + vec2(0.0, e)), tz0 = trackAt(tp - vec2(0.0, e));
     float bx1 = trackAt(tp + vec2(E, 0.0)), bx0 = trackAt(tp - vec2(E, 0.0));
     float bz1 = trackAt(tp + vec2(0.0, E)), bz0 = trackAt(tp - vec2(0.0, E));
+    t0 = mix(t0, (t0 * 2.0 + tx1 + tx0 + tz1 + tz0) / 6.0, smoothstep(0.03, 0.08, tFP));
     float blur = (bx1 + bx0 + bz1 + bz0) * 0.25;
     float lip = max(blur - t0, 0.0);
     // height = -depth * t + lip, gradients from the small and large stencils.

@@ -237,13 +237,14 @@ class TrackMap {
         void main() {
           vec2 f = vec2(-sin(iStamp.z), -cos(iStamp.z));
           vec2 r = vec2(-f.y, f.x);
-          vec2 w = iStamp.xy + r * position.x * iStamp.w * 0.5 + f * position.y * iStr.x * 0.5;
+          // 1.35× wider quad with a rounded (bell) profile: soft trench walls, no stair-stepped edges.
+          vec2 w = iStamp.xy + r * position.x * iStamp.w * 0.675 + f * position.y * iStr.x * 0.5;
           vQ = position.xy; vS = iStr.y;
           gl_Position = vec4((w - region.xy) / (region.z * 0.5), 0.0, 1.0);
         }`,
       fragmentShader: /* glsl */`
         varying vec2 vQ; varying float vS;
-        void main() { float a = smoothstep(1.0, 0.4, abs(vQ.x)) * smoothstep(1.0, 0.85, abs(vQ.y)); gl_FragColor = vec4(vec3(a * vS), 1.0); }`,
+        void main() { float a = smoothstep(1.0, 0.12, abs(vQ.x)) * smoothstep(1.0, 0.8, abs(vQ.y)); gl_FragColor = vec4(vec3(a * vS), 1.0); }`,
     });
     this.stampMesh = new THREE.Mesh(stampGeo, stampMat);
     this.stampMesh.frustumCulled = false;
