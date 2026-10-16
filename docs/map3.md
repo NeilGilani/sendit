@@ -393,7 +393,9 @@ rider placed at six spots down each map's course path and riding. `node web/scri
 
 Measured on Oct 16 around midnight, both maps back to back in the same session (the absolute numbers move with
 the GPU's clock state between sessions — an earlier session measured q1 at 12.9 / 12.7 ms average for
-Ravenspire / Valcrest — but the two maps always track each other within about 1 ms).
+Ravenspire / Valcrest — but the two maps always track each other within about 1 ms). Re-measured at 01:00 after the last props
+(footbridge, finish arch, smoke), two back-to-back pairs: Ravenspire q1 10.3–10.6 ms average / 12.1–13.0 ms
+worst spot, Valcrest 11.6–11.7 / 15.0–15.1 ms.
 
 Ravenspire costs the same as Valcrest at every quality: at quality 1 (the default) it averages ~9–11 ms with
 its worst spot (the larch forest low on the run, 80 %) at ~11–13 ms, inside the 14–16 ms target. What it took:
