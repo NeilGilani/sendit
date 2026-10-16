@@ -190,7 +190,7 @@ export class RavenspireCourse {
     const m = Math.max(side, back * 1.2, beyond * 0.7, (r - 4200) * 0.8);
     if (m > -200) {
       const k = sstep(-200, 1100, m);
-      const amp = v < 0 ? 1650 : 1050;
+      const amp = 1050 + 600 * sstep(350, -350, v);   // north (v < 0) bigger; blended so there is no seam
       e += k * (amp * Math.pow(ridged(x / 2700 + 1.7, z / 2700 - 4.1, 5), 1.35) + 240 * (fbm(x / 900, z / 900, 3) - 0.5));
     }
     // The summit horn above the start (left / behind), and a distant spire in the view down the valley.

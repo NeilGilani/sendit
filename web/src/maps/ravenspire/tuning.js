@@ -10,6 +10,8 @@
 
 export const RAVENSPIRE_PHYSICS = {
   common: {
+    flow: { enabled: true },      // line chains, flow meter, SEND IT state (physics/flow.js)
+    slowmo: { minAir: 2.4, scale: 0.45, easeIn: 0.15, hold: 0.5, easeOut: 0.35, cooldown: 5 },   // apex slow motion on huge airs
     // Speed: the soft cap starts at each gear's maxVelocity (below); terminal speed on the 41° face
     // ≈ 31–32 m/s tucked, ≈ 27 upright; ≈ 27 / 21 on the 27° lower bowl.
     softCapDrag: 0.06,
@@ -63,4 +65,13 @@ export const RAVENSPIRE_PHYSICS = {
   },
 };
 
-export const RAVENSPIRE_CAMERA = {};
+export const RAVENSPIRE_CAMERA = {
+  maxFovBonus: 14, fovCurve: 1.6,      // the lens opens in the top of the speed range (66° → 80°)
+  distanceAtSpeed: 2.8, heightAtSpeed: 0.5,
+  steepLift: 0.6, steepPitch: 3,       // higher and looking further down on steep faces: read the rollover
+  speedShake: 0.12, speedShakeFrom: 0.75,
+  flowFov: 7,                          // SEND IT kick
+  airLook: 0.25,                       // big air: look toward the landing
+  airFollowY: 0.09,                    // …and keep up with the drop
+  landTrauma: 0.045,                   // landings here are bigger: a little less shake per m/s
+};

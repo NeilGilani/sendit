@@ -80,11 +80,13 @@ export function ride(type, key, style, opts = {}) {
   const vAt = lineSampler(L);
   const T = makeTerrain();
   const events = [];
-  const offs = [on('landed', (e) => events.push({ kind: 'land', ...e })), on('crashed', (k) => events.push({ kind: 'crash', k })), on('stumble', (r) => events.push({ kind: 'stumble', r }))];
+  const flowEv = [];
+  const offs = [on('flowBanked', (e) => flowEv.push(e)), on('flowState', (e) => flowEv.push({ state: e.on })), on('landed', (e) => events.push({ kind: 'land', ...e })), on('crashed', (k) => events.push({ kind: 'crash', k })), on('stumble', (r) => events.push({ kind: 'stumble', r }))];
   const p = new Player(T, null, null, { strength: () => 0, justPressed: () => false });
   p.setEquipment(type);
   p.fadeThen = (fn) => fn();
   p.startRiding();
+  game.score = 0;
   let t = 0, vSum = 0, n = 0, vMax = 0, crashes = 0, air = 0, airMax = 0, takeY = 0, drops = [], airSegs = [];
   let wasAir = false, takeU = 0, roofT = 0, wall = 0;
   const DT = 1 / 60;
@@ -143,7 +145,7 @@ export function ride(type, key, style, opts = {}) {
     line: key, type, style, time: +t.toFixed(1), finished: p.position.x - START_X > 2560,
     avg: +(vSum / Math.max(1, n)).toFixed(1), max: +vMax.toFixed(1), crashes,
     stumbles: events.filter((e) => e.kind === 'stumble').length, airTotal: +air.toFixed(1), airMax: +airMax.toFixed(2),
-    roofSeconds: +roofT.toFixed(1), airs: big, trace, wall,
+    roofSeconds: +roofT.toFixed(1), airs: big, trace, wall, score: game.score, flow: flowEv,
   };
 }
 
@@ -155,6 +157,7 @@ if (process.argv[1] && process.argv[1].endsWith('map3-ride.mjs')) {
     const r = ride(ty, k, style);
     console.log(`\n${LINES[k].name} · ${ty} · ${style}: ${r.finished ? 'finished' : 'DNF'} in ${r.time}s  avg ${r.avg} m/s (${(r.avg * 2.237).toFixed(0)} mph)  max ${r.max} (${(r.max * 2.237).toFixed(0)} mph)  crashes ${r.crashes}  stumbles ${r.stumbles}  air ${r.airTotal}s (max ${r.airMax}s)  roof ${r.roofSeconds}s`);
     for (const a of r.airs) console.log(`   air @u${a.u}: ${a.air}s  drop ${a.drop} m  in ${a.v} m/s  impact ${a.impact} m/s  → ${a.result} ${a.why || ''}`);
+    console.log(`   score ${r.score}  flow: ${r.flow.map((f) => (f.state !== undefined ? (f.state ? 'SEND-IT' : 'end') : `+${f.bonus}×${f.mult}`)).join(' ')}`);
     if (r.trace.length) console.log(r.trace.join('\n'));
   }
 }
