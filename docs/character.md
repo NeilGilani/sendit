@@ -93,7 +93,8 @@ hooks, so they sit in the same light as the terrain:
   wrinkles (gradient noise, periodic around each piece, faded with distance), a fine crumple
   (warped sines: no lattice lines) and fold occlusion from each vertex's crease depth (`aCrease`); BRDF = Lambert +
   Charlie sheen (matte nylon fuzz) + a broad GGX lobe + grazing sky sheen (brighter rims). Leather mitts,
-  fleece gaiter and nylon gauntlets change roughness / sheen / spec per piece.
+  fleece gaiter (heathered knit with a topographic contour print) and nylon gauntlets change
+  roughness / sheen / spec per piece.
 - **bodyMaterial**: shrink + garment colours + glossy boots.
 - **helmetMaterial**: hybrid shell (matte top over a glossier lower band split by a parting groove),
   vent slots with bevels, ear pads, liner, padded strap with wordmarks.

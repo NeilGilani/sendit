@@ -77,7 +77,7 @@ GARMENTS.jacket['storm-shell'].cut = { ...GARMENTS.jacket['tuff-shell'].cut, hoo
 export const COLORWAYS = {
   tuff: {
     name: 'Tuff', blurb: 'Olive, tan and carob with one blaze-orange accent.',
-    jacket: { base: '#5e5f45', panel: '#b9a27a', accent: '#ff5b14', gaiter: '#6e695f', style: 0 },
+    jacket: { base: '#5e5f45', panel: '#b9a27a', accent: '#ff5b14', gaiter: '#4a473f', style: 0 },
     pants: { base: '#3a3129', cuff: '#231d18' },
     helmet: { base: '#3a3c39', liner: '#171819', accent: '#ff5b14' },
     goggles: { lens: '#f2a23a', lensBase: '#b9471e', strap: '#1d1d1b', strapLogo: '#cfc6b2' },

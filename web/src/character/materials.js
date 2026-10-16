@@ -221,6 +221,11 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
           // Heathered knit with fine vertical ribs and a small accent tag on the left.
           float heather = chNoise(vec2(u * 90.0, v * 160.0)) * 0.4 + chNoise(vec2(u * 23.0, v * 50.0)) * 0.6;
           c = uGaiter * (0.93 + 0.08 * heather);
+          // Topographic contour print (periodic around the tube), lighter than the base.
+          float topo = chPerlin(vec2(u * 6.0, v * 22.0), 6.0) * 0.8 + chPerlin(vec2(u * 12.0 + 3.0, v * 44.0), 12.0) * 0.25;
+          float tl = topo * 7.0;
+          float contour = 1.0 - smoothstep(0.0, fwidth(tl) * 1.2 + 0.04, 0.5 - abs(fract(tl) - 0.5));   // near integer levels
+          c = mix(c, mix(c, vec3(0.85, 0.82, 0.74), 0.4), contour * 0.75);
           float rib = u * 6.2831853 * 110.0;
           fabH += sin(rib) * 0.00009 * (1.0 - smoothstep(0.3, 0.8, fwidth(rib)));
           c = mix(c, uAccent, 1.0 - step(0.0, chBox(vec2((uc - 0.2) * 0.5, v - 1.6), vec2(0.008, 0.005), 0.002)));
