@@ -13,11 +13,13 @@
 //     variants: [{ id, name, colors: { base, accent, trim } }],   first = default colorway
 //     stats: { speed, carve, pop, stability },                     0..10, see STATS
 //     unlock: { type: 'default' } | { type: 'score' | 'distance' | 'runs', value } | { type: 'locked' }
-//     model: { kind: 'builtin' | 'equipment', ref }   how the 3D model is produced (hint for renderers):
+//     model: { kind: 'builtin' | 'equipment' | 'outfit', ref }   how the 3D model is produced (hint for renderers):
 //            'equipment' = a model id from src/equipment (getEquipmentSpec(type, ref)) — the lobby
 //            preview and the game rider both ride that model, with its physics (see gearModel()).
+//            'outfit' = a garment id from src/character/outfits.js; variant ids are colourway ids.
 //   }
 // Nothing here renders anything; the lobby and the rider read this data.
+import { GARMENTS, COLORWAYS } from '../character/outfits.js';
 
 export const CATEGORIES = {
   outfit: { label: 'Clothing', order: 1 },
@@ -110,33 +112,27 @@ export function unlockState(item, profile) {
 }
 
 // ---------------------------------------------------------------- the first entries
-// The current look of the rider (rider.js) expressed as catalog data, plus one snowboard.
+// The rider's clothing (src/character) and starter gear.
 const NW = 'Northwake';   // fictional house brand used on banners and the suit
 
-registerItem({
-  id: 'helmet-dome-pink', name: 'Dome Helmet', slot: 'helmet', brand: NW,
-  description: 'Rounded shell in hot pink.',
-  variants: [{ id: 'pink', name: 'Hot Pink', colors: { base: '#ff3d7f' } }],
-});
-registerItem({
-  id: 'goggles-cyan-mirror', name: 'Mirror Goggles', slot: 'goggles', brand: NW,
-  description: 'Wide cyan mirror lens.',
-  variants: [{ id: 'cyan', name: 'Cyan Mirror', colors: { base: '#2ff5d6' } }],
-});
-registerItem({
-  id: 'jacket-northwake-shell', name: 'Northwake Shell', slot: 'jacket', brand: NW,
-  description: 'Colour-blocked indigo and pink shell with neon trim that glows with speed.',
-  variants: [{ id: 'indigo-pink', name: 'Indigo / Pink', colors: { base: '#ff598c', accent: '#29206b', trim: '#1affd9' } }],
-});
-registerItem({
-  id: 'gloves-midnight', name: 'Midnight Gloves', slot: 'gloves', brand: NW,
-  variants: [{ id: 'midnight', name: 'Midnight', colors: { base: '#141424' } }],
-});
-registerItem({
-  id: 'pants-northwake-teal', name: 'Northwake Pants', slot: 'pants', brand: NW,
-  description: 'Teal pants with a pink neon leg stripe.',
-  variants: [{ id: 'teal', name: 'Teal', colors: { base: '#1f99a8', trim: '#ff33bf' } }],
-});
+// Clothing: one catalog item per garment in character/outfits.js, one variant per colourway. The
+// rider reads item.model.ref (the garment) and the variant id (the colourway) — see character/profile.js.
+const CLOTHING = [
+  { slot: 'helmet', id: 'helmet-tuff', garment: 'tuff-helmet' },
+  { slot: 'goggles', id: 'goggles-tuff', garment: 'tuff-goggle' },
+  { slot: 'jacket', id: 'jacket-tuff-shell', garment: 'tuff-shell' },
+  { slot: 'jacket', id: 'jacket-tuff-shell-hood', garment: 'storm-shell' },
+  { slot: 'gloves', id: 'gloves-tuff-mitt', garment: 'tuff-mitt' },
+  { slot: 'pants', id: 'pants-tuff-bib', garment: 'tuff-bib' },
+];
+for (const { slot, id, garment } of CLOTHING) {
+  const g = GARMENTS[slot][garment];
+  registerItem({
+    id, name: g.name, slot, brand: NW, description: g.blurb,
+    variants: Object.entries(COLORWAYS).map(([cw, c]) => ({ id: cw, name: c.name, colors: c[slot] })),
+    model: { kind: 'outfit', ref: garment },
+  });
+}
 // Starter gear = the default models of src/equipment/specs.js (names and looks match what you ride).
 registerItem({
   id: 'skis-northwake-carver', name: 'Northwake Ridge 172', slot: 'skis', brand: NW,

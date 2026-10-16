@@ -116,6 +116,29 @@ body.device-touch .lb-key { display: none; }
 #lobby .lp-btn small { font-weight: 500; font-style: normal; font-size: 0.82em; color: var(--lb-dim); }
 #lobby .lp-btn.ghost { background: transparent; }
 
+/* ---------------------------------------------------------------- character tab */
+.ch-ways { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6em; }
+#lobby .ch-way { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 0.55em; padding: 0.8em 0.9em 0.75em; border-radius: 0.9em;
+  background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.12); color: #fff; text-align: left; }
+#lobby .ch-way:hover { background: rgba(255,255,255,0.11); }
+#lobby .ch-way.on { border-color: var(--lb-cyan); background: linear-gradient(160deg, rgba(47,245,214,0.2), rgba(47,245,214,0.05)); }
+#lobby .ch-way.on .eq-check { opacity: 1; transform: none; }
+.ch-way b { font-size: 1.05em; font-weight: 900; font-style: italic; }
+.ch-chips { display: flex; gap: 0; border-radius: 0.4em; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,0.25); }
+.ch-chips i { width: 1.35em; height: 1.35em; }
+.ch-slots { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35em; }
+.ch-slots li { display: grid; grid-template-columns: 4.6em 1fr auto; align-items: center; gap: 0.5em; padding: 0.45em 0.6em; border-radius: 0.6em; background: var(--lb-glass-2); font-size: 0.9em; }
+.ch-slots .lp-k { color: var(--lb-dim); }
+.ch-item { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.ch-item small { color: var(--lb-dim); font-size: 0.82em; }
+#lobby .ch-cycle { align-items: flex-start; text-align: left; padding: 0.15em 0.4em; margin: -0.15em -0.4em; border-radius: 0.45em; background: transparent; border: 1px solid transparent; color: inherit; }
+#lobby .ch-cycle:hover { border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.06); }
+.ch-sw { display: flex; gap: 0.3em; }
+#lobby .ch-sw button { width: 1.55em; height: 1.55em; padding: 0.2em; border-radius: 50%; background: transparent; border: 2px solid transparent; display: grid; place-items: center; }
+#lobby .ch-sw button i { width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 0 0 1px rgba(255,255,255,0.4); }
+#lobby .ch-sw button.on { border-color: var(--lb-cyan); }
+#lobby .ch-sw button:hover { border-color: rgba(255,255,255,0.5); }
+
 /* ---------------------------------------------------------------- equipment tab */
 .eq-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7em; }
 #lobby .eq-opt { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 0.6em; padding: 1em 1em 0.95em; border-radius: 0.95em;

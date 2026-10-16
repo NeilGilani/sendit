@@ -4,9 +4,10 @@ The lobby is the first screen after loading. Your rider stands on a snow plinth 
 the selected map's run, **inside the real game world**: same terrain, trees, sky, sun, shadows and
 post stack as a ride. You can rotate them like a turntable. Around the rider sit a tab bar, one
 panel, your profile chip, the selected map, the **Zen / Challenge** mode switch and the **Ride**
-button (it reads **Race** in Challenge; the choice is saved in `sendit.mode`). Only **Equipment**
-(Skis / Snowboard) is a real feature today. Every other area is a stub or registry that later work
-plugs into: character customization, maps, multiplayer, leaderboards, profile and settings.
+button (it reads **Race** in Challenge; the choice is saved in `sendit.mode`). **Equipment**
+(Skis / Snowboard) and **Character** (outfit colourways, see [character.md](character.md)) are real
+features. The other areas are stubs or registries that later work plugs into: maps, multiplayer,
+leaderboards, profile and settings.
 
 ```
 npm --prefix web run dev                → http://localhost:5173/        (lobby)
@@ -38,7 +39,7 @@ main.js ── boot: loadMap(resolveMapSelection()) → world → LobbyStage at 
    │   ├─ stage.js            LobbyStage: plinth + preview Rider in the world scene, turntable,
    │   │                      camera shots, activate()/deactivate() camera ownership
    │   ├─ tabs.js             registerLobbyTab registry
-   │   ├─ tabs/*.js           equipment (real), character, maps, multiplayer, leaderboards,
+   │   ├─ tabs/*.js           equipment (real), character (real), maps, multiplayer, leaderboards,
    │   │                      profile, settings (minimal / coming soon)
    │   ├─ equipmentBridge.js  the two optional calls into rider.js / player.js (see below)
    │   ├─ nav.js              spatial focus navigation (lobby, pause, settings, credits)
@@ -178,8 +179,8 @@ Slots: helmet, goggles, jacket, gloves, pants (outfit) and skis, poles, board, b
 first `unlock: default` item per slot goes into fresh loadouts. `unlockState(item, profile)` gives
 `{ unlocked, progress, label }`, and `profileStore.equip()` refuses locked items. For gear,
 `catalog.gearModel(item)` / `profileStore.gearModel(type)` turn the primary slot's item into the
-model id passed to `setEquipment`. Outfit items are data only for now: the suit colours in rider.js
-do not read them yet.
+model id passed to `setEquipment`. Outfit items point at a garment (`model: { kind: 'outfit', ref }`)
+and their variants are colourways; the rider dresses from them (see [character.md](character.md)).
 
 ### Swap in a real service
 ```js
@@ -236,8 +237,8 @@ Hint glyphs follow the last-used device (`body.device-*`).
   a `lobby()` hook.
 - Snowboard stance (regular / goofy) is not in the profile yet. The preview and rides use the
   rider's default (`?stance=goofy` still works in a ride).
-- Character, Multiplayer and global leaderboards are "coming soon" stubs. Leaderboards are per
-  browser (`LocalLeaderboard`). Outfit catalog items do not change the suit yet.
+- Multiplayer and global leaderboards are "coming soon" stubs. Leaderboards are per
+  browser (`LocalLeaderboard`).
 - Starting a ride with the gamepad can't take pointer lock (browsers need a mouse or keyboard
   gesture). Mouse look starts after the first click; the gamepad's right stick works anyway.
 - `?ride` builds the lobby stage only on the first return to the lobby, which adds a short wait

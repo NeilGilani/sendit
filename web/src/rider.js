@@ -19,6 +19,8 @@ import { toonMaterial, outlineMaterial, mulberry32 } from './world.js';
 import { on } from './state.js';
 import { createEquipmentModel, disposeEquipmentModel, poleGeometry } from './equipment/models.js';
 import { getEquipmentSpec, normalizeType } from './equipment/registry.js';
+import { dressRider, HEAD_SCALE, OUTFIT_SLOTS } from './character/index.js';
+import { outfitSlotsFromProfile } from './character/profile.js';
 
 const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4(), _v1 = new THREE.Vector3();
@@ -70,12 +72,8 @@ export class Rider {
       o.castShadow = true;
       o.receiveShadow = true;
       o.frustumCulled = false;
-      if (o.material?.name?.includes('Superhero')) {
-        o.material = suitMaterial(o.material);
-        this.suit = o.material;
-      } else {
-        o.material = toonMaterial({ name: 'face', map: o.material.map, rim: 0.6 });
-      }
+      // The body's material comes from the outfit (character/); eyes and brows stay toon-shaded.
+      if (!o.material?.name?.includes('Superhero')) o.material = toonMaterial({ name: 'face', map: o.material.map, rim: 0.6 });
       outlines.push(o);
     });
     for (const o of outlines) {
@@ -95,9 +93,9 @@ export class Rider {
         this.restLocal.set(o, { p: o.position.clone(), q: o.quaternion.clone(), s: o.scale.clone(), m: new THREE.Matrix4().compose(o.position, o.quaternion, o.scale) });
       }
     });
-    // Slightly heroic cartoon proportions.
+    // Head proportions (the old toon look used a heroic 1.12; the outfit is fitted at HEAD_SCALE).
     const hr = this.restLocal.get(this.bones.Head);
-    hr.s.setScalar(1.12);
+    hr.s.setScalar(HEAD_SCALE);
     hr.m.compose(hr.p, hr.q, hr.s);
     this.restGlobal = new Map();
     const walk = (b, parentM) => {
@@ -106,6 +104,11 @@ export class Rider {
       for (const c of b.children) if (c.isBone) walk(c, m);
     };
     walk(this.bones.root, new THREE.Matrix4());
+    // Outfit + helmet (character/): procedural shells skinned to these bones, colours from the profile.
+    this.look = dressRider(gltf.scene, { bones: this.bones, fp: () => !!this.fp });
+    this.suit = this.look.suit;
+    this.setOutfit(outfitSlotsFromProfile());
+    on('loadout', (e) => { if (!e.slot || OUTFIT_SLOTS.includes(e.slot)) this.setOutfit(outfitSlotsFromProfile()); });
     this.ankleH = pos(this.restGlobal.get(this.bones.foot_l)).y;
     this.pelvisH = pos(this.restGlobal.get(this.bones.pelvis)).y;
     this.buildGear();
@@ -161,35 +164,15 @@ export class Rider {
     this.chair.rotation.y = Math.PI;
     this.chair.visible = false;
     this.root.add(this.chair);
-    // Helmet + goggles on the head bone (with outlines).
-    const head = this.bones.Head;
-    const inv = this.restGlobal.get(head).clone().invert();
-    const place = (mesh, m) => {
-      mesh.matrixAutoUpdate = false; mesh.matrix.copy(inv.clone().multiply(m)); mesh.castShadow = true; head.add(mesh);
-      const o = new THREE.Mesh(mesh.geometry, outlineMaterial(1.5)); mesh.add(o);
-    };
-    this.helmetMat = toonMaterial({ name: 'helmet', color: 0xff3d7f, rim: 0.8 });
-    place(new THREE.Mesh(new THREE.SphereGeometry(0.135, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), this.helmetMat),
-      new THREE.Matrix4().compose(new THREE.Vector3(0, 1.69, -0.006), new THREE.Quaternion(), new THREE.Vector3(0.95, 1.02, 1.1)));
-    const lensMat = this.lensMat = toonMaterial({ name: 'lens', color: 0x2ff5d6, rim: 1.0 });
-    lensMat.userData.uniforms.uEmissiveBoost.value = 0;
-    place(new THREE.Mesh(new THREE.CapsuleGeometry(0.036, 0.12, 6, 16), lensMat),
-      new THREE.Matrix4().compose(new THREE.Vector3(0, 1.703, 0.1), new THREE.Quaternion().setFromAxisAngle(Z, Math.PI / 2), new THREE.Vector3(1, 1, 0.55)));
+    // Helmet + goggles: built with the outfit (character/helmet.js), rigid on the head bone.
   }
 
   /**
-   * Outfit colours (hex numbers or CSS strings), for clothing customisation. Any subset of:
-   * { jacket, jacket2 (shoulders), pants, gloves (gloves + boots), trim, trim2 (neon), helmet, lens }.
+   * Dress the rider: slot selections { jacket, pants, helmet, goggles, gloves: { garment, colorway, colors } }
+   * (any subset; see character/outfits.js) or a resolveOutfit() result. Returns the resolved outfit.
    */
   setOutfit(o = {}) {
-    const U = this.suit?.userData.uniforms;
-    const set = (u, v) => { if (u && v !== undefined) u.value.set(v); };
-    if (U) {
-      set(U.uJacket, o.jacket); set(U.uJacket2, o.jacket2); set(U.uPants, o.pants); set(U.uGloves, o.gloves);
-      set(U.uNeon, o.trim); set(U.uNeon2, o.trim2);
-    }
-    if (o.helmet !== undefined) this.helmetMat?.color.set(o.helmet);
-    if (o.lens !== undefined) this.lensMat?.color.set(o.lens);
+    return this.look?.apply(o);
   }
 
   get isBoard() { return this.equip?.type === 'snowboard'; }
@@ -799,37 +782,3 @@ export function standInPlayer(type = 'ski', variant, stance = 'regular') {
 
 const pos = (m) => new THREE.Vector3().setFromMatrixPosition(m);
 const scl = (m) => new THREE.Vector3().setFromMatrixScale(m);
-
-/** Cel-shaded outfit from the baked zones (R jacket, G pants, B gloves/boots, A coverage), neon trims. */
-function suitMaterial(src) {
-  const m = toonMaterial({
-    name: 'suit', map: src.map, rim: 1.0,
-    vertPars: 'attribute vec4 color;\nvarying vec4 vZone;\nvarying vec3 vObj;',
-    vert: 'vZone = color; vObj = position;',
-    fragPars: `varying vec4 vZone;\nvarying vec3 vObj;\nuniform vec3 uNeon; uniform vec3 uNeon2;\nuniform vec3 uJacket; uniform vec3 uJacket2; uniform vec3 uPants; uniform vec3 uGloves;`,
-    frag: /* glsl */`
-      {
-        float tot = max(vZone.r + vZone.g + vZone.b, 0.001);
-        float jz = vZone.r / tot, pz = vZone.g / tot;
-        // Jacket: bold colour-blocked shell (fictional "Northwake").
-        vec3 jacket = mix(uJacket, uJacket2, step(1.28, vObj.y));
-        vec3 pants = uPants;
-        vec3 dark = uGloves;
-        vec3 cloth = jacket * vZone.r + pants * vZone.g + dark * vZone.b;
-        cloth /= tot;
-        diffuseColor.rgb = mix(diffuseColor.rgb * vec3(1.05, 0.95, 0.9), cloth, vZone.a);
-        // Neon trim: chest band, cuffs and a stripe down the pant legs.
-        float band = smoothstep(0.014, 0.0, abs(vObj.y - 1.27)) * step(0.5, jz);
-        float cuff = smoothstep(0.015, 0.0, abs(abs(vObj.x) - 0.62)) * step(0.5, jz);
-        float leg = smoothstep(0.012, 0.0, abs(abs(vObj.x) - 0.15)) * step(0.5, pz) * step(vObj.y, 0.85);
-        toonEmissive = uNeon * (band + cuff) * 1.4 + uNeon2 * leg * 1.4;
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), clamp(band + cuff + leg, 0.0, 1.0) * 0.6);
-      }`,
-    uniforms: {
-      uNeon: { value: new THREE.Color(...ART.neonColor) }, uNeon2: { value: new THREE.Color(...ART.neonColor2) },
-      uJacket: { value: new THREE.Color(0.16, 0.12, 0.42) }, uJacket2: { value: new THREE.Color(1.0, 0.35, 0.55) },
-      uPants: { value: new THREE.Color(0.12, 0.6, 0.66) }, uGloves: { value: new THREE.Color(0.08, 0.08, 0.14) },
-    },
-  });
-  return m;
-}
