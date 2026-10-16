@@ -6,7 +6,7 @@
 // Tunables: PHYSICS (+ PHYSICS.ski / PHYSICS.snowboard) in config.js.
 import * as THREE from 'three';
 import { PHYSICS as P, FX, applyMapTuning } from './config.js';
-import { game, Mode, setMode, emit, addScore } from './state.js';
+import { game, Mode, setMode, emit, addScore, on } from './state.js';
 import { angleDiff, lerpAngle, clamp } from './physics/math.js';
 import { SkiPhysics } from './physics/ski.js';
 import { SnowboardPhysics } from './physics/snowboard.js';
@@ -25,6 +25,10 @@ export class Player {
     // previews on a flat stand-in never reset the loaded map's tuning.
     if (terrain && terrain.course !== undefined) applyMapTuning(terrain.course);
     this.flow = terrain && terrain.course !== undefined && P.flow?.enabled ? new Flow(this) : null;   // SSX-style energy layer (opt-in)
+    // Maps with drop zones say so once the ride is under way.
+    if (terrain?.course?.dropZones?.length && typeof document !== 'undefined') {
+      on('rideStarted', () => setTimeout(() => emit('hint', `Drop zones: keys 1–${Math.min(9, terrain.course.dropZones.length)} or d-pad ◀ ▶`), 5000));
+    }
     if (this.flow && typeof document !== 'undefined') import('./flowhud.js').then((m) => m.mountFlowHud(this)).catch((e) => console.warn('[flow] HUD failed', e));
     this.state = State.FROZEN;
     this.position = new THREE.Vector3();
@@ -215,6 +219,7 @@ export class Player {
       c.tuck = I.strength('tuck');
       c.jump = I.strength('jump') > 0.5;
       if (I.justPressed('reset')) this.resetToTop();
+      this.dropZoneInput();
     }
     if (this.script) this.script(c, this);   // headless tests / demos can drive the controls
     // Hard brake: a fan of snow + camera FoV snap.
@@ -478,6 +483,29 @@ export class Player {
     this.place(p[0], p[1]);
     this._safe = keep;
     emit('respawned');
+  }
+
+  /**
+   * Drop zones (course.dropZones = [{ name, x, z, heading }], Steep-style): keys 1–9 pick one, the
+   * d-pad ◀ ▶ cycles them; the rider fades to the top of that line.
+   */
+  dropZoneInput() {
+    const Z = this.terrain.course?.dropZones, I = this.input;
+    if (!Z?.length || this._busy || !I.codePressed) return;
+    let pick = -1;
+    for (let i = 0; i < Math.min(9, Z.length); i++) if (I.codePressed(`Digit${i + 1}`)) pick = i;
+    const cur = this._zone ?? 0;
+    if (I.btnPressed?.(15)) pick = (cur + 1) % Z.length;              // d-pad right
+    if (I.btnPressed?.(14)) pick = (cur - 1 + Z.length) % Z.length;   // d-pad left
+    if (pick < 0) return;
+    this._zone = pick;
+    const z = Z[pick];
+    emit('hint', `Drop zone ${pick + 1} · ${z.name}`);
+    this.fadeThen(() => {
+      this.place(new THREE.Vector3(z.x, 0, z.z), z.heading);
+      emit('respawned');
+      emit('dropZone', { index: pick, ...z });
+    });
   }
 
   resetToTop() { if (!this._busy && this.state !== State.FROZEN) this.fadeThen(() => { this.startRiding(); emit('resetTop'); }); }
