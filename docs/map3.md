@@ -13,6 +13,8 @@ http://localhost:5183/?map=ravenspire&ride        straight into a ride (the lobb
 http://localhost:5183/?map=ravenspire&ride&equip=snowboard
 node web/scripts/map3-ride.mjs both all send       bot rides every line (styles: send, control, carve, trick)
 node web/scripts/map3-structures.mjs               walls solid, roofs rideable (skis + board)
+node web/scripts/map3-fuzz.mjs                     random inputs from random starts: no NaN, never below the snow, never stuck
+node web/scripts/map3-unit.mjs                     tuning hook, structures, flow layer, snowflake spots
 node web/scripts/map3-perf.mjs http://localhost:5183 1600 900 0,1,2 90   GPU / CPU / draws at six spots
 ```
 
