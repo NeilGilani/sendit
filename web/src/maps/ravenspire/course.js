@@ -517,6 +517,19 @@ export class RavenspireCourse {
 
   // ---------------------------------------------------------------- lobby / spawn
   /** Where the lobby plinth stands: on the summit shoulder, looking down the face. */
+  /**
+   * Cornices (scatter.js → gfx/cornices.js) are visual only, so on this face they would be white slabs you ride
+   * straight through: on the cliff lips, the rollover, the drifts by the huts. Keep them to the framing ridge
+   * crests and the summit, well away from the lines and the buildings.
+   */
+  corniceOk(x, z) {
+    const u = x - START_X;
+    if (this.lineDist(u, z) < 45) return false;
+    for (const s of this.structures) if (Math.hypot(x - s.x, z - s.z) < s.R + 30) return false;
+    for (const d of this.dropZones) if (Math.hypot(x - d.x, z - d.z) < 200) return false;   // e.g. the heli shoulder's knoll
+    return u < -10 || Math.abs(z) > FACE.halfWidth(Math.max(0, u)) * 0.85;
+  }
+
   /** Rock clusters (scatter.js) stay off the canonical lines, the drop zones and the ravine floor. */
   rockOk(x, z) {
     const u = x - START_X;

@@ -157,6 +157,7 @@ snow** on convex crests (Laplacian) — packed snow is faster and lands harder (
 | life.js | `life: { skiers: 0, lodge: false }` | no other riders, no lodge (birds stay) |
 | scatter.js | `spawn: {...}` (SPAWN overrides), `forestAt / pisteAt / treeline` | fewer, smaller boulders on the face; larches only low, clearings around buildings and under the gondola, 16–32 m glades along the canonical lines |
 | scatter.js | `rockOk(x, z)` | rock clusters stay off the lines, drop zones and ravine floor |
+| scatter.js | `corniceOk(x, z)` | cornices (visual only) form only on the framing ridge crests and behind the summit: never on the lines, lips, drifts or within 200 m of a drop zone |
 | activities.js | `challenge: { medalSpeeds }` | medal speeds for a fast map (24 / 20 / 16 m/s) |
 | activities.js | `challenge.flakes: [{ x, z, y above the snow }]` | the 12 golden snowflakes at hand-picked spots instead of along the course path (the same hook and code as map 2) |
 | player.js | `edgeHint` | the "edge of the map" hint text |
@@ -431,7 +432,9 @@ whole valley in view: mid-ring chunks, far ranges) and fall to ~175 low down. CP
 - **Spine crests launch you at speed** (by design: crossing a 13 m spine diagonally at 30 m/s is a kicker).
   Ride a sluff channel or slow down to slash them.
 - **Slow motion** scales the physics only; snow spray and other particles keep real time.
-- **Roof snow** shows no tracks (the track map is drawn on the terrain only); cornices are visual only.
+- **Roof snow** shows no tracks (the track map is drawn on the terrain only). Cornices are visual only, so
+  Ravenspire keeps them to the far ridge crests (`corniceOk`): before that, ~150 of them sat on cliff lips, the
+  start knoll and the huts' drifts as white slabs you rode straight through.
 - **Gondola cables** are visual (towers collide); the helicopter is decorative and its rotor sound is not
   positional.
 - **Flow layer, landing grades, drops, drop zones, run summary** are opt-in per map; Valcrest keeps its
