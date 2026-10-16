@@ -190,7 +190,8 @@ defaults. Maps load at boot (a map switch reloads the page), so "reset when anot
 | `landRedirect` | 0 | deg: landing lined up with your flight, this much of the surface bending your path (a ravine sidewall) is absorbed instead of counting as a sideways landing |
 | `landSpeedCap` | 0 | m/s: after a landing, speed above this is cut to 35 % of the excess (the rest goes into the powder) |
 | `airSettleAngle` | 0 | deg: with no spin going, a released stick squares the gear up to the path from this far out (launched mid-skid) |
-| `trickStyle` | false | Tail grab / Truck driver on skis, "Tweaked" grabs (+50 % grab points) |
+| `windRoar` | 0 | 0..1: the low-pass wind roar layer above 16 m/s (audio.js) |
+| `trickStyle` | false | Tail grab / Truck driver on skis, "Tweaked" grabs (+50 % grab points) and the tweak pose |
 | `slowmo` | null | `{ minAir, scale, easeIn, hold, easeOut, cooldown }`: apex slow motion on huge airs |
 | `flow` | null | `{ enabled, … }`: the flow layer (§4), defaults in `physics/flow.js FLOW_DEFAULTS` |
 | CAMERA `fovCurve` | 1 | FoV bonus = maxFovBonus · speedRatio^fovCurve |

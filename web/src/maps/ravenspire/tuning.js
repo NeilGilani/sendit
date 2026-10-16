@@ -11,6 +11,7 @@
 export const RAVENSPIRE_PHYSICS = {
   common: {
     trickStyle: true,             // more grabs, tweaks
+    windRoar: 1,                  // the wind roar layer at speed (audio.js)
     airSettleAngle: 100,          // launched mid-skid: square up in the air
     microHop: 0.12,               // skimming a bump at 30 m/s is not a landing
     landRedirect: 30,             // land on a ravine sidewall lined up: the skis pivot into the new line

@@ -234,7 +234,7 @@ export class Rider {
     p.grab += ((air ? pl.grab : 0) - p.grab) * k(14);
     // Tweak: a grab held past ~0.4 s gets style — the board is pushed out / the skis cross, the body arches.
     const grabT = pl.dyn?.takeoff?.grabT || 0;
-    p.tweak = (p.tweak || 0) + ((air && pl.grab > 0.6 ? THREE.MathUtils.smoothstep(grabT, 0.35, 0.9) : 0) - (p.tweak || 0)) * k(6);
+    p.tweak = (p.tweak || 0) + ((air && pl.grab > 0.6 && PHYSICS.trickStyle ? THREE.MathUtils.smoothstep(grabT, 0.35, 0.9) : 0) - (p.tweak || 0)) * k(6);   // opt-in (trickStyle)
     // Flipping: knees pulled up, hands in toward the shins (a tuck spins faster and reads as a flip).
     p.flipTuck = (p.flipTuck || 0) + ((air ? THREE.MathUtils.clamp(Math.abs(pl.flipRate || 0) / 3.5, 0, 1) * (1 - pl.grab) : 0) - (p.flipTuck || 0)) * k(8);
     p.stanceYaw += (this.stanceYawTarget() * (1 - p.sit) - p.stanceYaw) * k(10);

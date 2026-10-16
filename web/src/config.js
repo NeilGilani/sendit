@@ -47,6 +47,7 @@ export const PHYSICS = {
   landRedirect: 0,            // deg: landing lined up with the flight, this much of the surface bending the path (a sidewall) is absorbed
   landSpeedCap: 0,            // m/s: after a landing, speed above this is cut to 35 % of the excess (0 = off)
   microHop: 0,                // s: airs shorter than this (a bump skimmed at speed) re-ground quietly instead of being judged as landings
+  windRoar: 0,                // 0..1: the low-pass wind roar layer above 16 m/s (audio.js; 0 = off, maps opt in)
   airSettleAngle: 0,          // deg: with no spin going, a released stick squares the gear up to the path from this far out (0 = spinCheckAngle only)
   trickStyle: false,          // big-mountain trick extras: Tail grab / Truck driver on skis, tweaked grabs (labels, +50 % grab points)
   slowmo: null,               // { minAir, scale, easeIn, hold, easeOut, cooldown }: apex slow motion on huge airs (player.js)

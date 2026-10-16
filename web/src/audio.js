@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { State } from './player.js';
 import { game, Mode, on, settings } from './state.js';
+import { PHYSICS } from './config.js';
 
 const LOOPS = ['snow_powder', 'snow_groomed', 'snow_carve', 'wind_speed', 'wind_ambient'];
 
@@ -247,7 +248,7 @@ export class SoundScape {
     this.set('snow_carve', onSnow * moving * turn * (0.25 + 0.75 * s01) * 0.7, 0.25);
     this.set('wind_speed', paused ? 0 : Math.pow(s01, 1.4) * (air ? 0.95 : 0.75), 0.4);
     this.set('wind_ambient', paused ? 0.18 : 0.32, 1.2);
-    const roar = paused || menu ? 0 : smooth(16, 32, speed);
+    const roar = paused || menu || !PHYSICS.windRoar ? 0 : smooth(16, 32, speed) * PHYSICS.windRoar;   // opt-in per map (PHYSICS.windRoar)
     this.set('roar', roar * (air ? 0.55 : 0.4), 0.25);
     if (roar > 0 || this.layers.roar.level > 0) this.roarFilter.frequency.setTargetAtTime(300 * Math.pow(20, smooth(8, 34, speed)) * (air ? 1.15 : 1), c.currentTime, 0.2);
     // Sugar crunch: louder in deep, soft snow and when sinking in; brighter with speed and carving.

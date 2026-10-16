@@ -131,7 +131,7 @@ export class Player {
     T.getNormal(pos.x, pos.z, P.normalRadius, this.groundNormal);
     groundQuat(this.groundNormal, yaw, this.orient);
     this.state = State.GROUNDED;
-    this.airTime = 0; this.squat = 0; this.stumbleT = 0;
+    this.airTime = 0; this.squat = 0; this.stumbleT = 0; this.compression = 0; this._landGrace = 0;
     this.dyn.charge = 0; this.dyn.charging = false; this.dyn.travel = 1; this.dyn.edge = 0; this.dyn.stop = 0;
     this.travelSign = 1; this.edgeAngle = 0; this.skidAngle = 0; this.latAccel = 0;
     this.flip = 0; this.flipRate = 0; this.visFlip = 0; this.flipSettle = 0; this.prevFlip = 0; this.renderFlip = 0;
