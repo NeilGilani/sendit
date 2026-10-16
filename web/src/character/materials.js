@@ -90,10 +90,10 @@ export function fabricMaterial() {
   };
   const m = toonMaterial({
     name: 'riderFabric', rim: 0.25, uniforms: U,
-    vertPars: 'attribute vec4 aG; attribute float aLin; varying vec4 vG; varying float vLin; varying vec3 vObj; uniform float uHide;',
-    vertPre: 'vG = aG; vLin = aLin; vObj = position;\n  if (uHide > 0.5 && (aG.x > 2.5 && aG.x < 5.5)) transformed *= 0.0;',
+    vertPars: 'attribute vec4 aG; attribute float aLin; attribute float aCrease; varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj; uniform float uHide;',
+    vertPre: 'vG = aG; vLin = aLin; vCrease = aCrease; vObj = position;\n  if (uHide > 0.5 && (aG.x > 2.5 && aG.x < 5.5)) transformed *= 0.0;',
     fragPars: `${COMMON}
-varying vec4 vG; varying float vLin; varying vec3 vObj;
+varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj;
 uniform vec3 uJacket, uPanel, uAccent, uGaiter, uPants, uCuff, uMitt, uGauntlet; uniform float uStyle; uniform vec3 uHemY;
 float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fabAO = 1.0, fabH = 0.0;`,
     frag: /* glsl */`
@@ -254,7 +254,8 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
         float cfade = 1.0 - smoothstep(0.002, 0.008, fwidth(v));
         fabH += (chPerlin(wp, wf.x) * 0.7 + chPerlin(vec2(u * wf.x * 3.0, v * wf.y * 2.7 + 3.1), wf.x * 3.0) * 0.3) * 0.0024 * wr * wfade;
         fabH += chPerlin(vec2(u * 40.0, v * 38.0), 40.0) * 0.0005 * wr * cfade;
-        fabAO = 1.0 - seam * 0.25;
+        // Fold occlusion: valleys between folds get less sky and sun; ridges catch a little more.
+        fabAO = (1.0 - seam * 0.25) * clamp(1.0 + vCrease * 26.0, 0.66, 1.1);
         diffuseColor.rgb = c;
       }`,
     band: FABRIC_LIGHT,

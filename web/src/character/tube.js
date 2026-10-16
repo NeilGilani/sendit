@@ -149,7 +149,7 @@ export function sweep(rings, meta) {
   // Rolled edges: the shell turns over and runs back inside a little (reads as thickness).
   const lip = (end, at, sgn) => {
     const base = R[at];
-    const mk = (dr, dt, lining) => ({ c: base.c.clone().addScaledVector(A, dt * sgn * dirT), r: base.r.map((x) => Math.max(0.004, x + dr)), t: base.t + dt * sgn * dirT, off: base.off, lining, v: (base.v ?? base.t) });
+    const mk = (dr, dt, lining) => ({ c: base.c.clone().addScaledVector(A, dt * sgn * dirT), r: base.r.map((x) => Math.max(0.004, x + dr)), t: base.t + dt * sgn * dirT, off: base.off, lining, v: (base.v ?? base.t), crease: null });
     let ls = [mk(-0.004, 0.004, 0), mk(-0.010, 0.0045, 1), mk(-0.016, -0.022, 1)];
     // Gaiter cuff: an inner elastic gaiter closes the opening down onto what it wraps (the boot).
     if (meta.gaiterEnd && end && base.raw) {
@@ -166,10 +166,27 @@ export function sweep(rings, meta) {
       const a = (j / n) * Math.PI / 2;
       const rr = base.r.map((x) => x * Math.cos(a) + 0.0005);
       const avg = base.r.reduce((p, q) => p + q, 0) / segs;
-      extra.push({ c: base.c.clone().addScaledVector(A, Math.sin(a) * avg * len * sgn * dirT), r: rr, t: base.t + Math.sin(a) * avg * len * sgn * dirT, off: base.off, v: base.v });
+      extra.push({ c: base.c.clone().addScaledVector(A, Math.sin(a) * avg * len * sgn * dirT), r: rr, t: base.t + Math.sin(a) * avg * len * sgn * dirT, off: base.off, v: base.v, crease: null });
     }
     if (end) R.push(...extra); else R.unshift(...extra.reverse());
   };
+  // Crease depth of each vertex: radius minus its local average (negative in fold valleys). Feeds the
+  // fold occlusion in the fabric shader.
+  {
+    const n = R.length;
+    for (let i = 0; i < n; i++) {
+      const cr = new Float32Array(segs);
+      for (let k = 0; k < segs; k++) {
+        let acc = 0, cnt = 0;
+        for (let di = -2; di <= 2; di++) {
+          const ii = Math.min(n - 1, Math.max(0, i + di));
+          for (let dk = -2; dk <= 2; dk++) { acc += R[ii].r[(k + dk + segs) % segs]; cnt++; }
+        }
+        cr[k] = R[i].r[k] - acc / cnt;
+      }
+      R[i] = { ...R[i], crease: cr };
+    }
+  }
   if (meta.lipEnd) lip(true, R.length - 1, 1);
   if (meta.lipStart) lip(false, 0, -1);
   if (meta.capEnd) cap(true, R.length - 1, 1);
@@ -213,7 +230,7 @@ export function sweep(rings, meta) {
       N[o] = (n[0] / l) * orient; N[o + 1] = (n[1] / l) * orient; N[o + 2] = (n[2] / l) * orient;
     }
   }
-  const G = new Float32Array(nr * cols * 4), L = new Float32Array(nr * cols);
+  const G = new Float32Array(nr * cols * 4), L = new Float32Array(nr * cols), C = new Float32Array(nr * cols);
   for (let i = 0; i < nr; i++) {
     const ring = R[i];
     const v = meta.v ? meta.v(ring.v ?? ring.t) : (ring.v ?? ring.t);
@@ -221,6 +238,7 @@ export function sweep(rings, meta) {
       const o = i * cols + k;
       G[o * 4] = meta.id; G[o * 4 + 1] = k / segs; G[o * 4 + 2] = v; G[o * 4 + 3] = meta.side ?? 0;
       L[o] = ring.lining ?? 0;
+      C[o] = ring.crease ? ring.crease[k % segs] : 0;
     }
   }
   const idx = [];
@@ -230,7 +248,7 @@ export function sweep(rings, meta) {
       if (orient > 0) idx.push(a, b, c, c, b, d); else idx.push(a, c, b, c, d, b);
     }
   }
-  return { pos: P, nrm: N, g: G, lin: L, idx, rows: nr, cols, skinBones: meta.skinBones, rigid: meta.rigid, anchor: meta.anchor, skinMask: meta.skinMask };
+  return { pos: P, nrm: N, g: G, lin: L, crease: C, idx, rows: nr, cols, skinBones: meta.skinBones, rigid: meta.rigid, anchor: meta.anchor, skinMask: meta.skinMask };
 }
 
 // ------------------------------------------------------------------ skinning + merge
@@ -296,17 +314,18 @@ export function skinPiece(piece, body, smoothIters = 6) {
   return piece;
 }
 
-/** Merge pieces into one skinned BufferGeometry (attributes: position, normal, aG, aLin, skinIndex, skinWeight). */
+/** Merge pieces into one skinned BufferGeometry (attributes: position, normal, aG, aLin, aCrease, skinIndex, skinWeight). */
 export function mergePieces(pieces) {
   let nv = 0, ni = 0;
   for (const p of pieces) { nv += p.pos.length / 3; ni += p.idx.length; }
-  const pos = new Float32Array(nv * 3), nrm = new Float32Array(nv * 3), g = new Float32Array(nv * 4), lin = new Float32Array(nv);
+  const pos = new Float32Array(nv * 3), nrm = new Float32Array(nv * 3), g = new Float32Array(nv * 4), lin = new Float32Array(nv), cre = new Float32Array(nv);
   const si = new Uint16Array(nv * 4), sw = new Float32Array(nv * 4);
   const idx = new Uint32Array(ni);
   let ov = 0, oi = 0;
   for (const p of pieces) {
     const n = p.pos.length / 3;
     pos.set(p.pos, ov * 3); nrm.set(p.nrm, ov * 3); g.set(p.g, ov * 4); lin.set(p.lin, ov);
+    if (p.crease) cre.set(p.crease, ov);
     si.set(p.si, ov * 4); sw.set(p.sw, ov * 4);
     for (let i = 0; i < p.idx.length; i++) idx[oi + i] = p.idx[i] + ov;
     ov += n; oi += p.idx.length;
@@ -316,6 +335,7 @@ export function mergePieces(pieces) {
   geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
   geo.setAttribute('aG', new THREE.BufferAttribute(g, 4));
   geo.setAttribute('aLin', new THREE.BufferAttribute(lin, 1));
+  geo.setAttribute('aCrease', new THREE.BufferAttribute(cre, 1));
   geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
   geo.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
   geo.setIndex(new THREE.BufferAttribute(nv > 65535 ? idx : new Uint16Array(idx), 1));
