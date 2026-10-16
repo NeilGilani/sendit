@@ -349,7 +349,6 @@ export class BlackspruceCourse {
     }
     // Packed snow at the start and finish; forest floor (needle litter, shade) under the trees so
     // the open lanes read brighter than the woods.
-    const p = { x: 0, z: 0 };
     for (let j = 0; j < N; j++) {
       const z = -half + j * sp, t = this.tAt(z);
       if (!(t < 60 || (t > P.finishT - 50 && t < P.finishT + 260))) continue;
@@ -370,7 +369,6 @@ export class BlackspruceCourse {
         }
       }
     }
-    void p;
     onProgress(0.85);
     const FN = P.farRes, fs = P.farSize, fsp = fs / (FN - 1);
     const far = new Float32Array(FN * FN);
