@@ -460,9 +460,16 @@ export class EdgePhysics {
       let ahead = spinning ? ((velYaw - pl.heading) * dir) % period : 0;
       if (ahead < 0) ahead += period;
       const need = ahead / Math.max(tLand, 0.12);   // rate that arrives on the next alignment at touchdown
-      if (Math.abs(d) < settleA * DEG && (!spinning || need > Math.abs(h) * C.spinTuckGain || Math.abs(d) < 12 * DEG)) {
+      const reach = need <= Math.abs(h) * C.spinTuckGain;
+      // The alignment just passed, if the upper body can still check back to it before touchdown.
+      const back = spinning ? period - ahead : Infinity, canCheck = back <= C.spinCheck * Math.max(tLand, 0.1);
+      if (Math.abs(d) < settleA * DEG && (!spinning || !reach || Math.abs(d) < 12 * DEG)) {
         // Close to an alignment (or not spinning): check the spin onto it (the upper body counter-rotates).
         rate = clamp(d / Math.max(tLand, 0.1), -C.spinCheck, C.spinCheck);
+      } else if (spinning && !reach && canCheck) {
+        // Too little spin to come round (a carve's pre-wind off a lip, an under-set): check back instead of
+        // landing sideways or backwards.
+        rate = clamp(-dir * back / Math.max(tLand, 0.1), -C.spinCheck, C.spinCheck);
       } else if (spinning) {
         const f = need / Math.abs(h);
         pose = f >= 1 ? Math.min(1, (f - 1) / (C.spinTuckGain - 1)) : -Math.min(1, (1 - f) / (1 - C.spinOpen));

@@ -59,8 +59,10 @@ function ride(type, kick, plan) {
   const res = p.state === State.CRASH ? `CRASH (${p.lastCrash?.reason} yaw ${p.lastCrash?.dev?.toFixed(0)}° pitch ${p.lastCrash?.flipDev?.toFixed(0)}°, spins ${p.lastCrash?.spins})` : L ? `${L.result} yaw ${L.dev.toFixed(0)}° pitch ${(L.flipDev ?? 0).toFixed(0)}°` : '-';
   return `lip ${lipV.toFixed(1)} m/s  air ${(L?.air ?? 0).toFixed(2)} s  height ${maxH.toFixed(1)} m  impact ${(p.landingVy).toFixed(1)} m/s → ${res.padEnd(30)} "${L?.trick ?? ''}" ${scores.join(', ')}`;
 }
-const flipTo = (dir, turns) => (p) => (Math.abs(p.flip) + Math.abs(p.flipRate) * 0.25 < turns * TAU ? (dir > 0 ? { brake: 1 } : { up: 1 }) : {});
-const spinTo = (deg) => (p) => (Math.abs(p._spinTotal) + Math.abs(p.spinRate) * 0.14 < deg * Math.PI / 180 ? { steer: -1 } : {});
+// A skilled player (rotation is momentum, physics/edge.js): keep the key / stick in until the open-body
+// rotation left would carry it round by touchdown (opening takes ~0.2 s), then let go and spot.
+const flipTo = (dir, turns) => (p) => (p.airTime < 0.12 || Math.abs(p.flip) + Math.abs(p.flipRate) * 0.2 + Math.abs(p.dyn.flipH || 0) * Math.max(0, p.dyn.timeToLand() - 0.2) < turns * TAU ? (dir > 0 ? { brake: 1 } : { up: 1 }) : {});
+const spinTo = (deg) => (p) => (p.airTime < 0.12 || Math.abs(p._spinTotal) + Math.abs(p.spinRate) * 0.15 + Math.abs(p.dyn.spinH || 0) * p.dyn.C.spinOpen * Math.max(0, p.dyn.timeToLand() - 0.15) < deg * Math.PI / 180 ? { steer: -1 } : {});
 
 const which = process.argv[2] || 'both';
 for (const type of ['ski', 'snowboard']) {
@@ -71,7 +73,7 @@ for (const type of ['ski', 'snowboard']) {
     console.log(`  kicker ${kick.name}  pop               ${ride(type, kick, { pop: true })}`);
     console.log(`  kicker ${kick.name}  pop + 360         ${ride(type, kick, { pop: true, air: spinTo(360) })}`);
     console.log(`  kicker ${kick.name}  pop + backflip    ${ride(type, kick, { pop: true, air: flipTo(1, 1) })}`);
-    console.log(`  kicker ${kick.name}  preload backflip  ${ride(type, kick, { pop: true, preload: true })}`);
+    console.log(`  kicker ${kick.name}  preload backflip  ${ride(type, kick, { pop: true, preload: true, air: flipTo(1, 1) })}`);   // S from the load through the throw
     const cork = type === 'ski' ? 360 : 720;   // skis spin slower (6.4 vs 7.6 rad/s): a ski cork 720 needs more air than these kickers give
     console.log(`  kicker ${kick.name}  pop + cork ${cork}    ${ride(type, kick, { pop: true, air: (p) => ({ ...flipTo(1, 1)(p), ...spinTo(cork)(p) }) })}`);
   }
