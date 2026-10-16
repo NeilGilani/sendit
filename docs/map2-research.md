@@ -90,3 +90,14 @@ Units: v = speed (m/s). "Hitbox gap" means trunk hitbox to trunk hitbox. The rid
 11. **Readability:**
     - Lanes are bright, clean snow. The forest floor under trees is darker (needle litter, shade; splat B).
     - Lane-edge trees are narrow spires, like subalpine fir or a limbed glade, so the corridor stays visible and the chase camera stays out of the needles.
+
+## 5. What playtesting added (bots, sightline checks, in-game playtests)
+
+12. **Sightline thinning.** A pivot hidden behind a lane-edge crown on a curve is invisible until about 1 s before you reach it. After planting, any crown that blocks the view from the lane 25–50 m before a pivot is removed, as real glade crews do. Lane-mouth landmark trees are tall but narrow.
+13. **No pivot mid-traverse or right after air.** Pivots are skipped:
+    - where the lane drifts faster than 0.35 m/m;
+    - within 55 m after a roller, or 45 m after a pillow on the lane (at 25 m/s you fly 30–40 m);
+    - in a side lane's first 60 m.
+14. **Third-person camera.** The chase camera trails ~6.5 m behind on the rider's path, so whatever the rider threads at 1–2 m, the camera threads too. Pivots and lane-edge trees are slim spires (crown ≤ ~1.2 m), so near misses don't bury the view in needles.
+15. **Air budget.** In the trees the rider needs snow underfoot to steer. Background lumps of 1.6 m threw the bot into 1–1.5 s airs every few seconds and into trees; 1 m lumps and 0.3 m ribs fixed it. Air belongs to features: kickers, the cliff, logs, pillows and rollers in the open.
+16. **Rest beats measured.** Close shaves per second (bot) are 0.2–0.55 on the flow line, 0.8–1.5 in the slots and 0 in every clearing (6–9 s). This confirms the rhythm of tight sections broken by rest beats with checkpoints.
