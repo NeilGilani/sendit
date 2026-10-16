@@ -136,6 +136,12 @@ export class RavenspireCourse {
   // ---------------------------------------------------------------- buildings
   buildStructures() {
     this.structures = BUILDINGS.map((b) => new Structure(b, START_X + b.u, b.v, FALL, (x, z) => this.natural(x, z)));
+    // Bounding box of every drift (driftAt's own reach test, padded), so height() skips them elsewhere.
+    this.driftBox = [Infinity, -Infinity, Infinity, -Infinity];
+    for (const s of this.structures) {
+      const r = s.hl + 26 + s.hw + 2;
+      this.driftBox = [Math.min(this.driftBox[0], s.x - r), Math.max(this.driftBox[1], s.x + r), Math.min(this.driftBox[2], s.z - r), Math.max(this.driftBox[3], s.z + r)];
+    }
     // Gondola towers along the old line (obstacles + props).
     const G = GONDOLA, towers = [];
     for (let i = 1; i <= G.towers; i++) {
@@ -262,7 +268,8 @@ export class RavenspireCourse {
 
   height(x, z) {
     let e = this.natural(x, z);
-    if (this.structures) for (const s of this.structures) e += s.driftAt(x, z, e);
+    const B = this.driftBox;
+    if (this.structures && x > B[0] && x < B[1] && z > B[2] && z < B[3]) for (const s of this.structures) e += s.driftAt(x, z, e);
     return e;
   }
 
@@ -611,6 +618,8 @@ function benchRaise(u, uc, h, L, wF) {
 /** A pyramidal horn rising out of the terrain. */
 function horn(e, x, z, hx, hz, peak, slope, twist) {
   const dx = x - hx, dz = z - hz;
+  // Cheap bound first: r below is never under 0.684 × the distance (max(|a|,|b|) ≥ d/√2, lobes ≥ 0.86).
+  if (peak - Math.hypot(dx, dz) * 0.684 * slope + 120 <= e) return e;
   const c = Math.cos(twist), s = Math.sin(twist);
   // A lobed footprint (aretes and faces, not a pyramid) and radial gullies / ribs down its faces.
   const ang = Math.atan2(dz, dx);
