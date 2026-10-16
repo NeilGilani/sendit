@@ -216,32 +216,53 @@ No console errors. Results, best time, medal targets and the ghost save all work
 
 ## Performance
 
-Quality 1, 1600×900, Intel Arc 130V, GPU timer queries.
-- **Before** (first dense version): 12k designed trees, 20–28 ms in the dense sections versus Valcrest's 13.9 ms.
-- **After** (min of 3 runs per spot at the same time as Valcrest's 13.5–14.2 ms):
+Quality 1, 1600×900, Intel Arc 130V, GPU timer queries. The GPU was shared with other sessions' test runs most of the night, so the numbers below come from quiet windows.
 
-  | Spot | GPU |
-  |------|-----|
-  | Old Growth | 15.1 ms |
-  | Gauntlet | 16.4 ms |
-  | Needles | 16.9 ms |
+**Contention caveat:** single measurements varied up to 3× under load. Contention only adds time, so minimums are the honest estimate.
 
-**Contention caveat:** the GPU was shared with other sessions' test runs. Single measurements varied by up to 3×; only minimums taken alongside Valcrest's are quoted.
+**Before** (first dense version): 12k designed trees, 20–28 ms in the dense sections versus Valcrest's 13.9 ms (gfxperf median).
+
+**After:** `node web/scripts/map2-perf.mjs` (the minimum of 60 identical frames at each stop down the main line). Each stop takes the lowest value over passes that ran in quiet windows, and Valcrest was measured the same way in a quiet pass.
+
+| | median | p90 | max |
+|---|---|---|---|
+| Valcrest Gully (every 100 m) | 11.6 ms | 13.4 ms | 16.4 ms |
+| Blackspruce Plunge (every 75 m) | 12.4 ms | 14.6 ms | 15.6 ms (Gauntlet) |
+
+Blackspruce by section:
+
+| Section | GPU |
+|---------|-----|
+| Drop-in | 11–15 ms |
+| Spruce Gate | 13.8–14.6 ms |
+| Kicker Meadow | 11.5–12 ms |
+| Needles | 13–14 ms |
+| Pillow Garden | 8–11 ms |
+| Deadfall | 11.6–13.8 ms |
+| Gauntlet | 12.6–15.6 ms |
+| Big Air | 10.5 ms |
+| Old Growth | 10.7–11.8 ms |
+| Finish | ~10 ms |
+
+- The min-of-60 metric reads ~2 ms below gfxperf's median frame time (Valcrest: 11.6 vs 13.9 ms).
+- On the gfxperf scale Blackspruce sits at roughly 14–16 ms in the dense sections, the target, about the same as Valcrest.
 
 What it took:
-- The designed forest thins with distance from the lanes (12k → 5.2k trees; the woods you can't see behind the lane-edge trees).
-- `perf = { treeNear: 0.48, treeMid: 0.35 }`: full-frond trees within ~19.5 m instead of ~41 m, and mid trees hand over to the opaque far shells at ~91 m instead of 260 m.
+- The designed forest thins with distance from the lanes, starting 6 m behind a lane edge: 12k → 4.8k designed trees. Those are the woods you can't see behind the lane-edge trees.
+- `perf = { treeNear: 0.44, treeMid: 0.35 }`: full-frond trees within ~18 m instead of ~41 m, and mid trees hand over to the opaque far shells at ~91 m instead of 260 m. Not noticeable at riding speed in screenshots or playtests.
 - Fewer saplings (8 % in the dense sections).
 - Not changed: gfx/ shaders, gfx/perf.js, scene.js TREES.
 
-Cost breakdown (Gauntlet, before the last two steps):
+Cost breakdown (Gauntlet, first dense version):
 - Full-frond trees ~35 % (alpha-tested foliage filling the screen).
 - Terrain ~16 %.
 - Mid trees ~9 %.
 
+In open clearings the terrain shader dominates, as it does on Valcrest.
+
 Further levers, if needed:
 - `perf.treeNear` 0.4.
-- `SECTIONS` spacing in the Needles and Gauntlet.
+- `SECTIONS` spacing in the Gauntlet.
 - A camera-aware foliage fade in gfx/trees.js (not done: not my file).
 
 ## Known issues
