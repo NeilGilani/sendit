@@ -25,7 +25,7 @@ web/src/character/
   profile.js    outfitSlotsFromProfile(): the profile's five clothing slots → slot selections
   body.js       BodyInfo: the body mesh in bind pose: support() outlines, centre(), skinAt() weight transfer
   tube.js       ring-swept shells: bodyRings() → sweep() → skinPiece() → mergePieces(); noise helpers
-  garments.js   the pieces: collar, jacket body, sleeves, pant legs, gaiter, stowed hood, mitts, gauntlets
+  garments.js   the pieces: collar, jacket body, sleeves, pant legs, gaiter, stowed hood or hood up, mitts, gauntlets
   helmet.js     helmet shell + liner edge + brim, toric goggle lens + gasket, strap with rear clip
   materials.js  fabricMaterial, bodyMaterial, helmetMaterial, lensMaterial (all on world.js toonMaterial)
 web/src/lobby/tabs/character.js   the Character tab
@@ -105,7 +105,7 @@ wrinkle detail fades out by itself with distance.
 
 | slot | default | what the cut / shape controls |
 |---|---|---|
-| jacket | `tuff-shell` | `hemFront`, `hemBack`, `jacketEase {shoulder, chest, hem}`, `sleeveEase {upper, elbow, forearm}`, `sleeveEnd`, `collarTop`, `hood: 'down'`, `gaiter`, `gaiterTop` |
+| jacket | `tuff-shell`, `storm-shell` | `hemFront`, `hemBack`, `jacketEase {shoulder, chest, hem}`, `sleeveEase {upper, elbow, forearm}`, `sleeveEnd`, `collarTop`, `hood: 'down' \| 'up'`, `gaiter`, `gaiterTop` |
 | pants | `tuff-bib` | `pantsEase {thigh, knee, cuff}`, `cuffY`, `stack {y0, y1, n, amp}` |
 | gloves | `tuff-mitt` | `mittEase`, `gauntlet [start |x|, ease at the open end]` |
 | helmet | `tuff-helmet` | `shape {width, front, back, top, brim}` |
@@ -122,12 +122,18 @@ helmet {base, liner, accent}, goggles {lens, lensBase, strap, strapLogo}, gloves
 | `arcade` | retro park: teal + magenta, cream pants, white helmet, violet lens, yellow mitts |
 | `summit` | pro team: brick red under a black yoke, white helmet, sapphire lens |
 
+`storm-shell` ("Tuff Shell, hood up") is the same cut with the helmet-compatible hood pulled up over the
+helmet: a shell offset 1.9 cm off the helmet surface (`helmetFit()` in helmet.js), a stiff rolled brim
+over the goggle, the face opening running down behind the goggle's sides, rigid on the head above the
+jaw and blended into the neck below; it replaces the stowed hood roll.
+
 **Catalog.** `profile/catalog.js` registers one clothing item per garment (`helmet-tuff`,
-`goggles-tuff`, `jacket-tuff-shell`, `gloves-tuff-mitt`, `pants-tuff-bib`) with
+`goggles-tuff`, `jacket-tuff-shell`, `jacket-tuff-shell-hood`, `gloves-tuff-mitt`, `pants-tuff-bib`) with
 `model: { kind: 'outfit', ref: <garment id> }` and one variant per colourway (`variant.id` = colourway id,
 `variant.colors` = that slot's colours). The profile stores `{ item, variant }` per slot as before.
 
-**Flow.** Character tab → `profile.equip(itemId, colourwayId)` → `loadout` event → `rider.js` →
+**Flow.** Character tab (a colourway card, a swatch, or the item name to cycle garments in a slot) →
+`profile.equip(itemId, colourwayId)` → `loadout` event → `rider.js` →
 `outfitSlotsFromProfile()` → `resolveOutfit()` → `look.apply()`: colours are uniform writes; a different
 cut rebuilds (and caches) the geometry. Both the lobby preview and the game rider follow the profile.
 
@@ -187,7 +193,7 @@ first load, shared by both riders) and adds two draw calls (outfit + lens) to th
 
 - Shells are single layers skinned with blended weights, so extreme poses (deep crashes, big grabs) can
   still stretch folds or push one layer into another for a frame.
-- The hood only comes "down" (a roll behind the collar); a hood-up variant over the helmet is not built.
+- The hood worn up is rigid on the head; it doesn't sway or crease with fast head turns.
 - The goggle reflection is a stylised environment (sky gradient, skyline, snow), not a real reflection
   of the scene.
 - Poles and skis / board keep their equipment-catalog colours (pink poles), which can clash with

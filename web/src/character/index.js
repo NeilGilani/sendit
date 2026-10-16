@@ -25,14 +25,14 @@ function bodyInfo(mesh) {
   return cache.body;
 }
 
-const cutKey = (g) => JSON.stringify([g.jacket.cut, g.pants.cut, g.gloves.cut]);
+const cutKey = (g) => JSON.stringify([g.jacket.cut, g.pants.cut, g.gloves.cut, g.jacket.cut.hood === 'up' ? g.helmet.shape : 0]);
 const helmKey = (g) => JSON.stringify([g.helmet.shape, g.goggles.shape]);
 
 function outfitGeometry(body, garments) {
   const k = cutKey(garments);
   if (!cache.outfit.has(k)) {
     const t0 = performance.now();
-    cache.outfit.set(k, buildOutfitGeometry(body, { ...garments.jacket.cut, ...garments.pants.cut, ...garments.gloves.cut }));
+    cache.outfit.set(k, buildOutfitGeometry(body, { ...garments.jacket.cut, ...garments.pants.cut, ...garments.gloves.cut, helmetShape: garments.helmet.shape }));
     if (typeof window !== 'undefined' && window.__senditDebug) console.info(`[character] outfit geometry ${(performance.now() - t0).toFixed(0)} ms`);
   }
   return cache.outfit.get(k);

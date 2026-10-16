@@ -91,7 +91,7 @@ export function fabricMaterial() {
   const m = toonMaterial({
     name: 'riderFabric', rim: 0.25, uniforms: U,
     vertPars: 'attribute vec4 aG; attribute float aLin; attribute float aCrease; varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj; uniform float uHide;',
-    vertPre: 'vG = aG; vLin = aLin; vCrease = aCrease; vObj = position;\n  if (uHide > 0.5 && (aG.x > 2.5 && aG.x < 5.5)) transformed *= 0.0;',
+    vertPre: 'vG = aG; vLin = aLin; vCrease = aCrease; vObj = position;\n  if (uHide > 0.5 && ((aG.x > 2.5 && aG.x < 5.5) || aG.x > 7.5)) transformed *= 0.0;',
     fragPars: `${COMMON}
 varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj;
 uniform vec3 uJacket, uPanel, uAccent, uGaiter, uPants, uCuff, uMitt, uGauntlet; uniform float uStyle; uniform vec3 uHemY;
@@ -228,7 +228,13 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
           seam += chLine(uc * 0.3 - 0.0, 0.0018) * step(0.8, v);
           fabRough = 0.5; fabSheen = 0.18; fabSpec = 0.6;
           wr = 1.6;
-        } else {
+        } else if (id > 7.5) {
+          // ---------------- hood worn up: yoke colour, a centre seam over the crown, accent lining
+          c = uPanel;
+          seam += chLine(uc * 0.75, 0.002) + chLine((abs(uc) - 0.5) * 0.75, 0.002);
+          seam += chLine(v - 0.93, 0.002);
+          wr = 0.6; wf = vec2(12.0, 6.0);
+        } else if (id > 6.5) {
           // ---------------- gauntlet: nylon with a cinch strap at the wrist
           c = uGauntlet;
           float strap = (1.0 - step(0.012, abs(v - 0.69)));
@@ -240,7 +246,7 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
           wr = 0.8;
         }
         // Rolled edges / linings
-        if (vLin > 0.5) { c = (id > 2.5 && id < 3.5) ? uAccent : c * 0.55; seam = 0.0; zip = 0.0; }
+        if (vLin > 0.5) { c = ((id > 2.5 && id < 3.5) || id > 7.5) ? uAccent : c * 0.55; seam = 0.0; zip = 0.0; }
         // Zips: dark coil, smoother
         c = mix(c, vec3(0.025), clamp(zip, 0.0, 1.0));
         fabRough = mix(fabRough, 0.45, clamp(zip, 0.0, 1.0));

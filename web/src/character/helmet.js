@@ -9,7 +9,7 @@ const lerp = THREE.MathUtils.lerp;
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 /** Piecewise-linear lookup over |θ| in degrees: keys [[deg, value], …]. */
-function keyed(keys, deg) {
+export function keyed(keys, deg) {
   const d = Math.abs(deg);
   for (let i = 1; i < keys.length; i++) {
     if (d <= keys[i][0]) { const [a, va] = keys[i - 1], [b, vb] = keys[i]; const t = (d - a) / (b - a); return lerp(va, vb, t * t * (3 - 2 * t)); }
@@ -18,7 +18,7 @@ function keyed(keys, deg) {
 }
 
 /** Grid → indexed geometry pieces with finite-difference normals oriented by `outward(i,k)`. */
-function grid(P, rows, cols, wrap, outward) {
+export function grid(P, rows, cols, wrap, outward) {
   const at = (i, k) => {
     i = Math.min(rows - 1, Math.max(0, i));
     k = wrap ? ((k % (cols - 1)) + (cols - 1)) % (cols - 1) : Math.min(cols - 1, Math.max(0, k));
@@ -65,10 +65,10 @@ function merge(parts) {
 }
 
 /**
- * Measure the head (dominant bone Head) and build helmet + goggle geometry.
- * Returns { shell: BufferGeometry (aR, aUV), lens: BufferGeometry, hs: shape summary for the shader }.
+ * Fit the helmet shell to the head: its plan (rounded square), crown profile and lower edge, all in
+ * bind space. Shared by the helmet and by garments that sit over it (the hood worn up).
  */
-export function buildHelmet(body, shape = {}, goggle = {}) {
+export function helmetFit(body, shape = {}) {
   // ---- head measurements (bind space)
   const head = body.bone('Head');
   let top = -1, back = 1, front = -1, halfW = 0;
@@ -97,11 +97,6 @@ export function buildHelmet(body, shape = {}, goggle = {}) {
   };
   const domeF = (y) => { const h = (y - yEq) / (yTop - yEq); return h <= 0 ? 1 : Math.pow(Math.max(0, 1 - Math.pow(h, 2.6)), 1 / 2.6); };   // flattish crown
 
-  const parts = [];
-  // ---- shell: rows from the crown down to the lower edge, then the rolled liner edge
-  const cols = 73, rowsS = 30;
-  const rows = rowsS + 3;
-  const P = new Float32Array(rows * cols * 3), reg = new Float32Array(rows * cols);
   const shellPt = (th, y, extra = 0) => {
     const [px, pz] = plan(th);
     const deg = THREE.MathUtils.radToDeg(Math.atan2(Math.sin(th), Math.cos(th)));
@@ -109,6 +104,20 @@ export function buildHelmet(body, shape = {}, goggle = {}) {
     const pl = Math.hypot(px, pz) || 1;
     return new THREE.Vector3(px * f + (px / pl) * extra, y, cz + pz * f + (pz / pl) * extra);
   };
+  return { a, cz, cF, cB, yTop, yEq, brim, yBotKeys, plan, domeF, shellPt };
+}
+
+/**
+ * Build helmet + goggle geometry.
+ * Returns { shell: BufferGeometry (aR, aUV), lens: BufferGeometry, hs: shape summary for the shader }.
+ */
+export function buildHelmet(body, shape = {}, goggle = {}) {
+  const { a, cz, cF, yTop, yEq, brim, yBotKeys, shellPt } = helmetFit(body, shape);
+  const parts = [];
+  // ---- shell: rows from the crown down to the lower edge, then the rolled liner edge
+  const cols = 73, rowsS = 30;
+  const rows = rowsS + 3;
+  const P = new Float32Array(rows * cols * 3), reg = new Float32Array(rows * cols);
   for (let k = 0; k < cols; k++) {
     const th = (k / (cols - 1)) * TAU;
     const deg = THREE.MathUtils.radToDeg(Math.atan2(Math.sin(th), Math.cos(th)));

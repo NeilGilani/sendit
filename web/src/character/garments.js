@@ -4,11 +4,12 @@
 // shell follows the same bones the animation drives. See docs/character.md for the numbers.
 //
 // Piece ids (aG.x in the shader): 0 jacket body, 1 sleeve, 2 pant leg, 3 collar, 4 stowed hood,
-// 5 gaiter, 6 mitt, 7 gauntlet.
+// 5 gaiter, 6 mitt, 7 gauntlet, 8 hood worn up.
 import * as THREE from 'three';
 import { bodyRings, hang, sweep, skinPiece, mergePieces, frame, pnoise, vnoise, smooth, bump } from './tube.js';
+import { helmetFit, keyed, grid } from './helmet.js';
 
-export const PIECE = { jacket: 0, sleeve: 1, pants: 2, collar: 3, hood: 4, gaiter: 5, mitt: 6, gauntlet: 7 };
+export const PIECE = { jacket: 0, sleeve: 1, pants: 2, collar: 3, hood: 4, gaiter: 5, mitt: 6, gauntlet: 7, hoodUp: 8 };
 const TAU = Math.PI * 2;
 
 /**
@@ -243,6 +244,61 @@ export function buildOutfitGeometry(body, cut) {
       e1s.push(o2); e2s.push(up);
     }
     pieces.push(sweepFrames(rings, { id: PIECE.hood, side: 0, capStart: true, capEnd: true, skinBones: B(/^(spine_03|neck_01|clavicle_[lr])$/) }));
+  }
+
+  // ---------------------------------------------------------------- hood worn up, over the helmet
+  if (cut.hood === 'up') {
+    const fit = helmetFit(body, cut.helmetShape || {});
+    const off = 0.019;                                        // clears the shell, strap and vents
+    // Face opening / lower edge over |θ|: a stiff brim above the goggle, down the cheeks behind the
+    // goggle's sides, then around the nape into the collar.
+    const edge = [[0, 1.79], [36, 1.782], [52, 1.735], [64, 1.66], [78, 1.6], [110, 1.575], [180, 1.565]];
+    const cols = 65, rowsS = 28, lipRows = 3, rows = rowsS + lipRows;
+    const P = new Float32Array(rows * cols * 3), G = new Float32Array(rows * cols * 4), L = new Float32Array(rows * cols);
+    // A point `extra` metres off the helmet shell (offset away from a centre inside the head, so the
+    // crown is a smooth dome); below the helmet's lower edge the hood tapers into the collar.
+    const C = new THREE.Vector3(0, fit.yEq - 0.04, fit.cz);
+    const at = (th, y, extra) => {
+      const deg = THREE.MathUtils.radToDeg(Math.atan2(Math.sin(th), Math.cos(th)));
+      const taper = 1 - 0.2 * smooth(keyed(fit.yBotKeys, deg) + 0.01, 1.565, y);
+      const p = fit.shellPt(th, y, 0);
+      p.addScaledVector(p.clone().sub(C).normalize(), extra);
+      p.x *= taper; p.z = fit.cz + (p.z - fit.cz) * taper;
+      return p;
+    };
+    for (let k = 0; k < cols; k++) {
+      const th = (k / (cols - 1)) * TAU;
+      const deg = THREE.MathUtils.radToDeg(Math.atan2(Math.sin(th), Math.cos(th)));
+      const yb = keyed(edge, deg);
+      const front = 1 - smooth(40, 70, Math.abs(deg));
+      for (let i = 0; i < rows; i++) {
+        let p, v, lin = 0;
+        if (i < rowsS) {
+          const s = i / (rowsS - 1);
+          const y = THREE.MathUtils.lerp(fit.yTop, yb, Math.pow(s, 1.1));
+          // Soft drape: a couple of shallow folds running back from the brim, a puff over the crown.
+          const fold = Math.sin(th * 6 + 0.7) * 0.003 * s * (1 - front) + 0.002 * Math.sin(s * Math.PI);
+          p = at(th, y, off + fold + front * 0.006 * smooth(0.85, 1, s));
+          v = s;
+        } else {
+          // Rolled, stiffened edge (a brim in front) turning in to the lining.
+          const j = i - rowsS;
+          const d = [[-0.004, off + 0.014 * (0.5 + front)], [0.006, off + 0.002], [0.03, off - 0.01]][j];
+          p = at(th, yb + d[0] * (yb > 1.7 ? 1 : 1), d[1]);
+          v = 1 + j * 0.01; lin = j > 0 ? 1 : 0;
+        }
+        const o = i * cols + k;
+        P.set([p.x, p.y, p.z], o * 3);
+        G.set([PIECE.hoodUp, k / (cols - 1), v, 0], o * 4);
+        L[o] = lin;
+      }
+    }
+    const g = grid(P, rows, cols, true, (i, k) => new THREE.Vector3().fromArray(P, (i * cols + k) * 3).sub(new THREE.Vector3(0, fit.yEq - 0.03, fit.cz)));
+    pieces.push({
+      pos: g.P, nrm: g.N, g: G, lin: L, crease: new Float32Array(rows * cols), idx: g.idx, rows, cols,
+      skinBones: B(/^(Head|neck_01|spine_03)$/),
+      anchor: { bone: body.bone('Head'), y0: 1.68, y1: 1.6 },     // rigid on the head above the jaw
+    });
   }
 
   // ---------------------------------------------------------------- mitts + gauntlets

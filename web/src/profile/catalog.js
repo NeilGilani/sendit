@@ -117,14 +117,15 @@ const NW = 'Northwake';   // fictional house brand used on banners and the suit
 
 // Clothing: one catalog item per garment in character/outfits.js, one variant per colourway. The
 // rider reads item.model.ref (the garment) and the variant id (the colourway) — see character/profile.js.
-const CLOTHING = {
-  helmet: { id: 'helmet-tuff', garment: 'tuff-helmet' },
-  goggles: { id: 'goggles-tuff', garment: 'tuff-goggle' },
-  jacket: { id: 'jacket-tuff-shell', garment: 'tuff-shell' },
-  gloves: { id: 'gloves-tuff-mitt', garment: 'tuff-mitt' },
-  pants: { id: 'pants-tuff-bib', garment: 'tuff-bib' },
-};
-for (const [slot, { id, garment }] of Object.entries(CLOTHING)) {
+const CLOTHING = [
+  { slot: 'helmet', id: 'helmet-tuff', garment: 'tuff-helmet' },
+  { slot: 'goggles', id: 'goggles-tuff', garment: 'tuff-goggle' },
+  { slot: 'jacket', id: 'jacket-tuff-shell', garment: 'tuff-shell' },
+  { slot: 'jacket', id: 'jacket-tuff-shell-hood', garment: 'storm-shell' },
+  { slot: 'gloves', id: 'gloves-tuff-mitt', garment: 'tuff-mitt' },
+  { slot: 'pants', id: 'pants-tuff-bib', garment: 'tuff-bib' },
+];
+for (const { slot, id, garment } of CLOTHING) {
   const g = GARMENTS[slot][garment];
   registerItem({
     id, name: g.name, slot, brand: NW, description: g.blurb,

@@ -23,6 +23,11 @@ export const GARMENTS = {
         gaiter: true, gaiterTop: 1.69,            // fleece gaiter pulled up under the goggle
       },
     },
+    'storm-shell': {
+      name: 'Tuff Shell, hood up',
+      blurb: 'The same long shell with its helmet-compatible hood pulled up over the lid.',
+      cut: null,                                   // filled in below: tuff-shell with the hood up
+    },
   },
   pants: {
     'tuff-bib': {
@@ -57,6 +62,8 @@ export const GARMENTS = {
     },
   },
 };
+
+GARMENTS.jacket['storm-shell'].cut = { ...GARMENTS.jacket['tuff-shell'].cut, hood: 'up' };
 
 /**
  * Colourways. Each slot's colours are what a catalog variant carries in `colors`:
