@@ -9,7 +9,7 @@ globalThis.addEventListener = () => {};
 const THREE = await import('three');
 const { Player, State } = await import('../src/player.js');
 const { RavenspireCourse } = await import('../src/maps/ravenspire/course.js');
-const { START_X } = await import('../src/maps/ravenspire/layout.js');
+const { START_X, RIDE_LINES } = await import('../src/maps/ravenspire/layout.js');
 const { game, Mode, on, emit } = await import('../src/state.js');
 const { PHYSICS } = await import('../src/config.js');
 game.mode = Mode.RIDING;
@@ -22,6 +22,27 @@ const grid = await course.generate();
 const { res: N, spacing: SP, size_m: SIZE } = grid.meta;
 const HALF = SIZE / 2, H = grid.heights, S = grid.splat;
 console.log(`grid ${N}² generated in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+
+// OBSTACLES=<file.json>: the browser's tree / rock / tower list ([x, z, r, kind], dumped from scatter.hash)
+// so the bots ride the real forest (without it, only the course's own obstacles exist: none in the sim).
+let SCATTER = null;
+if (process.env.OBSTACLES) {
+  const fs = await import('node:fs');
+  const HASHM = 16, hash = new Map();
+  for (const o of JSON.parse(fs.readFileSync(process.env.OBSTACLES, 'utf8'))) {
+    const k = `${Math.floor(o[0] / HASHM)},${Math.floor(o[1] / HASHM)}`;
+    if (!hash.has(k)) hash.set(k, []);
+    hash.get(k).push(o);
+  }
+  const around = function* (pos) {
+    const cx = Math.floor(pos.x / HASHM), cz = Math.floor(pos.z / HASHM);
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) yield* (hash.get(`${cx + dx},${cz + dz}`) || []);
+  };
+  SCATTER = {
+    findObstacle(pos, radius) { for (const o of around(pos)) if (Math.hypot(pos.x - o[0], pos.z - o[1]) < o[2] + radius) return o; return null; },
+    nearest(pos, maxR) { let best = null; for (const o of around(pos)) { const d = Math.hypot(pos.x - o[0], pos.z - o[1]) - o[2]; if (d < maxR && (!best || d < best.dist)) best = { dist: d, o }; } return best; },
+  };
+}
 
 export function makeTerrain() {
   const base = (x, z) => {
@@ -50,14 +71,7 @@ export function makeTerrain() {
 }
 
 // Lines: waypoints in (u, v); the bot aims at the line a little ahead of itself.
-export const LINES = {
-  stacks: { name: 'The Stacks (cliff into cliff)', pts: [[0, 0], [300, 10], [520, -40], [700, -40], [1000, -40], [1300, -40], [1500, -60], [1800, -40], [2200, 30], [2600, 40]] },
-  spines: { name: 'Spine Wall → pillows → ledges', pts: [[0, 0], [120, -200], [300, -330], [600, -420], [850, -420], [1000, -380], [1300, -360], [1450, -440], [1700, -300], [2100, -100], [2600, 0]] },
-  ravine: { name: 'The Ravine', pts: [[0, 0], [150, 120], [330, 360], 'ravine', [2250, 380], [2600, 300]] },
-  station: { name: 'Station Cliff → roof', pts: [[0, 0], [250, 250], [500, 310], [800, 310], [1100, 290], [1300, 288], [1400, 288], [1520, 288], [1700, 250], [2100, 150], [2600, 60]] },
-  hammer: { name: 'The Hammer (36 m)', pts: [[0, 0], [200, 260], [500, 600], [800, 700], [1000, 700], [1300, 650], [1700, 560], [2200, 450], [2600, 300]] },
-  refuge: { name: 'Bowl → refuge roof', pts: [[0, 0], [400, -60], [900, -200], [1300, -230], [1600, -200], [1840, -175], [1910, -175], [2200, -60], [2600, 0]] },
-};
+export const LINES = RIDE_LINES;   // the canonical lines (layout.js): the course keeps them clear of trees and rocks
 
 function lineSampler(L) {
   // Expand 'ravine' into the ravine's centre line.
@@ -83,7 +97,7 @@ export function ride(type, key, style, opts = {}) {
   const flowEv = [];
   const stumbleAt = [];
   const offs = [on('stumble', (r) => stumbleAt.push(`${r}@u${Math.round(0)}`)), on('flowBanked', (e) => flowEv.push(e)), on('flowState', (e) => flowEv.push({ state: e.on })), on('landed', (e) => events.push({ kind: 'land', ...e })), on('crashed', (k) => events.push({ kind: 'crash', k })), on('stumble', (r) => events.push({ kind: 'stumble', r: `${r}@${Math.round(p.position.x - START_X)},${Math.round(p.position.z)}` }))];
-  const p = new Player(T, null, null, { strength: () => 0, justPressed: () => false });
+  const p = new Player(T, SCATTER, null, { strength: () => 0, justPressed: () => false });
   p.setEquipment(type);
   p.fadeThen = (fn) => fn();
   p.startRiding();

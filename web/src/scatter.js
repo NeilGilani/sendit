@@ -197,6 +197,7 @@ export class Scatter {
         if (surf.x > S.pisteClear) continue;
         if (runDist(cx, cz) < S.runCorridor + 4) continue;
         if ((this.clearings || []).some(([qx, qz, r]) => Math.hypot(cx - qx, cz - qz) < r + 5)) continue;
+        if (course?.rockOk && !course.rockOk(cx, cz)) continue;   // a wild map keeps rocks off its lines (opt-in)
         formations++;
         const count = S.rockPerCluster[0] + Math.floor(rnd() * (S.rockPerCluster[1] - S.rockPerCluster[0] + 1));
         for (let i = 0; i < count; i++) {

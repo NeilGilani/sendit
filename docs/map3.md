@@ -13,6 +13,7 @@ http://localhost:5183/?map=ravenspire&ride        straight into a ride (the lobb
 http://localhost:5183/?map=ravenspire&ride&equip=snowboard
 node web/scripts/map3-ride.mjs both all send       bot rides every line (styles: send, control, carve, trick)
 node web/scripts/map3-structures.mjs               walls solid, roofs rideable (skis + board)
+node web/scripts/map3-obstacles.mjs obs.json      dump the real trees / rocks; then OBSTACLES=obs.json node web/scripts/map3-ride.mjs ...
 node web/scripts/map3-fuzz.mjs                     random inputs from random starts: no NaN, never below the snow, never stuck
 node web/scripts/map3-unit.mjs                     tuning hook, structures, flow layer, snowflake spots
 node web/scripts/map3-perf.mjs http://localhost:5183 1600 900 0,1,2 90   GPU / CPU / draws at six spots
@@ -317,6 +318,14 @@ Styles: **send** = tucked straight down the line, popping every cliff; **trick**
 | Bowl → refuge roof | snowboard | trick | finished | 149 s | 20.4 m/s (46 mph) | 0 | 0 | 16.3 s (4.45 s) | 32 m | 88 |
 
 All 24 runs reach the valley; the one crash is the Hammer sent with a full pop (by design: roll it). Carve style (12 more runs): 15–17 m/s average, all finish; its 3 crashes are a wide turn into the couloir wall and turns into the refuge's solid chimney while riding its roof. Every drop zone rides cleanly: 9 zones × 2 gears, the first 200 m from each with the control bot, no crashes (a stumble off Station Cliff and one in the pillows).
+
+**With the real forest.** The headless bots normally ride without trees (scatter is browser-only); with
+`OBSTACLES=<dump>` (web/scripts/map3-obstacles.mjs) they ride the browser's actual 8,800 larches, 1,570 rocks
+and the gondola towers. The first such run found a minefield: random rock clusters in the couloir throat and on
+the upper lines, and larches across every runout (bots crashed 3–7 times per run). Now the canonical lines
+(`RIDE_LINES` in layout.js) run through 10–30 m wandering glades in the larches (`pisteAt`), and rock clusters stay
+off the lines, the drop zones and the ravine floor (`rockOk`, an opt-in hook in scatter.js): send and control
+runs through the real forest finish with the same numbers as above (only the Hammer full-pop crash).
 
 ### Terminal speeds (web/scripts/map3-speeds.mjs: 60 s straight down a powder plane)
 

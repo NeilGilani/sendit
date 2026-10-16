@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { vnoise, noise1, fbm, ridged, smooth, sstep, mulberry32, hash1 } from './noise.js';
 import {
-  TILE, START_X, TOP, FINISH_U, PROFILE, BEHIND, FACE, BANDS, SPINES, PILLOWS, RAVINE, HITS, BUILDINGS, GONDOLA, BUTTRESSES, DROP_ZONES, LINE_GOALS,
+  TILE, START_X, TOP, FINISH_U, PROFILE, BEHIND, FACE, BANDS, SPINES, PILLOWS, RAVINE, HITS, BUILDINGS, GONDOLA, BUTTRESSES, DROP_ZONES, LINE_GOALS, RIDE_LINES,
 } from './layout.js';
 import { Structure } from './structures.js';
 import { RAVENSPIRE_PHYSICS, RAVENSPIRE_CAMERA } from './tuning.js';
@@ -478,6 +478,9 @@ export class RavenspireCourse {
 
   pisteAt(x, z) {
     // Clearings around the old buildings, and the gondola corridor (cut decades ago) stay free of trees.
+    // The canonical lines run through ~22 m glades in the larches (you can ride the lower bowl at speed).
+    const u = x - START_X;
+    if (u > 1500 && this.lineDist(u, z) < 10 + 5 * (noise1(u / 41 + z / 57, 77) * 2 - 1)) return 1;   // 5–15 m half-width, wandering
     for (const s of this.structures) if (Math.hypot(x - s.x, z - s.z) < s.R + 12) return 1;
     const G = GONDOLA;
     const ax = START_X + G.from[0], az = G.from[1], bx = START_X + G.to[0], bz = G.to[1];
@@ -488,6 +491,48 @@ export class RavenspireCourse {
 
   // ---------------------------------------------------------------- lobby / spawn
   /** Where the lobby plinth stands: on the summit shoulder, looking down the face. */
+  /** Rock clusters (scatter.js) stay off the canonical lines, the drop zones and the ravine floor. */
+  rockOk(x, z) {
+    const u = x - START_X;
+    if (this.lineDist(u, z) < 24) return false;
+    for (const [, zu, zv] of DROP_ZONES) {
+      const v = zv === 'ravine' ? this.rvAt(this.rv.c, zu) : zv;
+      if (Math.hypot(u - zu, z - v) < 45) return false;
+    }
+    if (u > RAVINE.u0 - 60 && u < RAVINE.u1) {
+      const uu = Math.max(RAVINE.u0, u);
+      if (Math.abs(z - this.rvAt(this.rv.c, uu)) < this.rvAt(this.rv.f, uu) + 12) return false;
+    }
+    return true;
+  }
+
+  /** Distance (m, in u / v) to the nearest canonical line (layout.js RIDE_LINES); ≥ 32 reads as "far". */
+  lineDist(u, v) {
+    if (!this._lineHash) {
+      const H = new Map();
+      const add = (a, b) => { const k = Math.floor(a / 32) * 4096 + Math.floor(b / 32); let l = H.get(k); if (!l) H.set(k, (l = [])); l.push(a, b); };
+      for (const L of Object.values(RIDE_LINES)) {
+        const pts = [];
+        for (const p of L.pts) {
+          if (p === 'ravine') for (let k = 420; k <= 2180; k += 20) pts.push([k, this.rvAt(this.rv.c, k)]);
+          else pts.push(p);
+        }
+        for (let i = 0; i < pts.length - 1; i++) {
+          const [a0, b0] = pts[i], [a1, b1] = pts[i + 1], n = Math.max(1, Math.ceil(Math.hypot(a1 - a0, b1 - b0) / 4));
+          for (let k = 0; k < n; k++) add(a0 + (a1 - a0) * k / n, b0 + (b1 - b0) * k / n);
+        }
+      }
+      this._lineHash = H;
+    }
+    const cu = Math.floor(u / 32), cv = Math.floor(v / 32);
+    let best = 1e9;
+    for (let du = -1; du <= 1; du++) for (let dv = -1; dv <= 1; dv++) {
+      const l = this._lineHash.get((cu + du) * 4096 + cv + dv);
+      if (l) for (let i = 0; i < l.length; i += 2) best = Math.min(best, Math.hypot(u - l[i], v - l[i + 1]));
+    }
+    return best;
+  }
+
   lobbySpot() { return { x: START_X + 22, z: -18, heading: -Math.PI / 2 - 0.18 }; }
 
   /**

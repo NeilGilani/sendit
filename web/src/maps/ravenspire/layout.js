@@ -136,3 +136,14 @@ export const LINE_GOALS = [
   ['Hammer Time', 2000, 'The Hammer'],
   ['Roof Hopper', 1800, 'Old Lift Station', 'Corvo Refuge'],
 ];
+
+// The canonical lines, as (u, v) waypoints ('ravine' = the ravine's centre line): the bots ride them
+// (scripts/map3-ride.mjs), and the course keeps a glade through the larches and the rocks off them.
+export const RIDE_LINES = {
+  stacks: { name: 'The Stacks (cliff into cliff)', pts: [[0, 0], [300, 10], [520, -40], [700, -40], [1000, -40], [1300, -40], [1500, -60], [1800, -40], [2200, 30], [2600, 40]] },
+  spines: { name: 'Spine Wall → pillows → ledges', pts: [[0, 0], [120, -200], [300, -330], [600, -420], [850, -420], [1000, -380], [1300, -360], [1450, -440], [1700, -300], [2100, -100], [2600, 0]] },
+  ravine: { name: 'The Ravine', pts: [[0, 0], [150, 120], [330, 360], 'ravine', [2250, 380], [2600, 300]] },
+  station: { name: 'Station Cliff → roof', pts: [[0, 0], [250, 250], [500, 310], [800, 310], [1100, 290], [1300, 288], [1400, 288], [1520, 288], [1700, 250], [2100, 150], [2600, 60]] },
+  hammer: { name: 'The Hammer (36 m)', pts: [[0, 0], [200, 260], [500, 600], [800, 700], [1000, 700], [1300, 650], [1700, 560], [2200, 450], [2600, 300]] },
+  refuge: { name: 'Bowl → refuge roof', pts: [[0, 0], [400, -60], [900, -200], [1300, -230], [1600, -200], [1840, -175], [1910, -175], [2200, -60], [2600, 0]] },
+};
