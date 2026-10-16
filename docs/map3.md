@@ -290,6 +290,18 @@ Styles: **send** = tucked straight down the line, popping every cliff; **trick**
 
 All 24 runs reach the valley. Carve style: 16–17 m/s average with no crashes (linked short turns scrub speed). Every drop zone starts cleanly (8 zones × 2 gears, 8 s straight-line from each).
 
+### Terminal speeds (web/scripts/map3-speeds.mjs: 60 s straight down a powder plane)
+
+| | 20° | 27° | 34° | 41° | 45° |
+|---|---|---|---|---|---|
+| ski, tucked | 23.7 m/s (53 mph) | 27.5 (62) | 29.3 (66) | 30.6 (68) | 31.2 (70) |
+| ski, upright | 16.8 (38) | 19.9 (44) | 22.4 (50) | 24.5 (55) | 25.5 (57) |
+| snowboard, crouched | 21.2 (48) | 24.9 (56) | 27.3 (61) | 28.7 (64) | 29.4 (66) |
+| snowboard, upright | 17.2 (39) | 20.2 (45) | 22.6 (51) | 24.7 (55) | 25.7 (57) |
+| *defaults (Valcrest), ski tucked* | *18.7 (42)* | *20.2 (45)* | *21.3 (48)* | *22.2 (50)* | *22.6 (51)* |
+
+So the big lines run at 50–70 mph tucked and 40–57 mph standing up; Valcrest's own physics is unchanged.
+
 ### Buildings (web/scripts/map3-structures.mjs) — all pass on skis and snowboard
 
 slow into a wall: bounced, not on the roof · fast into a wall: knocked down · grazing a wall at 12°: slides
