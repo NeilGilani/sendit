@@ -114,6 +114,8 @@ web/src/maps/builtin.js     one line: import './ravenspire/index.js';
 - **Drainages** — 1D ridged noise across the face (crests drift slowly along it): rocky aretes and gullies
   that shape lines without launching riders; calmer through the Stacks.
 - **Buttresses** — sharp jagged aretes along the fall line (Raven's Beak, Spine Rib, West Spur).
+- **Rock islands** — ~60 knobs of rock (3–7 m) poking out of the face on a hashed 60 m grid, kept off the
+  signature lines (Stacks corridor, ravine, spine and pillow fields, cliff lips, buildings, drop zones).
 - **Spines** — a triangle wave across the fall line with sharp crests and rounded sluff channels.
 - **Cliff bands** (`cliff(u, uc, h, L)`) — above the lip a bench of length `L = max(bench, 4·h)` raises the
   terrain by `h · t^1.25`, so the approach flattens steadily toward the lip (lip ≈ 30°, never a kicker); the

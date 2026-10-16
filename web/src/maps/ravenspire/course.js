@@ -241,6 +241,7 @@ export class RavenspireCourse {
       e += ribs * (calm * (big - 0.42) * 30 + (small - 0.45) * 6.5);
     }
     for (const B of BUTTRESSES) e += buttress(u, v, B);
+    if (u > 110 && u < 1560) e += this.outcrops(u, v);
     // Big lateral undulations on the lower bowl (natural halfpipes and spines between drainages).
     const low = sstep(1450, 1700, u) * (1 - sstep(2350, 2600, u));
     if (low > 0) e += low * (fbm(u / 260 + 4, v / 110, 2) - 0.5) * 22;
@@ -256,6 +257,42 @@ export class RavenspireCourse {
     let e = this.natural(x, z);
     if (this.structures) for (const s of this.structures) e += s.driftAt(x, z, e);
     return e;
+  }
+
+  /**
+   * Rock islands: knobs of rock poking out of the face on a 60 m hashed grid (about one cell in six),
+   * 3–7 m tall with steep sides (rock shows), kept off the signature lines (the Stacks corridor, the
+   * ravine, the spine and pillow fields, cliff lips, buildings, drop zones).
+   */
+  outcrops(u, v) {
+    const C = 60;
+    const ci = Math.floor(u / C), cj = Math.floor(v / C);
+    let add = 0;
+    for (let di = -1; di <= 0; di++) for (let dj = -1; dj <= 0; dj++) {
+      const i = ci + di + (u - ci * C > C / 2 ? 1 : 0), j = cj + dj + (v - cj * C > C / 2 ? 1 : 0);
+      const hsh = hash1(i * 7919 + j * 104729 + 17);
+      if (hsh < 0.83) continue;
+      const ou = (i + 0.2 + 0.6 * hash1(i * 31 + j * 7 + 3)) * C, ov = (j + 0.2 + 0.6 * hash1(i * 13 + j * 29 + 5)) * C;
+      if (!this.outcropOk(ou, ov)) continue;
+      const R = 6 + 7 * hash1(i * 3 + j * 11 + 9), H = 3 + 4 * hash1(i * 17 + j * 5 + 1);
+      const du = (u - ou) / (R * 1.4), dv = (v - ov) / R;   // a little longer down the fall line
+      const q = du * du + dv * dv;
+      if (q < 1) add += H * Math.pow(1 - q, 0.55);
+    }
+    return add;
+  }
+
+  outcropOk(u, v) {
+    if (u < 140 || u > 1520) return false;
+    if (u > 430 && u < 1420 && Math.abs(v + 40) < 170) return false;           // the Stacks corridor
+    if (u > RAVINE.u0 - 40 && Math.abs(v - this.rvAt(this.rv.c, Math.min(u, RAVINE.u1))) < 90) return false;
+    const W = FACE.halfWidth(u);
+    if (u > SPINES.u0 - 20 && u < SPINES.u1 + 20 && v > SPINES.v0 * W - 20 && v < SPINES.v1 * W + 20) return false;
+    if (Math.abs(v) > W * 0.86) return false;                                    // the framing walls are rock already
+    for (const B of BANDS) if (Math.abs(u - B.uc) < 45 && v > B.v0 - 30 && v < B.v1 + 30) return false;
+    for (const b of BUILDINGS) if (Math.hypot(u - b.u, v - b.v) < 80) return false;
+    for (const [, zu, zv] of DROP_ZONES) if (typeof zv === 'number' && Math.hypot(u - zu, v - zv) < 60) return false;
+    return true;
   }
 
   spines(u, v, W) {
