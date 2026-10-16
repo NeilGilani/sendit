@@ -103,6 +103,9 @@ createEquipmentModel('ski', { id: 'park', graphic: { top: 0xff3355, pattern: 'st
   | `flip`, `flipRate` | flip angle in the air (rad, + = backflip, i.e. the leading end up) and its rate; 0 on the ground |
   | `renderFlip` | `flip` interpolated for rendering |
   | `flipLoad` | 0..1 backflip preload while charging (S held) |
+  | `flipTuck`, `spinTuck` | the rider's shape in the air: flip tuck 0 (layout) … 1 (tight tuck); spin pose −1 (arms out) … 1 (arms in) |
+  | `lastPopQ` | 0..1 how well the last pop was timed (1 = right at the lip); scales the rotation set |
+  | `dyn.spinH`, `dyn.flipH` | rotation momentum in the air (rad/s in the neutral spin / open flip pose) |
   | `lastLanding` | `{ result, switch, dev, flipDev, impact, air, spins, flips, trick }` |
   | `lastCrash` | `{ reason: 'impact'\|'yaw'\|'pitch', impact, dev, flipDev, air, spins, flips }` for a landing crash (a UI could say "Over-rotated!") |
   | `dyn.dbg` | per-term deceleration breakdown |
@@ -118,10 +121,10 @@ createEquipmentModel('ski', { id: 'park', graphic: { top: 0xff3355, pattern: 'st
 | W, RT | Double-pole / skate push below 8.5 m/s; tuck above (worth about +20% top speed) | One-foot skate when slow; low crouch at speed. Held while charging a pop, it gives a nose press and a **nollie**. |
 | Hold Space | Crouch to charge, release to pop (W + Space: nose press, **nollie**). Steering while charging **winds up** a spin; below 11 m/s it also **butters** (best on the twin-tip park ski). | Tail press to charge, release to **ollie**. Steering while pressing gives a **butter** (pivot on the pressed end) and winds up the spin. |
 | Space held over a crest | The crouch soaks up rollers and drop lips (you stay on the snow). Release on the crest to pop off it; up to 0.15 s after the snow falls away still counts (**late pop**). | Same |
-| S while charging | **Backflip preload**: the rider arches back, and the pop leaves the lip already rotating and commits to a full backflip. No stop or plough while charging. | Same (a **Wildcat** off the tail) |
-| A / D in the air | Spin, named Left/Right 180/360…. Let go and the spin carries on to the next 360 (or 180 on twin tips). Rolling off a crest or lip **without popping**, a turn held from the ground stays a carve: it only spins once steer is let go and pressed again. | Spin, named **FS/BS** 180/360… by stance and switch (switch FS = **Cab**, Half-Cab for a 180). Let go and the spin carries on to the next 180. |
-| W / S in the air | **Frontflip / backflip** (stick forward / back). Keys already held at take-off are ignored until pressed again. Let go and the flip carries on to the next upright; within 50° of upright the rider spots the landing and settles. With a spin: **Cork** (back) or **Misty** (front), Double/Triple by flips. | **Tamedog / Wildcat** (front / back over the toe-heel axis). With a spin: **Rodeo** (single back), **Double Cork** (more), **Misty** (front). |
-| Shift in the air | Grab: Safety, Mute or Japan | Grab: Indy or Melon. With W it is a Nose grab; with S, a Tail grab. |
+| S while charging | **Backflip preload**: the rider arches back, and the pop leaves the lip already rotating (55% of a full flip set). Keep S held into the air to finish the throw. No stop or plough while charging. | Same (a **Wildcat** off the tail) |
+| A / D in the air | Spin, named Left/Right 180/360…. **Spins are set at the take-off**: wind up while charging, pop at the lip, keep steering for the first 0.3 s (the throw). After that, steering with the spin pulls the arms in (faster) and against it flings them out (slower). Let go and the rider spots the landing. Rolling off a crest or lip **without popping**, a turn held from the ground stays a carve: it only spins once steer is let go and pressed again. | Spin, named **FS/BS** 180/360… by stance and switch (switch FS = **Cab**, Half-Cab for a 180). Same set / throw / tuck / spot. |
+| W / S in the air | **Frontflip / backflip** (stick forward / back). A flip is thrown in the first 0.4 s of the air (a preload already set most of it); held after that it **tucks** (faster), against it **opens** (slower). Let go and the rider spots the landing: comes round early and stretches out (layout) for the touchdown. Keys already held at take-off are ignored until pressed again (except S from a preload). With a spin: **Cork** (back) or **Misty** (front), Double/Triple by flips. | **Tamedog / Wildcat** (front / back over the toe-heel axis). With a spin: **Rodeo** (single back), **Double Cork** (more), **Misty** (front). |
+| Shift in the air | Grab: Safety, Mute or Japan. The hand takes ~0.2 s to get there; the rider lets go by itself 0.22 s before touchdown. | Grab: Indy or Melon. With W it is a Nose grab; with S, a Tail grab. |
 | E (debug) | Swap to the snowboard | Swap to skis |
 
 Frontside means the toe side, and so the chest, swings toward the direction of travel first. For a regular rider riding forward that is counter-clockwise from above, which is a left spin. Goofy mirrors it, and riding switch mirrors it again.
@@ -187,28 +190,30 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
 
 ### Air and tricks (shared)
 
-- **Spins.** Stick X drives the spin rate with an exponential response: 6.4 rad/s for skis, 7.6 rad/s for the board, × the spec spin factor from swing weight. Take-off adds spin from two sources:
-  - About 45–55% of the ground yaw rate carries into the air as pre-wind.
-  - A **wind-up** (steering while charging the pop) adds up to 2.6 rad/s on skis and 3.2 rad/s on the board.
-- **Spin momentum.** With the stick released, rotation does not stop dead:
-  - Within `spinCheckAngle` (40°) of a landable alignment, the spin settles onto it. Just past one, the rider checks the spin back.
-  - Farther away, momentum carries the spin on to the next alignment, timed to arrive by touchdown when reachable. Alignments are the nose, or the tail too for boards and twin tips.
-  - A 180 attempt on non-twin skis therefore becomes a 360.
+- **Rotation is angular momentum** (docs/jumps-research.md). Real riders set their rotation on the lip and can only change shape in the air (tuck to speed up, open up to slow down); the game does the same, so how far you can rotate comes from the set and the air time, not from holding a key. State: `dyn.spinH` / `dyn.flipH` = momentum, expressed as the rate in the neutral (spin) / open (flip) pose.
+  - **The set at take-off.** Pre-wind (45–55% of the ground yaw rate), the **wind-up** (steering while charging: up to `windupSpin` 2.6 / 3.2 rad/s × spec spin) and the **flip preload** (S while charging: `flipPreload` 55% of `flipSet`), all × the pop timing.
+  - **Pop timing** (`player.lastPopQ`, 0..1): 1 when the pop is released right at a lip (the snow falls away from the path within `popLipTime` 0.12 s), down to `popEarlySet` (0.55) when the lip is `popEarly` (0.5 s) ahead, `popFlatSet` (0.7) with no lip ahead, a late (coyote) pop loses up to a third, rolling off without a pop sets `rollSet` (0.6). A full set needs the pop at the lip: the most momentum reachable is × (0.6 + 0.4·timing).
+  - **The throw.** For `spinThrow` (0.3 s) / `flipThrow` (0.4 s) after leaving the snow, steer / W / S still add momentum at `spinThrowRate` / `flipThrowRate`, fading over the window. Without a wind-up / preload the throw tops out at `spinThrowMax` (3.4 / 3.8 rad/s) / `flipThrowMax` (2.0): a thrown-only 360 or backflip is fine, a double needs the preload.
+  - **Shape.** Afterwards the stick in the rotation's direction tucks (flip × `flipTuckGain` 2.3, spin × `spinTuckGain` 1.45), against it opens (spin × `spinOpen` 0.6; the open flip is the layout, × 1). Poses take `poseTime` (0.22 s) to change, so a flip winds up, rotates steadily and slows into the landing. A tight flip tuck holds `flipTuckHold` (1.6 s) at full gain, then fades over `flipTuckFade` (1 s) to `flipTuckFloor` (20%): the legs hold against a load ∝ ω², so a triple needs ~3 s of air and a perfect set, and long airs don't turn into quads.
+  - **Spotting** (stick / keys released): flips plan to come round early and open into the layout for the last `flipSpot` (0.35 s), with the tuck the rest of the rotation needs; just past upright with the next one out of reach they stay open and ride out the small over-rotation. Spins pick the pose that brings the next alignment (nose, or tail for boards and twin tips) round at touchdown; within `spinCheckAngle` (40°) of one — or when the next is out of reach — the upper body checks the spin onto it (≤ `spinCheck` 3.2 rad/s, which bleeds the momentum; it also squares up a rider launched mid-skid on maps with `airSettleAngle`). With no momentum, steering only twists the hips (`airTwist` 1 rad/s, nothing stored).
+  - **Rates.** Full set: skis 345°/s neutral, 500°/s tucked spin (`spinSet` 6.0), board 390 / 565°/s (6.8); flips 180°/s open, ~410–425°/s (≈1.15 rev/s) tucked (`flipSet` 3.1 / 3.2). The research gives 500–650°/s average spins and 1.0–1.4 rev/s flips for experts.
+  - **Ceiling** (`node web/scripts/physics-tricks.mjs`, a frame-perfect set and the key held to touchdown): 1.1 s of air → 1.0 flip, 1.4 → 1.4, 1.8 → 1.9, 2.2 → 2.3, 2.6 → 2.7, 3.0 → 3.0, 3.4 → 3.3, 3.8 → 3.5 (research: 1 flip ≈ 1.0–1.3 s, 2 ≈ 1.9–2.3 s, 3 ≈ 2.6–3.0 s, quads ≥ 2.8–3.2 s at record level). Landed with a skilled release: thrown singles, a preloaded double at 2.45 s, a double cork 1080 at 2.6 s (sketchy), a triple at 3.2 s; a full set tucked to 300° on a 1.85 s air over-rotates.
 - **Landing assist (SSX-style).** In the last `landAssistTime` (0.25 s) with the stick released, a gear within `landAssistAngle` (14°) of its path settles straight.
-- **Grabs.** Shift in the air, after 0.12 s of air time. A grab held for 0.25 s or more scores and names the trick. Each grab moves its own hand to its own spot:
+- **Grabs.** Shift in the air, after 0.12 s of air time. The hand reaches it at `grabRate` (≈0.2 s) and lets go at `grabRelease`; the rider lets go by itself `grabLetGo` (0.22 s) before touchdown. A grab is a compact shape: it tucks a flip (×0.7 of the tuck) and a spin (pose 0.6), lowers the air drag, and holds that shape (no spotting while grabbing). A grab held for 0.25 s or more scores and names the trick. Each grab moves its own hand to its own spot:
   - Board: Indy is the rear hand to the toe edge, Melon the front hand to the heel edge, Nose grab the front hand to the nose, Tail grab the rear hand to the tail.
   - Skis: Safety is the left hand to its ski, Mute the right hand across, and Japan crosses the skis.
 - **Trick label.**
   - Board example: `Switch Nollie FS 540 Indy`.
   - Ski example: `Switch Right 360 Japan`.
   - Points: air time × 80, + 90 per 180°, + the grab, + 30 for switch, + 50 for a perfect landing (8° or less).
-- **Kicker pop.** A pop on a kicker is the same pop as on the flat (`lipPopBonus` = 1). It already rides the ramp's launch angle, adding about 0.5 s of air. The old 1.7× bonus made the pop dominate: every kicker gave 2.2–2.6 s, and kicker size hardly mattered. Now S / M / L kickers give 1.1 / 1.3 / 1.5 s straight and 1.7 / 1.9 / 2.0 s popped.
-- **Flips.** W / S (stick y) in the air drive the flip rate toward ±`flipRateMax`: 5.6 rad/s for skis and 5.9 for the board, × √(spec spin). That is about 1.1 s per flip; the research gives 4.5–7 rad/s for tucked flips.
+- **Kicker pop.** A pop on a kicker lip gets `lipPopBonus` (0.8) of the flat pop — the legs have less time to push (the research measured −2.5…+1.1 m/s on real park lips) — and every pop fades with speed to 45% from 10 to 26 m/s (`popSpeedFade`). It rides the ramp's launch angle. S / M / L kickers (physics-kicker, 16°) give 1.1 / 1.3 / 1.45 s straight and 1.55 / 1.75 / 1.85 s popped on skis (1.6 / 1.8 / 1.9 on the board).
+- **Air drag** is `a = k·v²` with `airDrag` k = ρ·CdA / 2m = 0.0027 (CdA 0.4 m², ρ 1.0, 75 kg; terminal speed ≈ 60 m/s), × `airDragCompact` (0.7) when tucked or grabbing. It used to be ≈0.0006 (the old formula's ×0.1), a fifth of a real rider's. It hardly changes a park kicker (2% of the distance at 10 m/s) but cuts 10–15% off a 30 m/s cliff flight.
+- **Flips.** W / S (stick y) in the air: momentum, throw, tuck and spot as above, × √(spec spin) on the set.
   - The flip turns about the gear's lateral axis. For the board, ridden sideways, that is the toe-heel axis, so a backflip is a **Wildcat** (over the tail) and a frontflip a **Tamedog** (over the nose).
   - The flip is composed at render time: `orient` stays the un-flipped base, and `renderOrient = slerp(base) · Rx(renderFlip)`. `renderFlip` is signed (flip × travelSign). The rider rotates about its centre of mass (`ANIM.flipPivot`, 0.85 m) using exactly the drawn angle. On touchdown the leftover pitch (within the landing tolerance) settles visually over about 0.2 s instead of snapping.
-  - **No flip from a little hop:** a flip only starts with at least `flipMinAir` (0.45 s) of predicted air. The time to land is predicted by marching the ballistic path against the real terrain. The stick has a wide dead zone (0.4) for flips, so an off-axis stick while spinning doesn't start one.
-  - **Commitment.** Keys held at take-off are ignored until re-pressed, so a held tuck or nollie never flips by accident. With the stick released, a flip far from upright carries on to the next upright, timed for touchdown. Within 50° of upright the rider settles onto it.
-  - **Preload.** S held while charging (`flipLoad`) leaves the lip already rotating at `flipPreload` (4.2 / 4.4 rad/s) and commits through the first half turn: a hands-free backflip off any popped kicker or drop. Rotation is set on the ramp, as in Steep, Shredders and the aerials research.
+  - **No flip from a little hop:** a flip can't be thrown with less than `flipMinAir` (0.45 s) of predicted air. The time to land is predicted by marching the ballistic path against the real terrain. The stick has a wide dead zone (0.4) for flips, so an off-axis stick while spinning doesn't start one.
+  - **Commitment.** Keys held at take-off are ignored until re-pressed, so a held tuck or nollie never flips by accident. A flip with momentum always carries on; the rider can only tuck, open, or let go and spot. Too much set for the air (a full set tucked to 300° on a 1.85 s air) over-rotates; too little under-rotates.
+  - **Preload.** S held while charging (`flipLoad`) leaves the lip already rotating with `flipPreload` (55%) of the set; keep S held through the throw for the rest. Rotation is set on the ramp, as in Steep, Shredders and the aerials research.
   - **Names.** Skis: Backflip / Frontflip, or with a 360+ spin `Left Cork 720` / `Misty`. Board: Wildcat / Tamedog, or `BS Rodeo 540` (a single backflip with a spin), `FS Double Cork 1080`, `Misty`. Double and Triple prefixes count the flips.
   - **Points:** +150 per flip.
 - **Landing (pitch and impact).** On top of the yaw rules, pitch must come round to within `flipLandClean` (22°) for a clean landing. Up to `flipLandStumble` (42°) is a stumble; beyond that is a crash. Impacts above `hardLanding` (12.5 m/s into the slope) turn a clean landing into a stumble; above `crashImpact` (18 m/s) the rider crashes.
@@ -220,6 +225,7 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
 
 - **Terrain following** used to throw away 0.3% of the speed every frame, about 18%/s. Now only abrupt impacts beyond `smoothFollow` cost speed.
 - **Kicker lips.** The terrain normal is sampled at grid spacing (about 3 m), which smeared across lips and steered riders down the drop. As a result kickers barely launched (0.37 s of air). On park features the physics now samples a one-sided normal, 0.35 m upstream; the same kicker gives 1.2 s straight or 2.2 s with a pop.
+- **Launched sky-high at the start of a kicker** (Valcrest). Kickers were built from the centre-line ground height, so on a cross-slope the downhill half of the ramp started 0.4–1.1 m above the local snow: a vertical step at the very start of the ramp (11 of the 17 kickers), which the fine lip normal turned into a 57–69° launch at 9–13 m/s straight up. `kickerY()` (features.js) now fades the levelling in over the in-run and out across the sidewalls, so the ramp starts flush; and the ground follow turns the path upward at most `followMaxRate` (12 rad/s), so a step in any height field is a bump, not a ramp. Regression check: `node web/scripts/jumps-valcrest.mjs --check` (2870 take-offs: every kicker × speeds × offsets × angles × rolled / popped; 461 anomalous before, 0 after; the follow guard alone left 139).
 - **Popping on a rising ramp** used to "land" again the very next frame. A rider moving off the surface now stays airborne.
 - **Glued to convex terrain.** The ground step projected the velocity back onto the surface every frame, so nothing but a kicker's discontinuous lip could ever launch the rider. The course's five natural drops gave no air at all. Natural air (above) fixes this: a straight rider now gets about 1 s off each drop.
 
@@ -228,7 +234,9 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
 - `PHYSICS`: shared values:
   - `gravity`, friction by surface, `softCapDrag`.
   - `powderDepth`, `turnScrub`.
-  - `lipPopBonus`, `terrainImpactLoss`, `smoothFollow`.
+  - `terrainImpactLoss`, `smoothFollow`, `followMaxRate` (12 rad/s: the most the ground can turn the path upward per second; a height-field step is a bump, never a ramp).
+  - Jumps (docs/jumps-research.md): `lipPopBonus` (0.8), `popSpeedFade` ([10, 26, 0.45]), `airDrag` (0.0027 = ρ·CdA/2m), `airDragCompact` (0.7), `airGravity` (1: no float), pop timing `popLipTime` (0.12 s), `popEarly` (0.5 s), `popEarlySet` (0.55), `popFlatSet` (0.7).
+  - `slowmo` (null = off; maps: `{ minAir, minDrop, scale, easeIn, hold, easeOut, cooldown }`).
   - Natural air: `liftOffGrip`, `liftOffAbsorb`, `liftOffMin`, `latePopTime`; `hardLanding`.
   - `landAssistTime`, `landAssistAngle`, `spinCheckAngle`.
   - `digitalSteerStart`, `digitalSteerRamp` (the key steering ramp).
@@ -247,8 +255,10 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
   | Push and drag | `pushAccel`, `pushMaxSpeed`, `dragUpright`, `dragTuck` |
   | Powder | `powderFloat`, `sinkSlow`/`sinkFast`, `powderBog`, `powderDrag`, `powderBogDecel`, `powderSteer` |
   | Butter (board) | `butterRate`, `butterMaxSpeed`, `butterDrag` |
-  | Air | `popMin`/`popMax`, `nollie`, `chargeTime`, `spinRateMax`, `spinResponse`, `prewind`, `windupSpin` |
-  | Flips | `flipRateMax`, `flipResponse`, `flipPreload`, `flipLandClean`/`flipLandStumble` |
+  | Air | `popMin`/`popMax`, `nollie`, `chargeTime`, `rollSet` (set rolling off without a pop), `poseTime` |
+  | Spins | `spinSet` (full set, rad/s neutral), `spinTuckGain`, `spinOpen`, `spinResponse`, `prewind`, `windupSpin`, `spinThrow`/`spinThrowRate`/`spinThrowMax`, `spinMinH`, `spinCheck`, `airTwist` |
+  | Flips | `flipSet` (full set, rad/s open), `flipTuckGain`, `flipTuckHold`/`flipTuckFade`/`flipTuckFloor` (the tuck tires), `flipResponse`, `flipPreload` (share of the set), `flipThrow`/`flipThrowRate`/`flipThrowMax`, `flipMinH`, `flipMinAir`, `flipCheck`, `flipSpot`, `flipLandClean`/`flipLandStumble` |
+  | Grabs | `grabRate`, `grabRelease`, `grabLetGo` |
   | Edge vs speed | `angulation` (deg beyond the lean) |
   | Butter (skis) | `butterRate`, `butterMaxSpeed`, `butterDrag`, `butterNonTwin` |
   | Landing | `landClean`/`landStumble`/`landCrash`/`landSlide`, `switchLand` |
@@ -257,7 +267,7 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
   - `angulation`, `angulationReverse` (the share kept when the edge is below the lean, 0.25), `polePlantTime`.
   - Letting go: `rollRelease` (the lean eases back up, 15 vs `rollResponse` 10) and `leadRelease` (the upper-body turn lead, 10 vs 6), used only while the steer is released and the value is heading back to neutral.
   - Skis: `skiPressPitch`, `skiPressShift`, `skiPopSnap`.
-  - Flips: `flipPivot` (centre of mass height), `flipTuckLift`, `flipLoadArch`.
+  - Flips: `flipPivot` (centre of mass height), `flipTuckLift`, `flipLoadArch`. In the air the drawn tuck follows the physics tuck (`player.flipTuck`); a flip turning open is drawn as a layout (body long, arms out), and spins wrap the arms in (`player.spinTuck` > 0) or fling them wide (< 0) — `Rider.armSpin`.
   - `gearSinkVisual`: the share of the physics powder sink that is drawn (0.15). The course reads as packed snow, so the gear rides on top instead of disappearing.
   - `ANIM.board`: crouch, `crouchHinge` (hip fold per unit crouch), shoulder and hip opening, head turn, turn lead, heel sit, toe drive, press shift and pitch, air and grab tuck, `handDragEdge`.
 
@@ -333,8 +343,9 @@ At runtime, `registerVariant(type, spec)` adds a model (for DLC or user presets)
 | Kicker S / M / L on 16°, straight / popped air | 1.1 / 1.3 / 1.5 s, popped 1.7 / 1.85 / 2.0 s | 1.1 / 1.3 / 1.5 s, popped 1.8 / 1.9 / 2.05 s | size should matter |
 
 - **On the real course,** a bot following the gully centre line for 60 s averages about 10 m/s (max about 16). The previous physics gained speed from every turn, a linear lateral-to-forward conversion; it did 0→13.6 m/s in 5 s while weaving on about 18°, which is faster than free fall along the slope allows. Constant full-lock zig-zagging is now about 6 m/s on average, as it should be.
-- **Kickers** (`physics-kicker.mjs`, 60 m run-up on 16°): every kicker lands a popped 360, a backflip, a preloaded (hands-free) backflip and, on the board, an `FS Rodeo 720`. A ski cork 720 needs kicker L and is marginal: it slides out under-rotated, because the ski spin rate is lower.
-- **Tricks** (`physics-tricks.mjs`, launches on the flat): Backflip / Frontflip / Wildcat / Tamedog clean. A flip released at 90° or 180° still comes round by momentum. `Left Cork 720` and `FS Double Cork 1080` (2.7 s of air) land on the board. A backflip with only 0.9 s of air crashes. W or S held through take-off never flips.
+- **Kickers** (`physics-kicker.mjs`, 60 m run-up on 16°, a skilled player: key in until the open-body rotation left carries it round, then let go): every kicker lands a popped 360 and a preloaded backflip; a backflip thrown in the air lands on M and L (sketchy on the ski S kicker, 1.55 s). A board cork 720 thrown only in the air comes round as a 540 (slide / stumble): a 720 on a 1.6–1.9 s air needs a wind-up on the snow.
+- **Tricks** (`physics-tricks.mjs`, launches on the flat with a given set): thrown singles (back, front, rolled off), a preloaded double (2.45 s), a double cork 1080 (2.6 s, sketchy) and a triple (3.2 s, sketchy) land; a double thrown without a preload, a triple at 2.6 s and a quad at 4 s don't come round; a full set tucked to 300° on 1.85 s over-rotates; 360 / 720 wound up land, a ski 1080 at 2.2 s and a 720 thrown only in the air don't. W or S held through take-off never flips. The last line prints the ceiling (most flips per air time).
+- **Jumps on the real maps** (`jumps-bench.mjs`): see docs/jumps-research.md §4.
 - **Real course** (`physics-course.mjs`, start to finish, no crashes in any style):
   - `straight`: 165 s / 183 s (skis / board). Average 15.7 / 14.1 m/s, about 1 s of natural air off each of the five drops.
   - `flip`: the bot loads the pop with S over each drop lip. Five clean Backflips (skis) and Wildcats (board), 1.2–1.4 s of air each, using the late pop because the riders leave the snow just before the lip.
