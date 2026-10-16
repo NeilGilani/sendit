@@ -4,6 +4,7 @@
 // The bot picks a route (which lanes it prefers), looks ~1 s ahead along its lane, and steers for
 // the lateral offset with the most clearance to the obstacles ahead — a skilled, not perfect, rider.
 // Usage: node web/scripts/map2-bot.mjs [ski|snowboard|both] [main|fast|safe|all] [--ovr] [--brake=<m/s>] [--splits]
+//   --cam     share of frames the chase camera would sit inside a tree crown
 //   --tension per-section time, speed and close shaves per second (the run's rhythm)
 //   --flakes  which snowflakes the route collects (the game's pickup rule)
 //   --airs    list every air > 0.45 s by what launched it (t:air/impact!result)
@@ -34,7 +35,7 @@ const args = process.argv.slice(2);
 const flag = (k, d) => { const a = args.find((x) => x.startsWith(`--${k}`)); return a ? (a.includes('=') ? a.split('=')[1] : true) : d; };
 const pos = args.filter((a) => !a.startsWith('--'));
 const which = pos[0] || 'both', routeArg = pos[1] || 'main';
-const TENSION = !!flag('tension', false), FLAKES = !!flag('flakes', false), AIRS = !!flag('airs', false), POP = !!flag('pop', false), XTRACK = Number(flag('xtrack', 0.25)), GAIN = Number(flag('gain', 6)), LINE = !!flag('line', false), FAIR = !!flag('fair', false), TRACE = Number(flag('trace', 0)) || 0, CHECK = !!flag('check', false), TUCK = !!flag('tuck', false), SPLITS = !!flag('splits', false), OVR = !!flag('ovr', false), BRAKE = Number(flag('brake', 0)) || 0;
+const CAM = !!flag('cam', false), TENSION = !!flag('tension', false), FLAKES = !!flag('flakes', false), AIRS = !!flag('airs', false), POP = !!flag('pop', false), XTRACK = Number(flag('xtrack', 0.25)), GAIN = Number(flag('gain', 6)), LINE = !!flag('line', false), FAIR = !!flag('fair', false), TRACE = Number(flag('trace', 0)) || 0, CHECK = !!flag('check', false), TUCK = !!flag('tuck', false), SPLITS = !!flag('splits', false), OVR = !!flag('ovr', false), BRAKE = Number(flag('brake', 0)) || 0;
 
 const course = new BlackspruceCourse();
 const CLEARINGS = course.clearings;
@@ -97,6 +98,14 @@ on('stumble', (r) => events.push({ kind: 'stumble', r }));
 on('nearMiss', (e) => events.push({ ...e, kind: 'near' }));
 on('score', (e) => events.push({ ...e, kind: 'score' }));
 const DT = 1 / 60;
+// Trees by 8 m cell (crown-occlusion estimate for --cam): every cell a crown can reach.
+const crownHash = new Map();
+for (const tr of course.forest.trees) {
+  const R = 2.4 * tr[3];
+  for (let cz = Math.floor((tr[1] - R) / 8); cz <= Math.floor((tr[1] + R) / 8); cz++) for (let cx = Math.floor((tr[0] - R) / 8); cx <= Math.floor((tr[0] + R) / 8); cx++) {
+    const k = `${cx},${cz}`; if (!crownHash.has(k)) crownHash.set(k, []); crownHash.get(k).push(tr);
+  }
+}
 
 /** Which lane the route wants at t: fast → slots, safe → safe lanes, main → the main line. */
 function laneFor(route, t) {
@@ -186,6 +195,7 @@ function ride(type, route) {
   const got = new Set();   // snowflakes collected (activities.js pickup rule)
   const secs = SECTIONS.map((S) => ({ name: S.name, t0: S.t0, t1: S.t1, time: 0, near: 0, v: 0 }));
   let nearSeen = 0;
+  let camFrames = 0, camIn = 0;
   let nextSplit = 0;
   let off = 0;
   const trace = [];
@@ -274,6 +284,15 @@ function ride(type, route) {
     }
     if (p.state === State.CRASH && was !== State.CRASH) { crashes++; if (TRACE && Math.abs(tt - TRACE) < 15) { console.log(trace.filter((_, i) => i % 6 === 0).join(String.fromCharCode(10))); } { const k = events.filter((e) => e.kind === 'crash').slice(-1)[0]?.k; crashAt.push(`${Math.round(tt)}${k === 'landing' ? 'L:' + p.lastCrash?.reason + ':' + (p.lastCrash?.impact ?? 0).toFixed(0) : k?.[0] || ''}`); } }
     if (p.state === State.AIR) airMax = Math.max(airMax, p.airTime);
+    if (CAM && p.state === State.GROUNDED && p.speed > 5) {
+      // Chase camera estimate (config.js CAMERA): distance 4.7 + 2.2·speedRatio behind along the
+      // velocity, 1.75 m up. Inside a crown = within 2.4 × width scale of a trunk at that height.
+      const back = 4.7 + 2.2 * Math.min(1, p.speed / 15), vx = p.velocity.x / p.speed, vz = p.velocity.z / p.speed;
+      const cx = p.position.x - vx * back, cz = p.position.z - vz * back;
+      camFrames++;
+      const a = crownHash.get(`${Math.floor(cx / 8)},${Math.floor(cz / 8)}`);
+      if (a && a.some((tr) => Math.hypot(cx - tr[0], cz - tr[1]) < 2.4 * tr[3] * 0.85)) camIn++;
+    }
     { const tq = course.tAt(p.position.z), sec = secs.find((q) => tq >= q.t0 && tq < q.t1);
       const nn = events.filter((e) => e.kind === 'near').length;
       if (sec) { sec.time += DT; sec.v += p.speed * DT; sec.near += nn - nearSeen; }
@@ -297,6 +316,7 @@ function ride(type, route) {
   const lands = events.filter((e) => e.kind === 'land' && e.air > 0.45);
   const avg = course.finishAt / t;
   console.log(`  ${type.padEnd(9)} ${route.padEnd(5)} ${finished ? 'FINISH' : 'DNF   '} ${t.toFixed(1)} s, run avg ${avg.toFixed(1)} m/s (ground ${(vSum / Math.max(1, n)).toFixed(1)}), max ${vMax.toFixed(1)} m/s, crashes ${crashes} [${crashAt.join(' ')}], stumbles ${events.filter((e) => e.kind === 'stumble').length}, near misses ${nears}, min clearance ${minClear.toFixed(2)} m, max air ${airMax.toFixed(1)} s, big airs ${lands.length}, score ${scoreSum}`);
+  if (CAM) console.log(`            camera inside a crown: ${(100 * camIn / Math.max(1, camFrames)).toFixed(1)} % of riding frames`);
   if (TENSION) for (const q of secs) if (q.time > 0.5) console.log(`            ${q.name.padEnd(14)} ${q.time.toFixed(1).padStart(5)} s  ${(q.v / q.time).toFixed(1).padStart(4)} m/s  close shaves ${String(q.near).padStart(3)} (${(q.near / q.time).toFixed(2)}/s) ${'#'.repeat(Math.round(q.near / q.time * 10))}`);
   if (FLAKES) console.log(`            snowflakes: ${got.size}/${course.challenge.flakes.length} [${[...got].sort((a, b) => a - b).join(' ')}]`);
   if (AIRS) {
