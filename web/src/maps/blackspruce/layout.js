@@ -179,9 +179,9 @@ export const GATES = [[176, 16], [428, 20], [532, 16], [848, 24], [928, 22], [12
 // Golden snowflakes: [t, d, height above the snow]. Risk pays: most sit on the slots, over the
 // cliff and the kickers.
 export const FLAKES = [
-  [130, -16, 1.2], [300, ['gate-slot', 0], 1.2], [470, 0, 5.4], [700, ['needles-slot', 0], 1.2], [818, ['needles-slot', 0], 3.2],
+  [130, -16, 1.2], [300, ['gate-slot', 0], 1.2], [465, 0, 7.3], [700, ['needles-slot', 0], 1.2], [815, ['needles-slot', 0], 5.0],
   [880, 12, 3.4], [1100, ['deadfall-slot', 0], 1.2], [1180, ['deadfall-safe', 0], 1.2], [1380, ['gauntlet-slot', 0], 1.2],
-  [1525, 0, 6.5], [1725, ['oldgrowth-left', 0], 1.2], [1840, ['main', 0], 1.2],
+  [1518, 0.5, 8.6], [1725, ['oldgrowth-left', 0], 1.2], [1840, ['main', 0], 1.2],
 ];
 
 // Stumps (snow-capped, they collide): scattered off the lines, a few at lane edges.

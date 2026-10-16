@@ -4,6 +4,7 @@
 // The bot picks a route (which lanes it prefers), looks ~1 s ahead along its lane, and steers for
 // the lateral offset with the most clearance to the obstacles ahead — a skilled, not perfect, rider.
 // Usage: node web/scripts/map2-bot.mjs [ski|snowboard|both] [main|fast|safe|all] [--ovr] [--brake=<m/s>] [--splits]
+//   --flakes  which snowflakes the route collects (the game's pickup rule)
 //   --airs    list every air > 0.45 s by what launched it (t:air/impact!result)
 //   --pop     charge and pop off kicker lips
 //   --sight   can riders see each pivot 30 / 40 / 50 m ahead? (crowns and crests block)
@@ -32,7 +33,7 @@ const args = process.argv.slice(2);
 const flag = (k, d) => { const a = args.find((x) => x.startsWith(`--${k}`)); return a ? (a.includes('=') ? a.split('=')[1] : true) : d; };
 const pos = args.filter((a) => !a.startsWith('--'));
 const which = pos[0] || 'both', routeArg = pos[1] || 'main';
-const AIRS = !!flag('airs', false), POP = !!flag('pop', false), XTRACK = Number(flag('xtrack', 0.25)), GAIN = Number(flag('gain', 6)), LINE = !!flag('line', false), FAIR = !!flag('fair', false), TRACE = Number(flag('trace', 0)) || 0, CHECK = !!flag('check', false), TUCK = !!flag('tuck', false), SPLITS = !!flag('splits', false), OVR = !!flag('ovr', false), BRAKE = Number(flag('brake', 0)) || 0;
+const FLAKES = !!flag('flakes', false), AIRS = !!flag('airs', false), POP = !!flag('pop', false), XTRACK = Number(flag('xtrack', 0.25)), GAIN = Number(flag('gain', 6)), LINE = !!flag('line', false), FAIR = !!flag('fair', false), TRACE = Number(flag('trace', 0)) || 0, CHECK = !!flag('check', false), TUCK = !!flag('tuck', false), SPLITS = !!flag('splits', false), OVR = !!flag('ovr', false), BRAKE = Number(flag('brake', 0)) || 0;
 
 const course = new BlackspruceCourse();
 const CLEARINGS = course.clearings;
@@ -181,6 +182,7 @@ function ride(type, route) {
   let t = 0, vSum = 0, n = 0, vMax = 0, crashes = 0, airMax = 0, minClear = Infinity, lane = course.mainLane, laneId = 'main';
   const crashAt = [];
   const splits = [];   // time at each challenge gate (t)
+  const got = new Set();   // snowflakes collected (activities.js pickup rule)
   let nextSplit = 0;
   let off = 0;
   const trace = [];
@@ -262,9 +264,19 @@ function ride(type, route) {
     if (TRACE) { trace.push(`${t.toFixed(2)} t=${tt.toFixed(1)} d=${course.dAt(p.position.x, tt).toFixed(2)} lane=${laneId} v=${p.speed.toFixed(1)} st=${p.state} steer=${(p._ctrl?.steer ?? 0).toFixed(2)} off=${off.toFixed(1)} near=${(scatter.nearest(p.position, 6)?.dist ?? 9).toFixed(2)}`); if (trace.length > 150) trace.shift(); }
     p.step(DT);
     t += DT;
-    if (was !== State.AIR && p.state === State.AIR) lastTakeoff = { t: course.tAt(p.position.z), what: featureAt(p.position.x, p.position.z), v: p.speed };
+    if (was !== State.AIR && p.state === State.AIR) lastTakeoff = { t: course.tAt(p.position.z), what: featureAt(p.position.x, p.position.z), v: p.speed, apex: 0, apexT: 0, apexD: 0 };
+    if (p.state === State.AIR && lastTakeoff) {
+      const hh = p.position.y - terrain.getHeight(p.position.x, p.position.z);
+      if (hh > lastTakeoff.apex) { lastTakeoff.apex = hh; lastTakeoff.apexT = course.tAt(p.position.z); lastTakeoff.apexD = course.dAt(p.position.x, lastTakeoff.apexT); }
+    }
     if (p.state === State.CRASH && was !== State.CRASH) { crashes++; if (TRACE && Math.abs(tt - TRACE) < 15) { console.log(trace.filter((_, i) => i % 6 === 0).join(String.fromCharCode(10))); } { const k = events.filter((e) => e.kind === 'crash').slice(-1)[0]?.k; crashAt.push(`${Math.round(tt)}${k === 'landing' ? 'L:' + p.lastCrash?.reason + ':' + (p.lastCrash?.impact ?? 0).toFixed(0) : k?.[0] || ''}`); } }
     if (p.state === State.AIR) airMax = Math.max(airMax, p.airTime);
+    course.challenge.flakes.forEach((fl, i) => {
+      const fy = terrain.getHeight(fl.x, fl.z) + fl.y;
+      const dx = p.position.x - fl.x, dz = p.position.z - fl.z, dy = p.position.y + 0.9 - fy;
+      if (dx * dx + dz * dz < 2.6 && Math.abs(dy) < 1.9 && p.state !== State.CRASH) got.add(i);
+      if (process.env.FLAKEDBG && dx * dx + dz * dz < 2.6 && (i === 2 || i === 9)) console.log('   flake', i, 'h above snow', (p.position.y - terrain.getHeight(p.position.x, p.position.z)).toFixed(2), 'dy', dy.toFixed(2), 'state', p.state);
+    });
     if (p.state === State.GROUNDED) { vSum += p.speed; n++; vMax = Math.max(vMax, p.speed); }
     const near = scatter.nearest(p.position, 5);
     if (near) minClear = Math.min(minClear, near.dist);
@@ -278,11 +290,12 @@ function ride(type, route) {
   const lands = events.filter((e) => e.kind === 'land' && e.air > 0.45);
   const avg = course.finishAt / t;
   console.log(`  ${type.padEnd(9)} ${route.padEnd(5)} ${finished ? 'FINISH' : 'DNF   '} ${t.toFixed(1)} s, run avg ${avg.toFixed(1)} m/s (ground ${(vSum / Math.max(1, n)).toFixed(1)}), max ${vMax.toFixed(1)} m/s, crashes ${crashes} [${crashAt.join(' ')}], stumbles ${events.filter((e) => e.kind === 'stumble').length}, near misses ${nears}, min clearance ${minClear.toFixed(2)} m, max air ${airMax.toFixed(1)} s, big airs ${lands.length}, score ${scoreSum}`);
+  if (FLAKES) console.log(`            snowflakes: ${got.size}/${course.challenge.flakes.length} [${[...got].sort((a, b) => a - b).join(' ')}]`);
   if (AIRS) {
     const by = {};
     for (const l of events.filter((e) => e.kind === 'land' && e.air > 0.45)) {
       const w = l.from?.what || '?';
-      (by[w] || (by[w] = [])).push(`${Math.round(l.from?.t ?? 0)}:${l.air.toFixed(1)}s/${l.impact.toFixed(0)}${l.result && l.result !== 'clean' ? '!' + l.result : ''}`);
+      (by[w] || (by[w] = [])).push(`${Math.round(l.from?.t ?? 0)}:${l.air.toFixed(1)}s/${l.impact.toFixed(0)}${l.result && l.result !== 'clean' ? '!' + l.result : ''}${l.from?.apex > 1.5 ? ` (apex ${l.from.apex.toFixed(1)} m at t ${Math.round(l.from.apexT)} d ${l.from.apexD.toFixed(1)})` : ''}`);
     }
     for (const [w, a] of Object.entries(by)) console.log(`            ${w.padEnd(10)} ${a.join(' ')}`);
   }
