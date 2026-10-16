@@ -38,7 +38,7 @@ export const RAVENSPIRE_PHYSICS = {
     airGravity: 0.9,
     landPowderAbsorb: 5,
     landPowderScrub: 0.012,
-    hardLanding: 16,
+    hardLanding: 17,
     crashImpact: 24,
     landYawSpeed: [18, 32, 0.75],
     obstacleHeights: true,

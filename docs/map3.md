@@ -37,7 +37,7 @@ spines, pillows and cliff lips have a lit and a shaded side.
 | 60…540 | upper face | 41° | **Spine Wall** (skier's left, 13 m spines, sluff channels), open face, **Raven's Beak** buttress, couloir into the ravine (right) |
 | 548 | **Band A** | | 7–15 m cliff band with two ramp-arounds |
 | 540…940 | mid face | 38° | **Beak Steps**, **West Ledges**, the **Hammer** (36 m, far right, u 905) |
-| 990 / 1160 / 1370 | **the Stacks** | 41° landings, ~30° benches | three bands 170–210 m apart: the **First Stack** (11–19 m), **the Throne** (13–28 m, peak at v ≈ −40), the **Last Stack** (9–19 m) — cliff into cliff; **Left Ledges** (u 1150), **East Ledges** (u 1185) |
+| 990 / 1160 / 1390 | **the Stacks** | 41° landings, ~30° benches | three bands 170–230 m apart: the **First Stack** (11–19 m), **the Throne** (13–28 m, peak at v ≈ −40), the **Last Stack** (9–19 m) — cliff into cliff; **Left Ledges** (u 1150), **East Ledges** (u 1185) |
 | 1418 | **Station Cliff** | | 15–19 m band above the **Old Lift Station** (roof rideable); the station's 24 m weather mast and windsock poke over the lip and mark the roof |
 | 1400…1700 | apron | 34° | the station, **Cable Drop** (8 m, u 1585, right under the old cable below the station's eave), the abandoned gondola line, **Lower Steps** |
 | 1560…1800 | **pillow stacks** (left) | 27° base | terraced pillows: flat-ish tops, ~4 m rounded drops |
@@ -210,7 +210,7 @@ defaults. Maps load at boot (a map switch reloads the page), so "reset when anot
 | `compressionStumble` / `Crash` | 11 / 17 m/s | flat-bottoming at 30 m/s hurts |
 | `airGravity` | 0.9 | a little floatier: longer hang time |
 | `landPowderAbsorb`, `landPowderScrub` | 5 m/s, 0.012 | 15–25 m drops onto 41° powder land clean; big impacts cost speed |
-| `hardLanding` / `crashImpact` | 16 / 24 m/s (after absorption) | the Hammer stumbles unless rolled and straight |
+| `hardLanding` / `crashImpact` | 17 / 24 m/s (after absorption) | the Hammer stumbles unless rolled and straight |
 | `landYawSpeed` | [18, 32, 0.75] | sideways landings at speed are less forgiving |
 | `landClean` / `landStumble` | 18° / 32° ski (crash 40°), 18° / 46° board | |
 | pop, spin, flip | popMax 4.2 / 4.6, spinRateMax 7.2 / 8.2, flipRateMax 6.0 / 6.2 | bigger tricks for bigger air |
@@ -320,7 +320,7 @@ Styles: **send** = tucked straight down the line, popping every cliff; **trick**
 | Bowl → refuge roof | ski | trick | finished | 152.7 s | 19.9 m/s (45 mph) | 0 | 0 | 18.1 s (4.4 s) | 31 m | 88 |
 | Bowl → refuge roof | snowboard | trick | finished | 149 s | 20.4 m/s (46 mph) | 0 | 0 | 16.3 s (4.45 s) | 32 m | 88 |
 
-All 24 runs reach the valley; the one crash is the Hammer sent with a full pop (by design: roll it). Carve style (12 more runs): 15–17 m/s average, all finish; its 3 crashes are a wide turn into the couloir wall and turns into the refuge's solid chimney while riding its roof. Every drop zone rides cleanly: 9 zones × 2 gears, the first 200 m from each with the control bot, no crashes (a stumble off Station Cliff and one in the pillows).
+All 24 runs reach the valley; the one crash is the Hammer sent with a full pop (by design: roll it). Carve style (12 more runs): 15–17 m/s average, all finish; its 3 crashes are a wide turn into the couloir wall and turns into the refuge's solid chimney while riding its roof. Every drop zone rides cleanly: 9 zones × 2 gears, the first 200 m from each with the control bot, no crashes (a stumble off Station Cliff).
 
 **With the real forest.** The headless bots normally ride without trees (scatter is browser-only); with
 `OBSTACLES=<dump>` (web/scripts/map3-obstacles.mjs) they ride the browser's actual 8,800 larches, 1,570 rocks
