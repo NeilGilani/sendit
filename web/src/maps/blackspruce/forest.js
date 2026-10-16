@@ -192,7 +192,7 @@ export function planForest(course) {
     let spacing = S.spacing * (0.82 + 0.4 * n) * (1 - 0.2 * wall);
     // Perf: the woods far from every line are backdrop (hidden behind the lane-edge trees from the
     // rider's eye), so they thin out with distance from the nearest lane.
-    spacing *= 1 + Math.min(0.9, Math.max(0, g0 - 9) * 0.05);
+    spacing *= 1 + Math.min(0.9, Math.max(0, g0 - 6) * 0.06);
     if (Math.abs(d) > W + 20) spacing = Math.max(spacing, 8.5);   // far side: cheaper, sparser
     // Young spruce fill the understorey of the dense sections (they collide like any other tree).
     const young = S.spacing < 6 && g0 < 9 && rnd() < 0.08;

@@ -406,7 +406,7 @@ export class BlackspruceCourse {
     this.life = { skiers: 0 };
     // Dense forest: full-frond trees only close by, mid-detail trees hand over to the opaque far
     // shells sooner (scatter.js scales the quality tier's pool radii). See docs/map2.md (perf).
-    this.perf = { treeNear: 0.48, treeMid: 0.35 };
+    this.perf = { treeNear: 0.44, treeMid: 0.35 };
     // Per-map physics overrides (merged over config.js PHYSICS by the per-map physics hook):
     // a steeper, faster run needs a higher speed reference so the soft cap doesn't eat the slope.
     this.physics = {
