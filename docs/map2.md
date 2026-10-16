@@ -30,6 +30,7 @@ docs/map2-research.md.
   - **Tree slalom ×N**: close shaves chained less than 1.6 s apart bank +40·N/5 at every 5th.
   - Everything feeds the Challenge combo multiplier.
 - **Thread a spruce** closer than 1.3 m and its branches dump their snow on your side.
+- **First rides:** a hint explains the fork signs (first three ride starts per session).
 - **Challenge:** 9 checkpoint gates (16–24 m wide, all at convergence points), a ghost, and map-specific medals (see Tunables).
 - **Snowflakes (12):** five sit on the slots, one at the apex of the cliff drop, and one each on the low line and the left Old Growth line. One is by a Drop-in pillow, one is past a Pillow Garden stack, and one is on the flow line near the finish. Two float over the kickers and need a popped jump: an unpopped arc passes under them.
 - **The lobby** stands at the top of Kicker Meadow, looking down at the kicker and its crowd.
@@ -195,7 +196,7 @@ Untucked (no speed tricks): every route 143–155 s, 0–1 crash.
 **Visual playtests:** an in-page driver rides the real game (renderer, chase camera, HUD) through the Needles, band, Pillow Garden and Deadfall on skis (flow line), and from Spruce Gate through Deadfall on a snowboard (slots). Frames every 0.4 s:
 - 55–74 km/h, constant close shaves in the slots.
 - Clean "PERFECT!" landings off the M kicker, the cliff and the logs.
-- The chase camera ends up inside a crown in about 3 of 35 frames.
+- The chase camera ended up inside a crown in about 3 of 35 frames. After the pivots became slim spires it was 0 of 35 (pivots are where riders pass closest, with the camera right behind).
 
 ## Performance
 
@@ -229,7 +230,7 @@ Further levers, if needed:
 
 ## Known issues
 
-- The chase camera can still pass through the needles of a lane-edge tree on a hard carve. camera.js has no foliage avoidance and trees.js no near-camera fade. Lane-edge spires keep it rare.
+- The chase camera can still pass through the needles of a lane-edge tree on a hard carve: camera.js has no foliage avoidance and trees.js no near-camera fade. Lane-edge trees and pivots are slim spires, which keeps it rare.
 - Logs read best from the side. Riding straight at one, you see a dark line on a drift crest.
 - The physics overrides only apply once the map 3 hook is merged. The medal speeds sit between the bot's times with and without them.
 - The bot is a heuristic. Expect a crash or two in its runs. Real players brake, which the bot only approximates.
