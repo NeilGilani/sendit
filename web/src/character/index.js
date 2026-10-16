@@ -16,7 +16,7 @@ import { resolveOutfit } from './outfits.js';
 export { resolveOutfit, colorwaySlots, COLORWAYS, GARMENTS, OUTFIT_SLOTS, DEFAULT_COLORWAY } from './outfits.js';
 
 /** Head scale of the rig (1 = the model's own proportions; the old toon look used 1.12). */
-export const HEAD_SCALE = 1.0;
+export const HEAD_SCALE = 1.06;
 
 const cache = { body: null, outfit: new Map(), helmet: new Map() };
 

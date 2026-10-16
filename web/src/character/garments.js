@@ -20,11 +20,33 @@ export function buildOutfitGeometry(body, cut) {
   const B = (re) => body.bones(re);
   const J = body.joint;
 
+  let collarRings = null;
+  // ---------------------------------------------------------------- collar (zipped to the chin)
+  {
+    const segs = 40;
+    const bones = B(/^(neck_01)$/);
+    const rings = collarRings = bodyRings(body, {
+      axis: 'y', t0: 1.52, t1: cut.collarTop, rings: 10, segs, half: 0.025, bones,
+      axisPoint: (t) => new THREE.Vector3(0, t, -0.02),
+      filter: (x) => Math.abs(x) < 0.1,
+      centre: (t, c) => new THREE.Vector3(0, t, c.z),
+      smoothA: 4, smoothT: 4, minEase: 0.02,
+      ease: (t, th) => 0.026 + smooth(1.56, cut.collarTop, t) * 0.012 + Math.max(0, Math.cos(th)) * 0.01,
+      post: (rings, S) => {
+        // A collar is a smooth funnel: lean toward the widest outline over its height.
+        const mx = new Float32Array(S);
+        for (const r of rings) for (let k = 0; k < S; k++) mx[k] = Math.max(mx[k], r.r[k]);
+        for (const r of rings) for (let k = 0; k < S; k++) r.r[k] = THREE.MathUtils.lerp(r.r[k], mx[k], 0.4);
+      },
+    });
+    pieces.push(sweep(rings, { id: PIECE.collar, side: 0, ...frame('y'), lipEnd: true, skinBones: B(/^(neck_01|spine_03|Head)$/), anchor: { bone: body.bone('spine_03'), y0: 1.57, y1: 1.61 } }));
+  }
+
   // ---------------------------------------------------------------- jacket body
   {
     const segs = 56;
     const hemF = cut.hemFront, hemB = cut.hemBack;
-    const top = 1.585, bot = Math.max(hemF, hemB);
+    const top = 1.575, bot = Math.max(hemF, hemB);
     const bones = B(/^(pelvis|spine_0[123]|neck_01|clavicle_[lr]|upperarm_[lr]|thigh_[lr])$/);
     const rings = bodyRings(body, {
       axis: 'y', t0: top, t1: bot, rings: 46, segs, half: 0.03, bones,
@@ -50,6 +72,13 @@ export function buildOutfitGeometry(body, cut) {
             r.r[q] = Math.max(r.r[q] * (1 - k * sd), r.raw[q] + 0.004);
           }
         }
+        // Neckline: the top of the shell tucks under the collar (which is sewn on over it).
+        for (const r of rings) {
+          if (r.t < 1.525) continue;
+          const cr = collarAt(collarRings, r.t, S);
+          const w = smooth(1.525, 1.56, r.t);
+          for (let q = 0; q < S; q++) r.r[q] = THREE.MathUtils.lerp(r.r[q], Math.min(r.r[q], cr[q] - 0.006), w);
+        }
         // Hem: a little flare.
         for (const r of rings) {
           const f = smooth(0.8, bot, r.t) * 0.012;
@@ -73,7 +102,11 @@ export function buildOutfitGeometry(body, cut) {
         r.r[k] += drape * below + bunch + lump * smooth(1.45, 1.2, r.t);
       }
     }
-    pieces.push(sweep(rings, { id: PIECE.jacket, side: 0, ...frame('y'), lipEnd: true, skinBones: bones }));
+    // Only the top of the shoulder rides on the upper arm (like a deltoid); the armpit stays with the trunk.
+    pieces.push(sweep(rings, {
+      id: PIECE.jacket, side: 0, ...frame('y'), lipEnd: true, skinBones: bones,
+      skinMask: (b, x, y) => !b.startsWith('upperarm') || (y > 1.45 && Math.abs(x) > 0.13),
+    }));
   }
 
   // ---------------------------------------------------------------- sleeves
@@ -160,28 +193,7 @@ export function buildOutfitGeometry(body, cut) {
         if (Math.cos(th) > 0) r.r[k] += Math.cos(th) * 0.012 * bump(r.t, knee, 0.12);
       }
     }
-    pieces.push(sweep(rings, { id: PIECE.pants, side: s, ...frame('y'), lipEnd: true, skinBones: B(new RegExp(`^(thigh_${sd}|calf_${sd}|foot_${sd}|pelvis)$`)) }));
-  }
-
-  // ---------------------------------------------------------------- collar (zipped to the chin)
-  {
-    const segs = 40;
-    const bones = B(/^(neck_01)$/);
-    const rings = bodyRings(body, {
-      axis: 'y', t0: 1.535, t1: cut.collarTop, rings: 10, segs, half: 0.025, bones,
-      axisPoint: (t) => new THREE.Vector3(0, t, -0.02),
-      filter: (x) => Math.abs(x) < 0.1,
-      centre: (t, c) => new THREE.Vector3(0, t, c.z),
-      smoothA: 4, smoothT: 4, minEase: 0.02,
-      ease: (t, th) => 0.026 + smooth(1.56, cut.collarTop, t) * 0.012 + Math.max(0, Math.cos(th)) * 0.01,
-      post: (rings, S) => {
-        // A collar is a smooth funnel: lean toward the widest outline over its height.
-        const mx = new Float32Array(S);
-        for (const r of rings) for (let k = 0; k < S; k++) mx[k] = Math.max(mx[k], r.r[k]);
-        for (const r of rings) for (let k = 0; k < S; k++) r.r[k] = THREE.MathUtils.lerp(r.r[k], mx[k], 0.4) - smooth(1.575, 1.54, r.t) * 0.016;
-      },
-    });
-    pieces.push(sweep(rings, { id: PIECE.collar, side: 0, ...frame('y'), lipEnd: true, skinBones: B(/^(neck_01|spine_03|Head)$/) }));
+    pieces.push(sweep(rings, { id: PIECE.pants, side: s, ...frame('y'), lipEnd: true, gaiterEnd: true, skinBones: B(new RegExp(`^(thigh_${sd}|calf_${sd}|foot_${sd}|pelvis)$`)) }));
   }
 
   // ---------------------------------------------------------------- gaiter (pulled up under the goggle)
@@ -211,7 +223,7 @@ export function buildOutfitGeometry(body, cut) {
     const pts = [];
     for (let i = 0; i < n; i++) {
       const f = (i / (n - 1)) * 2 - 1;                      // −1 … 1 across the back
-      const a = f * THREE.MathUtils.degToRad(118);
+      const a = f * THREE.MathUtils.degToRad(100);
       pts.push(new THREE.Vector3(Math.sin(a) * 0.125, 1.548 - f * f * 0.035 + (1 - f * f) * 0.01, -0.03 - Math.cos(a) * 0.14 + f * f * 0.025));
     }
     for (let i = 0; i < n; i++) {
@@ -267,6 +279,21 @@ export function buildOutfitGeometry(body, cut) {
 
   for (const p of pieces) skinPiece(p, body);
   return mergePieces(pieces);
+}
+
+/** Collar radii at height t, resampled to `segs` directions (the collar has its own segment count). */
+function collarAt(rings, t, segs) {
+  let i = 0;
+  while (i < rings.length - 2 && rings[i + 1].t < t) i++;
+  const a = rings[i], b = rings[i + 1];
+  const f = Math.min(1, Math.max(0, (t - a.t) / (b.t - a.t || 1)));
+  const n = a.r.length, out = new Float32Array(segs);
+  for (let q = 0; q < segs; q++) {
+    const x = (q / segs) * n, k0 = Math.floor(x) % n, k1 = (k0 + 1) % n, fx = x - Math.floor(x);
+    const ra = a.r[k0] * (1 - fx) + a.r[k1] * fx, rb = b.r[k0] * (1 - fx) + b.r[k1] * fx;
+    out[q] = ra * (1 - f) + rb * f;
+  }
+  return out;
 }
 
 /** sweep() for rings that carry their own frames (curved pieces). */

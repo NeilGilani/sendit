@@ -101,7 +101,7 @@ export class BodyInfo {
    * whose dominant bone is in `boneSet` (all if null). Accumulates into `out` (Float32Array, one
    * slot per bone).
    */
-  skinAt(x, y, z, boneSet, out, k = 8) {
+  skinAt(x, y, z, boneSet, out, k = 8, mask = null) {
     const c = this.cell;
     const cx = Math.floor(x / c), cy = Math.floor(y / c), cz = Math.floor(z / c);
     const best = [];   // [d2, i] sorted, length ≤ k
@@ -112,6 +112,7 @@ export class BodyInfo {
         if (!a) continue;
         for (const i of a) {
           if (boneSet && !boneSet.has(this.dom[i])) continue;
+          if (mask && !mask(this.names[this.dom[i]], x, y, z)) continue;
           const ex = this.pos[i * 3] - x, ey = this.pos[i * 3 + 1] - y, ez = this.pos[i * 3 + 2] - z;
           const d2 = ex * ex + ey * ey + ez * ez;
           if (best.length < k || d2 < best[best.length - 1][0]) {

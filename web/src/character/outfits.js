@@ -15,7 +15,7 @@ export const GARMENTS = {
       blurb: 'Long, roomy 3-layer freeride shell: dropped back hem, high collar, stowed hood.',
       cut: {
         hemFront: 0.68, hemBack: 0.64,            // mid-thigh, the back drops 4 cm
-        jacketEase: { shoulder: 0.024, chest: 0.036, hem: 0.062 },   // how far the shell stands off the skin
+        jacketEase: { shoulder: 0.016, chest: 0.036, hem: 0.062 },   // how far the shell stands off the skin
         sleeveEase: { upper: 0.02, elbow: 0.028, forearm: 0.022 },
         sleeveEnd: 0.69,                           // |x| of the cuff in the T-pose (wrist at 0.706)
         collarTop: 1.615,                          // zipped up under the jaw
@@ -30,8 +30,8 @@ export const GARMENTS = {
       blurb: 'Wide straight-leg bib that stacks over the boots, reinforced cuffs.',
       cut: {
         pantsEase: { thigh: 0.036, knee: 0.042, cuff: 0.048 },
-        cuffY: 0.19,                               // hem height over the boot
-        stack: { y0: 0.2, y1: 0.34, n: 3, amp: 0.011 },   // stacked folds above the boot
+        cuffY: 0.15,                               // hem height over the boot (to the lower buckles)
+        stack: { y0: 0.17, y1: 0.33, n: 3, amp: 0.012 },   // stacked folds above the boot
       },
     },
   },

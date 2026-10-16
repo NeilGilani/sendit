@@ -26,8 +26,19 @@ float chNoise(vec2 p) {
   vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(chHash(i), chHash(i + vec2(1, 0)), f.x), mix(chHash(i + vec2(0, 1)), chHash(i + vec2(1, 1)), f.x), f.y) * 2.0 - 1.0;
 }
+// Gradient noise, periodic in x every px cells (seamless around a garment), no lattice-line artefacts.
+float chPerlin(vec2 p, float px) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 w = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+  vec2 i1 = vec2(mod(i.x + 1.0, px), i.y), i0 = vec2(mod(i.x, px), i.y);
+  float a0 = chHash(i0) * 6.2831853, a1 = chHash(i1) * 6.2831853;
+  float a2 = chHash(i0 + vec2(0, 1)) * 6.2831853, a3 = chHash(i1 + vec2(0, 1)) * 6.2831853;
+  float a = dot(vec2(cos(a0), sin(a0)), f), b = dot(vec2(cos(a1), sin(a1)), f - vec2(1, 0));
+  float c = dot(vec2(cos(a2), sin(a2)), f - vec2(0, 1)), d = dot(vec2(cos(a3), sin(a3)), f - vec2(1, 1));
+  return mix(mix(a, b, w.x), mix(c, d, w.x), w.y) * 1.6;
+}
 // Antialiased line mask: 1 within w of d = 0.
-float chLine(float d, float w) { float fw = fwidth(d) + 1e-5; return 1.0 - smoothstep(w, w + fw * 1.2, abs(d)); }
+float chLine(float d, float w) { float fw = fwidth(d) + 1e-5; return (1.0 - smoothstep(w, w + fw * 1.5, abs(d))) * clamp(w * 2.0 / fw, 0.15, 1.0); }
 float chBox(vec2 p, vec2 h, float r) { vec2 q = abs(p) - h + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
 vec3 chBump(vec3 pos, vec3 n, float h, float fd) {
   vec2 dh = vec2(dFdx(h), dFdy(h));
@@ -93,6 +104,7 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
         vec3 c = uJacket;
         float seam = 0.0, zip = 0.0, tape = 0.0;
         float wr = 1.0;                            // wrinkle strength
+        vec2 wf = vec2(14.0, 4.0);                 // wrinkle frequency (around u, along v): long drape folds
         if (id < 0.5) {
           // ---------------- jacket body: x = arc metres from the centre front
           float x = uc * 1.42, ax = abs(x);
@@ -157,7 +169,7 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
             vec2 sp = vec2(a + 0.04, v - 0.25);
             c = mix(c, uAccent, 1.0 - step(0.0, chBox(sp, vec2(0.018, 0.005), 0.002)));
           }
-          wr = 1.2;
+          wr = 1.2; wf = vec2(3.0, 20.0);         // ring-shaped compression folds
         } else if (id < 2.5) {
           // ---------------- pant leg: uc 0 = front, outer side at uc = +0.25·side
           float a = uc * 0.95;
@@ -183,15 +195,15 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
             seam += chLine(flap, 0.002);
             fabH += (1.0 - smoothstep(-0.002, 0.002, flap)) * 0.0015;
           }
-          wr = 1.1;
+          wr = 1.1; wf = vec2(7.0, 6.0);
         } else if (id < 3.5) {
           // ---------------- collar: zip continues to the chin, accent lining at the rim
           c = mix(uJacket, uPanel, step(0.5, uStyle) * 0.0);
           zip = chLine(uc * 0.62, 0.005);
-          wr = 0.6;
+          wr = 0.6; wf = vec2(10.0, 30.0);
         } else if (id < 4.5) {
           // ---------------- stowed hood roll
-          c = mix(uPanel, uJacket, step(0.5, uStyle));
+          c = uPanel;
           seam += chLine(uc, 0.004);
           wr = 1.4;
         } else if (id < 5.5) {
@@ -225,11 +237,13 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
         // Seams: a groove and slightly darker thread line, taped look
         seam = clamp(seam, 0.0, 1.0);
         c *= 1.0 - seam * 0.28;
-        fabH -= seam * 0.0011 - zip * 0.0008;
-        // Wrinkles: soft anisotropic noise along the piece, faded with distance (no shimmer)
-        vec2 wp = vec2(u * 9.0, v * 26.0);
-        float wfade = 1.0 - smoothstep(0.004, 0.02, fwidth(v));
-        fabH += (chNoise(wp) * 0.6 + chNoise(wp * 2.3 + 4.1) * 0.3) * 0.0012 * wr * wfade;
+        fabH -= seam * 0.0006 - zip * 0.0006;
+        // Wrinkles: anisotropic folds per piece plus a fine crumple, faded with distance (no shimmer)
+        vec2 wp = vec2(u * wf.x, v * wf.y);
+        float wfade = 1.0 - smoothstep(0.006, 0.03, fwidth(v));
+        float cfade = 1.0 - smoothstep(0.002, 0.008, fwidth(v));
+        fabH += (chPerlin(wp, wf.x) * 0.7 + chPerlin(vec2(u * wf.x * 3.0, v * wf.y * 2.7 + 3.1), wf.x * 3.0) * 0.3) * 0.0024 * wr * wfade;
+        fabH += chPerlin(vec2(u * 40.0, v * 38.0), 40.0) * 0.0005 * wr * cfade;
         fabAO = 1.0 - seam * 0.25;
         diffuseColor.rgb = c;
       }`,
@@ -254,7 +268,12 @@ export function bodyMaterial(src) {
     vertPre: `vZone = color; vObj = position;
   {
     float tot = max(color.r + color.g + color.b, 0.001);
-    float cover = color.a * clamp((color.r + color.g) / tot + step(1.2, position.y) * color.b / tot, 0.0, 1.0);
+    // Jacket zone (big superhero shoulders / arms) pulls in furthest, pants and hands less.
+    // Arms are always inside the sleeves: pull them toward the arm's axis (never through it), the
+    // rest of the covered skin in along its normal.
+    float arm = color.a * color.r / tot * smoothstep(0.17, 0.25, abs(position.x)) * step(1.25, position.y);
+    transformed.yz = mix(transformed.yz, vec2(1.45, -0.075), arm * 0.6);
+    float cover = color.a * (color.r / tot * 1.8 * (1.0 - arm) + color.g / tot * 1.25 + step(1.2, position.y) * color.b / tot * 0.8);
     transformed -= objectNormal * uShrink * cover;
   }`,
     fragPars: `${COMMON}\nvarying vec4 vZone; varying vec3 vObj;\nuniform vec3 uJacket, uPants, uMitt, uBoot, uBootAccent;\nfloat fabRough = 0.85, fabSheen = 0.1, fabSheenRough = 0.6, fabSpec = 0.2, fabAO = 1.0;`,

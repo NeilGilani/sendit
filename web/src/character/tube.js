@@ -150,7 +150,12 @@ export function sweep(rings, meta) {
   const lip = (end, at, sgn) => {
     const base = R[at];
     const mk = (dr, dt, lining) => ({ c: base.c.clone().addScaledVector(A, dt * sgn * dirT), r: base.r.map((x) => Math.max(0.004, x + dr)), t: base.t + dt * sgn * dirT, off: base.off, lining, v: (base.v ?? base.t) });
-    const ls = [mk(-0.004, 0.004, 0), mk(-0.010, 0.0045, 1), mk(-0.016, -0.022, 1)];
+    let ls = [mk(-0.004, 0.004, 0), mk(-0.010, 0.0045, 1), mk(-0.016, -0.022, 1)];
+    // Gaiter cuff: an inner elastic gaiter closes the opening down onto what it wraps (the boot).
+    if (meta.gaiterEnd && end && base.raw) {
+      const g = (dt, lining) => ({ ...mk(0, dt, lining), r: base.raw.map((x) => x + 0.008) });
+      ls = [mk(-0.004, 0.004, 0), mk(-0.012, 0.0045, 1), g(0.003, 1), g(-0.04, 1)];
+    }
     if (end) R.push(...ls); else R.unshift(...ls.reverse());
   };
   const cap = (end, at, sgn) => {
@@ -225,7 +230,7 @@ export function sweep(rings, meta) {
       if (orient > 0) idx.push(a, b, c, c, b, d); else idx.push(a, c, b, c, d, b);
     }
   }
-  return { pos: P, nrm: N, g: G, lin: L, idx, rows: nr, cols, skinBones: meta.skinBones, rigid: meta.rigid };
+  return { pos: P, nrm: N, g: G, lin: L, idx, rows: nr, cols, skinBones: meta.skinBones, rigid: meta.rigid, anchor: meta.anchor, skinMask: meta.skinMask };
 }
 
 // ------------------------------------------------------------------ skinning + merge
@@ -239,9 +244,21 @@ export function skinPiece(piece, body, smoothIters = 6) {
     const tmp = new Float32Array(nb);
     for (let i = 0; i < nv; i++) {
       tmp.fill(0);
-      body.skinAt(piece.pos[i * 3], piece.pos[i * 3 + 1], piece.pos[i * 3 + 2], piece.skinBones, tmp);
+      body.skinAt(piece.pos[i * 3], piece.pos[i * 3 + 1], piece.pos[i * 3 + 2], piece.skinBones, tmp, 8, piece.skinMask);
       let s = 0; for (let j = 0; j < nb; j++) s += tmp[j];
       if (s > 0) for (let j = 0; j < nb; j++) W[i * nb + j] = tmp[j] / s;
+    }
+    // Anchor: below y0 the piece follows one bone only (e.g. a collar's base rides on the chest like
+    // the jacket it is sewn into), blending to the transferred weights by y1.
+    if (piece.anchor) {
+      const { bone, y0, y1 } = piece.anchor;
+      for (let i = 0; i < nv; i++) {
+        const y = piece.pos[i * 3 + 1];
+        const a = 1 - Math.min(1, Math.max(0, (y - y0) / (y1 - y0)));
+        if (a <= 0) continue;
+        for (let j = 0; j < nb; j++) W[i * nb + j] *= 1 - a;
+        W[i * nb + bone] += a;
+      }
     }
     // Diffuse weights over the grid so neighbouring vertices bend together (no torn folds).
     const { rows, cols } = piece;
