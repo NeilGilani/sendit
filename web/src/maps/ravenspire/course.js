@@ -175,13 +175,16 @@ export class RavenspireCourse {
     const sd = v < 0 ? 0 : 1;
     // Ridge crests wander and carry gendarmes (rock towers), different on each side.
     const W = FACE.halfWidth(u) * (1 + 0.07 * (noise1(u / 170, 3 + sd) * 2 - 1));
-    const Rh = FACE.ridgeHeight(u) * (0.85 + 0.3 * noise1(u / 260, 7 + sd)) + 30 * Math.pow(ridged(u / 90, sd * 5.3, 2), 3) * sstep(-100, 200, u);
+    const Rh = FACE.ridgeHeight(u) * (0.85 + 0.3 * noise1(u / 260, 7 + sd));
+    // Gendarmes: rock towers on the crest itself (within ~30 m of it), never on the face.
+    const crest = 30 * Math.pow(ridged(u / 90, sd * 5.3, 2), 3) * sstep(-100, 200, u) * Math.exp(-(((Math.abs(v) - W) / 30) ** 2));
     const av = Math.abs(v), a = av / W;
+    e += crest;
     if (a <= 1) e += Rh * Math.pow(a, FACE.bowlPower);
     else {
       // Past the crest: a steep rocky flank into the neighbouring couloir, then the next ridges.
       const d = av - W;
-      e += Rh - d * 0.7 * (1 - 0.6 * sstep(0, 700, d)) + 38 * Math.sin(d / 95) * sstep(0, 200, d);
+      e += Rh - d * 0.7 * (1 - 0.6 * sstep(0, 700, d)) + 70 * (vnoise(d / 140 + 3.7, u / 260 + sd * 9) - 0.5) * sstep(0, 200, d);
     }
     // Wild ranges around (bigger and darker north / left, lower south / right so the face keeps the sun);
     // the valley below bends north and is closed off by peaks, so every view ends in mountains.
@@ -191,10 +194,15 @@ export class RavenspireCourse {
     if (m > -200) {
       const k = sstep(-200, 1100, m);
       const amp = 1050 + 600 * sstep(350, -350, v);   // north (v < 0) bigger; blended so there is no seam
-      e += k * (amp * Math.pow(ridged(x / 2700 + 1.7, z / 2700 - 4.1, 5), 1.35) + 240 * (fbm(x / 900, z / 900, 3) - 0.5));
+      // Further out the ranges grow (a wall of big peaks around the horizon hides the backdrop's sunk rim).
+      const far = sstep(4500, 10500, r);
+      e += k * (amp * (1 + 0.7 * far) * Math.pow(ridged(x / 2700 + 1.7, z / 2700 - 4.1, 5), 1.35) + 240 * (fbm(x / 900, z / 900, 3) - 0.5)) + far * 1100;
     }
     // The summit horn above the start (left / behind), and a distant spire in the view down the valley.
-    e = horn(e, x, z, START_X - 95, -165, TOP + 190, 1.25, 0.6);
+    // The Ravenspire itself: a sharp horn ~400 m above the heli shoulder, so the face reads as a real summit.
+    e = horn(e, x, z, START_X - 285, 30, TOP + 430, 1.6, 0.35);
+    e = horn(e, x, z, START_X - 420, 190, TOP + 330, 1.45, 1.0);    // its shoulder, so the silhouette is not a pyramid
+    e = horn(e, x, z, START_X - 95, -185, TOP + 150, 1.25, 0.6);
     e = horn(e, x, z, START_X + 5600, -3600, 4250, 0.95, 1.1);
     e = horn(e, x, z, START_X + 2300, 2900, 3550, 0.9, 0.2);
     return e;
@@ -265,13 +273,34 @@ export class RavenspireCourse {
       h *= taper;
       if (h < 0.05) continue;
       add += cliff(u, uc, h, Math.max(B.bench, h * BENCH_PER_M));   // taller cliffs get a longer, gentler bench
+      // Rock teeth just over the lip: dark knobs that mark the edge when you look down from above.
+      if (h > 5 && u > uc - 2.5 && u < uc + 1) {
+        const cell = Math.floor(v / 9), f = v / 9 - cell;
+        const hk = hash1(cell * 7 + B.seed * 131);
+        if (hk > 0.55) add += (0.8 + 1.8 * hk) * Math.sin(Math.PI * f) ** 2 * Math.exp(-(((u - uc + 0.7) / 0.9) ** 2));
+      }
     }
     return add;
   }
 
   pillowsAt(u, v) {
+    let add = 0;
+    // Terraced pillow stacks: each `step` the slope pauses (flat-ish top) and then drops ~5 m.
+    for (const F of PILLOWS) {
+      if (!F.terrace || u < F.u0 - 10 || u > F.u1 + 10 || v < F.v0 - 10 || v > F.v1 + 10) continue;
+      const env = sstep(F.u0 - 10, F.u0 + 20, u) * (1 - sstep(F.u1 - 20, F.u1 + 10, u)) * sstep(F.v0 - 10, F.v0 + 15, v) * (1 - sstep(F.v1 - 15, F.v1 + 10, v));
+      if (env <= 0) continue;
+      const G = (this.profileAt(u - 6) - this.profileAt(u + 6)) / 12;
+      const S = F.step, f = (u + S * 1.3 * noise1(v / 16, F.seed) + S * 0.5 * noise1(v / 5.5, F.seed + 3)) / S;
+      const fr = f - Math.floor(f);
+      // Rounded pillow: the top rises gently, rolls over and drops over the last ~40 % of the step.
+      const s = fr < 0.6 ? fr / 0.6 - 0.12 * Math.sin(Math.PI * fr / 0.6) : 1 - smooth((fr - 0.6) / 0.4);
+      // Lobes across the field: each step breaks into separate rounded pillows with soft gaps between.
+      const lobe = F.lobe ? 0.55 + 0.45 * Math.pow(Math.cos(Math.PI * (v + 3 * noise1(u / 7, F.seed + 5)) / F.lobe), 2) : 1;
+      add += env * G * S * F.terrace * lobe * (s - 0.5);
+    }
     const a = this.pillowHash.get(Math.floor(u / 16) * 4096 + Math.floor(v / 16));
-    if (!a) return 0;
+    if (!a) return add;
     let best = 0;
     for (const p of a) {
       const du = (u - p.u) / p.R, dv = (v - p.v) / p.Rv;
@@ -281,7 +310,7 @@ export class RavenspireCourse {
       const h = p.H * Math.pow(1 - q * q, 1.25);
       if (h > best) best = h;
     }
-    return best;
+    return add + best;
   }
 
   hits(u, v) {
@@ -362,7 +391,7 @@ export class RavenspireCourse {
 
   // ---------------------------------------------------------------- lobby / spawn
   /** Where the lobby plinth stands: on the summit shoulder, looking down the face. */
-  lobbySpot() { return { x: START_X + 6, z: -18, heading: -Math.PI / 2 - 0.18 }; }
+  lobbySpot() { return { x: START_X + 22, z: -18, heading: -Math.PI / 2 - 0.18 }; }
 
   // ---------------------------------------------------------------- terrain arrays
   async generate(onProgress = () => {}) {
@@ -384,6 +413,11 @@ export class RavenspireCourse {
       normals[k * 2 + 1] = Math.round((nz / l) * 127.5 + 127.5);
       const up = ny / l;
       splat[k * 3 + 1] = Math.round(smooth((0.7 - up) / 0.16) * 255);   // rock on faces steeper than ~46°
+      // Wind-packed snow on convex crests (ridges, spine crests, rollovers): faster, harder landings.
+      if (i > 2 && j > 2 && i < N - 3 && j < N - 3) {
+        const lap = (hAt(i - 3, j) + hAt(i + 3, j) + hAt(i, j - 3) + hAt(i, j + 3) - 4 * heights[k]) / (9 * sp * sp);
+        splat[k * 3] = Math.round(smooth((-lap - 0.035) / 0.07) * 0.55 * 255);
+      }
     }
     onProgress(0.85);
     const FN = TILE.farRes, fs = TILE.farSize, fsp = fs / (FN - 1);
@@ -406,7 +440,7 @@ export class RavenspireCourse {
   }
 
   /** The heli drop: on the summit shoulder, facing down the face. */
-  spawnPoint() { return { x: START_X + 14, z: 0, heading: -Math.PI / 2 }; }
+  spawnPoint() { return { x: START_X + 30, z: 0, heading: -Math.PI / 2 }; }   // right at the rollover: you see the face fall away
 }
 
 // ------------------------------------------------------------------ shapes

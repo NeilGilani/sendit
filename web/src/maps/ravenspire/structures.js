@@ -141,12 +141,15 @@ export class Structure {
     if (dx * dx + dz * dz > (reach + this.hw) ** 2) return 0;
     const [a, b] = this.local(x, z);
     const up = -a - this.hl;                       // metres uphill of the uphill wall
-    if (up < -this.hl * 0.3 || up > 24) return 0;
+    const mono = this.roof === 'mono';
+    // Mono roof: the drift is a wedge outside the wall that continues the roof plane uphill until it meets
+    // the slope (a smooth ramp onto the roof). Gable / A-frame: snow piled against the uphill slab, flat
+    // inside the footprint up to where the slab rises out of it (never past the ridge).
+    if (up < (mono ? -0.6 : -this.hl) || up > 26) return 0;
     const side = 1 - smooth((Math.abs(b) - this.rw) / 7);
     if (side <= 0) return 0;
-    // Ramp: a smooth shoulder that meets the roof edge at the wall.
-    const t = 1 - smooth(Math.max(0, up) / 24);
-    const want = this.driftTop - 0.15 - Math.max(0, up) * 0.18;
+    const t = 1 - smooth(Math.max(0, up - 14) / 12);
+    const want = this.driftTop - 0.12 + Math.max(0, up) * (mono ? this.tp : 0.35);
     return Math.max(0, (want - ground) * t * side);
   }
 }

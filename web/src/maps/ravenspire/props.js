@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toonMaterial } from '../../world.js';
 import { snowUniforms, SNOW_COMMON_PARS, SNOW_BAND_GLSL } from '../../gfx/snow.js';
+import { on, emit } from '../../state.js';
 
 export function buildRavenspireProps(course, { terrain }) {
   const group = new THREE.Group();
@@ -13,7 +14,8 @@ export function buildRavenspireProps(course, { terrain }) {
   const M = materials(terrain);
   for (const s of course.structures) group.add(buildStructure(s, M, terrain));
   group.add(buildGondola(course, M, terrain));
-  group.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  group.add(buildHeli(course, terrain));
+  group.traverse((o) => { if (o.isMesh && !o.material.transparent) { o.castShadow = true; o.receiveShadow = true; } });
   return group;
 }
 
@@ -438,5 +440,66 @@ function buildGondola(course, M, terrain) {
     g.add(new THREE.Mesh(win, M.glass));
   }
   g.add(new THREE.Mesh(mergeGeometries(cabins), M.cabin));
+  return g;
+}
+
+// ------------------------------------------------------------------ the heli drop
+/**
+ * A small mountain helicopter hovering off the summit shoulder (it just dropped you). When the ride
+ * starts it holds a moment, then lifts, banks away past the spire and is gone. Animated from wall-clock
+ * time in onBeforeRender, so it needs no update hook; emits 'heliDrop' for the rotor sound (audio.js).
+ */
+function buildHeli(course, terrain) {
+  const sp = course.spawnPoint();
+  const g = new THREE.Group();
+  g.name = 'Heli';
+  const red = toonMaterial({ name: 'heliRed', color: 0xc8322a });
+  const white = toonMaterial({ name: 'heliWhite', color: 0xe9e6df });
+  const dark = toonMaterial({ name: 'heliDark', color: 0x1d2128 });
+  const glass = toonMaterial({ name: 'heliGlass', color: 0x2b3a4c });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1.25, 18, 12), red);
+  body.scale.set(1.0, 0.95, 1.7);
+  const cab = new THREE.Mesh(new THREE.SphereGeometry(1.0, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), glass);
+  cab.scale.set(1.05, 0.95, 1.1); cab.position.set(0, 0.2, -1.05); cab.rotation.x = -0.9;
+  const stripe = new THREE.Mesh(new THREE.CylinderGeometry(1.27, 1.27, 0.35, 18, 1, true), white);
+  stripe.rotation.x = Math.PI / 2; stripe.scale.set(1, 1.7, 0.95); stripe.position.z = 0.2;
+  const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.16, 5.2, 8), red);
+  boom.rotation.x = Math.PI / 2; boom.position.set(0, 0.35, 3.6);
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.3, 0.8), red); fin.position.set(0, 0.95, 6.0);
+  const skids = [];
+  for (const sx of [-1, 1]) {
+    const sk = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 3.4, 6), dark); sk.rotation.x = Math.PI / 2; sk.position.set(sx * 0.95, -1.35, 0); skids.push(sk);
+    for (const sz of [-0.8, 0.8]) { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.7, 6), dark); st.position.set(sx * 0.8, -1.05, sz); st.rotation.z = sx * 0.4; skids.push(st); }
+  }
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.5, 8), dark); mast.position.y = 1.35;
+  const rotor = new THREE.Group(); rotor.position.y = 1.6;
+  for (let i = 0; i < 3; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.04, 9.5), dark); b.rotation.y = i * Math.PI * 2 / 3; rotor.add(b); }
+  const blurMat = new THREE.MeshBasicMaterial({ color: 0x1d2128, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
+  const blur = new THREE.Mesh(new THREE.CircleGeometry(4.8, 32), blurMat); blur.rotation.x = -Math.PI / 2; blur.position.y = 1.62;
+  const tail = new THREE.Group(); tail.position.set(0.18, 0.95, 6.1);
+  for (let i = 0; i < 2; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.4, 0.14), dark); b.rotation.x = i * Math.PI / 2; tail.add(b); }
+  g.add(body, cab, stripe, boom, fin, mast, rotor, blur, tail, ...skids);
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  // Hover spot: just off the rollover, ahead and to the rider's left, where the chase cam sees it.
+  const hx = sp.x + 30, hz = sp.z - 42, hy = terrain.getHeight(hx, hz) + 14;
+  let start = -1;
+  on('rideStarted', () => { start = performance.now() / 1000; emit('heliDrop', { t: 0 }); });
+  on('mode', (m) => { if (m === 0) { start = -1; g.visible = true; } });   // back in the lobby: hovering again
+  const pos = new THREE.Vector3();
+  body.onBeforeRender = () => {
+    const now = performance.now() / 1000;
+    const t = start < 0 ? 0 : now - start;
+    rotor.rotation.y = now * 26; tail.rotation.x = now * 60;
+    blur.visible = true;
+    // Leave: hold 1.2 s, lift and bank away to the north-west past the spire, accelerating.
+    const k = Math.max(0, t - 1.2);
+    const climb = k * k * 1.6 + k * 2.5, away = k * k * 3.2;
+    pos.set(hx - away * 0.55, hy + climb + Math.sin(now * 1.7) * 0.25, hz - away * 0.85);
+    g.position.copy(pos);
+    g.rotation.set(-Math.min(0.35, k * 0.12), Math.PI * 0.62 + Math.min(1.1, k * 0.25), Math.min(0.45, k * 0.18), 'YXZ');
+    g.visible = t < 22;
+  };
+  g.position.set(hx, hy, hz);
+  g.rotation.y = Math.PI * 0.62;
   return g;
 }

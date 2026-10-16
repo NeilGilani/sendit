@@ -40,8 +40,8 @@ export function makeTerrain() {
     },
     getSurface(x, z, out = new THREE.Vector4()) {
       const i = Math.min(N - 1, Math.max(0, Math.round((x + HALF) / SP))), j = Math.min(N - 1, Math.max(0, Math.round((z + HALF) / SP)));
-      const r = S[(j * N + i) * 3 + 1] / 255;
-      return out.set(0, 1 - r, r, 0);
+      const g = S[(j * N + i) * 3] / 255, r = S[(j * N + i) * 3 + 1] / 255;
+      return out.set(g, Math.max(0, 1 - Math.max(g, r)), r, 0);
     },
     isInside: (x, z, m = 0) => Math.abs(x) < HALF - m && Math.abs(z) < HALF - m,
     getSpawn() { const s = course.spawnPoint(); return { position: new THREE.Vector3(s.x, base(s.x, s.z), s.z), heading: s.heading }; },
@@ -54,7 +54,7 @@ export const LINES = {
   stacks: { name: 'The Stacks (cliff into cliff)', pts: [[0, 0], [300, 10], [520, -40], [700, -40], [1000, -40], [1300, -40], [1500, -60], [1800, -40], [2200, 30], [2600, 40]] },
   spines: { name: 'Spine Wall → pillows → ledges', pts: [[0, 0], [120, -200], [300, -330], [600, -420], [850, -420], [1000, -380], [1300, -360], [1450, -440], [1700, -300], [2100, -100], [2600, 0]] },
   ravine: { name: 'The Ravine', pts: [[0, 0], [150, 120], [330, 360], 'ravine', [2250, 380], [2600, 300]] },
-  station: { name: 'Station Cliff → roof', pts: [[0, 0], [300, 60], [700, 230], [1100, 280], [1300, 288], [1400, 288], [1520, 288], [1700, 250], [2100, 150], [2600, 60]] },
+  station: { name: 'Station Cliff → roof', pts: [[0, 0], [250, 250], [500, 310], [800, 310], [1100, 290], [1300, 288], [1400, 288], [1520, 288], [1700, 250], [2100, 150], [2600, 60]] },
   hammer: { name: 'The Hammer (36 m)', pts: [[0, 0], [200, 260], [500, 600], [800, 700], [1000, 700], [1300, 650], [1700, 560], [2200, 450], [2600, 300]] },
   refuge: { name: 'Bowl → refuge roof', pts: [[0, 0], [400, -60], [900, -200], [1300, -230], [1600, -200], [1840, -175], [1910, -175], [2200, -60], [2600, 0]] },
 };
@@ -104,8 +104,10 @@ export function ride(type, key, style, opts = {}) {
       const d = Math.atan2(Math.sin(want - travel), Math.cos(want - travel));
       if (pl.state === State.GROUNDED) c.steer = Math.max(-1, Math.min(1, -d * 2.2));
       if (style === 'send') c.tuck = Math.abs(d) < 0.2 ? 1 : 0;
+      // 'control': a real rider's speed check (scrub with a brief skid above the target speed).
+      if (style === 'control' && pl.state === State.GROUNDED && pl.speed > (opts.target ?? 21)) c.brake = 0.7;
       // Lip ahead (terrain falls away much faster than the slope): load the pop, release at the lip.
-      if (pl.state === State.GROUNDED && style !== 'carve') {
+      if (pl.state === State.GROUNDED && style !== 'carve' && !c.brake) {
         const fx = -Math.sin(travel), fz = -Math.cos(travel);
         const h0 = T.getHeight(pl.position.x, pl.position.z);
         const slope = (h0 - T.getHeight(pl.position.x + fx * 3, pl.position.z + fz * 3)) / 3;
@@ -125,7 +127,11 @@ export function ride(type, key, style, opts = {}) {
     p.step(DT);
     t += DT;
     const u = p.position.x - START_X;
-    if (p.state === State.CRASH && was !== State.CRASH) crashes++;
+    if (p.state === State.CRASH && was !== State.CRASH) {
+      crashes++;
+      if (was === State.GROUNDED) airSegs.push({ u: Math.round(u), air: 0, drop: 0, impact: 0, v: +prevVel.length().toFixed(1), result: 'GROUND CRASH', why: JSON.stringify(p.lastCrash && p.lastCrash.air === 0 ? p.lastCrash : { obstacle: true }) + ` z=${p.position.z.toFixed(0)}` });
+      p.lastCrash = null;
+    }
     if (p.state === State.AIR && !wasAir) { takeY = p.position.y; takeU = u; }
     if (p.state !== State.AIR && wasAir) {
       airSegs.push({ why: p.state === State.CRASH ? JSON.stringify(p.lastCrash) : '', u: Math.round(takeU), air: +p.lastLanding?.air?.toFixed(2) || 0, drop: +(takeY - p.position.y).toFixed(1), impact: +(p.lastLanding?.impact ?? 0).toFixed(1), result: p.state === State.CRASH ? 'CRASH' : p.lastLanding?.result, v: +prevVel.length().toFixed(1) });
@@ -140,7 +146,8 @@ export function ride(type, key, style, opts = {}) {
     if (u > 2560 || crashes > 6) break;
   }
   for (const o of offs) o();
-  const big = airSegs.filter((a) => a.air > 0.5);
+  p.flow?.dispose();
+  const big = airSegs.filter((a) => a.air > 0.5 || /CRASH/.test(a.result));
   return {
     line: key, type, style, time: +t.toFixed(1), finished: p.position.x - START_X > 2560,
     avg: +(vSum / Math.max(1, n)).toFixed(1), max: +vMax.toFixed(1), crashes,
