@@ -275,7 +275,8 @@ export class RavenspireCourse {
       const ou = (i + 0.2 + 0.6 * hash1(i * 31 + j * 7 + 3)) * C, ov = (j + 0.2 + 0.6 * hash1(i * 13 + j * 29 + 5)) * C;
       if (!this.outcropOk(ou, ov)) continue;
       const R = 6 + 7 * hash1(i * 3 + j * 11 + 9), H = 3 + 4 * hash1(i * 17 + j * 5 + 1);
-      const du = (u - ou) / (R * 1.4), dv = (v - ov) / R;   // a little longer down the fall line
+      // Snow ramps up the uphill side (a natural kicker), rock drops away on the downhill side.
+      const du = (u - ou) / (u < ou ? R * 3.2 : R * 0.9), dv = (v - ov) / R;
       const q = du * du + dv * dv;
       if (q < 1) add += H * Math.pow(1 - q, 0.55);
     }

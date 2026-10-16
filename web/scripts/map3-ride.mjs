@@ -81,7 +81,8 @@ export function ride(type, key, style, opts = {}) {
   const T = makeTerrain();
   const events = [];
   const flowEv = [];
-  const offs = [on('flowBanked', (e) => flowEv.push(e)), on('flowState', (e) => flowEv.push({ state: e.on })), on('landed', (e) => events.push({ kind: 'land', ...e })), on('crashed', (k) => events.push({ kind: 'crash', k })), on('stumble', (r) => events.push({ kind: 'stumble', r }))];
+  const stumbleAt = [];
+  const offs = [on('stumble', (r) => stumbleAt.push(`${r}@u${Math.round(0)}`)), on('flowBanked', (e) => flowEv.push(e)), on('flowState', (e) => flowEv.push({ state: e.on })), on('landed', (e) => events.push({ kind: 'land', ...e })), on('crashed', (k) => events.push({ kind: 'crash', k })), on('stumble', (r) => events.push({ kind: 'stumble', r: `${r}@${Math.round(p.position.x - START_X)},${Math.round(p.position.z)}` }))];
   const p = new Player(T, null, null, { strength: () => 0, justPressed: () => false });
   p.setEquipment(type);
   p.fadeThen = (fn) => fn();
@@ -153,7 +154,7 @@ export function ride(type, key, style, opts = {}) {
   return {
     line: key, type, style, time: +t.toFixed(1), finished: p.position.x - START_X > 2560,
     avg: +(vSum / Math.max(1, n)).toFixed(1), max: +vMax.toFixed(1), crashes,
-    stumbles: events.filter((e) => e.kind === 'stumble').length, airTotal: +air.toFixed(1), airMax: +airMax.toFixed(2),
+    stumbles: events.filter((e) => e.kind === 'stumble').length, stumbleWhy: events.filter((e) => e.kind === 'stumble').map((e) => e.r).join(','), airTotal: +air.toFixed(1), airMax: +airMax.toFixed(2),
     roofSeconds: +roofT.toFixed(1), airs: big, trace, wall, score: game.score, flow: flowEv, judged,
   };
 }
@@ -165,6 +166,7 @@ if (process.argv[1] && process.argv[1].endsWith('map3-ride.mjs')) {
   for (const k of keys) for (const ty of types) {
     const r = ride(ty, k, style);
     console.log(`\n${LINES[k].name} · ${ty} · ${style}: ${r.finished ? 'finished' : 'DNF'} in ${r.time}s  avg ${r.avg} m/s (${(r.avg * 2.237).toFixed(0)} mph)  max ${r.max} (${(r.max * 2.237).toFixed(0)} mph)  crashes ${r.crashes}  stumbles ${r.stumbles}  air ${r.airTotal}s (max ${r.airMax}s)  roof ${r.roofSeconds}s`);
+    if (r.stumbleWhy) console.log(`   stumbles: ${r.stumbleWhy}`);
     for (const a of r.airs) console.log(`   air @u${a.u}: ${a.air}s  drop ${a.drop} m  in ${a.v} m/s  impact ${a.impact} m/s  → ${a.result} ${a.why || ''}`);
     if (r.judged) console.log(`   lines: ${(r.judged.goalList || []).join(", ") || "-"}   linked: ${(r.judged.featureList || []).join(", ")}
    judged ${r.judged.total}/100  (line ${r.judged.line.toFixed(0)} · fluidity ${r.judged.fluidity.toFixed(0)} · control ${r.judged.control.toFixed(0)} · air & style ${r.judged.style.toFixed(0)})  biggest drop ${r.judged.biggestDrop.toFixed(0)} m, longest air ${r.judged.longestAir.toFixed(1)} s`);

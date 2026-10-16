@@ -40,7 +40,7 @@ export const BANDS = [
   { name: 'Band A', uc: 548, v0: -250, v1: 105, h: 11, var: 4, bench: 55, wob: 7, seed: 1, gaps: [[-95, 22], [120, 18]] },
   { name: 'The First Stack', uc: 990, v0: -215, v1: 170, h: 15, var: 4, bench: 50, wob: 6, seed: 2, gaps: [[60, 16]] },
   { name: 'The Throne', uc: 1160, v0: -250, v1: 185, h: 18, var: 5, bench: 55, wob: 5, seed: 3, gaps: [[-200, 18], [150, 16]], peak: [-40, 10, 38] },
-  { name: 'The Last Stack', uc: 1330, v0: -190, v1: 150, h: 14, var: 5, bench: 48, wob: 6, seed: 4, gaps: [[-150, 16]] },
+  { name: 'The Last Stack', uc: 1370, v0: -190, v1: 150, h: 14, var: 5, bench: 48, wob: 6, seed: 4, gaps: [[-150, 16]] },
   { name: 'Station Cliff', uc: 1418, v0: 205, v1: 362, h: 17, var: 2, bench: 46, wob: 3, seed: 5, gaps: [] },
   { name: 'The Hammer', uc: 905, v0: 630, v1: 775, h: 36, var: 6, bench: 70, wob: 6, seed: 6, gaps: [] },
   { name: 'Left Ledges', uc: 1150, v0: -490, v1: -265, h: 10, var: 4, bench: 40, wob: 8, seed: 7, gaps: [[-420, 15], [-330, 12]] },
@@ -89,7 +89,7 @@ export const HITS = [
 // L = length along it, W = width, roof: 'mono' (falls downhill), 'gable' (ridge across), 'aframe'.
 export const BUILDINGS = [
   { id: 'station', name: 'Old Lift Station', u: 1497, v: 288, L: 36, W: 17, roof: 'mono', pitch: 30, eave: 5.5, drift: 1.0, chimney: null },
-  { id: 'refuge', name: 'Corvo Refuge', u: 1880, v: -175, L: 15, W: 12, roof: 'gable', pitch: 33, eave: 4.6, drift: 0.85, chimney: [0.2, 0.62] },
+  { id: 'refuge', name: 'Corvo Refuge', u: 1880, v: -175, L: 15, W: 12, roof: 'gable', pitch: 33, eave: 4.6, drift: 1.3, chimney: [0.2, 0.62] },
   { id: 'aframe1', name: 'A-frame', u: 2290, v: 120, L: 10, W: 9, roof: 'aframe', pitch: 56, eave: 0, drift: 0.6, chimney: null },
   { id: 'aframe2', name: 'A-frame', u: 2318, v: 162, L: 9, W: 8.5, roof: 'aframe', pitch: 56, eave: 0, drift: 0.55, chimney: [0.0, -0.6], yaw: 0.25 },
   { id: 'aframe3', name: 'A-frame', u: 2272, v: 205, L: 9, W: 8, roof: 'aframe', pitch: 56, eave: 0, drift: 0.6, chimney: null, yaw: -0.2 },
