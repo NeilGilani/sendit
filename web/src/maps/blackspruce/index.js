@@ -5,22 +5,35 @@ import { BlackspruceCourse } from './course.js';
 
 const svg = (body) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 90">${body}</svg>`)}`;
 
-// A steep white lane plunging between dark spruce, a rock band and a lone rider-sized gap.
-const pine = (x, y, s) => `<path d="M${x} ${y - 16 * s} l${7 * s} ${16 * s} h${-14 * s}z M${x} ${y - 24 * s} l${5 * s} ${11 * s} h${-10 * s}z" />`;
-const forest = [];
-for (let i = 0; i < 46; i++) {
-  const x = (i * 37.3) % 160, y = 30 + ((i * 53.7) % 62);
-  const lane = Math.abs(x - (80 + (y - 60) * 0.45 + Math.sin(y / 9) * 7)) < 11 + (y - 30) * 0.12;
-  if (!lane) forest.push(pine(x, y, 0.55 + (y - 30) / 70));
+// A steep white lane S-curving down between dense spruce spires (bigger toward the viewer), the rock
+// band with the lane's notch, and an orange fork sign.
+const laneX = (y) => 80 + Math.sin((y - 30) / 11) * (4 + (y - 30) * 0.18);   // lane centre at height y
+const laneW = (y) => 3 + (y - 30) * 0.32;                                   // half-width, perspective
+const spire = (x, y, s, c) => `<path fill="${c}" d="M${x.toFixed(1)} ${(y - 22 * s).toFixed(1)} L${(x + 4.2 * s).toFixed(1)} ${y.toFixed(1)} L${(x - 4.2 * s).toFixed(1)} ${y.toFixed(1)} Z"/>`
+  + `<path fill="#eef3fa" d="M${x.toFixed(1)} ${(y - 22 * s).toFixed(1)} L${(x + 1.3 * s).toFixed(1)} ${(y - 15 * s).toFixed(1)} L${(x - 1.6 * s).toFixed(1)} ${(y - 14 * s).toFixed(1)} Z"/>`;   // snow on the tip
+const trees = [];
+for (let row = 0; row < 15; row++) {
+  const y = 34 + row * 4.3, s = 0.35 + row * 0.085;
+  for (let k = 0; k < 17; k++) {
+    const x = ((k * 10.4 + row * 5.1) % 177) - 8;
+    if (Math.abs(x - laneX(y)) < laneW(y) + 2.5 * s) continue;
+    trees.push(spire(x, y, s, row % 2 ? '#183026' : '#1e3a2e'));
+  }
 }
+let lane = '';
+for (let y = 30; y <= 90; y += 2) lane += `${y === 30 ? 'M' : 'L'}${(laneX(y) - laneW(y)).toFixed(1)} ${y}`;
+for (let y = 90; y >= 30; y -= 2) lane += `L${(laneX(y) + laneW(y)).toFixed(1)} ${y}`;
+const bandY = 56, bx = laneX(bandY), bw = laneW(bandY);
 export const BLACKSPRUCE_THUMB = svg(`
   <defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f86cc"/><stop offset="1" stop-color="#e6edf5"/></linearGradient></defs>
   <rect width="160" height="90" fill="url(#s)"/>
-  <path d="M0 40 L24 14 L44 30 L70 6 L96 28 L120 12 L160 36 L160 90 L0 90 Z" fill="#dfe6f0"/>
-  <path d="M70 6 L78 16 L72 18 L64 14 Z M120 12 L126 20 L116 19 Z" fill="#b6cff6"/>
-  <path d="M0 90 L0 34 C40 30 120 30 160 34 L160 90 Z" fill="#f6f9fd"/>
-  <path d="M30 58 L130 56 L130 60 L30 62 Z" fill="#6c6660"/>
-  <g fill="#1b3127">${forest.join('')}</g>`);
+  <path d="M0 36 L22 12 L42 26 L68 4 L94 26 L118 10 L160 32 L160 90 L0 90 Z" fill="#dfe6f0"/>
+  <path d="M68 4 L76 14 L70 16 L62 12 Z M118 10 L124 18 L114 17 Z" fill="#b6cff6"/>
+  <path d="M0 90 L0 30 C40 27 120 27 160 30 L160 90 Z" fill="#eef3f9"/>
+  <path d="${lane} Z" fill="#fbfdff"/>
+  <path d="M0 ${bandY} L${(bx - bw - 1).toFixed(1)} ${bandY - 1} L${(bx - bw - 1).toFixed(1)} ${bandY + 2.5} L0 ${bandY + 3.5} Z M160 ${bandY} L${(bx + bw + 1).toFixed(1)} ${bandY - 1} L${(bx + bw + 1).toFixed(1)} ${bandY + 2.5} L160 ${bandY + 3.5} Z" fill="#6a645e"/>
+  ${trees.join('')}
+  <g transform="translate(${(laneX(44) + laneW(44) + 1).toFixed(1)} 40)"><rect x="-0.3" y="0" width="0.6" height="4.5" fill="#3a2c20"/><rect x="-2.6" y="-1.6" width="5.2" height="2.4" fill="#f28a1b"/></g>`);
 
 registerMap({
   id: 'blackspruce',
