@@ -121,6 +121,7 @@ export const DROP_ZONES = [
   ['Station Cliff', 1310, 290],
   ['The Ravine', 1050, 'ravine'],
   ['Lower Bowl', 1560, -60],
+  ['Pillow Stacks', 1480, -360],
 ];
 
 // Line goals (Steep "Mountain Stories" style): hit these named features in order in one run, cleanly.

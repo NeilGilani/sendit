@@ -261,9 +261,9 @@ every line, Steep-style: just out over the big lips where a popped rider flies (
 the Hammer, Station Cliff, Frozen Falls, a bowl wind lip), on the station and refuge roofs, on a spine crest, in
 the gorge and on the pillow stacks. They glow, so they double as markers for where the good lips are.
 
-**Drop zones** (Steep-style, `course.dropZones`): keys **1–8** (or the d-pad ◀ ▶) fade you to the top of a
+**Drop zones** (Steep-style, `course.dropZones`): keys **1–9** (or the d-pad ◀ ▶) fade you to the top of a
 line — 1 Heli Drop, 2 Spine Wall, 3 the Couloir, 4 the Stacks, 5 the Hammer, 6 Station Cliff, 7 the Ravine,
-8 Lower Bowl. R / Y still goes back to the heli drop. A hint names the keys a few seconds into a ride.
+8 Lower Bowl, 9 Pillow Stacks. R / Y still goes back to the heli drop. A hint names the keys a few seconds into a ride.
 
 The heli-drop intro: a small red helicopter hovers off the shoulder (it just dropped you); when the ride
 starts it holds a moment, lifts and banks away past the spire with a synthesized rotor sound.
@@ -315,7 +315,7 @@ Styles: **send** = tucked straight down the line, popping every cliff; **trick**
 | Bowl → refuge roof | ski | trick | finished | 152.7 s | 19.9 m/s (45 mph) | 0 | 0 | 18.1 s (4.4 s) | 31 m | 88 |
 | Bowl → refuge roof | snowboard | trick | finished | 149 s | 20.4 m/s (46 mph) | 0 | 0 | 16.3 s (4.45 s) | 32 m | 88 |
 
-All 24 runs reach the valley; the one crash is the Hammer sent with a full pop (by design: roll it). Carve style (12 more runs): 15–17 m/s average, all finish; its 3 crashes are a wide turn into the couloir wall and turns into the refuge's solid chimney while riding its roof. Every drop zone starts cleanly (8 zones × 2 gears, 8 s straight-line from each).
+All 24 runs reach the valley; the one crash is the Hammer sent with a full pop (by design: roll it). Carve style (12 more runs): 15–17 m/s average, all finish; its 3 crashes are a wide turn into the couloir wall and turns into the refuge's solid chimney while riding its roof. Every drop zone starts cleanly (9 zones × 2 gears, 8 s straight-line from each).
 
 ### Terminal speeds (web/scripts/map3-speeds.mjs: 60 s straight down a powder plane)
 
