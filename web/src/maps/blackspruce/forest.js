@@ -136,7 +136,7 @@ export function planForest(course) {
         course.world(t, d, p);
         const r = rnd();
         if (r < 0.72 || l.hw < 4.5) {   // rocks only where the lane is wide enough to go round them
-          const sc = S.scale[0] + (S.scale[1] - S.scale[0]) * (0.5 + 0.5 * rnd()), sx = Math.min(0.62, sc * S.slim);
+          const sc = S.scale[0] + (S.scale[1] - S.scale[0]) * (0.5 + 0.5 * rnd()), sx = Math.min(0.45, sc * S.slim);   // slim: the chase camera follows the rider past it
           const hit = TREE_HIT.base + TREE_HIT.perWidth * sx;
           trees.push([p.x, p.z, sc, sx, sc * (0.95 + rnd() * 0.2), rnd() < 0.25 ? 1 : 0, rnd() * 6.28, hit, 0]);
           put(p.x, p.z, hit);
