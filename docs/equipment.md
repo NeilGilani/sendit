@@ -361,8 +361,8 @@ At runtime, `registerVariant(type, spec)` adds a model (for DLC or user presets)
 ## Integration notes (files this track does not own)
 
 - **fx.js:** it stamps two ski grooves (`FX.skiSpacing`) for both types. For the board, one wide groove (about the waist width, 0.25 m) from the waist contact point would be right. Spray could be driven by `rider.getContactPoints()` (load × speed × `skid`, and `edgeAngle` for direction).
-- **ui.js:** the controls hint still reads like the ski controls. Suggested hints:
-  - Both: "W/S in the air: flip · S + Space: backflip off the lip · Shift in the air: grab · hold Space over a roller to stay low".
+- **ui.js:** `UI.trickTip` shows one trick tip after each of the first three clean airs (> 0.8 s) of a page load, keyboard or pad wording by the last input device: spins start at the take-off (steer while holding Space / A, keep steering off the lip); backflip preload (S / pull back while loading) and the W / S throw; in the air push with the spin to tuck, against it to slow, let go to land. Not yet hinted:
+  - "Shift in the air: grab · hold Space over a roller to stay low".
   - Board: "W+Space nollie · steer while holding Space to butter".
   - A HUD equipment badge could read `player.equipment.spec.name`.
 - **Score popups:** trick labels can now be long (`Switch Nollie FS Double Cork 1080 Indy`).

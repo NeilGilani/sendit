@@ -37,6 +37,7 @@ export class UI {
     on('liftBoarded', (name) => { $('liftlabel').textContent = `${name}  ·  hold W / RT to hurry`; });
     on('mode', () => this.refresh());
     on('landed', ({ perfect }) => { if (perfect) this.pop('PERFECT!', 'gold'); });
+    on('landed', ({ air, clean }) => this.trickTip(air, clean));
     on('stumble', () => this.pop('WOBBLE!', 'pink'));
     on('nearMiss', () => this.pop('CLOSE SHAVE', 'cyan', true));
     on('countdown', (n) => this.pop(n > 0 ? String(n) : 'GO!', n > 0 ? 'cyan' : 'gold'));
@@ -233,6 +234,25 @@ export class UI {
     el.classList.add('on');
     clearTimeout(this._hintT);
     this._hintT = setTimeout(() => el.classList.remove('on'), 4300);
+  }
+
+  /**
+   * Trick controls, one tip after each of the first clean airs of a session (once each per page load).
+   * Rotation is set at the take-off (physics/edge.js): wind up / preload while loading, release at the
+   * lip, keep the input in for the throw; in the air the stick only tucks, opens up or spots the landing.
+   */
+  trickTip(air, clean) {
+    if (!clean || air < 0.8 || game.mode !== Mode.RIDING) return;
+    const n = this._trickTips = (this._trickTips || 0) + 1;
+    const pad = this.input?.usingPad;
+    const tip = [
+      pad ? 'Spins start at take-off: steer while holding A, keep steering off the lip'
+        : 'Spins start at take-off: steer while holding Space, keep steering off the lip',
+      pad ? 'Backflip: pull back while holding A  ·  push or pull off the lip to throw a flip'
+        : 'Backflip: hold S while loading Space  ·  W or S off the lip to throw a flip',
+      'In the air: push with the spin to tuck, against it to slow, let go to land',
+    ][n - 1];
+    if (tip) setTimeout(() => { if (game.mode === Mode.RIDING) this.hint(tip); }, 700);
   }
 
   update(dt, skier) {

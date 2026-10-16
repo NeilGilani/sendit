@@ -230,9 +230,11 @@ defaults. Maps load at boot (a map switch reloads the page), so "reset when anot
 
 ## 4. Tricks, flow and scoring
 
-Controls are the game's (docs/equipment.md): hold Space to load, release to pop; steer in the air to
-spin, W / S to flip; Shift grabs — rotation is set at the take-off (wind up / preload while loading, pop at the
-lip, throw), then tuck or open in the air (docs/equipment.md "Air and tricks"). On this map (trickStyle):
+Controls are the game's (docs/equipment.md): hold Space to load, release to pop; Shift grabs. Rotation is
+set at the take-off: steer while loading to wind up a spin, hold S to preload a backflip, release at the lip and
+keep steering / holding W or S for the throw. After that the stick only tucks (with the rotation), opens up
+(against it) or spots the landing (let go); steering late in the air no longer starts a spin (docs/equipment.md
+"Air and tricks"). On this map (trickStyle):
 
 - **Grabs**: skis — Safety, Mute (steer left), Japan (steer right), **Tail grab** (S), **Truck driver** (W);
   board — Indy, Melon, Nose (W), Tail (S). Held past ~0.4 s the grab **tweaks** (board pushed out and rolled,
