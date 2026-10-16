@@ -21,6 +21,7 @@ export function buildRavenspireProps(course, { terrain }) {
   group.add(buildSmoke(course, terrain));
   group.add(buildMast(course, M, terrain));
   group.add(buildFinish(M, terrain));
+  group.add(buildBridge(course, M));
   group.traverse((o) => { if (o.isMesh && !o.material.transparent) { o.castShadow = true; o.receiveShadow = true; } });
   return group;
 }
@@ -783,5 +784,70 @@ function buildFinish(M, terrain) {
   banner.translate(x - 0.05, top - 1.35, (Z0 + Z1) / 2);
   banner.computeVertexNormals();
   g.add(new THREE.Mesh(banner, toonMaterial({ name: 'finishBanner', map: tex, side: THREE.DoubleSide })));
+  return g;
+}
+
+// ------------------------------------------------------------------ the old footbridge over the ravine
+/**
+ * A rickety suspension footbridge across the gorge (course.bridge: anchors on each wall top): timber A-frame
+ * towers, two sagging main cables, hangers every 3 m, a plank deck with a few planks missing and two hand
+ * ropes. Seen from the ravine floor you ride under it ~35–50 m below. Merged into three draws.
+ */
+function buildBridge(course, M) {
+  const g = new THREE.Group();
+  g.name = 'Footbridge';
+  const B = course.bridge;
+  if (!B) return g;
+  const x = B.x, [za, ya] = B.a, [zb, yb] = B.b;
+  const span = zb - za, sag = 5 + span * 0.04, half = 0.75;   // deck half-width (along x)
+  const deckY = (t) => ya + 1.0 + (yb - ya) * t - sag * 4 * t * (1 - t);
+  const towerH = 5.5;
+  const cableY = (t) => ya + towerH + (yb - ya) * t - (sag + 2.5) * 4 * t * (1 - t);
+  const wood = [], rope = [];
+  // Towers: two leaning posts per side and a cross beam.
+  for (const [z, y, s] of [[za, ya, -1], [zb, yb, 1]]) {
+    for (const dx of [-1.1, 1.1]) {
+      const p = new THREE.BoxGeometry(0.28, towerH + 1.2, 0.28);
+      p.rotateX(s * 0.12); p.translate(x + dx, y + (towerH + 1.2) / 2 - 0.6, z + s * 0.3);
+      wood.push(p.toNonIndexed());
+    }
+    const beam = new THREE.BoxGeometry(2.6, 0.24, 0.24); beam.translate(x, y + towerH - 0.1, z - s * 0.05);
+    wood.push(beam.toNonIndexed());
+  }
+  // Deck planks (each 0.25 m wide along the span), a few missing.
+  let seed = 31;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const n = Math.round(Math.abs(span) / 0.32);
+  for (let i = 0; i < n; i++) {
+    if (rnd() < 0.07) continue;
+    const t = (i + 0.5) / n, z = za + span * t;
+    const pl = new THREE.BoxGeometry(half * 2 * (0.9 + rnd() * 0.15), 0.05, 0.24);
+    pl.rotateY((rnd() - 0.5) * 0.08);
+    pl.translate(x + (rnd() - 0.5) * 0.08, deckY(t) - 0.02, z);
+    wood.push(pl.toNonIndexed());
+  }
+  // Ropes: main cables, hand ropes, hangers (thin boxes between points).
+  const seg = (p, q, r) => {
+    const d = new THREE.Vector3().subVectors(q, p), L = d.length();
+    const c = new THREE.CylinderGeometry(r, r, L, 4, 1, true);
+    c.translate(0, L / 2, 0);
+    c.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()));
+    c.translate(p.x, p.y, p.z);
+    rope.push(c.toNonIndexed());
+  };
+  const N = 40;
+  for (const dx of [-1.1, 1.1]) {
+    for (let i = 0; i < N; i++) {
+      const t0 = i / N, t1 = (i + 1) / N;
+      seg(new THREE.Vector3(x + dx, cableY(t0), za + span * t0), new THREE.Vector3(x + dx, cableY(t1), za + span * t1), 0.04);   // main cable
+      seg(new THREE.Vector3(x + dx * 0.7, deckY(t0) + 1.05, za + span * t0), new THREE.Vector3(x + dx * 0.7, deckY(t1) + 1.05, za + span * t1), 0.022);   // hand rope
+    }
+    for (let k = 1; k < Math.abs(span) / 3; k++) {
+      const t = k * 3 / Math.abs(span);
+      seg(new THREE.Vector3(x + dx * 0.72, deckY(t), za + span * t), new THREE.Vector3(x + dx, cableY(t), za + span * t), 0.015);   // hanger
+    }
+  }
+  g.add(new THREE.Mesh(mergeGeometries(wood), M.woodDark));
+  g.add(new THREE.Mesh(mergeGeometries(rope), M.cable));
   return g;
 }

@@ -47,6 +47,7 @@ export class RavenspireCourse {
     // Drop zones (player.js): { name, x, z, heading }.
     this.dropZones = DROP_ZONES.map(([name, u, v]) => ({ name, x: START_X + u, z: v === 'ravine' ? this.rvAt(this.rv.c, u) : v, heading: -Math.PI / 2 }));
     this.challenge.flakes = this.placeFlakes();   // hand-placed golden snowflakes (activities.js)
+    this.buildBridge();
   }
 
   // ---------------------------------------------------------------- tables
@@ -132,6 +133,25 @@ export class RavenspireCourse {
         }
       }
     }
+  }
+
+  // ---------------------------------------------------------------- the old footbridge
+  /**
+   * An old suspension footbridge slung across the ravine just below the Ravine drop zone (props.js draws it):
+   * anchored where each wall tops out, ~40–55 m above the gorge floor, so you ride under it. Its anchor
+   * posts collide (course.obstacles); the deck is out of reach.
+   */
+  buildBridge() {
+    const u = 1080, vc = this.rvAt(this.rv.c, u), x = START_X + u, floor = this.height(x, vc);
+    const anchor = (s) => {
+      for (let d = 20; d < 120; d += 1) {
+        const a = this.height(x, vc + s * d), b = this.height(x, vc + s * (d + 1.5));
+        if (Math.abs(b - a) / 1.5 < Math.tan(32 * DEG) && a - floor > 25) return [vc + s * d, a];
+      }
+      return [vc + s * 60, this.height(x, vc + s * 60)];
+    };
+    this.bridge = { x, a: anchor(-1), b: anchor(1) };
+    for (const [z] of [this.bridge.a, this.bridge.b]) for (const dx of [-1.1, 1.1]) this.obstacles.push([x + dx, z, 0.35, 'tower']);
   }
 
   // ---------------------------------------------------------------- buildings
