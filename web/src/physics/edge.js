@@ -248,6 +248,8 @@ export class EdgePhysics {
 
     // --- 4. push, friction, drag, skid scrub, powder
     if (pl.controllable() && pl._ctrl.up > 0.3 && speed < C.pushMaxSpeed && this.stop < 0.2) v.addScaledVector(tdir, C.pushAccel * dt);
+    // SEND IT (flow state): tucking boosts, SSX-style — a little thrust on top of gravity.
+    if (pl.flowBoost && pl.tuck > 0.3 && this.stop < 0.2) v.addScaledVector(tdir, flowK(pl, 'boostAccel') * pl.tuck * dt);
     // Clean carves pump a little speed back (edge rebound, pressure timing): carving beats skidding.
     const quality = clamp(1 - wash / Math.max(k, 1e-3), 0, 1) * track * (1 - smoothstep(4 * DEG, 14 * DEG, Math.abs(beta)));
     const pump = C.carvePump * Math.abs(speed * this.velYawRate) * quality * smoothstep(3, 6, speed) * (1 - this.stop);

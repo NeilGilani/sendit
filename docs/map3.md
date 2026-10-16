@@ -4,8 +4,8 @@ An isolated big-mountain face in the spirit of Steep: you are dropped by helicop
 430 m horn and ride 1,670 m of vertical to the valley — stacked cliff bands (cliff into cliff), a spine
 wall, terraced pillow stacks, a deep ravine with frozen ledges, rock buttresses, wind lips, and old
 buildings whose snowy roofs you can ride. No lifts, no banners, no crowds: wilderness, big peaks on every
-horizon, an abandoned gondola rusting between two old stations. Tuned for 22–31 m/s (50–70 mph) on the
-big lines, on skis and on a snowboard.
+horizon, an abandoned gondola rusting between two old stations, ravens riding the updraft round the spire.
+Tuned for 22–31 m/s (50–70 mph) on the big lines, on skis and on a snowboard.
 
 ```
 npm --prefix web run dev -- --port 5183 --strictPort
@@ -222,7 +222,8 @@ spin, W / S to flip; Shift grabs. On this map (trickStyle):
   move on the snow (the air keeps it alive) and is lost on a crash.
 - **Flow meter → SEND IT**: filled by landed tricks, drops, perfect landings, close shaves and speed over
   24 m/s; drains slowly when idle. Full → the **SEND IT** state for 9 s (+1.6 s per landed trick, up to
-  20 s): +10 % top speed, +20 % pop, +15 % spin/flip rate, +25 % landing tolerance, ×2 trick points; the
+  20 s): +10 % top speed, +20 % pop, +15 % spin/flip rate, +25 % landing tolerance, ×2 trick points, and tucking gives a little SSX-style
+  boost (1.8 m/s² of thrust); the
   music lifts (the upbeat track), a FoV kick and shake, an orange vignette, the suit's trims flare, a rumble.
 - **Run summary** at the valley (zen runs): time, average / top speed, biggest drop, longest air, best line,
   score, and a **judged score out of 100** like the Freeride World Tour — Line, Fluidity, Control,
