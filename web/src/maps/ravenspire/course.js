@@ -185,7 +185,12 @@ export class RavenspireCourse {
     const crest = 30 * Math.pow(ridged(u / 90, sd * 5.3, 2), 3) * sstep(-100, 200, u) * Math.exp(-(((Math.abs(v) - W) / 30) ** 2));
     const av = Math.abs(v), a = av / W;
     e += crest;
-    if (a <= 1) e += Rh * Math.pow(a, FACE.bowlPower);
+    if (a <= 1) {
+      e += Rh * Math.pow(a, FACE.bowlPower);
+      // The upper face is framed by steep rock walls: the outer ~20 % of the bowl rears up toward the crests.
+      const wall = FACE.wallHeight(u);
+      if (wall > 0) { const s = sstep(0.78, 1.0, a); e += wall * s * s; }
+    }
     else {
       // Past the crest: a steep rocky flank into the neighbouring couloir, then the next ridges.
       const d = av - W;

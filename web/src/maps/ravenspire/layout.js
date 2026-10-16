@@ -29,6 +29,7 @@ export const FACE = {
   halfWidth: (u) => 380 + 0.47 * Math.min(Math.max(u, 0), 1350) + 0.25 * Math.max(0, u - 1800),
   ridgeHeight: (u) => 22 + 0.13 * Math.min(Math.max(u, 0), 1300) + 0.12 * Math.max(0, u - 1700),
   bowlPower: 2.3,
+  wallHeight: (u) => 70 * smoothRange(u, 20, 160) * (1 - smoothRange(u, 900, 1400)),   // rock walls framing the upper face
 };
 
 // Cliff bands. uc = lip position (u), [v0, v1] lateral extent, h = height (m), var = ± variation,

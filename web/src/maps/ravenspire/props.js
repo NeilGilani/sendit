@@ -15,6 +15,7 @@ export function buildRavenspireProps(course, { terrain }) {
   for (const s of course.structures) group.add(buildStructure(s, M, terrain));
   group.add(buildGondola(course, M, terrain));
   group.add(buildHeli(course, terrain));
+  group.add(buildRavens(course, terrain));
   group.traverse((o) => { if (o.isMesh && !o.material.transparent) { o.castShadow = true; o.receiveShadow = true; } });
   return group;
 }
@@ -501,5 +502,59 @@ function buildHeli(course, terrain) {
   };
   g.position.set(hx, hy, hz);
   g.rotation.y = Math.PI * 0.62;
+  return g;
+}
+
+// ------------------------------------------------------------------ ravens
+/**
+ * A few ravens riding the updraft around the spire (the map's namesake). Wings flap now and then,
+ * mostly they soar; when the camera is near the summit one of them calls ('ravenCaw', audio.js).
+ */
+function buildRavens(course, terrain) {
+  const g = new THREE.Group();
+  g.name = 'Ravens';
+  const mat = new THREE.MeshLambertMaterial({ color: 0x101216, side: THREE.DoubleSide });
+  const wingG = new THREE.BufferGeometry();
+  // One wing: a tapered, slightly swept blade with "fingered" primaries (span 0.65 m).
+  wingG.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, -0.12, 0, 0, 0.14, 0.62, 0.02, 0.06, 0.66, 0.02, -0.02, 0.5, 0.02, -0.12], 3));
+  wingG.setIndex([0, 1, 2, 0, 2, 3, 0, 3, 4]);
+  wingG.computeVertexNormals();
+  const bodyG = new THREE.ConeGeometry(0.09, 0.62, 6); bodyG.rotateX(Math.PI / 2);
+  const tailG = new THREE.BufferGeometry();
+  tailG.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0.25, -0.12, 0, 0.5, 0.12, 0, 0.5], 3));
+  tailG.setIndex([0, 1, 2]); tailG.computeVertexNormals();
+  const sp = course.spawnPoint();
+  const cx = sp.x - 300, cz = sp.z + 30, top = terrain.getHeight(cx, cz);
+  const birds = [];
+  for (let i = 0; i < 4; i++) {
+    const b = new THREE.Group();
+    const l = new THREE.Mesh(wingG, mat), r = new THREE.Mesh(wingG, mat);
+    r.scale.x = -1;
+    b.add(l, r, new THREE.Mesh(bodyG, mat), new THREE.Mesh(tailG, mat));
+    b.scale.setScalar(1.6);
+    g.add(b);
+    birds.push({ b, l, r, a: i * 1.7, rad: 70 + i * 28, h: 30 + i * 22, sp: 0.18 + i * 0.03, ph: i * 2.1 });
+  }
+  let nextCaw = 0;
+  const lead = birds[0].b.children[2];
+  lead.onBeforeRender = (_r, _s, cam) => {
+    const t = performance.now() / 1000;
+    for (const k of birds) {
+      const a = k.a + t * k.sp;
+      const x = cx + Math.cos(a) * k.rad, z = cz + Math.sin(a) * k.rad * 0.8;
+      const y = Math.max(top, terrain.getHeight(x, z)) + k.h + Math.sin(t * 0.4 + k.ph) * 8;
+      k.b.position.set(x, y, z);
+      k.b.rotation.set(0, -a, 0.35, 'YXZ');   // banked into the circle
+      const flapOn = Math.sin(t * 0.5 + k.ph) > 0.55;   // mostly soaring
+      const f = flapOn ? Math.sin(t * 9 + k.ph) * 0.55 : 0.08;
+      k.l.rotation.z = f; k.r.rotation.z = -f;
+    }
+    if (t > nextCaw && cam.position.distanceTo(birds[0].b.position) < 650) {
+      nextCaw = t + 5 + Math.random() * 9;
+      const k = birds[Math.floor(Math.random() * birds.length)].b.position;
+      emit('ravenCaw', { x: k.x, y: k.y, z: k.z });
+    }
+  };
+  lead.frustumCulled = false;
   return g;
 }

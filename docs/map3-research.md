@@ -316,7 +316,7 @@ https://freerideworldtour.com/events/2025-kicking-horse-golden-bc-pro); Teton Gr
 
 | Finding | Adopted as | Code |
 |---|---|---|
-| Steep: hand-authored lines on a big procedural mountain; no helicopter, drop-in points | One authored face (`layout.js`: bands, spines, pillows, ravine, buttresses, hits) over a procedural massif; the run starts on a summit shoulder (heli-drop style intro, but no flying helicopter) | `maps/ravenspire/` |
+| Steep: hand-authored lines on a big procedural mountain; no helicopter, drop-in points | One authored face (`layout.js`: bands, spines, pillows, ravine, buttresses, hits) over a procedural massif; the run starts on a summit shoulder with a heli-drop intro; **drop zones** (keys 1–8 / d-pad) start any named line | `maps/ravenspire/`, `player.js dropZoneInput()` |
 | Faces 40–48° average, 35–45° landings, cliffs 4–20 m + one 30–35 m hero | Upper face 41°, Stacks 41° landings with 30° benches; bands 11–18 m, the Throne up to ~28 m, the Hammer 36 m | `layout.js`, `course.js cliff()` |
 | EFH = v⊥²/2g; straight drop onto θ gives EFH = H·cos²θ; steep landings make big drops survivable | Landing impact = normal speed v⊥; deep powder absorbs part (`landPowderAbsorb`) and scrubs speed (`landPowderScrub`); stumble/crash thresholds per map | `player.js land()`, `tuning.js` |
 | Riders snag on chalets in Steep | Walls deflect: glancing hits slide along the wall, only square hits at > 9 m/s knock you down | `player.js hitWall()` |
@@ -324,4 +324,5 @@ https://freerideworldtour.com/events/2025-kicking-horse-golden-bc-pro); Teton Gr
 | SSX: tricks fill a meter → Tricky state; combo multiplier cashed on landing, lost on bail | Flow meter → "SEND IT" flow state; line combo multiplier (see docs/map3.md) | `physics/flow.js` |
 | RR: graded landings (Perfect / Good / Sloppy) | Landing grade from misalignment + impact | `player.js land()` |
 | Speed feel: FOV ramp in the top of the speed range, camera higher/further on steeps, shake from speed, wind LPF sweep | Per-map CAMERA overrides + speed-driven shake, wind roar layer | `camera.js`, `audio.js`, `tuning.js` |
-| Slow-mo unverified in Steep/RR; proposal 0.6× for 0.35 s at the apex of big airs | Optional apex slow-mo for long predicted airs | `player.js` |
+| Slow-mo unverified in Steep/RR; proposal 0.6× for 0.35 s at the apex of big airs | Apex slow-mo (0.45×, ~1 s) for predicted airs over 2.4 s, never in the last 0.45 s | `player.js slowmoScale()` |
+| FWT: one overall impression from Line, Fluidity, Control, Technique, Air & Style | End-of-run card with a judged score /100 (Line, Fluidity, Control, Air & Style, 0–25 each) | `physics/flow.js finishRun()` |

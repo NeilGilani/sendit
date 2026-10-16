@@ -32,7 +32,7 @@ export class Structure {
     this.tp = tp;
     if (def.roof === 'mono') {
       // Falls downhill; the high edge sits just above the drift on the uphill side.
-      this.high = Math.max(this.gUp + 0.6, this.gDn + def.eave + tp * def.L);
+      this.high = Math.max(this.gUp + 0.6, this.gDn + def.eave + tp * (def.L + OVERHANG));   // eave height measured at the wall
       this.ridge = this.high;
     } else if (def.roof === 'gable') {
       this.ridge = Math.max(this.gDn + def.eave + tp * this.hl, this.gUp + 2.5);
