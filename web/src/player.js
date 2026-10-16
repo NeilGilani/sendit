@@ -399,6 +399,12 @@ export class Player {
       return;
     }
     if (P.landPowderScrub) this.velocity.multiplyScalar(Math.max(0.55, 1 - P.landPowderScrub * rawImpact * soft));
+    // Big drops onto steep landings turn the fall into speed; above landSpeedCap most of it goes into the snow.
+    if (P.landSpeedCap) {
+      const sp = this.velocity.length();
+      if (sp > P.landSpeedCap) this.velocity.multiplyScalar((P.landSpeedCap + (sp - P.landSpeedCap) * 0.35) / sp);
+      this.speed = this.velocity.length();   // not the in-air speed (vertical included) on the speedometer for a frame
+    }
     const velYaw = Math.atan2(-this.velocity.x, -this.velocity.z);
     // Landing on a sidewall bends the path; a rider lined up with the flight pivots into the new line
     // (PHYSICS.landRedirect degrees absorbed, 0 = off). preYaw = the flight direction before touchdown.

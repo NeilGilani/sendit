@@ -14,6 +14,7 @@ export const RAVENSPIRE_PHYSICS = {
     airSettleAngle: 100,          // launched mid-skid: square up in the air
     microHop: 0.12,               // skimming a bump at 30 m/s is not a landing
     landRedirect: 30,             // land on a ravine sidewall lined up: the skis pivot into the new line
+    landSpeedCap: 34,             // no 130 mph moments after a 40 m drop: the excess goes into the powder
     flow: { enabled: true },      // line chains, flow meter, SEND IT state (physics/flow.js)
     slowmo: { minAir: 2.4, scale: 0.45, easeIn: 0.15, hold: 0.5, easeOut: 0.35, cooldown: 5 },   // apex slow motion on huge airs
     // Speed: the soft cap starts at each gear's maxVelocity (below); terminal speed on the 41° face

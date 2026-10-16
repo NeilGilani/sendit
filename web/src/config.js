@@ -45,6 +45,7 @@ export const PHYSICS = {
   obstacleHeights: false,     // obstacles have a height: flying well above a tree or rock clears it
   wallCrashSpeed: 9,          // m/s into a building wall that knocks the rider down
   landRedirect: 0,            // deg: landing lined up with the flight, this much of the surface bending the path (a sidewall) is absorbed
+  landSpeedCap: 0,            // m/s: after a landing, speed above this is cut to 35 % of the excess (0 = off)
   microHop: 0,                // s: airs shorter than this (a bump skimmed at speed) re-ground quietly instead of being judged as landings
   airSettleAngle: 0,          // deg: with no spin going, a released stick squares the gear up to the path from this far out (0 = spinCheckAngle only)
   trickStyle: false,          // big-mountain trick extras: Tail grab / Truck driver on skis, tweaked grabs (labels, +50 % grab points)

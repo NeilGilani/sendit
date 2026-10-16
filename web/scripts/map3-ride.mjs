@@ -89,7 +89,7 @@ export function ride(type, key, style, opts = {}) {
   p.startRiding();
   game.score = 0;
   let t = 0, vSum = 0, n = 0, vMax = 0, crashes = 0, air = 0, airMax = 0, takeY = 0, drops = [], airSegs = [];
-  let wasAir = false, takeU = 0, roofT = 0, wall = 0;
+  let wasAir = false, takeU = 0, roofT = 0, wall = 0, vMaxAt = "", wasAirPrev = false;
   const DT = 1 / 60;
   const trace = [];
   while (t < 260) {
@@ -124,6 +124,7 @@ export function ride(type, key, style, opts = {}) {
       if (opts.script) opts.script(c, pl, t);
     };
     const was = p.state;
+    wasAirPrev = was === State.AIR;
     const prevVel = p.velocity.clone();
     p.step(DT);
     t += DT;
@@ -140,7 +141,7 @@ export function ride(type, key, style, opts = {}) {
     wasAir = p.state === State.AIR;
     if (p.state === State.AIR) { air += DT; airMax = Math.max(airMax, p.airTime); }
     if (p.state === State.GROUNDED) {
-      vSum += p.speed; n++; vMax = Math.max(vMax, p.speed);
+      vSum += p.speed; n++; if (p.speed > vMax) { vMax = p.speed; vMaxAt = `u${Math.round(u)} air-before ${wasAirPrev ? "yes" : "no"}`; }
       if (course.heightAt(p.position.x, p.position.z) !== null) roofT += DT;
     }
     if (process.env.TRACE && Math.abs(t % 1) < DT) trace.push(`${t.toFixed(0)}s u=${u.toFixed(0)} v=${p.position.z.toFixed(0)} y=${p.position.y.toFixed(0)} spd=${p.speed.toFixed(1)} st=${p.state}`);
@@ -153,7 +154,7 @@ export function ride(type, key, style, opts = {}) {
   const big = airSegs.filter((a) => a.air > 0.5 || /CRASH/.test(a.result));
   return {
     line: key, type, style, time: +t.toFixed(1), finished: p.position.x - START_X > 2560,
-    avg: +(vSum / Math.max(1, n)).toFixed(1), max: +vMax.toFixed(1), crashes,
+    avg: +(vSum / Math.max(1, n)).toFixed(1), max: +vMax.toFixed(1), vMaxAt, crashes,
     stumbles: events.filter((e) => e.kind === 'stumble').length, stumbleWhy: events.filter((e) => e.kind === 'stumble').map((e) => e.r).join(','), airTotal: +air.toFixed(1), airMax: +airMax.toFixed(2),
     roofSeconds: +roofT.toFixed(1), airs: big, trace, wall, score: game.score, flow: flowEv, judged,
   };
@@ -167,6 +168,7 @@ if (process.argv[1] && process.argv[1].endsWith('map3-ride.mjs')) {
     const r = ride(ty, k, style);
     console.log(`\n${LINES[k].name} · ${ty} · ${style}: ${r.finished ? 'finished' : 'DNF'} in ${r.time}s  avg ${r.avg} m/s (${(r.avg * 2.237).toFixed(0)} mph)  max ${r.max} (${(r.max * 2.237).toFixed(0)} mph)  crashes ${r.crashes}  stumbles ${r.stumbles}  air ${r.airTotal}s (max ${r.airMax}s)  roof ${r.roofSeconds}s`);
     if (r.stumbleWhy) console.log(`   stumbles: ${r.stumbleWhy}`);
+    if (process.env.VMAX) console.log(`   max speed at ${r.vMaxAt}`);
     for (const a of r.airs) console.log(`   air @u${a.u}: ${a.air}s  drop ${a.drop} m  in ${a.v} m/s  impact ${a.impact} m/s  → ${a.result} ${a.why || ''}`);
     if (r.judged) console.log(`   lines: ${(r.judged.goalList || []).join(", ") || "-"}   linked: ${(r.judged.featureList || []).join(", ")}
    judged ${r.judged.total}/100  (line ${r.judged.line.toFixed(0)} · fluidity ${r.judged.fluidity.toFixed(0)} · control ${r.judged.control.toFixed(0)} · air & style ${r.judged.style.toFixed(0)})  biggest drop ${r.judged.biggestDrop.toFixed(0)} m, longest air ${r.judged.longestAir.toFixed(1)} s`);
