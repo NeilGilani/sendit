@@ -611,8 +611,11 @@ function buildIceFalls(course, terrain) {
     // Icicles hanging off the lip, pointing down the face.
     let seed = 7;
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-    for (let v = vc - half + 0.5; v < vc + half - 0.5; v += 0.5 + rnd() * 0.7) {
-      const len = 0.8 + rnd() * rnd() * h * 0.45, r = 0.12 + rnd() * 0.18;
+    for (let v = vc - half + 0.5; v < vc + half - 0.5; v += 0.35 + rnd() * 0.6) {
+      // Clusters and gaps along the lip (where meltwater ran), long ones in the middle of each cluster.
+      const cl = Math.sin(v * 0.55 + ul) * 0.5 + Math.sin(v * 1.7 + ul * 0.3) * 0.3;
+      if (cl < -0.25 && rnd() < 0.8) continue;
+      const len = (0.5 + rnd() * rnd() * h * 0.5) * (0.6 + Math.max(0, cl) * 1.2), r = (0.1 + rnd() * 0.16) * (0.8 + len * 0.08);
       const c = new THREE.ConeGeometry(r, len, 5);
       c.rotateX(Math.PI);                                   // tip down
       const x = x0 + 0.4 + rnd() * 0.5, top = terrain.baseHeight(x0 - 0.3, v);
