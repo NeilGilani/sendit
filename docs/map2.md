@@ -140,6 +140,7 @@ The bot rides the real Player physics on the course's height field (1.25 m grid 
 through the real collision circles.
 
 ```
+node web/scripts/map2-bot.mjs --verify --tuck --check             # all map guarantees in one go (exit 1 on failure)
 node web/scripts/map2-bot.mjs both all --tuck --check --splits   # ski + board × main / fast / safe
 node web/scripts/map2-bot.mjs both all --tuck --check --ovr      # with the declared physics overrides
 node web/scripts/map2-bot.mjs --curve                            # lane radii and drift

@@ -9,6 +9,7 @@
 //   --flakes  which snowflakes the route collects (the game's pickup rule)
 //   --airs    list every air > 0.45 s by what launched it (t:air/impact!result)
 //   --pop     charge and pop off kicker lips
+//   --verify  the map's guarantees in one go (fair lines, radii, sightlines, rides); exit 1 on failure
 //   --sight   can riders see each pivot 30 / 40 / 50 m ahead? (crowns and crests block)
 //   --curve   print each lane's tightest radius and exit
 //   --line    follow the planned best line (planLine) instead of searching locally
@@ -336,8 +337,8 @@ const types = which === 'both' ? ['ski', 'snowboard'] : [which];
 const routes = routeArg === 'all' ? ['main', 'fast', 'safe'] : [routeArg];
 console.log(`Blackspruce bot: ${course.forest.trees.length} trees, finishAt ${course.finishAt.toFixed(0)} m${OVR ? ', physics overrides ON' : ''}${BRAKE ? `, brake above ${BRAKE} m/s` : ''}`);
 /** Tightest radius along each lane's centre line (6 m chords) — the curvature rule in docs/map2-research.md. */
-function curvature() {
-  const a = {}, b = {}, q = {};
+function curvature(quiet = false) {
+  const a = {}, b = {}, q = {}, out = [];
   for (const L of course.lanes) {
     let worst = [Infinity, 0], drift = [0, 0];
     for (let t = L.t0 + 7; t < L.t1 - 7; t++) {
@@ -348,8 +349,11 @@ function curvature() {
       const dr = Math.abs(course.laneAt(L, t + 1).d - course.laneAt(L, t - 1).d) / 2;
       if (dr > drift[0] && !CLEARINGS.some(([ct, cd, ca, cb]) => ((t - ct) / ca) ** 2 + ((course.laneAt(L, t).d - cd) / cb) ** 2 < 1)) drift = [dr, t];
     }
-    console.log(`  ${L.id.padEnd(16)} ${L.kind.padEnd(5)} min radius ${worst[0].toFixed(0).padStart(3)} m at t=${worst[1]}${CLEARINGS.some(([ct, cd, ca, cb]) => ((worst[1] - ct) / ca) ** 2 < 1) ? ' (in a clearing)' : ''}, steepest drift outside clearings ${drift[0].toFixed(2)} m/m at t=${drift[1]}`);
+    const inClr = CLEARINGS.some(([ct, cd, ca, cb]) => ((worst[1] - ct) / ca) ** 2 < 1);
+    out.push({ id: L.id, R: worst[0], t: worst[1], inClearing: inClr });
+    if (!quiet) console.log(`  ${L.id.padEnd(16)} ${L.kind.padEnd(5)} min radius ${worst[0].toFixed(0).padStart(3)} m at t=${worst[1]}${CLEARINGS.some(([ct, cd, ca, cb]) => ((worst[1] - ct) / ca) ** 2 < 1) ? ' (in a clearing)' : ''}, steepest drift outside clearings ${drift[0].toFixed(2)} m/m at t=${drift[1]}`);
   }
+  return out;
 }
 if (flag('curve', false)) { curvature(); process.exit(0); }
 
@@ -358,7 +362,7 @@ if (flag('curve', false)) { curvature(); process.exit(0); }
  * (1.7 m up, on the lane centre) to the pivot's trunk (1 m up) is blocked by another tree's crown
  * (radius ≈ 2.4 × crown width scale near the ground) or by the snow itself (a crest).
  */
-function sightlines() {
+function sightlines(quiet = false) {
   const TH = 8, th = new Map();
   for (const tr of course.forest.trees) {
     const k = `${Math.floor(tr[0] / TH)},${Math.floor(tr[1] / TH)}`;
@@ -396,10 +400,31 @@ function sightlines() {
     }
     if (/[ck]/.test(res[0] + res[1])) bad.push(`${laneId}@${Math.round(pt)}(${kind}):${res.join('')}`);
   }
+  if (quiet) return bad;
   console.log(`  sightlines: ${seen}/${total} clear (30/40/50 m before each of ${course.forest.pivots.length} pivots; + clear, p behind the previous pivot (rhythm), c crown, k crest)`);
   if (bad.length) console.log('  not visible from 30 or 40 m: ' + bad.join('  '));
+  return bad;
 }
 if (flag('sight', false)) { sightlines(); process.exit(0); }
+/** One command for CI / integration: the map's guarantees, exit code 1 on any failure. */
+if (flag('verify', false)) {
+  let fail = 0;
+  const check = (ok, what) => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${what}`); if (!ok) fail++; };
+  for (const r of ['main', 'fast', 'safe']) {
+    const c = planLine(r).clear; let mn = Infinity; for (const v of c) mn = Math.min(mn, v);
+    check(mn >= 1.0, `best ${r} line keeps >= 1.0 m from every hitbox (${mn.toFixed(2)} m)`);
+  }
+  const tight = curvature(true).filter((x) => !x.inClearing && x.R < 20);
+  check(!tight.length, `lane radii >= 20 m outside clearings${tight.length ? ': ' + tight.map((x) => x.id + '@' + x.t + ' ' + x.R.toFixed(0) + ' m').join(', ') : ''}`);
+  const hidden = sightlines(true);
+  check(!hidden.length, `every pivot visible from 30 and 40 m${hidden.length ? ': ' + hidden.join(' ') : ''}`);
+  for (const type of ['ski', 'snowboard']) for (const r of ['main', 'fast']) {
+    const res = ride(type, r);
+    check(res.finished && res.crashes <= 2, `${type} ${r} finishes with <= 2 crashes (${res.t.toFixed(0)} s, ${res.crashes})`);
+  }
+  console.log(fail ? `${fail} check(s) failed` : 'all map checks passed');
+  process.exit(fail ? 1 : 0);
+}
 const lines = {};
 if (LINE || FAIR) for (const r of routes) {
   lines[r] = planLine(r);
