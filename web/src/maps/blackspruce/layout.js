@@ -17,8 +17,8 @@ export const BLACKSPRUCE = {
   // Fall-line gradient profile [length m, degrees]. Steep tree sections broken by flatter
   // clearings (rest beats, kickers, gates).
   profile: [
-    [40, 10],    //    0  start gate
-    [30, 21],    //   40  roll-in
+    [30, 13],    //    0  start gate
+    [40, 23],    //   30  roll-in
     [110, 29],   //   70  The Drop-in (open, scattered old trees)
     [250, 32],   //  180  Spruce Gate glade
     [50, 15],    //  430  Kicker Meadow (clearing 1)

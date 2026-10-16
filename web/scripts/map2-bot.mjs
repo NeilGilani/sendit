@@ -4,6 +4,7 @@
 // The bot picks a route (which lanes it prefers), looks ~1 s ahead along its lane, and steers for
 // the lateral offset with the most clearance to the obstacles ahead — a skilled, not perfect, rider.
 // Usage: node web/scripts/map2-bot.mjs [ski|snowboard|both] [main|fast|safe|all] [--ovr] [--brake=<m/s>] [--splits]
+//   --curve   print each lane's tightest radius and exit
 //   --line    follow the planned best line (planLine) instead of searching locally
 //   --fair    print each route's bottlenecks: where even the best line has < 0.3 m clearance
 //   --check   scrub speed when even the best line ahead is tight
@@ -219,6 +220,21 @@ function ride(type, route) {
 const types = which === 'both' ? ['ski', 'snowboard'] : [which];
 const routes = routeArg === 'all' ? ['main', 'fast', 'safe'] : [routeArg];
 console.log(`Blackspruce bot: ${course.forest.trees.length} trees, finishAt ${course.finishAt.toFixed(0)} m${OVR ? ', physics overrides ON' : ''}${BRAKE ? `, brake above ${BRAKE} m/s` : ''}`);
+/** Tightest radius along each lane's centre line (6 m chords) — the curvature rule in docs/map2-research.md. */
+function curvature() {
+  const a = {}, b = {}, q = {};
+  for (const L of course.lanes) {
+    let worst = [Infinity, 0];
+    for (let t = L.t0 + 7; t < L.t1 - 7; t++) {
+      course.world(t - 6, course.laneAt(L, t - 6).d, a); course.world(t, course.laneAt(L, t).d, b); course.world(t + 6, course.laneAt(L, t + 6).d, q);
+      const ax = b.x - a.x, az = b.z - a.z, bx = q.x - b.x, bz = q.z - b.z;
+      const R = 6 / Math.max(1e-6, Math.abs(Math.atan2(ax * bz - az * bx, ax * bx + az * bz)));
+      if (R < worst[0]) worst = [R, t];
+    }
+    console.log(`  ${L.id.padEnd(16)} ${L.kind.padEnd(5)} min radius ${worst[0].toFixed(0).padStart(3)} m at t=${worst[1]}${CLEARINGS.some(([ct, cd, ca, cb]) => ((worst[1] - ct) / ca) ** 2 < 1) ? ' (in a clearing)' : ''}`);
+  }
+}
+if (flag('curve', false)) { curvature(); process.exit(0); }
 const lines = {};
 if (LINE || FAIR) for (const r of routes) {
   lines[r] = planLine(r);

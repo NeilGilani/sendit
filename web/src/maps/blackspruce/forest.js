@@ -169,7 +169,7 @@ export function planForest(course) {
     spacing *= 1 + Math.min(0.9, Math.max(0, g0 - 9) * 0.05);
     if (Math.abs(d) > W + 20) spacing = Math.max(spacing, 8.5);   // far side: cheaper, sparser
     // Young spruce fill the understorey of the dense sections (they collide like any other tree).
-    const young = S.spacing < 6 && g0 < 9 && rnd() < 0.14;
+    const young = S.spacing < 6 && g0 < 9 && rnd() < 0.08;
     const sc = young ? 0.42 + rnd() * 0.2 : S.scale[0] + (S.scale[1] - S.scale[0]) * Math.pow(rnd(), 0.9);
     let sx = sc * S.slim * (0.9 + rnd() * 0.2);
     // Trees lining a lane are narrow spires (a limbed glade): their crowns barely reach into the
@@ -251,7 +251,7 @@ export function populateForest(course, scatter) {
 function buildWood(course, T) {
   const g = new THREE.Group();
   g.name = 'Deadwood';
-  const bark = new THREE.Color('#4a3a2c'), barkDark = new THREE.Color('#33281f'), snow = new THREE.Color('#eef3fa'), wood = new THREE.Color('#9c7a52');
+  const bark = new THREE.Color('#4a3a2c'), barkDark = new THREE.Color('#33281f'), snow = new THREE.Color('#eef3fa'), wood = new THREE.Color('#6e5638');
   const paint = (geo, fn) => {
     const pos = geo.attributes.position, nor = geo.attributes.normal;
     const c = new Float32Array(pos.count * 3);
@@ -274,7 +274,8 @@ function buildWood(course, T) {
       p.setY(k, y * r); p.setZ(k, z * r);
     }
     body.computeVertexNormals();
-    paint(body, (x, y, z, nx, ny) => (ny > 0.55 ? snow : Math.abs(x) > 0.49 ? wood : (Math.sin(x * 40 + z * 7) > 0.6 ? barkDark : bark)));
+    // Bark dominates (a dark line across the snow reads from far away); snow only in patches along the top.
+    paint(body, (x, y, z, nx, ny) => (Math.abs(x) > 0.49 ? wood : ny > 0.8 && Math.sin(x * 23) + Math.sin(x * 57 + 1.3) > 0.2 ? snow : (Math.sin(x * 40 + z * 7) > 0.6 ? barkDark : bark)));
     const stub = new THREE.CylinderGeometry(0.08, 0.16, 1.1, 5).toNonIndexed();
     stub.rotateZ(0.9).translate(0.2, 0.8, 0.3);
     stub.computeVertexNormals();
