@@ -36,7 +36,7 @@ export const GARMENTS = {
       cut: {
         pantsEase: { thigh: 0.036, knee: 0.042, cuff: 0.048 },
         cuffY: 0.15,                               // hem height over the boot (to the lower buckles)
-        stack: { y0: 0.17, y1: 0.33, n: 3, amp: 0.012 },   // stacked folds above the boot
+        stack: { y0: 0.17, y1: 0.33, n: 3, amp: 0.016 },   // stacked folds above the boot
       },
     },
   },

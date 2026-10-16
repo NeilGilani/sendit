@@ -164,8 +164,8 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
           seam += max(chLine(abs(a) - rw, 0.002) * step(capV, v) * step(v, 0.42), chLine(v - capV, 0.002) * step(rw, abs(a))) * (1.0 - block);
           // elbow articulation darts (back of the arm)
           float ea = (uc + 0.25) * 0.62;
-          seam += chLine(v - 0.43 - ea * ea * 6.0, 0.0018) * step(abs(ea), 0.07);
-          seam += chLine(v - 0.49 + ea * ea * 6.0, 0.0018) * step(abs(ea), 0.07);
+          seam += chLine(v - 0.43 - ea * ea * 5.0, 0.0018) * step(abs(ea), 0.08);
+          seam += chLine(v - 0.475 - ea * ea * 5.0, 0.0018) * step(abs(ea), 0.08);
           // cuff: Velcro tab underneath + seam
           float cuffV = uHemY.z - 0.04;
           seam += chLine(v - cuffV, 0.002);
@@ -264,7 +264,7 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
         float crum = sin(cu * 23.0 + 2.0 * sin(v * 190.0 + sin(cu * 7.0))) * sin(v * 230.0 + 2.2 * sin(cu * 17.0 + 1.3));
         if (abs(id - 6.0) > 0.5) fabH += crum * 0.00016 * wr * cfade;   // (not on leather)
         // Fold occlusion: valleys between folds get less sky and sun; ridges catch a little more.
-        fabAO = (1.0 - seam * 0.25) * clamp(1.0 + vCrease * 26.0, 0.66, 1.1);
+        fabAO = (1.0 - seam * 0.25) * clamp(1.0 + vCrease * 22.0, 0.72, 1.1);
         diffuseColor.rgb = c;
       }`,
     band: FABRIC_LIGHT,
@@ -280,7 +280,7 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
 export function bodyMaterial(src) {
   const U = {
     uJacket: { value: col('#5e5f45') }, uPants: { value: col('#3a3129') }, uMitt: { value: col('#9c6f45') },
-    uBoot: { value: col('#202124') }, uBootAccent: { value: col('#5a5d63') }, uShrink: { value: 0.022 },
+    uBoot: { value: col('#33363b') }, uBootAccent: { value: col('#4a4d52') }, uShrink: { value: 0.022 },
   };
   const m = toonMaterial({
     name: 'riderBody', map: src.map, rim: 0.3, uniforms: U,
@@ -306,12 +306,27 @@ export function bodyMaterial(src) {
         float tot = max(vZone.r + vZone.g + vZone.b, 0.001);
         float boot = step(vObj.y, 0.6) * vZone.b / tot;
         vec3 cloth = (uJacket * vZone.r + uPants * vZone.g + mix(uMitt, uBoot, step(vObj.y, 0.6)) * vZone.b) / tot;
-        // Ski boot shell: buckles as lighter bands across the instep and cuff.
-        float bk = 0.0;
-        for (int i = 0; i < 3; i++) { float by = 0.06 + float(i) * 0.075; bk += (1.0 - smoothstep(0.004, 0.008, abs(vObj.y - by - vObj.z * 0.25))) * step(0.0, vObj.z + 0.03); }
-        cloth = mix(cloth, uBootAccent, clamp(bk, 0.0, 1.0) * boot);
+        // Ski boot: rubber sole, glossy lower shell, two metal buckles across the instep, a lighter
+        // shell panel on the outside of the heel.
+        vec3 bootCol = uBoot;
+        float out_ = abs(vObj.x) - 0.114;                     // + = outer side of the foot
+        float sole = 1.0 - smoothstep(0.02, 0.024, vObj.y);
+        float buckle = 0.0;
+        for (int i = 0; i < 2; i++) {
+          float zc = 0.015 + float(i) * 0.055;
+          buckle += (1.0 - smoothstep(0.005, 0.0075, abs(vObj.z - zc))) * step(0.045, vObj.y) * step(-0.015, out_) * step(out_, 0.07);
+        }
+        buckle = clamp(buckle, 0.0, 1.0);
+        float heel = (1.0 - smoothstep(0.0, 0.01, chBox(vec2(vObj.z + 0.11, vObj.y - 0.075), vec2(0.045, 0.03), 0.01))) * step(0.03, out_);
+        bootCol = mix(bootCol, uBootAccent, heel);
+        bootCol = mix(bootCol, vec3(0.55, 0.56, 0.58), buckle);
+        bootCol = mix(bootCol, vec3(0.025), sole);
+        cloth = mix(cloth, bootCol, step(vObj.y, 0.6) * vZone.b / tot);
         diffuseColor.rgb = mix(diffuseColor.rgb * vec3(1.03, 0.97, 0.94), cloth, vZone.a);
-        fabRough = mix(0.85, 0.32, boot * vZone.a); fabSpec = mix(0.15, 1.0, boot * vZone.a);
+        float bw = boot * vZone.a;
+        fabRough = mix(0.85, mix(mix(0.3, 0.22, buckle), 0.9, sole), bw);
+        fabSpec = mix(0.15, mix(mix(0.9, 2.5, buckle), 0.1, sole), bw);
+        fabSheen = mix(0.1, 0.0, bw);
       }`,
     band: FABRIC_LIGHT,
   });

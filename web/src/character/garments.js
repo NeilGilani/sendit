@@ -50,7 +50,7 @@ export function buildOutfitGeometry(body, cut) {
     const top = 1.575, bot = Math.max(hemF, hemB);
     const bones = B(/^(pelvis|spine_0[123]|neck_01|clavicle_[lr]|upperarm_[lr]|thigh_[lr])$/);
     const rings = bodyRings(body, {
-      axis: 'y', t0: top, t1: bot, rings: 46, segs, half: 0.03, bones,
+      axis: 'y', t0: top, t1: bot, rings: 62, segs, half: 0.03, bones,
       axisPoint: (t) => new THREE.Vector3(0, t, 0),
       filter: (x, y, z, b) => (b.startsWith('upperarm') ? Math.abs(x) < 0.2 : b.startsWith('neck') ? y < 1.56 : true),
       centre: (t, c) => new THREE.Vector3(0, t, c.z),
@@ -103,8 +103,8 @@ export function buildOutfitGeometry(body, cut) {
         const back = (1 - Math.cos(th)) / 2;
         r.off[k] = -(hemF - hemB) * back * smooth(1.05, bot, r.t);
         // Vertical drape folds below the chest, horizontal bunching above the hips at the back/sides.
-        const drape = pnoise(u * 9 + r.t * 1.5, r.t * 2.5, 9) * 0.006 + Math.sin(th * 7 + pnoise(u * 3, r.t * 3, 3) * 2.5) * 0.0035;
-        const bunch = Math.sin((r.t - 1.0) * TAU / 0.055 + pnoise(u * 6, 1.7, 6) * 2) * 0.0035 * bump(r.t, 1.05, 0.12) * (0.4 + back * 0.6);
+        const drape = pnoise(u * 9 + r.t * 1.5, r.t * 2.5, 9) * 0.009 + Math.sin(th * 7 + pnoise(u * 3, r.t * 3, 3) * 2.5) * 0.007;
+        const bunch = Math.sin((r.t - 1.0) * TAU / 0.06 + pnoise(u * 6, 1.7, 6) * 2) * 0.007 * bump(r.t, 1.05, 0.13) * (0.3 + back * 0.7);
         const lump = pnoise(u * 5, r.t * 4 + 3.1, 5) * 0.004;
         r.r[k] += drape * below + bunch + lump * smooth(1.45, 1.2, r.t);
       }
@@ -125,7 +125,7 @@ export function buildOutfitGeometry(body, cut) {
     const bones = B(new RegExp(`^(upperarm_${sd}|lowerarm_${sd}|clavicle_${sd})$`));
     const t0 = 0.19, t1 = cut.sleeveEnd;
     const rings = bodyRings(body, {
-      axis: 'x', side: s, t0, t1, rings: 34, segs, half: 0.022, bones,
+      axis: 'x', side: s, t0, t1, rings: 44, segs, half: 0.022, bones,
       axisPoint: (t) => new THREE.Vector3(s * t, J['upperarm_' + sd].y, J['upperarm_' + sd].z),
       filter: (x, y) => y > 1.3,
       smoothA: 2, smoothT: 3, minEase: 0.012,
@@ -157,8 +157,8 @@ export function buildOutfitGeometry(body, cut) {
       for (let k = 0; k < segs; k++) {
         const th = (k / segs) * TAU, u = k / segs;
         const inner = Math.max(0, Math.sin(th));          // front of the arm = inside of the elbow bend
-        const elbow = Math.sin((r.t - 0.46) * TAU / 0.05 + pnoise(u * 4, 2.3, 4) * 1.5) * 0.006 * bump(r.t, 0.46, 0.08) * (0.35 + inner * 0.9);
-        const wrist = Math.sin((r.t - t1) * TAU / 0.028 + pnoise(u * 5, 4.1, 5) * 2.2) * 0.006 * bump(r.t, t1 - 0.07, 0.05);
+        const elbow = Math.sin((r.t - 0.46) * TAU / 0.055 + pnoise(u * 4, 2.3, 4) * 1.5) * 0.011 * bump(r.t, 0.46, 0.09) * (0.3 + inner * 0.9);
+        const wrist = Math.sin((r.t - t1) * TAU / 0.032 + pnoise(u * 5, 4.1, 5) * 2.2) * 0.009 * bump(r.t, t1 - 0.07, 0.055);
         const twist = pnoise(u * 4 + r.t * 3, r.t * 5, 4) * 0.004;
         r.r[k] += elbow + wrist + twist;
       }
@@ -180,7 +180,7 @@ export function buildOutfitGeometry(body, cut) {
     const t0 = 1.02, t1 = cut.cuffY;
     const knee = J['calf_' + sd].y;
     const rings = bodyRings(body, {
-      axis: 'y', t0, t1, rings: 52, segs, half: 0.025, bones,
+      axis: 'y', t0, t1, rings: 70, segs, half: 0.025, bones,
       axisPoint: (t) => new THREE.Vector3(s * 0.114, t, -0.04),
       filter: (x, y, z, b) => (b === 'pelvis' ? x * s > 0.015 : true) && (y > 0.14 || z < 0.0),
       smoothA: 3, smoothT: 4, smoothC: 5, minEase: 0.015,
@@ -203,9 +203,9 @@ export function buildOutfitGeometry(body, cut) {
         const stackY = (r.t - st.y0) / (st.y1 - st.y0);
         const roll = stackY > -0.1 && stackY < 1.1 ? Math.pow(Math.max(0, Math.sin(stackY * Math.PI * st.n + pnoise(u * 5, 7.3 + s, 5) * 0.9)), 1.5) * st.amp : 0;
         // Knee: compression folds behind the knee, softer ones in front.
-        const kf = Math.sin((r.t - knee) * TAU / 0.045 + pnoise(u * 4, 3.3 + s, 4) * 2) * bump(r.t, knee + 0.02, 0.09) * (0.002 + back * 0.006);
+        const kf = Math.sin((r.t - knee) * TAU / 0.05 + pnoise(u * 4, 3.3 + s, 4) * 2) * bump(r.t, knee + 0.02, 0.1) * (0.003 + back * 0.011);
         // Long drape folds down the thigh and shin, a slight twist.
-        const drape = pnoise(u * 6 + r.t * 2.2 * s, r.t * 2, 6) * 0.006;
+        const drape = pnoise(u * 6 + r.t * 2.2 * s, r.t * 2, 6) * 0.009 + Math.sin(u * TAU * 5 + r.t * 9 * s + pnoise(u * 3, r.t * 4, 3) * 2) * 0.004 * smooth(0.95, 0.75, r.t);
         r.r[k] += roll + kf + drape;
         // Pre-bent knee: the fabric hangs forward of the kneecap.
         if (Math.cos(th) > 0) r.r[k] += Math.cos(th) * 0.012 * bump(r.t, knee, 0.12);
