@@ -22,13 +22,17 @@ docs/map2-research.md.
 
   Every split merges back before a clearing and its gate.
 - **Clearings are the rest beats:** Start, Kicker Meadow (M kicker with a crowd plus a small side kicker), Pillow Garden (below the rock band), the Saddle, Big Air (L kicker plus a side M), and the Finish. Small glade pockets sit inside the long tree sections.
-- **The rock band** (t ≈ 812 m) is a 4.5 m cliff across the face. Drop it from the Needles slot, or ride the Notch (the main line) or the Ramp (the safe line's chute).
+- **The rock band** (t ≈ 812 m) is a 4.5 m cliff across the face. Orange-and-black poles mark its lip, and two of them frame the slot's drop. Drop it from the Needles slot (about 1.2 s of air), or ride the Notch (the main line) or the Ramp (the safe line's chute).
+- **Deadfall** also has snags: dead standing spruce, bare and broken-topped. They collide with their trunk.
 - **Deadfall** has fallen logs across the main line and the high line. Snow drifts up their uphill side, so each log is a small natural kicker: ollie it or roll it.
 - **Score:**
   - Close shaves (+15 each, existing) plus **Threaded** (+30 under 0.9 m from a hitbox).
   - **Tree slalom ×N**: close shaves chained less than 1.6 s apart bank +40·N/5 at every 5th.
   - Everything feeds the Challenge combo multiplier.
-- **Challenge:** 9 checkpoint gates (16–24 m wide, all at convergence points), 12 snowflakes (most on the slots, over the cliff and above the kickers), a ghost, and map-specific medals (see Tunables).
+- **Thread a spruce** closer than 1.3 m and its branches dump their snow on your side.
+- **Challenge:** 9 checkpoint gates (16–24 m wide, all at convergence points), a ghost, and map-specific medals (see Tunables).
+- **Snowflakes (12):** five sit on the slots, one at the apex of the cliff drop, and one each on the low line and the left Old Growth line. One is by a Drop-in pillow, one is past a Pillow Garden stack, and one is on the flow line near the finish. Two float over the kickers and need a popped jump: an unpopped arc passes under them.
+- **The lobby** stands at the top of Kicker Meadow, looking down at the kicker and its crowd.
 
 ## Sections (t = metres down the fall line)
 
@@ -124,7 +128,8 @@ No physics files or player.js were edited.
   - Rocks: their visible sunk footprint, 1.0–1.1 × scale.
   - Stumps: their radius.
 - Logs have no hitbox: they are in the height field, so what you see is what you ride over.
-- Fork signs are breakaway markers that don't collide, like the slalom gates' poles.
+- Fork signs and the rock band's lip poles are breakaway markers that don't collide, like the slalom gates' poles.
+- **Sightlines:** every pivot is visible from the lane 30 m and 40 m before it (≥ 2 s at speed). Trees whose crowns would hide one are removed (sightline thinning), and lane-mouth marker trees are tall and narrow. The only view still blocked is from 50 m, behind the previous pivot (the lane's rhythm). Check: `--sight`.
 - **Lane curvature:** every lane's tightest radius is ≥ 24 m (main, safe) and ≥ 36 m (slots). Tighter merges only happen inside clearings. Rule: R ≥ v²/(2.2 g) × 1.2. Check: `node web/scripts/map2-bot.mjs --curve`.
 - **Best-line check:** dynamic programming per route finds a line with at least **1.18 m** of room to every hitbox on all three routes. Check: `--fair`.
 
@@ -138,7 +143,21 @@ node web/scripts/map2-bot.mjs both all --tuck --check --splits   # ski + board �
 node web/scripts/map2-bot.mjs both all --tuck --check --ovr      # with the declared physics overrides
 node web/scripts/map2-bot.mjs --curve                            # lane radii and drift
 node web/scripts/map2-bot.mjs ski all --fair                     # best-line clearance per route
+node web/scripts/map2-bot.mjs --sight                            # can riders see each pivot 30 / 40 / 50 m ahead
+node web/scripts/map2-bot.mjs both fast --tuck --check --airs --pop --flakes   # every air (feature, air time, impact, apex) + snowflakes
 ```
+
+Jump audit, main and fast lines, both gear types; every landing clean:
+
+| Feature | Air | Air when popped | Impact |
+|---------|-----|-----------------|--------|
+| Rollers | 0.9 s | — | 4–5 m/s |
+| Logs | 0.6–0.9 s | — | 3–4 m/s |
+| Cliff (slot) | 1.2 s | — | 10 m/s |
+| M kicker | 1.5 s (apex 3.8 m) | 2.2 s (apex 6 m) | 7–9 m/s |
+| L kicker | 1.7 s (apex 4.9 m) | 2.3 s (apex 7.4 m) | 9–10 m/s |
+
+The stumble threshold is 12.5 m/s.
 
 Flags:
 - `--tuck`: tuck on straight stretches.
