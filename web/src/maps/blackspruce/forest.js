@@ -254,15 +254,18 @@ export function forestObstacles(course) {
 // ------------------------------------------------------------------ into the scene
 export function populateForest(course, scatter) {
   const T = scatter.terrain, F = course.forest;
+  // Keep clear of what life.js builds (the lodge's clearing): scatter.clearings = [[x, z, r]].
+  const free = (x, z) => !(scatter.clearings || []).some(([cx, cz, r]) => Math.hypot(x - cx, z - cz) < r + 3);
   for (const [x, z, sc, sx, sy, kind, yaw] of F.trees) {
-    if (!T.isInside(x, z, 20)) continue;
+    if (!T.isInside(x, z, 20) || !free(x, z)) continue;
     scatter.trees.add(x, T.getHeight(x, z) - 0.3, z, yaw, sx, sy, sx, kind);
     (scatter.wells || (scatter.wells = [])).push([x, z, sc]);
   }
-  for (const o of forestObstacles(course)) scatter.addObstacle(...o);
+  for (const o of forestObstacles(course)) if (free(o[0], o[1])) scatter.addObstacle(...o);
   const q = new THREE.Quaternion(), s = new THREE.Vector3(), pv = new THREE.Vector3(), m = new THREE.Matrix4();
   const up = new THREE.Vector3(0, 1, 0), n = new THREE.Vector3();
   for (const [x, z, sc, yaw, variant] of F.rocks) {
+    if (!free(x, z)) continue;
     T.getNormal(x, z, 2, n);
     q.setFromUnitVectors(up, n).multiply(new THREE.Quaternion().setFromAxisAngle(up, yaw));
     pv.set(x, T.getHeight(x, z) - 0.3 * sc, z);

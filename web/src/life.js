@@ -75,8 +75,8 @@ export class Life {
   }
 
   // ---------------------------------------------------------------- skiers on the run
-  buildSkiers(n = this.course.life?.skiers ?? 10) {
-    const rnd = this.rnd, L = this.course.finishAt, k = this.course.life?.spread ?? 1;   // a map may keep them tight to its line
+  buildSkiers(n = this.course.life?.skiers ?? 10) {   // a map may set how many (course.life)
+    const rnd = this.rnd, L = this.course.finishAt;
     this.skiers = [];
     for (let i = 0; i < n; i++) {
       const g = skierGeometry(JACKETS[i % JACKETS.length], PANTS[i % PANTS.length], JACKETS[(i + 3) % JACKETS.length], JACKETS[(i + 5) % JACKETS.length]);
@@ -85,7 +85,7 @@ export class Life {
       this.group.add(mesh);
       this.skiers.push({
         mesh, s: (i / n) * L * 0.9 + rnd() * 40, speed: 6.5 + rnd() * 5,
-        amp: (3 + rnd() * 6) * k, wave: 26 + rnd() * 24, phase: rnd() * 6.28, side: (rnd() - 0.5) * 6 * k, roll: 0,
+        amp: 3 + rnd() * 6, wave: 26 + rnd() * 24, phase: rnd() * 6.28, side: (rnd() - 0.5) * 6, roll: 0,
       });
     }
   }
