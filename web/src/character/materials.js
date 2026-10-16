@@ -122,17 +122,27 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
           // centre-front zip with a storm flap
           zip = chLine(x, 0.0055) * step(v, 1.66);
           seam += chLine(x - 0.02, 0.0018);
+          float pull = 0.0;   // zip pulls (accent)
           // two chest pocket zips, angled out
           for (int s = 0; s < 2; s++) {
             float sx = s == 0 ? 1.0 : -1.0;
-            float px = sx * x - (0.065 + (v - 1.22) * 0.18);
-            zip += chLine(px, 0.0035) * step(1.22, v) * step(v, 1.40) * (1.0 - back);
+            float px = sx * x - (0.07 + (v - 1.24) * 0.16);
+            zip += chLine(px, 0.0035) * step(1.24, v) * step(v, 1.42) * (1.0 - back);
+            pull = max(pull, 1.0 - step(0.0, chBox(vec2(px - 0.006, v - 1.405), vec2(0.004, 0.011), 0.003)));
             // hand pockets: high and angled
             float hx = sx * x - 0.1 - (v - 0.95) * 0.58;
             zip += chLine(hx, 0.0032) * step(0.95, v) * step(v, 1.1) * (1.0 - back);
           }
-          // hem band seam + drawcord channel
+          // hem band seam + drawcord channel, cord toggles at the side seams
           seam += chLine(v - (uHemY.x + 0.03), 0.002);
+          vec2 tg = vec2((abs(uc) - 0.25) * 1.42, v - uHemY.x - 0.016);
+          float tog = 1.0 - step(0.0, chBox(tg, vec2(0.007, 0.011), 0.004));
+          c = mix(c, uAccent * 0.8, tog);
+          fabH += tog * 0.003;
+          // zip pull of the main zip at the chin
+          pull = max(pull, 1.0 - step(0.0, chBox(vec2(x - 0.008, v - 1.57), vec2(0.005, 0.014), 0.003)));
+          c = mix(c, uAccent, pull * (1.0 - back));
+          fabH += pull * 0.002;
           // logo: small accent chevron on the left chest, a bar across the back yoke
           vec2 lp = vec2(x - 0.115, v - 1.355);
           float chev = step(abs(lp.x) * 0.55 + lp.y, 0.009) * step(-0.009, lp.y - abs(lp.x) * 0.55 + 0.0) * step(abs(lp.x), 0.018);
