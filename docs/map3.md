@@ -39,9 +39,9 @@ spines, pillows and cliff lips have a lit and a shaded side.
 | 540…940 | mid face | 38° | **Beak Steps**, **West Ledges**, the **Hammer** (36 m, far right, u 905) |
 | 990 / 1160 / 1390 | **the Stacks** | 41° landings, ~30° benches | three bands 170–230 m apart: the **First Stack** (11–19 m), **the Throne** (13–28 m, peak at v ≈ −40), the **Last Stack** (9–19 m) — cliff into cliff; **Left Ledges** (u 1150), **East Ledges** (u 1185) |
 | 1418 | **Station Cliff** | | 15–19 m band above the **Old Lift Station** (roof rideable); the station's 24 m weather mast and windsock poke over the lip and mark the roof |
-| 1400…1700 | apron | 34° | the station, **Cable Drop** (8 m, u 1585, right under the old cable below the station's eave), the abandoned gondola line, **Lower Steps** |
-| 1560…1800 | **pillow stacks** (left) | 27° base | terraced pillows: flat-ish tops, ~4 m rounded drops |
-| 1700…2100 | lower bowl | 27° → 19° | wind lips and rollers, the **Corvo Refuge** (rideable roof, stone chimney), larches |
+| 1370…1600 | apron | 34° | the station, **Cable Drop** (8 m, u 1585, right under the old cable below the station's eave), the abandoned gondola line, **Lower Steps** |
+| 1560…1800 | **pillow stacks** (left) | 34° → 27° base | terraced pillows: rolling tops, ~4 m rounded drops every 9 m, staggered lobes (a second field low on the left, u 2030–2290) |
+| 1600…2100 | lower bowl | 27° → 19° | wind lips and rollers, the **Corvo Refuge** (rideable roof, stone chimney), larches |
 | 2100…2540 | runout | 10° → 5° | A-frame cabins, the **Valley Station**; **run complete at u = 2540** |
 | 400…2180 | **the Ravine** (right, v ≈ 340–480) | 41° → 25° | couloir entrance, up to 54 m deep, rock walls and quarter-pipe banks, frozen ledges (4–5 m) and **Frozen Falls** (u 1330: a 9 m ice-sheeted ledge with icicles), bends around the station's knoll |
 
@@ -70,7 +70,7 @@ spines, pillows and cliff lips have a lit and a shaded side.
 | Corvo Refuge | u 1880, v −175 | gable, 33° (ridge across the fall line) | the drift reaches 85 % up the uphill slab: over the ridge, down the slab, 7 m off the eave; stone chimney is solid, wood smoke leans downwind from it (you see the plume from far up the bowl) |
 | A-frames × 3 | u ≈ 2290, v 120–205 | 56° slabs | drifted on the uphill side; steep slab landings |
 | Valley Station ("Talstation") | u 2400, v 300 | gable, 26° | low roof at the bottom of the gondola |
-| abandoned gondola | station → valley station | | 6 rusty leaning towers (collision), sagging haul ropes, two forgotten cabins |
+| abandoned gondola | station → valley station | | 6 rusty leaning towers (collision), sagging haul ropes, two forgotten cabins; the station's weather mast collides too |
 
 Walls are solid: a glancing touch slides along the wall (no snagging — a Steep complaint), a square hit
 faster than 9 m/s knocks you down. Snow on every roof is the rideable surface itself (the roof snow mesh
@@ -84,7 +84,7 @@ is sampled from the same function the physics uses).
 web/src/maps/ravenspire/
   index.js       registerMap (id 'ravenspire', order 3), thumbnail (inline SVG), lobby spot; loads props.js lazily
   layout.js      every feature in one place: profile, face width, BANDS, SPINES, PILLOWS, RAVINE, HITS,
-                 BUILDINGS, GONDOLA, BUTTRESSES (tunables)
+                 BUILDINGS, GONDOLA, BUTTRESSES, DROP_ZONES, LINE_GOALS, RIDE_LINES (tunables)
   course.js      RavenspireCourse: the height function, tile generation (heights, normals, rock + packed
                  snow splat, far grid), Course-compatible interface, features hooks, scatter hooks
   structures.js  Structure: roof surface (mono / gable / A-frame + snow load), walls (block test), drifts
@@ -127,8 +127,9 @@ web/src/maps/builtin.js     one line: import './ravenspire/index.js';
   face drops `h` over `max(1.4, 0.11·h)` m onto the unchanged 41° landing. Height varies across the band
   (noise, a peak, tapered ends, ramp-around gaps); a soft rounded snow lip; rock teeth on the lip mark the
   edge from above.
-- **Pillows** — terraced: every `step` m the slope pauses (flat top), rolls over and drops over the last
-  40 % of the step; wavy across the field, broken into rounded lobes.
+- **Pillows** — terraced: every `step` m the slope pauses on a rolling top (`top` = 70 % of the step, still
+  falling gently so you never land into the next riser), then drops; wavy across the field, broken into
+  rounded lobes with deep gaps between them.
 - **Hits** — rollers (symmetric) and wind lips (15 m up, 2.6 m abrupt down = natural kickers).
 - **Ravine** — carved last: a half-pipe floor, quarter-pipe transitions, steep rock walls and a rounded rim;
   depth up to 54 m; frozen ledges are benches in the floor.
@@ -148,7 +149,7 @@ snow** on convex crests (Laplacian) — packed snow is faster and lands harder (
 | features.js | `heightAt(x, z, base)`, `blockAt(...)` | rideable roofs, solid walls (`terrain.features.heightAt / blockAt`) |
 | features.js | `buildProps({ terrain })`, `obstacles` | the map's meshes; gondola tower collision circles |
 | life.js | `life: { skiers: 0, lodge: false }` | no other riders, no lodge (birds stay) |
-| scatter.js | `spawn: {...}` (SPAWN overrides), `forestAt / pisteAt / treeline` | fewer, smaller boulders on the face; larches only low, clearings around buildings and under the gondola |
+| scatter.js | `spawn: {...}` (SPAWN overrides), `forestAt / pisteAt / treeline` | fewer, smaller boulders on the face; larches only low, clearings around buildings and under the gondola, 10–30 m glades along the canonical lines |
 | scatter.js | `rockOk(x, z)` | rock clusters stay off the lines, drop zones and ravine floor |
 | activities.js | `challenge: { medalSpeeds }` | medal speeds for a fast map (24 / 20 / 16 m/s) |
 | activities.js | `flakeSpots()` | the 12 golden snowflakes at hand-picked spots instead of along the course path |
@@ -210,7 +211,7 @@ defaults. Maps load at boot (a map switch reloads the page), so "reset when anot
 | `compressionStumble` / `Crash` | 11 / 17 m/s | flat-bottoming at 30 m/s hurts |
 | `airGravity` | 0.9 | a little floatier: longer hang time |
 | `landPowderAbsorb`, `landPowderScrub` | 5 m/s, 0.012 | 15–25 m drops onto 41° powder land clean; big impacts cost speed |
-| `hardLanding` / `crashImpact` | 17 / 24 m/s (after absorption) | the Hammer stumbles unless rolled and straight |
+| `hardLanding` / `crashImpact` | 17 / 24 m/s (after absorption) | a full send off the Throne (~16.5 m/s) lands clean; the Hammer stumbles unless rolled and straight |
 | `landYawSpeed` | [18, 32, 0.75] | sideways landings at speed are less forgiving |
 | `landClean` / `landStumble` | 18° / 32° ski (crash 40°), 18° / 46° board | |
 | pop, spin, flip | popMax 4.2 / 4.6, spinRateMax 7.2 / 8.2, flipRateMax 6.0 / 6.2 | bigger tricks for bigger air |
@@ -234,14 +235,14 @@ spin, W / S to flip; Shift grabs. On this map (trickStyle):
   after what you launched off (`course.featureAt`): "The Throne · 26 m drop", "Spine Wall · 14 m drop".
   Landing on a roof scores **Roof landing · Old Lift Station** (+200).
 - **Pillow line**: clean landings off pillow after pillow (each within 3 s of the last) score **Pillow line ×N**
-  from the third on (40 × N, capped at ×6, times the flow multiplier); a full send down the stacks chains ×9–×12.
+  from the third on (40 × N, capped at ×6, times the flow multiplier); a full send down the field chains ×5–×8.
 - **Stomp boost** (flow maps): a STOMPED landing pushes you out 1.5 m/s faster along the line
   (`flow.stompBoost`), with its own sound; finishing a line goal plays a fanfare.
 - **Line goals** (`course.lineGoals`, Steep "Mountain Stories" style): hit named features in order in one
   clean run — **The Classic** (Band A → First Stack → Throne → Last Stack, +2500), **Station to Station**
-  (Station Cliff → the station roof → Cable Drop, +2000), **Spine Tingler** (Spine Wall → West Ledges → Pillow Stacks),
+  (Station Cliff → the station roof → Cable Drop, +2000), **Spine Tingler** (Spine Wall → West Ledges → Pillow Stacks, +1500),
   **Into the Gorge** (the Couloir → the Ravine → Frozen Falls, +1500), **Hammer Time** (land the Hammer clean, +2000), **Roof
-  Hopper** (the station roof and the refuge roof). Progress ticks show in the chain area; a crash resets it.
+  Hopper** (the station roof and the refuge roof, +1800). Progress ticks show in the chain area; a crash resets it.
 - **Line chain** (physics/flow.js): every scored move keeps the chain alive; the multiplier grows ×0.25 per
   *different* move (repeats count half) up to ×5; the chain banks as a **Line ×N** bonus 3.2 s after the last
   move on the snow (the air keeps it alive) and is lost on a crash.
@@ -280,6 +281,9 @@ starts it holds a moment, lifts and banks away past the spire with a synthesized
 | what | where |
 |---|---|
 | feature placement, heights, widths, buildings, gondola | `maps/ravenspire/layout.js` |
+| drop zones, line goals, the canonical lines (glades through the larches, rocks kept off) | `layout.js` (`DROP_ZONES`, `LINE_GOALS`, `RIDE_LINES`); glade width in `course.pisteAt`, rock margins in `course.rockOk` |
+| snowflake spots | `course.js` (`flakeSpots()`) |
+| chimney smoke, mast, ice falls | `props.js` (`buildSmoke`, `buildMast`, `buildIceFalls`) |
 | bench length per metre of cliff (`BENCH_PER_M` = 4), lip shape, rock teeth | `course.js` (`cliff()`, `bands()`) |
 | speeds, landings, powder, slow-mo, flow on/off, camera | `maps/ravenspire/tuning.js` |
 | flow meter / chain / SEND IT numbers | `physics/flow.js FLOW_DEFAULTS` (or `physics.common.flow` per map) |
