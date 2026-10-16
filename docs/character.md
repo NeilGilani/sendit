@@ -57,17 +57,22 @@ All geometry is made in the body's **bind pose** (T-pose, Y up, facing +Z, metre
    tips) or a gaiter cuff (`gaiterEnd`: an inner elastic gaiter that closes onto the boot).
 5. **Skin.** `skinPiece()` copies weights from the 8 nearest body vertices (inverse-distance blend,
    restricted to the piece's bones and an optional `skinMask`), diffuses them over the grid so folds bend
-   together, and keeps the top 4. Special cases: mitts are rigid on the hand bone; the collar's base is
-   `anchor`ed to `spine_03` so it rides with the jacket it is sewn into; only the top of the jacket's
-   shoulder may follow the upper arm (the armpit stays with the trunk, the sleeve covers the armhole).
+   together, and keeps the top 4. Controls: `rigid` (one bone), `anchor` (below / above a coordinate the
+   piece follows one bone, blending to the transferred weights), `skinMask` (which body vertices may
+   donate), `weightLimit` (cap a bone's share, re-applied after smoothing). Used for: mitts rigid on the
+   hand; the collar's base anchored to `spine_03`; the sleeve head anchored to the clavicle so it never
+   swings out through the yoke; the gaiter anchored to the neck; the jacket's shoulder taking at most
+   55 % of the upper arm, and only at the outer edge (the chest panel stays flat when the arms reach).
 6. **Merge.** All pieces become one `SkinnedMesh` (`Outfit`, one draw + one shadow draw) bound to the
    body's skeleton. Attributes: `aG = (piece id, u around, v along, side)`, `aLin` (lining).
 
 The body under the clothes stays (it gives the head, boots and the silhouette in odd poses), but
-`bodyMaterial` pulls covered skin inward in the vertex shader: arms collapse toward the arm axis
-(they are always sleeved), the trunk, legs and hands shrink along their normals. It takes the garment
+`bodyMaterial` pulls covered skin inward in the vertex shader: arms and hands collapse toward their
+axis (they are always sleeved / gloved, and the fingers curl into the fist), the trunk and legs shrink
+along their normals. The **mitts** are closed fists (a rounded box over the knuckles plus a thumb lobe)
+rigid on the hand bone, so they read as gripping the poles even though the rig's fingers are straight. It takes the garment
 colours too, so a fold that ever shows skin shows the right colour. Boots render as glossy plastic
-shells with buckle bands.
+shells with metal buckles, a heel panel and a rubber sole.
 
 The **helmet** is fitted to the head's measurements: a superellipse plan (rounded square), a flattish
 domed crown 2.6 cm above the scalp, a lower edge that sits on the brow line in front and drops behind the
@@ -85,11 +90,13 @@ hooks, so they sit in the same light as the terrain:
 
 - **fabricMaterial**: panel layout per piece computed from `aG` (yoke, side panels, raglan stripe,
   colour blocks, cuffs, kick patches), zips, seams, pockets, logos; bump-mapped seams + anisotropic
-  wrinkles (gradient noise, periodic around each piece, faded with distance); BRDF = Lambert +
+  wrinkles (gradient noise, periodic around each piece, faded with distance), a fine crumple
+  (warped sines: no lattice lines) and fold occlusion from each vertex's crease depth (`aCrease`); BRDF = Lambert +
   Charlie sheen (matte nylon fuzz) + a broad GGX lobe + grazing sky sheen (brighter rims). Leather mitts,
   fleece gaiter and nylon gauntlets change roughness / sheen / spec per piece.
 - **bodyMaterial**: shrink + garment colours + glossy boots.
-- **helmetMaterial**: matte shell (rough 0.62), vent slots with bevels, ear pads, liner, strap print.
+- **helmetMaterial**: hybrid shell (matte top over a glossier lower band split by a parting groove),
+  vent slots with bevels, ear pads, liner, padded strap with wordmarks.
 - **lensMaterial**: mirror: a sky → horizon → snow environment (with a procedural mountain skyline and
   the lens's own vertical gradient) tinted by the coating, Fresnel, iridescent shift at grazing angles,
   and an HDR sun glint that blooms.
@@ -107,7 +114,7 @@ wrinkle detail fades out by itself with distance.
 |---|---|---|
 | jacket | `tuff-shell`, `storm-shell` | `hemFront`, `hemBack`, `jacketEase {shoulder, chest, hem}`, `sleeveEase {upper, elbow, forearm}`, `sleeveEnd`, `collarTop`, `hood: 'down' \| 'up'`, `gaiter`, `gaiterTop` |
 | pants | `tuff-bib` | `pantsEase {thigh, knee, cuff}`, `cuffY`, `stack {y0, y1, n, amp}` |
-| gloves | `tuff-mitt` | `mittEase`, `gauntlet [start |x|, ease at the open end]` |
+| gloves | `tuff-mitt` | `mittLength` (|x| where the fist ends; wrist at 0.706), `gauntlet [start |x|, ease at the open end]` |
 | helmet | `tuff-helmet` | `shape {width, front, back, top, brim}` |
 | goggles | `tuff-goggle` | `shape {width, height, radius}` |
 
@@ -180,7 +187,7 @@ GPU timer queries per draw (`web/scripts/gfxgpu.mjs`, quality 1, 1600×900, chas
 | | before (toon suit + sphere helmet) | after |
 |---|---|---|
 | rider body | 0.06 ms draw + 0.04 ms shadow | 0.05 + 0.02 |
-| outfit (1 skinned mesh, 12.7 k vertices, 24 k triangles) | – | 0.08 + 0.04 |
+| outfit (1 skinned mesh, 15.9 k vertices, 30 k triangles) | – | 0.07 + 0.03 |
 | helmet + lens (3.1 k + 1.1 k vertices) | < 0.01 | 0.01 |
 | rider total | ≈ 0.10 ms (+0.17 ms eyebrow shadow artefact in both) | ≈ 0.20 ms |
 
@@ -202,5 +209,5 @@ No new asset files: everything is generated in code, so CREDITS.md is unchanged.
 - Poles and skis / board keep their equipment-catalog colours (pink poles), which can clash with
   earth-tone colourways; equipment colours are the equipment code's business.
 - Logos are abstract marks (no text rendering); the strap wordmark is blocky glyphs.
-- Helmet cam: the bulkier sleeves and gauntlets now hide most of the pole shafts, which `placePoles()`
-  runs along the forearms (animation code, untouched here).
+- Helmet cam: sleeves and gauntlets are slimmed 25 % in first person, but the pole shafts still run
+  along the forearms (`placePoles()`, animation code untouched here), so they are mostly hidden.

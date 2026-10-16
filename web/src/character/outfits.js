@@ -85,9 +85,9 @@ export const COLORWAYS = {
   },
   nightshift: {
     name: 'Nightshift', blurb: 'All black, tonal panels, an acid-mint lens.',
-    jacket: { base: '#18191b', panel: '#2b2d31', accent: '#2bf0c8', gaiter: '#2a2c30', style: 0 },
-    pants: { base: '#121315', cuff: '#08090a' },
-    helmet: { base: '#1a1b1c', liner: '#0c0c0d', accent: '#2bf0c8' },
+    jacket: { base: '#25272b', panel: '#3b3f45', accent: '#2bf0c8', gaiter: '#34373c', style: 0 },
+    pants: { base: '#1d1f22', cuff: '#0e0f11' },
+    helmet: { base: '#24262a', liner: '#0f1012', accent: '#2bf0c8' },
     goggles: { lens: '#2bf0c8', lensBase: '#0e5e52', strap: '#0b0b0c', strapLogo: '#2bf0c8' },
     gloves: { base: '#1e1e1e', cuff: '#111112' },
   },
