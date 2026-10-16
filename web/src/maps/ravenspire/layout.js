@@ -27,9 +27,11 @@ export const BEHIND = [[22, 3], [260, -31], [9000, -9]];   // behind the start (
 // Face width: ridge crest distance from the centre line, and the ridge height above the centre.
 export const FACE = {
   halfWidth: (u) => 380 + 0.47 * Math.min(Math.max(u, 0), 1350) + 0.25 * Math.max(0, u - 1800),
+  rightExtra: (u) => 110 * smoothRange(u, 0, 320),   // the right side is wider below the summit: room between the ravine and the ridge
   ridgeHeight: (u) => 22 + 0.13 * Math.min(Math.max(u, 0), 1300) + 0.12 * Math.max(0, u - 1700),
   bowlPower: 2.3,
-  wallHeight: (u) => 70 * smoothRange(u, 20, 160) * (1 - smoothRange(u, 900, 1400)),   // rock walls framing the upper face
+  // Rock walls framing the upper face (side: 0 left, 1 right); the right one ends above the Hammer.
+  wallHeight: (u, side) => 70 * smoothRange(u, 20, 160) * (1 - (side ? smoothRange(u, 480, 660) : smoothRange(u, 900, 1400))),
 };
 
 // Cliff bands. uc = lip position (u), [v0, v1] lateral extent, h = height (m), var = ± variation,
@@ -57,7 +59,6 @@ export const SPINES = { u0: 110, u1: 800, v0: -0.92, v1: -0.46, spacing: 30, hei
 export const PILLOWS = [
   { u0: 1560, u1: 1800, v0: -470, v1: -250, rows: 0, size: 0.6, seed: 11, step: 8, terrace: 0.55, lobe: 8 },
   { u0: 2030, u1: 2290, v0: -560, v1: -360, rows: 0, size: 0.6, seed: 12, step: 7, terrace: 0.55, lobe: 7 },
-  { u0: 610, u1: 780, v0: 520, v1: 610, rows: 6, size: 0.8, seed: 13 },
 ];
 
 // The ravine: centre line v(u), floor half-width, depth, natural ledges in the floor.
@@ -120,4 +121,15 @@ export const DROP_ZONES = [
   ['Station Cliff', 1310, 290],
   ['The Ravine', 1050, 'ravine'],
   ['Lower Bowl', 1560, -60],
+];
+
+// Line goals (Steep "Mountain Stories" style): hit these named features in order in one run, cleanly.
+// Names are course.featureAt() / roofAt() names. [name, bonus, ...features]
+export const LINE_GOALS = [
+  ['The Classic', 2500, 'Band A', 'The First Stack', 'The Throne', 'The Last Stack'],
+  ['Station to Station', 1500, 'Station Cliff', 'Old Lift Station'],
+  ['Spine Tingler', 1500, 'Spine Wall', 'West Ledges', 'Pillow Stacks'],
+  ['Into the Gorge', 1200, 'The Couloir', 'The Ravine'],
+  ['Hammer Time', 2000, 'The Hammer'],
+  ['Roof Hopper', 1800, 'Old Lift Station', 'Corvo Refuge'],
 ];

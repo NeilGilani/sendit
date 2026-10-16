@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { vnoise, noise1, fbm, ridged, smooth, sstep, mulberry32, hash1 } from './noise.js';
 import {
-  TILE, START_X, TOP, FINISH_U, PROFILE, BEHIND, FACE, BANDS, SPINES, PILLOWS, RAVINE, HITS, BUILDINGS, GONDOLA, BUTTRESSES, DROP_ZONES,
+  TILE, START_X, TOP, FINISH_U, PROFILE, BEHIND, FACE, BANDS, SPINES, PILLOWS, RAVINE, HITS, BUILDINGS, GONDOLA, BUTTRESSES, DROP_ZONES, LINE_GOALS,
 } from './layout.js';
 import { Structure } from './structures.js';
 import { RAVENSPIRE_PHYSICS, RAVENSPIRE_CAMERA } from './tuning.js';
@@ -42,6 +42,8 @@ export class RavenspireCourse {
     this.buildStructures();
     this.buildPath();
     this.treeline = this.profileAt(1640) + 40;
+    // Line goals (physics/flow.js): named features in order, in one clean run.
+    this.lineGoals = LINE_GOALS.map(([name, bonus, ...features]) => ({ name, bonus, features }));
     // Drop zones (player.js): { name, x, z, heading }.
     this.dropZones = DROP_ZONES.map(([name, u, v]) => ({ name, x: START_X + u, z: v === 'ravine' ? this.rvAt(this.rv.c, u) : v, heading: -Math.PI / 2 }));
   }
@@ -179,7 +181,7 @@ export class RavenspireCourse {
     let e = this.profileAt(u);
     const sd = v < 0 ? 0 : 1;
     // Ridge crests wander and carry gendarmes (rock towers), different on each side.
-    const W = FACE.halfWidth(u) * (1 + 0.07 * (noise1(u / 170, 3 + sd) * 2 - 1));
+    const W = (FACE.halfWidth(u) + (sd ? FACE.rightExtra(u) : 0)) * (1 + 0.07 * (noise1(u / 170, 3 + sd) * 2 - 1));
     const Rh = FACE.ridgeHeight(u) * (0.85 + 0.3 * noise1(u / 260, 7 + sd));
     // Gendarmes: rock towers on the crest itself (within ~30 m of it), never on the face.
     const crest = 30 * Math.pow(ridged(u / 90, sd * 5.3, 2), 3) * sstep(-100, 200, u) * Math.exp(-(((Math.abs(v) - W) / 30) ** 2));
@@ -188,7 +190,7 @@ export class RavenspireCourse {
     if (a <= 1) {
       e += Rh * Math.pow(a, FACE.bowlPower);
       // The upper face is framed by steep rock walls: the outer ~20 % of the bowl rears up toward the crests.
-      const wall = FACE.wallHeight(u);
+      const wall = FACE.wallHeight(u, sd);
       if (wall > 0) { const s = sstep(0.78, 1.0, a); e += wall * s * s; }
     }
     else {
@@ -223,7 +225,7 @@ export class RavenspireCourse {
     const u = x - START_X, v = z;
     let e = this.macro(x, z);
     if (Math.abs(x) > TILE.size * 0.5 + 60 || Math.abs(z) > TILE.size * 0.5 + 60) return e;
-    const W = FACE.halfWidth(u);
+    const W = FACE.halfWidth(u) + (v > 0 ? FACE.rightExtra(u) : 0);
     const onFace = sstep(30, 110, u) * (1 - sstep(2300, 2700, u)) * (1 - sstep(0.95, 1.15, Math.abs(v) / W));
     // Powder lumps, sized for 25–30 m/s: long and low (radius of curvature ≳ 150 m, so they don't throw
     // riders off at speed), stretched across the fall line like wind drifts; a little fine detail.
