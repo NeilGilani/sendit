@@ -49,7 +49,7 @@ export class Flow {
       on('resetTop', () => this.newRun()),
       on('runComplete', () => this.finishRun()),
       on('stumble', () => { if (this.run) this.run.stumbles++; }),
-      on('landingGrade', (e) => { if (this.run && e.grade !== 'sketchy') { if (e.feature) this.run.features.add(e.feature); if (e.roof) this.run.features.add(e.roof); } }),
+      on('landingGrade', (e) => { if (this.run && e.grade !== 'sketchy') { if (e.feature) this.run.features.add(e.feature); if (e.roof) this.run.features.add(e.roof); this.goalStep([e.feature, e.roof]); } }),
     ];
   }
 
@@ -112,6 +112,7 @@ export class Flow {
   }
 
   onCrash() {
+    if (this.goalProg) this.goalProg.fill(0);   // line goals must be clean
     if (this.run) this.run.crashes++;
     if (this.chain) emit('flowLost', { pts: this.chain.pts });
     this.chain = null;
@@ -174,10 +175,37 @@ export class Flow {
   /** Trick-score multiplier while in flow state. */
   scoreMul() { return this.stateT > 0 ? this.C.scoreMul : 1; }
 
+  // ---------------------------------------------------------------- line goals (course.lineGoals)
+  /**
+   * Steep "Mountain Stories" style: course.lineGoals = [{ name, bonus, features: [names in order] }].
+   * Each clean landing advances every goal whose next feature matches the take-off feature or the roof
+   * landed on; finishing one in a run scores its bonus once ('lineGoal' event). A crash resets progress.
+   */
+  goalStep(names) {
+    const G = this.pl.terrain?.course?.lineGoals;
+    if (!G?.length || !this.run) return;
+    if (!this.goalProg || this.goalProg.length !== G.length) this.goalProg = new Array(G.length).fill(0);
+    for (const nm of names) {
+      if (!nm) continue;
+      G.forEach((g, i) => {
+        if (this.run.goals.has(g.name) || g.features[this.goalProg[i]] !== nm) return;
+        this.goalProg[i]++;
+        if (this.goalProg[i] < g.features.length) { emit('lineGoalStep', { name: g.name, step: this.goalProg[i], of: g.features.length }); return; }
+        this.run.goals.add(g.name);
+        this._banking = true;
+        addScore(`Line: ${g.name}`, Math.round(g.bonus * this.scoreMul()));
+        this._banking = false;
+        this.addMeter(0.35);
+        emit('lineGoal', { name: g.name, bonus: g.bonus });
+      });
+    }
+  }
+
   // ---------------------------------------------------------------- run summary (FWT-style judging)
   newRun() {
     this.run = { time: 0, ground: 0, speedSum: 0, topSpeed: 0, slow: 0, longestAir: 0, biggestDrop: 0, airs: 0, drops: 0,
-      tricks: 0, trickPts: 0, trickOnly: 0, stomps: 0, bestLine: 0, crashes: 0, stumbles: 0, score0: game.score, features: new Set() };
+      tricks: 0, trickPts: 0, trickOnly: 0, stomps: 0, bestLine: 0, crashes: 0, stumbles: 0, score0: game.score, features: new Set(), goals: new Set() };
+    if (this.goalProg) this.goalProg.fill(0);
   }
 
   /**
@@ -199,7 +227,7 @@ export class Flow {
     const control = clamp25(25 - r.crashes * 7 - r.stumbles * 2.5 + r.stomps * 0.8);
     const style = clamp25(r.trickOnly / 120 + r.tricks * 1.2 + r.airs * 0.25);   // real tricks (spins, flips, grabs) count; plain airs a little
     const total = Math.round(line + fluidity + control + style);
-    const summary = { ...r, avg, line, fluidity, control, style, total, score: game.score - r.score0, featureList: [...r.features] };
+    const summary = { ...r, avg, line, fluidity, control, style, total, score: game.score - r.score0, featureList: [...r.features], goalList: [...r.goals] };
     this.lastRun = summary;
     emit('runSummary', summary);
     this.newRun();

@@ -166,7 +166,7 @@ if (process.argv[1] && process.argv[1].endsWith('map3-ride.mjs')) {
     const r = ride(ty, k, style);
     console.log(`\n${LINES[k].name} · ${ty} · ${style}: ${r.finished ? 'finished' : 'DNF'} in ${r.time}s  avg ${r.avg} m/s (${(r.avg * 2.237).toFixed(0)} mph)  max ${r.max} (${(r.max * 2.237).toFixed(0)} mph)  crashes ${r.crashes}  stumbles ${r.stumbles}  air ${r.airTotal}s (max ${r.airMax}s)  roof ${r.roofSeconds}s`);
     for (const a of r.airs) console.log(`   air @u${a.u}: ${a.air}s  drop ${a.drop} m  in ${a.v} m/s  impact ${a.impact} m/s  → ${a.result} ${a.why || ''}`);
-    if (r.judged) console.log(`   linked: ${(r.judged.featureList || []).join(", ")}
+    if (r.judged) console.log(`   lines: ${(r.judged.goalList || []).join(", ") || "-"}   linked: ${(r.judged.featureList || []).join(", ")}
    judged ${r.judged.total}/100  (line ${r.judged.line.toFixed(0)} · fluidity ${r.judged.fluidity.toFixed(0)} · control ${r.judged.control.toFixed(0)} · air & style ${r.judged.style.toFixed(0)})  biggest drop ${r.judged.biggestDrop.toFixed(0)} m, longest air ${r.judged.longestAir.toFixed(1)} s`);
     console.log(`   score ${r.score}  flow: ${r.flow.map((f) => (f.state !== undefined ? (f.state ? 'SEND-IT' : 'end') : `+${f.bonus}×${f.mult}`)).join(' ')}`);
     if (r.trace.length) console.log(r.trace.join('\n'));

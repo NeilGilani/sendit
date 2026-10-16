@@ -98,6 +98,17 @@ export function mountFlowHud(player) {
     bank.style.color = '#ff6bb0';
     restart(bank);
   });
+  // Line goals (course.lineGoals): progress ticks in the chain area, completion as a big gold banner.
+  on('lineGoalStep', ({ name, step, of }) => {
+    bank.textContent = `${name.toUpperCase()}  ${step} / ${of}`;
+    bank.style.color = '#2ff5d6';
+    restart(bank);
+  });
+  on('lineGoal', ({ name, bonus }) => {
+    bank.textContent = `LINE COMPLETE · ${name.toUpperCase()}  +${fmt(bonus)}`;
+    bank.style.color = '#ffe14d';
+    restart(bank);
+  });
   on('landingGrade', ({ grade, drop, air, feature, roof }) => {
     const [label, color] = GRADES[grade] || GRADES.clean;
     $('.g').textContent = roof && grade !== 'sketchy' ? `${label} · ROOF` : label;
@@ -122,6 +133,7 @@ export function mountFlowHud(player) {
       <div class="row"><span>Best line bonus</span><b>+${fmt(r.bestLine)}</b></div>
       <div class="row"><span>Score</span><b>${fmt(r.score)}</b></div>
       ${r.featureList?.length ? `<div class="row"><span>Linked</span><b style="text-align:right;max-width:240px">${r.featureList.slice(0, 6).join(' · ')}</b></div>` : ''}
+      ${r.goalList?.length ? `<div class="row"><span>Lines</span><b style="text-align:right;max-width:240px;color:#ffe14d">${r.goalList.join(' · ')}</b></div>` : ''}
       <div class="judge">${bar('Line', r.line)}${bar('Fluidity', r.fluidity)}${bar('Control', r.control)}${bar('Air &amp; style', r.style)}</div>
       <div class="tot"><span>${rating}</span><b>${r.total}</b></div>`;
     rs.classList.add('on');
