@@ -14,7 +14,7 @@ const TAU = Math.PI * 2;
 
 /**
  * Build the outfit geometry. `cut` (from outfits.js) sets lengths and ease:
- *   { hemFront, hemBack, jacketEase, sleeveEase, pantsEase, cuffY, stack, gaiter, hood, mitts }
+ *   { hemFront, hemBack, hemFlare, jacketEase, sleeveEase, pantsEase, cuffY, stack, gaiter, hood, mitts }
  */
 export function buildOutfitGeometry(body, cut) {
   const pieces = [];
@@ -58,7 +58,7 @@ export function buildOutfitGeometry(body, cut) {
       ease: (t, th) => {
         const back = (1 - Math.cos(th)) / 2;            // 0 front … 1 back
         const side = Math.abs(Math.sin(th));
-        let e = THREE.MathUtils.lerp(cut.jacketEase.chest, cut.jacketEase.hem, smooth(1.3, 0.75, t));
+        let e = THREE.MathUtils.lerp(cut.jacketEase.chest, cut.jacketEase.hem, smooth(1.3, bot + 0.07, t));
         e = THREE.MathUtils.lerp(cut.jacketEase.shoulder, e, smooth(1.53, 1.42, t));
         return e + back * 0.012 + side * 0.006;
       },
@@ -86,9 +86,9 @@ export function buildOutfitGeometry(body, cut) {
           const w = smooth(1.525, 1.56, r.t);
           for (let q = 0; q < S; q++) r.r[q] = THREE.MathUtils.lerp(r.r[q], Math.min(r.r[q], cr[q] - 0.006), w);
         }
-        // Hem: a little flare.
+        // Hem: a little flare over the last 12 cm.
         for (const r of rings) {
-          const f = smooth(0.8, bot, r.t) * 0.012;
+          const f = smooth(bot + 0.12, bot, r.t) * (cut.hemFlare ?? 0.012);
           for (let k = 0; k < S; k++) r.r[k] += f;
         }
       },
@@ -96,7 +96,7 @@ export function buildOutfitGeometry(body, cut) {
     const S = segs;
     for (const r of rings) {
       r.off = new Float32Array(S);
-      const below = smooth(1.22, 0.8, r.t);
+      const below = smooth(1.22, bot + 0.04, r.t);
       for (let k = 0; k < S; k++) {
         const th = (k / S) * TAU, u = k / S;
         // Dropped back hem: the lowest rings sag toward the back.

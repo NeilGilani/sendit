@@ -85,7 +85,7 @@ export function fabricMaterial() {
     uJacket: { value: col('#5e5f45') }, uPanel: { value: col('#b9a27a') }, uAccent: { value: col('#ff5b14') },
     uGaiter: { value: col('#d9ceb5') }, uPants: { value: col('#3a3129') }, uCuff: { value: col('#231d18') },
     uMitt: { value: col('#9c6f45') }, uGauntlet: { value: col('#1c1c1b') }, uStyle: { value: 0 },
-    uHemY: { value: new THREE.Vector3(0.68, 0.19, 0.69) },    // jacket hem, pants cuff, sleeve end
+    uHemY: { value: new THREE.Vector3(0.83, 0.15, 0.69) },    // jacket hem, pants cuff, sleeve end
     uHide: { value: 0 },
   };
   const m = toonMaterial({
