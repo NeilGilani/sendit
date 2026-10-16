@@ -576,10 +576,9 @@ function buildIceFalls(course, terrain) {
     const r = rand(21);
     c.fillStyle = '#cfe6f2'; c.fillRect(0, 0, w, h);
     for (let i = 0; i < 90; i++) {
-      const x = r() * w, ww = 1 + r() * 6, l = 150 + r() * 90;
+      const x = r() * w, ww = 1 + r() * 6;
       c.fillStyle = r() < 0.55 ? `rgba(120,180,215,${0.15 + r() * 0.3})` : `rgba(255,255,255,${0.2 + r() * 0.4})`;
       c.fillRect(x, r() * h * 0.3, ww, h * (0.4 + r() * 0.7));
-      void l;
     }
   });
   const ice = toonMaterial({ name: 'ice', map: tex, rim: 0.4, frag: 'toonEmissive = vec3(0.02, 0.05, 0.08);' });
@@ -652,7 +651,7 @@ function buildSmoke(course, terrain) {
   geo.instanceCount = n;
   const mat = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false,
-    uniforms: { noiseTex: { value: terrain.terrainUniforms?.noiseTex.value ?? null }, uSunDir: { value: new THREE.Vector3(0.5, 0.7, 0.3).normalize() } },
+    uniforms: { noiseTex: { value: terrain.terrainUniforms?.noiseTex.value ?? null } },
     vertexShader: /* glsl */`
       attribute vec4 iPos; attribute vec2 iData;
       varying vec2 vQ; varying float vA; varying float vSeed; varying float vLit;
