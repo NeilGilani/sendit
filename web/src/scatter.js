@@ -107,6 +107,7 @@ export class Scatter {
     const rnd = mulberry32(911);
     const S = course?.spawn ? { ...SPAWN, ...course.spawn } : SPAWN;   // a map may override SPAWN
     course?.populate?.(this);   // … and plant its own designed forest first (the generic one avoids it)
+    this.perfHint = course?.perf ?? null;
     // Path samples (every 6 m) in a coarse hash for fast "distance to run" queries.
     const samples = [];
     let run = 0;
@@ -395,6 +396,8 @@ export class Scatter {
 
   setQuality(q) {
     this.trees.setQuality(q);
+    // A dense map may shrink the near / mid tree pools (course.perf = { treeNear, treeMid } × the tier's radii).
+    if (this.perfHint) { this.trees.near *= this.perfHint.treeNear ?? 1; this.trees.mid *= this.perfHint.treeMid ?? 1; }
     this.treeDistance = PERF.treeDistance[perfQ(q)];   // perf tiers: gfx/perf.js
     this.rockDistance = PERF.rockDistance[perfQ(q)];
   }

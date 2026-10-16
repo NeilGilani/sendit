@@ -390,11 +390,15 @@ export class BlackspruceCourse {
       flakes: FLAKES.map(([t, d, y]) => { const w = this.world(t, d); return { x: w.x, z: w.z, y }; }),
       // Average m/s over the run (finishAt / time incl. penalties). Calibrated with the bot
       // (web/scripts/map2-bot.mjs) and test rides: see docs/map2.md.
-      medalSpeeds: { gold: 17.5, silver: 15.5, bronze: 13.5 },
+      medalSpeeds: { gold: 15.5, silver: 13.5, bronze: 11.5 },
     };
     // The generic background forest stays outside the designed one.
     this.spawn = { runCorridor: 150, ridgeFenceMax: 0, runLength: 2400, treeMax: 20000 };
-    this.life = { skiers: 4, spread: 0.3 };
+    // No background skiers: on a tree run they would ghost through the pivot trees.
+    this.life = { skiers: 0 };
+    // Dense forest: full-frond trees only close by, mid-detail trees hand over to the opaque far
+    // shells sooner (scatter.js scales the quality tier's pool radii). See docs/map2.md (perf).
+    this.perf = { treeNear: 0.72, treeMid: 0.5 };
     // Per-map physics overrides (merged over config.js PHYSICS by the per-map physics hook):
     // a steeper, faster run needs a higher speed reference so the soft cap doesn't eat the slope.
     this.physics = {

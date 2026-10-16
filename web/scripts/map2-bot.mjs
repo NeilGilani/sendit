@@ -3,7 +3,12 @@
 // through the real collision circles of the designed forest (trees, rocks, stumps), start to finish.
 // The bot picks a route (which lanes it prefers), looks ~1 s ahead along its lane, and steers for
 // the lateral offset with the most clearance to the obstacles ahead — a skilled, not perfect, rider.
-// Usage: node web/scripts/map2-bot.mjs [ski|snowboard|both] [main|fast|safe|all] [--ovr] [--brake=<m/s>] [--seed=n]
+// Usage: node web/scripts/map2-bot.mjs [ski|snowboard|both] [main|fast|safe|all] [--ovr] [--brake=<m/s>] [--splits]
+//   --line    follow the planned best line (planLine) instead of searching locally
+//   --fair    print each route's bottlenecks: where even the best line has < 0.3 m clearance
+//   --check   scrub speed when even the best line ahead is tight
+//   --tuck    tuck whenever the line ahead is straight
+//   --splits  print the time between challenge gates (section splits)
 //   --ovr   apply the map's declared physics overrides (course.physics) on top of config.js
 //   --brake hold speed under this (the bot brakes / skids above it)
 globalThis.localStorage = { getItem: () => null, setItem: () => {} };
@@ -13,6 +18,9 @@ const { Player, State } = await import('../src/player.js');
 const { PHYSICS } = await import('../src/config.js');
 const { BlackspruceCourse } = await import('../src/maps/blackspruce/course.js');
 const { forestObstacles } = await import('../src/maps/blackspruce/forest.js');
+const { GATES, CLEARINGS } = await import('../src/maps/blackspruce/layout.js');
+const inClearing = (t, d) => CLEARINGS.some(([ct, cd, a, b]) => ((t - ct) / a) ** 2 + ((d - cd) / b) ** 2 < 1);
+const GATE_T = GATES.map((g) => g[0]);
 const { Features } = await import('../src/features.js');
 const { game, Mode, on } = await import('../src/state.js');
 game.mode = Mode.RIDING;
@@ -21,7 +29,7 @@ const args = process.argv.slice(2);
 const flag = (k, d) => { const a = args.find((x) => x.startsWith(`--${k}`)); return a ? (a.includes('=') ? a.split('=')[1] : true) : d; };
 const pos = args.filter((a) => !a.startsWith('--'));
 const which = pos[0] || 'both', routeArg = pos[1] || 'main';
-const OVR = !!flag('ovr', false), BRAKE = Number(flag('brake', 0)) || 0;
+const GAIN = Number(flag('gain', 6)), LINE = !!flag('line', false), FAIR = !!flag('fair', false), TRACE = Number(flag('trace', 0)) || 0, CHECK = !!flag('check', false), TUCK = !!flag('tuck', false), SPLITS = !!flag('splits', false), OVR = !!flag('ovr', false), BRAKE = Number(flag('brake', 0)) || 0;
 
 const course = new BlackspruceCourse();
 const P = course.P, N = P.tileRes, SP = P.tileSize / (N - 1), HALF = P.tileSize / 2;
@@ -75,7 +83,61 @@ function laneFor(route, t) {
   return (route === 'fast' && pick('slot')) || (route === 'safe' && pick('safe')) || course.mainLane;
 }
 
+/**
+ * The best line through a route (independent of the bot's skill): dynamic programming over
+ * t (1 m) × d (0.25 m) inside the route's lanes, maximising the smallest clearance between the
+ * rider (0.35 m) and any hitbox, with the line's drift limited to SLOPE m per m (≈ 27°).
+ * Returns { d: Float32Array per t, clear: Float32Array per t (clearance at the chosen d) }.
+ */
+const SLOPE = 0.5, DB = 0.25, D0 = -70, ND = Math.round(140 / DB) + 1;
+function planLine(route) {
+  const T = P.finishT + 1, w = { x: 0, z: 0 };
+  const val = new Float32Array(ND), nxt = new Float32Array(ND), from = new Int16Array(T * ND), clr = new Float32Array(T * ND);
+  const reach = Math.max(1, Math.round(SLOPE / DB));
+  for (let t = 0; t < T; t++) {
+    const L = laneFor(route, t), l = course.laneAt(L, t) || course.laneAt(course.mainLane, t), m = course.laneAt(course.mainLane, t);
+    for (let k = 0; k < ND; k++) {
+      const d = D0 + k * DB;
+      let c = -9;   // outside the corridor
+      // Corridor: the route's lane, plus the main line and the clearings (where lanes split and merge).
+      const ends = L === course.mainLane || t < L.t0 + 15 || t > L.t1 - 15;
+      if (Math.abs(d - l.d) <= l.hw + 0.5 || (ends && Math.abs(d - m.d) <= m.hw + 0.5) || inClearing(t, d)) {
+        course.world(t, d, w);
+        c = 3;
+        each(w.x, w.z, (o) => { c = Math.min(c, Math.hypot(w.x - o[0], w.z - o[1]) - o[2] - 0.35); });
+      }
+      clr[t * ND + k] = c;
+      // Cost: heavy for overlapping a hitbox, quadratic under 1.2 m of room, a little for leaving the route's lane.
+      const cost = (c < 0 ? 100 - 50 * c : c < 1.2 ? 4 * (1.2 - c) ** 2 : 0) + (Math.abs(d - l.d) > l.hw + 0.5 ? 0.3 : 0) + Math.abs(d - l.d) * 1e-3;
+      if (t === 0) { nxt[k] = cost; continue; }
+      let bv = Infinity, bj = k;
+      for (let j = Math.max(0, k - reach); j <= Math.min(ND - 1, k + reach); j++) {
+        const v = val[j] + (j === k ? 0 : 0.02);   // prefer holding the line
+        if (v < bv) { bv = v; bj = j; }
+      }
+      nxt[k] = bv + cost;
+      from[t * ND + k] = bj;
+    }
+    val.set(nxt);
+  }
+  let k = 0;
+  for (let j = 1; j < ND; j++) if (val[j] < val[k]) k = j;
+  const d = new Float32Array(T), clear = new Float32Array(T);
+  for (let t = T - 1; t >= 0; t--) { d[t] = D0 + k * DB; clear[t] = clr[t * ND + k]; if (t > 0) k = from[t * ND + k]; }
+  return { d, clear };
+}
+
+/** Steer toward a world point; tuck when the line ahead is straight (what a player does in a slot). */
+function steerTo(c, pl, target, clearAhead) {
+  const travel = pl.heading + (pl.travelSign < 0 ? Math.PI : 0);
+  const want = Math.atan2(-(target.x - pl.position.x), -(target.z - pl.position.z));
+  const d = Math.atan2(Math.sin(want - travel), Math.cos(want - travel));
+  if (pl.state === State.GROUNDED) c.steer = Math.max(-1, Math.min(1, -d * GAIN));
+  if (TUCK && Math.abs(d) < 0.06 && Math.abs(c.steer) < 0.2 && clearAhead > 0.4) c.tuck = 1;
+}
+
 function ride(type, route) {
+  const line = LINE ? lines[route] : null;
   events.length = 0;
   const saved = JSON.parse(JSON.stringify({ ski: PHYSICS.ski, snowboard: PHYSICS.snowboard }));
   if (OVR) for (const k of ['ski', 'snowboard']) Object.assign(PHYSICS[k], course.physics?.[k] || {});
@@ -85,8 +147,10 @@ function ride(type, route) {
   p.startRiding();
   let t = 0, vSum = 0, n = 0, vMax = 0, crashes = 0, airMax = 0, minClear = Infinity, lane = course.mainLane, laneId = 'main';
   const crashAt = [];
-  const segT = {};
+  const splits = [];   // time at each challenge gate (t)
+  let nextSplit = 0;
   let off = 0;
+  const trace = [];
   const finishT = P.finishT;
   const tmp = { x: 0, z: 0 };
   while (t < 400) {
@@ -99,8 +163,16 @@ function ride(type, route) {
       const look = Math.max(9, pl.speed * 1.05);
       const ta = tt + look;
       const l = course.laneAt(lane, ta) || course.laneAt(course.mainLane, ta);
+      if (line) {
+        // Follow the planned line (smoothed over ±4 m), no local search.
+        let dd = 0;
+        for (let k = -4; k <= 4; k++) dd += line.d[Math.min(line.d.length - 1, Math.max(0, Math.round(ta) + k))];
+        course.world(ta, dd / 9, tmp);
+        steerTo(c, pl, tmp, 1);
+        return;
+      }
       // Candidate lateral offsets inside the lane: score = clearance along the straight line there.
-      let best = -Infinity, bestO = 0;
+      let best = -Infinity, bestO = 0, bestClear = Infinity;
       const lim = Math.max(0, l.hw - 0.6);
       for (let o = -lim; o <= lim + 1e-6; o += 0.5) {
         course.world(ta, l.d + o, tmp);
@@ -110,27 +182,26 @@ function ride(type, route) {
           const f = k / 8, x = pl.position.x + (tx - pl.position.x) * f, z = pl.position.z + (tz - pl.position.z) * f;
           each(x, z, (ob) => { clear = Math.min(clear, Math.hypot(x - ob[0], z - ob[1]) - ob[2]); });
         }
-        const score = Math.min(clear, 3) - Math.abs(o - off) * 0.08 - Math.abs(o) * 0.05;
-        if (score > best) { best = score; bestO = o; }
+        const score = Math.min(clear, 2.5) - Math.abs(o - off) * 0.12 - Math.abs(o) * 0.04;   // commit to a side (hysteresis)
+        if (score > best) { best = score; bestO = o; bestClear = clear; }
       }
       off = bestO;
       course.world(ta, l.d + off, tmp);
-      const travel = pl.heading + (pl.travelSign < 0 ? Math.PI : 0);
-      const want = Math.atan2(-(tmp.x - pl.position.x), -(tmp.z - pl.position.z));
-      const d = Math.atan2(Math.sin(want - travel), Math.cos(want - travel));
-      if (pl.state === State.GROUNDED) c.steer = Math.max(-1, Math.min(1, -d * 3));
+      steerTo(c, pl, tmp, bestClear);
       if (BRAKE && pl.speed > BRAKE) c.brake = Math.min(1, (pl.speed - BRAKE) / 3);
+      // Check speed when even the best line ahead is tight (what a player does).
+      if (CHECK && bestClear < 0.55 && pl.speed > 14) { c.brake = Math.min(1, (0.55 - bestClear) * 2.5); c.tuck = 0; }
     };
     const was = p.state;
+    if (TRACE) { trace.push(`${t.toFixed(2)} t=${tt.toFixed(1)} d=${course.dAt(p.position.x, tt).toFixed(2)} lane=${laneId} v=${p.speed.toFixed(1)} st=${p.state} steer=${(p._ctrl?.steer ?? 0).toFixed(2)} off=${off.toFixed(1)} near=${(scatter.nearest(p.position, 6)?.dist ?? 9).toFixed(2)}`); if (trace.length > 150) trace.shift(); }
     p.step(DT);
     t += DT;
-    if (p.state === State.CRASH && was !== State.CRASH) { crashes++; { const k = events.filter((e) => e.kind === 'crash').slice(-1)[0]?.k; crashAt.push(`${Math.round(tt)}${k === 'landing' ? 'L:' + p.lastCrash?.reason + ':' + (p.lastCrash?.impact ?? 0).toFixed(0) : k?.[0] || ''}`); } }
+    if (p.state === State.CRASH && was !== State.CRASH) { crashes++; if (TRACE && Math.abs(tt - TRACE) < 15) { console.log(trace.filter((_, i) => i % 6 === 0).join(String.fromCharCode(10))); } { const k = events.filter((e) => e.kind === 'crash').slice(-1)[0]?.k; crashAt.push(`${Math.round(tt)}${k === 'landing' ? 'L:' + p.lastCrash?.reason + ':' + (p.lastCrash?.impact ?? 0).toFixed(0) : k?.[0] || ''}`); } }
     if (p.state === State.AIR) airMax = Math.max(airMax, p.airTime);
     if (p.state === State.GROUNDED) { vSum += p.speed; n++; vMax = Math.max(vMax, p.speed); }
     const near = scatter.nearest(p.position, 5);
     if (near) minClear = Math.min(minClear, near.dist);
-    const sec = course.lanes && laneId;
-    segT[sec] = (segT[sec] || 0) + DT;
+    while (nextSplit < GATE_T.length && tt >= GATE_T[nextSplit]) { splits.push(t); nextSplit++; }
     if (tt > finishT) break;
     void tmp;
   }
@@ -140,6 +211,7 @@ function ride(type, route) {
   const lands = events.filter((e) => e.kind === 'land' && e.air > 0.45);
   const avg = course.finishAt / t;
   console.log(`  ${type.padEnd(9)} ${route.padEnd(5)} ${finished ? 'FINISH' : 'DNF   '} ${t.toFixed(1)} s, run avg ${avg.toFixed(1)} m/s (ground ${(vSum / Math.max(1, n)).toFixed(1)}), max ${vMax.toFixed(1)} m/s, crashes ${crashes} [${crashAt.join(' ')}], stumbles ${events.filter((e) => e.kind === 'stumble').length}, near misses ${nears}, min clearance ${minClear.toFixed(2)} m, max air ${airMax.toFixed(1)} s, big airs ${lands.length}, score ${scoreSum}`);
+  if (SPLITS) console.log(`            splits: ${splits.map((x, i) => (x - (splits[i - 1] ?? 0)).toFixed(1)).join(' | ')} | ${(t - (splits[splits.length - 1] ?? 0)).toFixed(1)}`);
   for (const k of ['ski', 'snowboard']) Object.assign(PHYSICS[k], saved[k]);
   return { t, crashes, finished };
 }
@@ -147,4 +219,14 @@ function ride(type, route) {
 const types = which === 'both' ? ['ski', 'snowboard'] : [which];
 const routes = routeArg === 'all' ? ['main', 'fast', 'safe'] : [routeArg];
 console.log(`Blackspruce bot: ${course.forest.trees.length} trees, finishAt ${course.finishAt.toFixed(0)} m${OVR ? ', physics overrides ON' : ''}${BRAKE ? `, brake above ${BRAKE} m/s` : ''}`);
-for (const type of types) for (const r of routes) ride(type, r);
+const lines = {};
+if (LINE || FAIR) for (const r of routes) {
+  lines[r] = planLine(r);
+  if (FAIR) {
+    const c = lines[r].clear, bad = [];
+    for (let t = 0; t < c.length; t++) if (c[t] < 0.3) bad.push(`${t}:${c[t].toFixed(2)}`);
+    let mn = Infinity; for (const v of c) mn = Math.min(mn, v);
+    console.log(`  best ${r.padEnd(5)} line: min clearance ${mn.toFixed(2)} m${bad.length ? ' — tight at ' + bad.slice(0, 30).join(' ') : ''}`);
+  }
+}
+if (!FAIR || LINE) for (const type of types) for (const r of routes) ride(type, r);

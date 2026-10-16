@@ -41,9 +41,9 @@ export const BLACKSPRUCE = {
   meander: [[30, 210, 0.4], [10, 80, 1.3]],   // [amplitude m, wavelength/2π m, phase] of the centre line
   faceHalfWidth: [100, 18],      // forested face: base ± variation (metres either side of the centre)
   dish: 6,                       // metres the face rises toward its edges (keeps riders in the middle)
-  ribs: 0.45,                    // metres of fall-line ribs across the face (gentle side hits)
+  ribs: 0.3,                     // metres of fall-line ribs across the face (gentle side hits)
   ribWave: 34,                   // metres between ribs
-  lumps: 1.6,                    // soft rolling lumps
+  lumps: 1.0,                    // soft rolling lumps (kept low: in the trees you need the snow to steer)
   fineLumps: 0.15,
   wallHeight: [34, 22],          // wooded spines bounding the face: base, variation
   wallWidth: [40, 70],
@@ -90,11 +90,11 @@ export const SECTIONS = [
   { name: 'The Drop-in', t0: 70, t1: 180, spacing: 9, scale: [1.0, 1.45], slim: 0.85, pivotEvery: 0 },
   { name: 'Spruce Gate', t0: 180, t1: 430, spacing: 5.4, scale: [0.8, 1.25], slim: 0.75, pivotEvery: 42 },
   { name: 'Kicker Meadow', t0: 430, t1: 550, spacing: 7, scale: [0.9, 1.3], slim: 0.8, pivotEvery: 0 },
-  { name: 'The Needles', t0: 550, t1: 812, spacing: 4.2, scale: [0.7, 1.1], slim: 0.68, pivotEvery: 36 },
+  { name: 'The Needles', t0: 550, t1: 812, spacing: 4.6, scale: [0.7, 1.1], slim: 0.68, pivotEvery: 36 },
   { name: 'Rock Band', t0: 812, t1: 840, spacing: 7, scale: [0.8, 1.2], slim: 0.72, pivotEvery: 0 },
   { name: 'Pillow Garden', t0: 840, t1: 930, spacing: 7, scale: [0.9, 1.3], slim: 0.8, pivotEvery: 0 },
   { name: 'Deadfall', t0: 930, t1: 1230, spacing: 5.0, scale: [0.75, 1.2], slim: 0.72, pivotEvery: 48 },
-  { name: 'The Gauntlet', t0: 1230, t1: 1475, spacing: 3.8, scale: [0.7, 1.05], slim: 0.66, pivotEvery: 40 },
+  { name: 'The Gauntlet', t0: 1230, t1: 1475, spacing: 4.3, scale: [0.7, 1.05], slim: 0.66, pivotEvery: 40 },
   { name: 'Big Air', t0: 1475, t1: 1600, spacing: 7, scale: [0.9, 1.3], slim: 0.8, pivotEvery: 0 },
   { name: 'Old Growth', t0: 1600, t1: 1900, spacing: 7.2, scale: [1.15, 1.55], slim: 0.82, pivotEvery: 34 },
   { name: 'Finish', t0: 1900, t1: 2300, spacing: 11, scale: [1.0, 1.4], slim: 0.85, pivotEvery: 0 },
@@ -108,27 +108,27 @@ export const SECTIONS = [
 //   safe — wide and slower: hw ≈ 5.5, longer wander, takes the chute instead of the cliff
 export const LANES = [
   {
-    id: 'main', kind: 'main', weave: [3.6, 72],
+    id: 'main', kind: 'main', weave: [2.6, 84],
     pts: [[-80, 0, 10], [60, 0, 10], [120, -3, 8], [180, 0, 5], [240, 7, 4.2], [300, 0, 4.4], [370, -7, 4.2], [430, -2, 6],
-      [470, 0, 10], [540, 0, 8], [575, 5, 4.2], [640, -3, 4], [700, 5, 4], [770, -2, 4.2], [800, 1.5, 4], [818, 1.5, 4],
+      [470, 0, 10], [540, 0, 8], [582, 4, 4.2], [640, -3, 4], [700, 5, 4], [770, -2, 4.2], [800, 1.5, 4], [818, 1.5, 4],
       [845, 0, 10], [920, 0, 9], [960, 6, 4.4], [1030, -5, 4.4], [1100, 5, 4.4], [1170, -5, 4.4], [1225, 0, 5],
       [1270, 6, 4], [1330, -4, 3.8], [1400, 5, 3.8], [1450, -1, 4], [1478, 0, 8], [1530, 0, 10], [1600, 0, 6],
       [1660, 8, 5.2], [1730, -7, 5.2], [1800, 7, 5.2], [1860, -3, 5.2], [1905, 0, 9], [2300, 0, 14]],
   },
   // Spruce Gate (side lanes branch off the main line ('m') and merge back into it)
   { id: 'gate-slot', kind: 'slot', weave: [1.2, 90], pts: [[178, 'm', 4.5], [215, -12, 2.6], [250, -16, 2.4], [300, -17, 2.3], [380, -15, 2.4], [420, -9, 3], [436, 'm', 5]] },
-  { id: 'gate-safe', kind: 'safe', weave: [5, 80], pts: [[178, 'm', 5.5], [225, 20, 5.5], [310, 18, 5.5], [380, 28, 5.5], [420, 14, 6], [436, 'm', 7]] },
+  { id: 'gate-safe', kind: 'safe', weave: [2.4, 96], pts: [[178, 'm', 5.5], [225, 20, 5.5], [310, 18, 5.5], [380, 28, 5.5], [420, 14, 6], [436, 'm', 7]] },
   // The Needles: the slot runs straight at the cliff; the safe line wanders to the Ramp chute.
   { id: 'needles-slot', kind: 'slot', weave: [1.0, 100], pts: [[540, 'm', 5], [580, -14, 2.4], [660, -17, 2.2], [740, -15, 2.2], [790, -12, 2.4], [815, -12, 3], [842, -8, 5]] },
-  { id: 'needles-safe', kind: 'safe', weave: [5, 76], pts: [[540, 'm', 5.5], [590, 20, 5.2], [660, 18, 5.2], [730, 30, 5.2], [790, 24, 6], [842, 22, 6.5]] },
+  { id: 'needles-safe', kind: 'safe', weave: [2.4, 96], pts: [[540, 'm', 5.5], [590, 20, 5.2], [660, 18, 5.2], [730, 30, 5.2], [790, 24, 6], [842, 22, 6.5]] },
   // Deadfall: logs lie across both the main line and the high line; the low line goes around them.
   { id: 'deadfall-slot', kind: 'slot', weave: [1.2, 100], pts: [[928, 'm', 5], [965, 16, 2.5], [1060, 20, 2.3], [1160, 17, 2.3], [1210, 9, 3], [1234, 'm', 5]] },
-  { id: 'deadfall-safe', kind: 'safe', weave: [5, 80], pts: [[926, 'm', 5.5], [970, -20, 5.3], [1050, -16, 5.2], [1130, -27, 5.2], [1200, -16, 5.5], [1234, 'm', 6]] },
+  { id: 'deadfall-safe', kind: 'safe', weave: [2.4, 96], pts: [[926, 'm', 5.5], [970, -20, 5.3], [1050, -16, 5.2], [1130, -27, 5.2], [1200, -16, 5.5], [1234, 'm', 6]] },
   // The Gauntlet: tight chute line vs the zig.
-  { id: 'gauntlet-slot', kind: 'slot', weave: [0.8, 110], pts: [[1232, 'm', 4.5], [1265, -14, 2.3], [1340, -18, 2.1], [1420, -16, 2.1], [1462, -8, 2.6], [1482, 'm', 5]] },
-  { id: 'gauntlet-safe', kind: 'safe', weave: [4.5, 70], pts: [[1232, 'm', 5], [1275, 20, 4.8], [1340, 16, 4.8], [1400, 26, 4.8], [1455, 13, 5.5], [1482, 'm', 7]] },
+  { id: 'gauntlet-slot', kind: 'slot', weave: [0.8, 110], pts: [[1232, 'm', 4.5], [1265, -14, 2.3], [1340, -18, 2.1], [1420, -16, 2.1], [1450, -12.5, 3.0], [1474, -6, 4.4], [1492, 'm', 6]] },
+  { id: 'gauntlet-safe', kind: 'safe', weave: [2.2, 96], pts: [[1232, 'm', 5], [1275, 20, 4.8], [1340, 16, 4.8], [1400, 26, 4.8], [1455, 13, 5.5], [1482, 'm', 7]] },
   // Old Growth: a second flowing line on the left.
-  { id: 'oldgrowth-left', kind: 'safe', weave: [4, 64], pts: [[1598, 'm', 5.5], [1640, -18, 5], [1720, -27, 5], [1800, -20, 5], [1880, -12, 5.5], [1910, 'm', 7]] },
+  { id: 'oldgrowth-left', kind: 'safe', weave: [2.4, 90], pts: [[1598, 'm', 5.5], [1640, -18, 5], [1720, -27, 5], [1800, -20, 5], [1880, -12, 5.5], [1910, 'm', 7]] },
 ];
 
 // Pillows (smooth snow mounds over buried boulders / stumps): [t, d, radius m, height m].
@@ -147,7 +147,6 @@ export const PILLOWS = [
 export const ROLLERS = [
   [95, 0, 22, 1.5, 6],
   [160, 0, 20, 1.3, 5.5],
-  [1625, 0, 16, 1.2, 5],
   [1925, 0, 22, 1.4, 6],
 ];
 

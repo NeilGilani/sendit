@@ -29,7 +29,8 @@ function inClearing(t, d, m = 0) {
 }
 
 export function planForest(course) {
-  const rnd = mulberry32(31337);
+  // One random stream per phase, so tuning one phase doesn't reshuffle the others.
+  let rnd = mulberry32(31337);
   const trees = [], rocks = [], stumps = [], pivots = [];
   // Occupancy hash of everything planted: [x, z, radius]
   const H = 6, occ = new Map();
@@ -66,6 +67,7 @@ export function planForest(course) {
   const blocked = (t, d, r) => inClearing(t, d) || laneGap(t, d) < r || features(t, d);
   const noise = (t, d) => hashNoise(t / 23, d / 23);
 
+  rnd = mulberry32(101);
   // ---- marker trees: big trees framing each lane mouth (readable entrances)
   for (const L of lanes) {
     if (L.kind === 'main') continue;
@@ -84,6 +86,7 @@ export function planForest(course) {
     }
   }
 
+  rnd = mulberry32(202);
   // ---- pivots: one obstacle in the middle of a main / safe lane every so often (pick a side)
   for (const L of lanes) {
     if (L.kind === 'slot') continue;
@@ -96,7 +99,7 @@ export function planForest(course) {
       // throws the rider into the air (rollers, logs, kickers, the band).
       const ok = l.hw >= 3.7 && t > S.t0 + 30 && !inClearing(t, l.d, 22) && !logZone(t, l.d)
         && !course.logs.some((g) => t > g.t - 14 && t < g.t + 26)
-        && !ROLLERS.some((r) => t > r[0] - 10 && t < r[0] + 35)
+        && !ROLLERS.some((r) => t > r[0] - 10 && t < r[0] + 55)
         && !GATES.some((g) => Math.abs(g[0] - t) < 25)
         && !(t > BAND.t - 20 && t < BAND.t + 40)
         && !kickZones.some((z) => t > z.t0 - 20 && t < z.t1 + 10);
@@ -106,23 +109,24 @@ export function planForest(course) {
         const d = l.d + off;
         course.world(t, d, p);
         const r = rnd();
-        if (r < 0.72) {
+        if (r < 0.72 || l.hw < 4.5) {   // rocks only where the lane is wide enough to go round them
           const sc = S.scale[0] + (S.scale[1] - S.scale[0]) * (0.5 + 0.5 * rnd()), sx = Math.min(0.62, sc * S.slim);
           const hit = TREE_HIT.base + TREE_HIT.perWidth * sx;
           trees.push([p.x, p.z, sc, sx, sc * (0.95 + rnd() * 0.2), rnd() < 0.25 ? 1 : 0, rnd() * 6.28, hit, 0]);
           put(p.x, p.z, hit);
           pivots.push([p.x, p.z, hit, 'tree', t, L.id]);
         } else {
-          const sc = 0.75 + rnd() * 0.35;
-          rocks.push([p.x, p.z, sc, rnd() * 6.28, Math.floor(rnd() * 3), 1.1 * sc]);
-          put(p.x, p.z, 1.1 * sc);
-          pivots.push([p.x, p.z, 1.1 * sc, 'rock', t, L.id]);
+          const sc = 0.6 + rnd() * 0.22;   // sunk 0.3·sc into the snow: hitbox ≈ the visible footprint
+          rocks.push([p.x, p.z, sc, rnd() * 6.28, Math.floor(rnd() * 3), 1.0 * sc]);
+          put(p.x, p.z, 1.0 * sc);
+          pivots.push([p.x, p.z, 1.0 * sc, 'rock', t, L.id]);
         }
         t += S.pivotEvery * (0.8 + rnd() * 0.4);
       } else t += 6;
     }
   }
 
+  rnd = mulberry32(303);
   // ---- the rock band: boulders on the cliff edge away from every line, and flanking the chutes
   for (let d = -BAND.reach - 10; d < BAND.reach + 10; d += 3 + rnd() * 3.5) {
     const m = course.bandMask(d);
@@ -144,6 +148,7 @@ export function planForest(course) {
     }
   }
 
+  rnd = mulberry32(404);
   // ---- the forest: dart throwing on a jittered 2 m grid, in random order
   const cands = [];
   const tEnd = course.P.finishT + 320;
@@ -157,15 +162,19 @@ export function planForest(course) {
     // Spacing: section base, clumped by noise, a bit denser toward the walls beyond the face.
     const W = course.at(course.W, t);
     const wall = smooth((Math.abs(d) - W * 0.6) / 40);
+    const g0 = laneGap(t, d);
     let spacing = S.spacing * (0.82 + 0.4 * n) * (1 - 0.2 * wall);
-    if (Math.abs(d) > W + 20) spacing = Math.max(spacing, 7.5);   // far side: cheaper, sparser
+    // Perf: the woods far from every line are backdrop (hidden behind the lane-edge trees from the
+    // rider's eye), so they thin out with distance from the nearest lane.
+    spacing *= 1 + Math.min(0.9, Math.max(0, g0 - 9) * 0.05);
+    if (Math.abs(d) > W + 20) spacing = Math.max(spacing, 8.5);   // far side: cheaper, sparser
     // Young spruce fill the understorey of the dense sections (they collide like any other tree).
-    const young = S.spacing < 6 && rnd() < 0.22;
+    const young = S.spacing < 6 && g0 < 9 && rnd() < 0.14;
     const sc = young ? 0.42 + rnd() * 0.2 : S.scale[0] + (S.scale[1] - S.scale[0]) * Math.pow(rnd(), 0.9);
     let sx = sc * S.slim * (0.9 + rnd() * 0.2);
     // Trees lining a lane are narrow spires (a limbed glade): their crowns barely reach into the
     // corridor, so the line stays readable and the chase camera stays out of the needles.
-    const g = laneGap(t, d);
+    const g = g0;
     if (g < 4) sx = Math.min(sx, Math.max(0.36, (g + 0.7) / 2.6));
     const hit = TREE_HIT.base + TREE_HIT.perWidth * sx;
     if (blocked(t, d, hit)) continue;
@@ -175,6 +184,7 @@ export function planForest(course) {
     put(p.x, p.z, hit);
   }
 
+  rnd = mulberry32(505);
   // ---- stumps: in the woods and at lane edges (never in a lane's middle half)
   for (const S of SECTIONS) {
     const n = STUMPS.perSection[S.name] || 0;
