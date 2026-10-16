@@ -81,7 +81,7 @@ logs, flakes and glade pockets follow a lane when it is re-shaped.
 | `challenge = { gates, flakes, medalSpeeds }` | activities.js | gates `{ at, lateral, width }`, flakes `{ x, z, y }`, medals |
 | `spawn = { runCorridor: 150, ridgeFenceMax: 0, runLength: 2400, treeMax: 20000 }` | scatter.js | the generic forest stays outside the designed one |
 | `populate(scatter)` | scatter.js `addEnvironment` | plants the designed forest first (trees, boulders, collision circles, logs, stumps, signs) |
-| `perf = { treeNear: 0.48, treeMid: 0.35 }` | scatter.js `setQuality` | × the quality tier's full-frond / mid tree-pool radii |
+| `perf = { treeNear: 0.44, treeMid: 0.35 }` | scatter.js `setQuality` | × the quality tier's full-frond / mid tree-pool radii |
 | `life = { skiers: 0 }` | life.js | no background skiers (they would ghost through the pivots) |
 | `physics = { ski: { maxVelocity: 18 }, snowboard: { maxVelocity: 17.5 } }` | map 3's `applyMapTuning` (config.js) | see below |
 | `w` (= face half-width table) | terrain.js `sculptCliffs` | fluted rock on the outer walls only |
