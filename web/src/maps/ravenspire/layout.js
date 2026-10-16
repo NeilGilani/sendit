@@ -48,6 +48,8 @@ export const BANDS = [
   { name: 'East Ledges', uc: 1185, v0: 470, v1: 700, h: 9, var: 4, bench: 40, wob: 8, seed: 9, gaps: [[560, 14]] },
   { name: 'West Ledges', uc: 870, v0: -700, v1: -520, h: 8, var: 3, bench: 35, wob: 7, seed: 10, gaps: [[-610, 14]] },
   { name: 'Lower Steps', uc: 1705, v0: 330, v1: 470, h: 7, var: 2, bench: 32, wob: 6, seed: 11, gaps: [] },
+  // Under the old gondola cable, just below the station's eave: cliff → roof → cliff.
+  { name: 'Cable Drop', uc: 1585, v0: 235, v1: 330, fadeOut: 14, h: 8, var: 1.5, bench: 32, wob: 3, seed: 13, gaps: [] },
 ];
 
 // Spine field (skier's left of the upper face).
@@ -128,7 +130,7 @@ export const DROP_ZONES = [
 // Names are course.featureAt() / roofAt() names. [name, bonus, ...features]
 export const LINE_GOALS = [
   ['The Classic', 2500, 'Band A', 'The First Stack', 'The Throne', 'The Last Stack'],
-  ['Station to Station', 1500, 'Station Cliff', 'Old Lift Station'],
+  ['Station to Station', 2000, 'Station Cliff', 'Old Lift Station', 'Cable Drop'],
   ['Spine Tingler', 1500, 'Spine Wall', 'West Ledges', 'Pillow Stacks'],
   ['Into the Gorge', 1500, 'The Couloir', 'The Ravine', 'Frozen Falls'],
   ['Hammer Time', 2000, 'The Hammer'],

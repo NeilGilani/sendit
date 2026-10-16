@@ -38,7 +38,7 @@ spines, pillows and cliff lips have a lit and a shaded side.
 | 540…940 | mid face | 38° | **Beak Steps**, **West Ledges**, the **Hammer** (36 m, far right, u 905) |
 | 990 / 1160 / 1370 | **the Stacks** | 41° landings, ~30° benches | three bands 170–210 m apart: the **First Stack** (11–19 m), **the Throne** (13–28 m, peak at v ≈ −40), the **Last Stack** (9–19 m) — cliff into cliff; **Left Ledges** (u 1150), **East Ledges** (u 1185) |
 | 1418 | **Station Cliff** | | 15–19 m band above the **Old Lift Station** (roof rideable); the station's 24 m weather mast and windsock poke over the lip and mark the roof |
-| 1400…1700 | apron | 34° | the station, the abandoned gondola line, **Lower Steps** |
+| 1400…1700 | apron | 34° | the station, **Cable Drop** (8 m, u 1585, right under the old cable below the station's eave), the abandoned gondola line, **Lower Steps** |
 | 1560…1800 | **pillow stacks** (left) | 27° base | terraced pillows: flat-ish tops, ~4 m rounded drops |
 | 1700…2100 | lower bowl | 27° → 19° | wind lips and rollers, the **Corvo Refuge** (rideable roof, stone chimney), larches |
 | 2100…2540 | runout | 10° → 5° | A-frame cabins, the **Valley Station**; **run complete at u = 2540** |
@@ -53,8 +53,9 @@ spines, pillows and cliff lips have a lit and a shaded side.
    the terraced pillow stacks on the apron.
 3. **The Ravine** — drop the couloir at u ≈ 330, ride the gorge (quarter-pipe walls, frozen ledges), send
    **Frozen Falls** (9 m) and carry on past the station knoll to the lower bowl.
-4. **Station Cliff → roof** — hit the Station Cliff at ~18–25 m/s: you land on the old lift station's long
-   snowy roof and air off its downhill eave. Slower: land short, ride the drift ramp onto the roof.
+4. **Station Cliff → roof → Cable Drop** — hit the Station Cliff at ~18–25 m/s: you land on the old lift
+   station's long snowy roof, air off its downhill eave and straight off Cable Drop under the old haul rope
+   (cliff → roof → cliff). Slower: land short, ride the drift ramp onto the roof. Full send overshoots the roof.
 5. **The Hammer** — the 36 m cliff on the far right; landable on its steep apron, but expect a stumble
    unless you roll it (no pop) and land straight.
 6. **Bowl → refuge roof** — the open bowl, wind lips, then over the Corvo Refuge's ridge, down its roof and off
@@ -234,7 +235,7 @@ spin, W / S to flip; Shift grabs. On this map (trickStyle):
   (`flow.stompBoost`), with its own sound; finishing a line goal plays a fanfare.
 - **Line goals** (`course.lineGoals`, Steep "Mountain Stories" style): hit named features in order in one
   clean run — **The Classic** (Band A → First Stack → Throne → Last Stack, +2500), **Station to Station**
-  (Station Cliff → the station roof, +1500), **Spine Tingler** (Spine Wall → West Ledges → Pillow Stacks),
+  (Station Cliff → the station roof → Cable Drop, +2000), **Spine Tingler** (Spine Wall → West Ledges → Pillow Stacks),
   **Into the Gorge** (the Couloir → the Ravine → Frozen Falls, +1500), **Hammer Time** (land the Hammer clean, +2000), **Roof
   Hopper** (the station roof and the refuge roof). Progress ticks show in the chain area; a crash resets it.
 - **Line chain** (physics/flow.js): every scored move keeps the chain alive; the multiplier grows ×0.25 per
