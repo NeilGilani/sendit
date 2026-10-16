@@ -370,7 +370,8 @@ up the drift onto the roof and off the eave · the refuge chimney is solid.
 
 Every physics bench (physics-sim, -scenarios, -tricks, -kicker, -variants, -fuzz, physics-course
 park / flip / straight, equipment-check) prints byte-identical output before and after this work
-(compared against a `git archive` of the base commit). `unittest.mjs`: 13/13; `lobbytest.mjs` (GPU): all
+(compared against a `git archive` of the base commit). The non-physics extras are opt-in too: the wind roar layer
+(`windRoar`), the grab-tweak pose (`trickStyle`), the flow HUD and sounds (`flow`) only exist on maps that set them. `unittest.mjs`: 13/13; `lobbytest.mjs` (GPU): all
 checks passed.
 
 ### Performance
