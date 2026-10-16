@@ -135,6 +135,7 @@ export const LINE_GOALS = [
   ['Into the Gorge', 1500, 'The Couloir', 'The Ravine', 'Frozen Falls'],
   ['Hammer Time', 2000, 'The Hammer'],
   ['Roof Hopper', 1800, 'Old Lift Station', 'Corvo Refuge'],
+  ['Pillow Talk', 1200, 'Left Ledges', 'Pillow Stacks'],
 ];
 
 // The canonical lines, as (u, v) waypoints ('ravine' = the ravine's centre line): the bots ride them

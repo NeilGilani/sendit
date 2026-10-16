@@ -243,7 +243,8 @@ spin, W / S to flip; Shift grabs. On this map (trickStyle):
   clean run — **The Classic** (Band A → First Stack → Throne → Last Stack, +2500), **Station to Station**
   (Station Cliff → the station roof → Cable Drop, +2000), **Spine Tingler** (Spine Wall → West Ledges → Pillow Stacks, +1500),
   **Into the Gorge** (the Couloir → the Ravine → Frozen Falls, +1500), **Hammer Time** (land the Hammer clean, +2000), **Roof
-  Hopper** (the station roof and the refuge roof, +1800). Progress ticks show in the chain area; a crash resets it.
+  Hopper** (the station roof and the refuge roof, +1800), **Pillow Talk** (Left Ledges → Pillow Stacks,
+  +1200). Progress ticks show in the chain area; a crash resets it.
 - **Line chain** (physics/flow.js): every scored move keeps the chain alive; the multiplier grows ×0.25 per
   *different* move (repeats count half) up to ×5; the chain banks as a **Line ×N** bonus 3.2 s after the last
   move on the snow (the air keeps it alive) and is lost on a crash.
