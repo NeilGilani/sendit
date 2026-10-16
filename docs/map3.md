@@ -125,10 +125,14 @@ web/src/maps/builtin.js     one line: import './ravenspire/index.js';
   signature lines (Stacks corridor, ravine, spine and pillow fields, cliff lips, buildings, drop zones).
 - **Spines** — a triangle wave across the fall line with sharp crests and rounded sluff channels.
 - **Cliff bands** (`cliff(u, uc, h, L)`) — above the lip a bench of length `L = max(bench, 4·h)` raises the
-  terrain by `h · t^1.25`, so the approach flattens steadily toward the lip (lip ≈ 30°, never a kicker); the
-  face drops `h` over `max(1.4, 0.11·h)` m onto the unchanged 41° landing. Height varies across the band
-  (noise, a peak, tapered ends, ramp-around gaps); a soft rounded snow lip; rock teeth on the lip mark the
-  edge from above.
+  terrain by `(h + d) · t^1.25`, so the approach flattens toward the lip (≈ 29°); its last `LIP_ROLL_LEN`
+  (24 m, at most L/2) then **roll back over** by `LIP_ROLL` (0.2 in slope, depth d = Lr·0.1): a ≥ 120 m radius,
+  so a rider at 30–35 m/s follows it and leaves at ≈ 36°, pointing down the 41° landing instead of out over it.
+  The face drops `h` over `max(1.4, 0.11·h)` m onto the unchanged 41° landing. Height varies across the band
+  (noise, a peak, tapered ends, ramp-around gaps). Rock teeth on the lip mark the edge from above — faded out
+  within 12–18 m of the canonical lines (`lineDist`), because a 1–2.6 m knob under you is a kicker.
+  (Until the jump rebalance the bench ended in a 0.15–0.5 m snow bump and the teeth sat on the lines: at
+  30 m/s both kicked take-offs 10–15° flatter, the main reason a 20 m cliff flew 100 m.)
 - **Pillows** — terraced: every `step` m the slope pauses on a rolling top (`top` = 70 % of the step, still
   falling gently so you never land into the next riser), then drops; wavy across the field, broken into
   rounded lobes with deep gaps between them.
@@ -183,7 +187,7 @@ defaults. Maps load at boot (a map switch reloads the page), so "reset when anot
 | `landPowderScrub` | 0 | share of speed lost per m/s of landing impact in powder (the snow explodes, you sink) |
 | `landYawSpeed` | null | `[v0, v1, scale]`: yaw landing tolerances shrink to `scale`× from v0 → v1 m/s (speed-based crash threshold) |
 | `compressionStumble` / `compressionCrash` | ∞ | m/s of normal velocity absorbed within ~0.12 s on the snow (a flat bottom at speed) |
-| `airGravity` | 1 | gravity multiplier in the air (hang time) |
+| `airGravity` | 1 | gravity multiplier in the air (Ravenspire no longer uses it: no hidden float) |
 | `obstacleHeights` | false | trees / rocks / towers have a height: flying over them clears them |
 | `wallCrashSpeed` | 9 | m/s into a building wall that knocks you down |
 | `microHop` | 0 | s: airs shorter than this (a bump skimmed at speed) re-ground quietly instead of being judged as landings (×2.5 when you didn't pop) |
@@ -192,7 +196,7 @@ defaults. Maps load at boot (a map switch reloads the page), so "reset when anot
 | `airSettleAngle` | 0 | deg: with no spin going, a released stick squares the gear up to the path from this far out (launched mid-skid) |
 | `windRoar` | 0 | 0..1: the low-pass wind roar layer above 16 m/s (audio.js) |
 | `trickStyle` | false | Tail grab / Truck driver on skis, "Tweaked" grabs (+50 % grab points) and the tweak pose |
-| `slowmo` | null | `{ minAir, scale, easeIn, hold, easeOut, cooldown }`: apex slow motion on huge airs |
+| `slowmo` | null | `{ minAir, minDrop, scale, easeIn, hold, easeOut, cooldown }`: apex slow motion on genuinely big airs (predicted flight ≥ minAir s and ≥ minDrop m above the snow when it triggers) |
 | `flow` | null | `{ enabled, … }`: the flow layer (§4), defaults in `physics/flow.js FLOW_DEFAULTS` |
 | CAMERA `fovCurve` | 1 | FoV bonus = maxFovBonus · speedRatio^fovCurve |
 | CAMERA `speedShake`, `speedShakeFrom` | 0, 0.7 | continuous shake on the snow at top speed |
@@ -212,14 +216,14 @@ defaults. Maps load at boot (a map switch reloads the page), so "reset when anot
 | `liftOffGrip` | 1.5 | legs soak up rolls at speed (fewer micro hops) |
 | `smoothFollow`, `terrainImpactLoss` | 0.5, 0.25 | rolls and dips cost little speed |
 | `compressionStumble` / `Crash` | 11 / 17 m/s | flat-bottoming at 30 m/s hurts |
-| `airGravity` | 0.9 | a little floatier: longer hang time |
+| `airDrag` | 0.0025 | k = ρ·CdA / 2m (a = k·v²): ρ ≈ 0.9 up here, CdA 0.42 m² — 10–15 % off a 30 m/s cliff flight (it was 0.004 in the old units, ≈0.0004: a fifth of a real rider's) |
 | `landPowderAbsorb`, `landPowderScrub` | 5 m/s, 0.012 | 15–25 m drops onto 41° powder land clean; big impacts cost speed |
 | `hardLanding` / `crashImpact` | 17 / 24 m/s (after absorption) | a full send off the Throne (~16.5 m/s) lands clean; the Hammer stumbles unless rolled and straight |
 | `landYawSpeed` | [18, 32, 0.75] | sideways landings at speed are less forgiving |
 | `landClean` / `landStumble` | 18° / 32° ski (crash 40°), 18° / 46° board | |
-| pop, spin, flip | popMax 4.2 / 4.6, spinRateMax 7.2 / 8.2, flipRateMax 6.0 / 6.2 | bigger tricks for bigger air |
+| pop, spin, flip | popMax 4.2 / 4.6 (fades to 45 % at 26 m/s, `popSpeedFade`), spinSet 6.0 / 6.8, flipSet 3.2 / 3.3, windupSpin 3.0 / 3.4 | a strong set (big-mountain riders); rotation is still momentum set at the lip (docs/equipment.md "Air and tricks") |
 | `microHop`, `landRedirect`, `landSpeedCap`, `airSettleAngle` | 0.12 s, 30°, 34 m/s, 100° | skimming rolls at 30 m/s is not a landing; ravine sidewall landings pivot you into the new line; no 130 mph moments after a 40 m drop; a hockey-stop launch squares up in the air |
-| `slowmo` | minAir 2.4 s, 0.45×, 0.15 / 0.5 / 0.35 s, cooldown 5 s | apex slow-mo on huge airs (never in the last 0.45 s) |
+| `slowmo` | minAir 2.8 s, minDrop 10 m, 0.7×, 0.2 / 0.3 / 0.3 s, cooldown 6 s | a touch of apex slow-mo on genuinely big air only (+≈0.2 s of wall-clock; never in the last 0.45 s). It was 0.45× for 0.5 s on every 2.4 s air (+0.43 s, the "overkill") |
 | CAMERA | maxFovBonus 14, fovCurve 1.6, followSmooth 0.1, steepLift 0.4, steepPitch 3, speedShake 0.12, flowFov 7, airLook 0.25, airFollowY 0.09, landTrauma 0.045 | 66° → 80° in the top of the speed range, closer and quicker at speed |
 
 ---
@@ -227,7 +231,8 @@ defaults. Maps load at boot (a map switch reloads the page), so "reset when anot
 ## 4. Tricks, flow and scoring
 
 Controls are the game's (docs/equipment.md): hold Space to load, release to pop; steer in the air to
-spin, W / S to flip; Shift grabs. On this map (trickStyle):
+spin, W / S to flip; Shift grabs — rotation is set at the take-off (wind up / preload while loading, pop at the
+lip, throw), then tuck or open in the air (docs/equipment.md "Air and tricks"). On this map (trickStyle):
 
 - **Grabs**: skis — Safety, Mute (steer left), Japan (steer right), **Tail grab** (S), **Truck driver** (W);
   board — Indy, Melon, Nose (W), Tail (S). Held past ~0.4 s the grab **tweaks** (board pushed out and rolled,
@@ -252,7 +257,7 @@ spin, W / S to flip; Shift grabs. On this map (trickStyle):
   move on the snow (the air keeps it alive) and is lost on a crash.
 - **Flow meter → SEND IT**: filled by landed tricks, drops, perfect landings, close shaves and speed over
   24 m/s; drains slowly when idle. Full → the **SEND IT** state for 9 s (+1.6 s per landed trick, up to
-  20 s): +10 % top speed, +20 % pop, +15 % spin/flip rate, +25 % landing tolerance, ×2 trick points, and tucking gives a little SSX-style
+  20 s): +10 % top speed, +8 % pop, +8 % rotation set, +25 % landing tolerance, ×2 trick points, and tucking gives a little SSX-style
   boost (1.8 m/s² of thrust); the
   music lifts (the upbeat track), a FoV kick and shake, an orange vignette, the suit's trims flare, a rumble.
 - **Run summary** at the valley (zen runs): time, average / top speed, biggest drop, longest air, best line,
@@ -263,7 +268,7 @@ spin, W / S to flip; Shift grabs. On this map (trickStyle):
 
 Game feel at speed: wind roar (noise through a low-pass sweeping 300 Hz → 6 kHz with speed, silent below
 16 m/s), the lens opening in the top of the speed range, a continuous speed shake, closer camera with less
-lag, the big-air side swing, landing shake scaled by impact, apex slow-mo (lens tightens, wind drops in
+lag, the big-air side swing, landing shake scaled by impact, a touch of apex slow-mo on genuinely big air (lens tightens, wind drops in
 pitch), controller rumble building with speed, wind streaks in the corners above 24 m/s.
 
 **Golden snowflakes** (`course.challenge.flakes`, from `course.placeFlakes()`): the game's 12 per-run collectibles
@@ -303,36 +308,39 @@ Styles: **send** = tucked straight down the line, popping every cliff; **trick**
 
 | line | gear | style | time | avg speed | crashes | stumbles | air total (longest) | biggest drop | judged | line goals |
 |---|---|---|---|---|---|---|---|---|---|---|
-| The Stacks (cliff into cliff) | ski | send | 103.6 s | 28.1 m/s (63 mph) | 0 | 0 | 23.9 s (5.34 s) | 48 m | 100 | The Classic |
-| The Stacks (cliff into cliff) | snowboard | send | 115 s | 25.3 m/s (57 mph) | 0 | 0 | 23.1 s (5.27 s) | 47 m | 100 | The Classic |
-| Spine Wall → pillows → ledges | ski | send | 141.5 s | 21.7 m/s (49 mph) | 0 | 0 | 50.3 s (4.85 s) | 35 m | 97 | Pillow Talk |
-| Spine Wall → pillows → ledges | snowboard | send | 137.1 s | 22.2 m/s (50 mph) | 0 | 0 | 43.2 s (4.6 s) | 29 m | 97 | Pillow Talk |
-| The Ravine | ski | send | 143.2 s | 22.4 m/s (50 mph) | 0 | 2 | 28.5 s (3.75 s) | 19 m | 90 | - |
-| The Ravine | snowboard | send | 146.5 s | 22 m/s (49 mph) | 0 | 0 | 25.9 s (3.4 s) | 17 m | 88 | - |
-| Station Cliff → roof | ski | send | 119.2 s | 26.2 m/s (59 mph) | 0 | 0 | 24.2 s (4.44 s) | 30 m | 99 | - |
-| Station Cliff → roof | snowboard | send | 135.8 s | 22.7 m/s (51 mph) | 0 | 1 | 21.7 s (4.57 s) | 29 m | 98 | Station to Station |
-| The Hammer (36 m) | ski | send | 152.2 s | 22.3 m/s (50 mph) | 1 | 0 | 35.1 s (6.04 s) | 51 m | 97 | Hammer Time |
-| The Hammer (36 m) | snowboard | send | 140 s | 22.2 m/s (50 mph) | 0 | 1 | 27.8 s (5.25 s) | 28 m | 89 | - |
-| Bowl → refuge roof | ski | send | 118.2 s | 26.2 m/s (59 mph) | 0 | 0 | 27.7 s (4.54 s) | 33 m | 99 | - |
-| Bowl → refuge roof | snowboard | send | 121.6 s | 24.9 m/s (56 mph) | 0 | 1 | 21.3 s (4.72 s) | 34 m | 98 | - |
-| The Stacks (cliff into cliff) | ski | trick | 145.9 s | 20.3 m/s (45 mph) | 0 | 0 | 20.8 s (4.75 s) | 41 m | 96 | The Classic |
-| The Stacks (cliff into cliff) | snowboard | trick | 143 s | 20.7 m/s (46 mph) | 0 | 0 | 21.3 s (4.9 s) | 43 m | 96 | The Classic |
-| Spine Wall → pillows → ledges | ski | trick | 167.8 s | 17.9 m/s (40 mph) | 0 | 1 | 44.3 s (3.94 s) | 22 m | 88 | Pillow Talk |
-| Spine Wall → pillows → ledges | snowboard | trick | 163.4 s | 18.5 m/s (41 mph) | 0 | 0 | 47.1 s (3.9 s) | 22 m | 90 | Pillow Talk |
-| The Ravine | ski | trick | 180.4 s | 17.8 m/s (40 mph) | 0 | 1 | 22.2 s (4.72 s) | 13 m | 75 | - |
-| The Ravine | snowboard | trick | 176.7 s | 18.1 m/s (40 mph) | 0 | 0 | 24.2 s (3.72 s) | 16 m | 89 | Into the Gorge |
-| Station Cliff → roof | ski | trick | 166.6 s | 19 m/s (43 mph) | 0 | 0 | 21.6 s (4.5 s) | 28 m | 95 | Station to Station |
-| Station Cliff → roof | snowboard | trick | 161.4 s | 19.4 m/s (43 mph) | 0 | 0 | 21.3 s (4.84 s) | 32 m | 95 | Station to Station |
-| The Hammer (36 m) | ski | trick | 180.5 s | 17.9 m/s (40 mph) | 0 | 0 | 27.9 s (6.57 s) | 49 m | 93 | Hammer Time |
-| The Hammer (36 m) | snowboard | trick | 171.8 s | 18.7 m/s (42 mph) | 0 | 1 | 22.4 s (4.97 s) | 19 m | 78 | - |
-| Bowl → refuge roof | ski | trick | 151.5 s | 20 m/s (45 mph) | 0 | 0 | 19.2 s (4.4 s) | 31 m | 94 | - |
-| Bowl → refuge roof | snowboard | trick | 149.5 s | 20.4 m/s (46 mph) | 0 | 0 | 17.1 s (4.45 s) | 32 m | 94 | - |
+| The Stacks (cliff into cliff) | ski | send | 108.5 s | 27.7 m/s (62 mph) | 0 | 0 | 15.2 s (3.2 s) | 31 m | 100 | The Classic |
+| The Stacks (cliff into cliff) | snowboard | send | 118.7 s | 25.1 m/s (56 mph) | 0 | 0 | 14.8 s (3.3 s) | 32 m | 100 | The Classic |
+| Spine Wall → pillows → ledges | ski | send | 163.7 s | 21.8 m/s (49 mph) | 1 | 0 | 62 s (3.68 s) | 19 m | 94 | Pillow Talk |
+| Spine Wall → pillows → ledges | snowboard | send | 142.2 s | 21.9 m/s (49 mph) | 0 | 0 | 43.1 s (4.57 s) | 39 m | 98 | Pillow Talk |
+| The Ravine | ski | send | 143.8 s | 22.5 m/s (50 mph) | 0 | 2 | 27.8 s (4.27 s) | – | – | - |
+| The Ravine | snowboard | send | 153.3 s | 21.2 m/s (47 mph) | 0 | 1 | 19.8 s (3.2 s) | 17 m | 84 | - |
+| Station Cliff → roof | ski | send | 126.6 s | 25 m/s (56 mph) | 0 | 1 | 17.2 s (2.38 s) | 18 m | 96 | Station to Station |
+| Station Cliff → roof | snowboard | send | 137.8 s | 22.8 m/s (51 mph) | 0 | 1 | 14.6 s (2.4 s) | 18 m | 94 | Station to Station |
+| The Hammer (36 m) | ski | send | 133.9 s | 24.2 m/s (54 mph) | 0 | 0 | 23 s (3.63 s) | 41 m | 97 | Hammer Time |
+| The Hammer (36 m) | snowboard | send | 143 s | 22.5 m/s (50 mph) | 0 | 0 | 22.2 s (3.63 s) | 41 m | 96 | Hammer Time |
+| Bowl → refuge roof | ski | send | 113.6 s | 27 m/s (60 mph) | 0 | 0 | 16.5 s (2.93 s) | 21 m | 94 | - |
+| Bowl → refuge roof | snowboard | send | 122.2 s | 25.4 m/s (57 mph) | 0 | 0 | 15.7 s (4.18 s) | 25 m | 96 | - |
+| The Stacks (cliff into cliff) | ski | trick | 147.9 s | 20.3 m/s (45 mph) | 0 | 0 | 13.8 s (3.17 s) | 31 m | 92 | The Classic |
+| The Stacks (cliff into cliff) | snowboard | trick | 145.5 s | 20.7 m/s (46 mph) | 0 | 0 | 13.9 s (3.17 s) | 31 m | 93 | The Classic |
+| Spine Wall → pillows → ledges | ski | trick | 177.6 s | 17.7 m/s (40 mph) | 0 | 1 | 45.6 s (2.95 s) | 16 m | 89 | Pillow Talk |
+| Spine Wall → pillows → ledges | snowboard | trick | 172.1 s | 18.1 m/s (40 mph) | 0 | 2 | 46.8 s (2.72 s) | 18 m | 87 | Pillow Talk |
+| The Ravine | ski | trick | 180.5 s | 17.8 m/s (40 mph) | 0 | 0 | 21.1 s (3.55 s) | 36 m | 93 | Into the Gorge |
+| The Ravine | snowboard | trick | 180 s | 18.1 m/s (40 mph) | 0 | 1 | 21.8 s (3 s) | 17 m | 84 | - |
+| Station Cliff → roof | ski | trick | 168.1 s | 18.9 m/s (42 mph) | 0 | 0 | 13.6 s (2.48 s) | 18 m | 85 | Station to Station |
+| Station Cliff → roof | snowboard | trick | 163.5 s | 19.4 m/s (43 mph) | 0 | 0 | 14.7 s (2.5 s) | 18 m | 88 | Station to Station |
+| The Hammer (36 m) | ski | trick | 178.3 s | 18.3 m/s (41 mph) | 0 | 0 | 18.4 s (3.62 s) | 41 m | 90 | Hammer Time |
+| The Hammer (36 m) | snowboard | trick | 174.7 s | 18.8 m/s (42 mph) | 0 | 1 | 17.4 s (3.62 s) | 41 m | 87 | Hammer Time |
+| Bowl → refuge roof | ski | trick | 153.3 s | 20.1 m/s (45 mph) | 0 | 0 | 11.5 s (3.02 s) | 21 m | 81 | - |
+| Bowl → refuge roof | snowboard | trick | 151.1 s | 20.4 m/s (46 mph) | 0 | 0 | 11.9 s (3.33 s) | 21 m | 82 | - |
 
-All 24 runs reach the valley — ridden through the real forest and rocks (`OBSTACLES=`, below). The one crash
-is the Hammer sent with a full pop (a 6 s air: by design, roll it). Control style (12 more runs, speed checks
-above 21 m/s): all finish, 0 crashes, 5 stumbles, 16.4–18.0 m/s average. Carve style (12 runs, linked turns
-every 1.5 s): all finish, 2 stumbles, 2 crashes — a wide turn into the couloir wall and one into the station's side
-wall. Every drop zone rides cleanly: 9 zones × 2 gears, the first 200 m from each with the control bot, no
+All 24 runs reach the valley — ridden through the real forest and rocks (`OBSTACLES=`, below). Numbers after the
+jump rebalance (docs/jumps-research.md): longest airs 2.4–4.6 s (were 3.4–6.6 s), biggest drops 16–41 m (were
+13–51 m) at the same 50–60 mph line speeds; the one crash is a larch on the pillow stacks. The line goals still
+complete (The Classic, Pillow Talk, Into the Gorge, Station to Station, Hammer Time); the trick bot throws its
+spins from the lip (rotation is set at the take-off now). Control style (12 more runs, speed checks above
+21 m/s): all finish, 3 crashes (larches on the Spine Wall line, one just after a landing), 5 stumbles,
+16.2–18.2 m/s average (before the rebalance: 0 crashes, 5 stumbles). Carve style (12 runs, linked turns every
+1.5 s): all finish, 0 stumbles, 3 crashes — weaving into larches in the ravine and the lower bowl (before: 2 + 2). Every drop zone rides cleanly: 9 zones × 2 gears, the first 200 m from each with the control bot, no
 crashes (a stumble off Station Cliff).
 
 **With the real forest.** The headless bots normally ride without trees (scatter is browser-only); with

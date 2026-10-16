@@ -24,6 +24,7 @@ import { outfitSlotsFromProfile } from './character/profile.js';
 
 const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4(), _v1 = new THREE.Vector3();
+const _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
 const BA = ANIM.board;
 
 export class Rider {
@@ -203,7 +204,12 @@ export class Rider {
 
     // --- layer drivers
     let crouchT = 0.45 + ratio * 0.15 + pl.tuck * 0.45 + pl.squat * 0.55 + pl.brake * 0.15;
-    if (air) crouchT = 0.35 + pl.grab * 0.5 + Math.min(1, Math.abs(pl.flipRate || 0) / 3) * 0.4;
+    // In the air the crouch follows the physical tuck (player.flipTuck: the faster the flip, the tighter
+    // the ball); a flip turning open is a layout: body stretched long (less crouch).
+    const flipTuckPhys = pl.flipTuck ?? Math.min(1, Math.abs(pl.flipRate || 0) / 3.5);
+    const layoutT = air && Math.abs(pl.flipRate || 0) > 1.2 ? (1 - flipTuckPhys) * (1 - pl.grab) : 0;
+    p.layout = (p.layout || 0) + (layoutT - (p.layout || 0)) * k(6);
+    if (air) crouchT = 0.35 + pl.grab * 0.5 + flipTuckPhys * 0.5 - p.layout * 0.25;
     p.crouch += (Math.min(1, crouchT) - p.crouch) * k(10);
     p.tuck += ((ground ? pl.tuck : 0) - p.tuck) * k(ANIM.tuckResponse);
     p.air += ((air ? 1 : 0) - p.air) * k(5);
@@ -218,8 +224,11 @@ export class Rider {
     // Tweak: a grab held past ~0.4 s gets style — the board is pushed out / the skis cross, the body arches.
     const grabT = pl.dyn?.takeoff?.grabT || 0;
     p.tweak = (p.tweak || 0) + ((air && pl.grab > 0.6 && PHYSICS.trickStyle ? THREE.MathUtils.smoothstep(grabT, 0.35, 0.9) : 0) - (p.tweak || 0)) * k(6);   // opt-in (trickStyle)
-    // Flipping: knees pulled up, hands in toward the shins (a tuck spins faster and reads as a flip).
-    p.flipTuck = (p.flipTuck || 0) + ((air ? THREE.MathUtils.clamp(Math.abs(pl.flipRate || 0) / 3.5, 0, 1) * (1 - pl.grab) : 0) - (p.flipTuck || 0)) * k(8);
+    // Flipping: knees pulled up, hands in toward the shins — as tight as the physics tuck (it is what
+    // speeds the flip up), opening into the layout to slow down and spot the landing.
+    p.flipTuck = (p.flipTuck || 0) + ((air && Math.abs(pl.flipRate || 0) > 0.6 ? flipTuckPhys * (1 - pl.grab) : 0) - (p.flipTuck || 0)) * k(8);
+    // Spinning: arms wrapped in to speed up (player.spinTuck > 0), flung wide to slow down (< 0).
+    p.spinTuck = (p.spinTuck || 0) + ((air && Math.abs(pl.spinRate || 0) > 1 ? (pl.spinTuck || 0) * (1 - pl.grab) : 0) - (p.spinTuck || 0)) * k(8);
     p.stanceYaw += (this.stanceYawTarget() * (1 - p.sit) - p.stanceYaw) * k(10);
     // Look direction along the bord: +1 toward the nose, −1 toward the tail (switch).
     p.look += (pl.travelSign - p.look) * k(5);
@@ -679,10 +688,23 @@ export class Rider {
     const upF = V(side * 0.3, -0.55, 0.65), loF = V(-side * 0.05, -0.45, 0.9);   // flip tuck: hands to the shins
     let u = upS.lerp(upP, p.push).lerp(upT, p.tuck).lerp(upA, p.air * (1 - g)).lerp(upF, p.flipTuck).lerp(upG, g);
     let l = loS.lerp(loP, p.push).lerp(loT, p.tuck).lerp(loA, p.air * (1 - g)).lerp(loF, p.flipTuck).lerp(loG, g);
+    this.armSpin(side, u, l, 1 - g);
     [u, l] = this.armOverlays(side, u, l);
     this.armAim(side, u, l);
     // First person: turn the gloves into a pole grip (palms in, knuckles forward).
     if (this.fp) this.rotateGlobal(this.bones['hand' + (side > 0 ? '_l' : '_r')], new THREE.Quaternion().setFromAxisAngle(Z, side * 1.35).multiply(new THREE.Quaternion().setFromAxisAngle(X, 0.5)));
+  }
+
+  /**
+   * In the air the arms show what the rotation is doing: wrapped in across the chest to spin faster
+   * (spinTuck > 0), flung wide to slow a spin (< 0) or stretched out in a flip's layout (opening up to
+   * spot the landing). `sx` = the arm's lateral sign, `w` = weight (0 while grabbing). Mutates u, l.
+   */
+  armSpin(sx, u, l, w) {
+    const p = this.p;
+    const inn = Math.max(0, p.spinTuck || 0) * w, out = Math.max(Math.max(0, -(p.spinTuck || 0)), (p.layout || 0) * 0.8) * w;
+    if (inn > 0.01) { u.lerp(_v2.set(sx * 0.35, -0.75, 0.4), inn); l.lerp(_v3.set(-sx * 0.3, -0.1, 0.8), inn); }
+    if (out > 0.01) { u.lerp(_v2.set(sx, 0.3, -0.1), out); l.lerp(_v3.set(sx, 0.4, 0.05), out); }
   }
 
   armBoard(side, nx, pl) {
@@ -705,6 +727,7 @@ export class Rider {
     l.lerp(V(fx * 0.8, 0.2, 0.35), p.air * 0.8);
     u.lerp(V(fx * 0.3, -0.55, 0.65), p.flipTuck);    // flip tuck: hands in toward the shins
     l.lerp(V(-fx * 0.05, -0.45, 0.9), p.flipTuck);
+    this.armSpin(fx, u, l, 1 - p.grab);
     // Hand drag on deep carves: toe side the front hand reaches down to the snow in front of the toes,
     // heel side the rear hand trails behind the heels.
     const drag = p.drag || 0;

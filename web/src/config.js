@@ -23,8 +23,17 @@ export const PHYSICS = {
   latePopTime: 0.15,          // s after rolling off a crest while loaded that releasing still pops (coyote time)           // m/s per step of separation below which the rider just stays on (no micro-hops)
   terrainImpactLoss: 0.5,     // share of an abrupt impact into the terrain (beyond smoothFollow) lost as speed
   smoothFollow: 0.25,         // m/s per step of normal velocity absorbed loss-free (smooth rolls and dips)
-  lipPopBonus: 1.0,           // pop multiplier on a kicker lip (1 = a plain ollie; the pop already rides the ramp's launch angle)
-  airDrag: 0.006,
+  followMaxRate: 12,          // rad/s the terrain can turn the path upward on the ground (a height-field step is a bump, not a ramp)
+  // Jumps (docs/jumps-research.md). Flights are plain ballistics + drag: no extra lift, no pop bonus.
+  lipPopBonus: 0.8,           // pop share on a kicker lip (the legs get less time to push than on the flat)
+  popSpeedFade: [10, 26, 0.45],   // [v0, v1, share]: the pop fades to this share from v0 → v1 m/s (a lip at 60 mph is a blink)
+  airDrag: 0.0027,            // k = ρ·CdA / 2m (1/m): a = k·v² in the air (CdA 0.4 m², ρ 1.0, 75 kg; terminal ≈ 60 m/s)
+  airDragCompact: 0.7,        // drag share tucked / grabbing (CdA ≈ 0.28)
+  // Pop timing sets the rotation (spin / flip momentum × this, edge.js): released right at the lip = 1.
+  popLipTime: 0.12,           // s before the snow falls away that still counts as "at the lip"
+  popEarly: 0.5,              // s ahead of the lip where an early pop is down to …
+  popEarlySet: 0.55,          // … this share of the set
+  popFlatSet: 0.7,            // a pop with no lip ahead (flat ground): a weaker set
   landAssistTime: 0.25,       // s before touchdown when a released stick lets the gear settle onto its path …
   landAssistAngle: 14,        // … if it's within this many degrees (SSX-style auto-righting)
   spinCheckAngle: 40,         // deg: stick released within this of an alignment → settle (or check back) onto it
@@ -50,7 +59,7 @@ export const PHYSICS = {
   windRoar: 0,                // 0..1: the low-pass wind roar layer above 16 m/s (audio.js; 0 = off, maps opt in)
   airSettleAngle: 0,          // deg: with no spin going, a released stick squares the gear up to the path from this far out (0 = spinCheckAngle only)
   trickStyle: false,          // big-mountain trick extras: Tail grab / Truck driver on skis, tweaked grabs (labels, +50 % grab points)
-  slowmo: null,               // { minAir, scale, easeIn, hold, easeOut, cooldown }: apex slow motion on huge airs (player.js)
+  slowmo: null,               // { minAir, minDrop, scale, easeIn, hold, easeOut, cooldown }: apex slow motion on huge airs (player.js)
   flow: null,                 // { enabled, … } turns on the flow layer (physics/flow.js: line chains, flow meter, SEND IT state)
   // Aerodynamic auto-tuck
   autoTuckDelay: 2.5,         // seconds without directional input
@@ -113,10 +122,28 @@ export const PHYSICS = {
     powderFloat: 1.0, sinkSlow: 0.22, sinkFast: 0.08, powderBog: 7, powderDrag: 0.3, powderBogDecel: 0.12, powderSteer: 0.7,
     // Air
     popMin: 1.9, popMax: 3.5, chargeTime: 0.4,    // m/s vertical pop (tap → full charge)
-    spinRateMax: 6.4, spinResponse: 7, prewind: 0.45,
-    windupSpin: 2.6,          // rad/s of spin added at take-off by a full wind-up (steer while charging)
-    // Flips (W = frontflip, S = backflip in the air): rate, response, and the pitch tolerance at touchdown.
-    flipRateMax: 5.6, flipResponse: 5, flipLandClean: 22, flipLandStumble: 42, flipPreload: 4.2, flipMinAir: 0.45,
+    // Rotation = angular momentum set at take-off, tuck / open in the air (edge.js, docs/jumps-research.md).
+    // Spin: rad/s in the neutral pose; tucked × spinTuckGain (arms in), open × spinOpen.
+    spinSet: 6.0,             // full set (wind-up + throw, popped at the lip): 345°/s neutral, 500°/s tucked
+    spinTuckGain: 1.45, spinOpen: 0.6, spinResponse: 9, prewind: 0.45,
+    windupSpin: 2.6,          // rad/s of spin momentum a full wind-up (steer while charging) sets at the pop
+    spinThrow: 0.3,           // s after take-off the shoulders can still throw (add to) the spin …
+    spinThrowRate: 18,        // … at this rate (rad/s²), fading over the window …
+    spinThrowMax: 3.4,        // … up to this without a wind-up (rad/s)
+    spinMinH: 0.5, spinCheck: 3.2, airTwist: 1.0,   // below spinMinH not spinning; check-back / hip-twist rates (rad/s)
+    poseTime: 0.22,           // s to tuck in / open up fully (the rotation speeds up and slows gradually)
+    rollSet: 0.6,             // set share rolling off without a pop
+    // Flips (W = front, S = back): rad/s in the open (layout) pose, × flipTuckGain tucked.
+    flipSet: 3.1,             // full set (preload + throw): 180°/s open, 410°/s tucked (≈ 1.15 rev/s)
+    flipTuckGain: 2.3, flipResponse: 8,
+    flipTuckHold: 1.6, flipTuckFade: 1.0, flipTuckFloor: 0.2,   // s a full tuck holds, s it fades over, share left (the legs tire: ∝ ω²)
+    flipPreload: 0.55,        // share of flipSet a full preload (S while charging) sets at the pop (holding S through the throw finishes it)
+    flipThrow: 0.4, flipThrowRate: 11, flipThrowMax: 2.0,   // the in-air throw window (s), rate, cap without a preload
+    flipMinH: 0.35, flipMinAir: 0.45, flipCheck: 1.2,       // not flipping below flipMinH; no new flip with < flipMinAir s left
+    flipSpot: 0.35,           // s: let go and the rider plans to come round early and open up (layout) for the last flipSpot s
+    flipLandClean: 22, flipLandStumble: 42,
+    grabRate: 7, grabRelease: 9,          // 1/s reaching for / letting go of a grab …
+    grabLetGo: 0.22,          // … which the rider does by itself this many s before touchdown
     landClean: 15, landStumble: 30, landCrash: 38, // deg yaw between ski and path
     switchLand: 30,           // deg — backwards landings within this are "switch" (twin tips clean)
   },
@@ -146,9 +173,17 @@ export const PHYSICS = {
     butterRate: 3.4, butterMaxSpeed: 13, butterDrag: 0.8,
     // Air
     popMin: 2.2, popMax: 4.0, nollie: 0.88, chargeTime: 0.45,
-    spinRateMax: 7.6, spinResponse: 7.5, prewind: 0.55, windupSpin: 3.2,
-    // Flips (W = tamedog / front, S = wildcat / back, over the toe-heel axis), pitch tolerance at touchdown.
-    flipRateMax: 5.9, flipResponse: 5, flipLandClean: 22, flipLandStumble: 42, flipPreload: 4.4, flipMinAir: 0.45,
+    // Rotation (see ski): a board spins a little faster (one platform, arms free): 390°/s neutral, 565°/s tucked.
+    spinSet: 6.8, spinTuckGain: 1.45, spinOpen: 0.6, spinResponse: 9, prewind: 0.55, windupSpin: 3.2,
+    spinThrow: 0.3, spinThrowRate: 20, spinThrowMax: 3.8, spinMinH: 0.5, spinCheck: 3.2, airTwist: 1.0,
+    poseTime: 0.22, rollSet: 0.6,
+    // Flips (W = tamedog / front, S = wildcat / back, over the toe-heel axis): 185°/s open, 425°/s tucked.
+    flipSet: 3.2, flipTuckGain: 2.3, flipResponse: 8, flipPreload: 0.55,
+    flipTuckHold: 1.6, flipTuckFade: 1.0, flipTuckFloor: 0.2,
+    flipThrow: 0.4, flipThrowRate: 11, flipThrowMax: 2.0, flipMinH: 0.35, flipMinAir: 0.45, flipCheck: 1.2,
+    flipSpot: 0.35,
+    flipLandClean: 22, flipLandStumble: 42,
+    grabRate: 7, grabRelease: 9, grabLetGo: 0.22,
     landClean: 15, landStumble: 45, landSlide: 82, // deg yaw from the nearest board end to the path (sideways = hard slide)
   },
 };

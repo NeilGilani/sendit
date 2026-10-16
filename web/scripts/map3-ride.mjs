@@ -136,8 +136,11 @@ export function ride(type, key, style, opts = {}) {
         if (drop > (opts.popDrop ?? 6)) c.jump = !(lipNear > 1.2);
         if (style === 'trick' && drop > (opts.popDrop ?? 6)) c.brake = opts.flip ? 1 : 0;
       }
-      if (style === 'trick' && pl.state === State.AIR && pl.airTime > 0.15 && (Math.abs(pl._spinTotal) > 0.6 || pl.dyn.timeToLand() > 1.3)) {
-        if (Math.abs(pl._spinTotal) + Math.abs(pl.spinRate) * 0.3 < Math.PI * (opts.spins || 2)) c.steer = -1;
+      // Spins are set at the take-off (physics/edge.js): throw from the lip, keep the stick in until the
+      // open-arms rotation left would carry it round by touchdown, then let go and spot the landing.
+      if (style === 'trick' && pl.state === State.AIR && (Math.abs(pl._spinTotal) > 0.6 || pl.dyn.timeToLand() > 1.3)) {
+        const tl = pl.dyn.timeToLand();
+        if (Math.abs(pl._spinTotal) + Math.abs(pl.spinRate) * 0.15 + Math.abs(pl.dyn.spinH || 0) * pl.dyn.C.spinOpen * Math.max(0, tl - 0.15) < Math.PI * (opts.spins || 2)) c.steer = -1;
       }
       if (opts.script) opts.script(c, pl, t);
     };

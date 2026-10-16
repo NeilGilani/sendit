@@ -335,74 +335,74 @@ export class EdgePhysics {
     return this._popEnd === 'nose' && C.nollie ? v * C.nollie : v;   // the nose is shorter / softer than the tail
   }
 
-  /** Called by Player.enterAir — trick bookkeeping. */
+  // Rotation in the air follows angular momentum (docs/jumps-research.md):
+  //   • The take-off SETS it: the carve's pre-wind, the wind-up (steer while loading the pop), the flip
+  //     preload (S while loading), all scaled by how well the pop was timed (popQ: 1 = released right at
+  //     the lip, less for an early pop on the flat, a late coyote pop or rolling off without one).
+  //   • For the first `spinThrow` / `flipThrow` s of the air the arms and shoulders can still finish the
+  //     throw (steer / W / S add to it, less and less as the window closes).
+  //   • After that the rider can only change shape: tuck (keep the stick / key in the direction of the
+  //     rotation) turns faster, × spinTuckGain / flipTuckGain; opening up (stick against it) slows down,
+  //     × spinOpen; let go and the rider spots the landing — picks the pose, within what the momentum
+  //     allows, that arrives at the next rideable alignment at touchdown, extending for the last
+  //     flipSpot s. So how far you rotate comes from the set and the air time, not from holding a key:
+  //     1–2 flips with good timing on a big kicker, a triple needs a perfect set and ~2.8 s of air.
+  // State: spinH / flipH = angular momentum as the rate in the neutral (spin) / open (flip) pose, rad/s.
+
+  /** Called by Player.enterAir — trick bookkeeping and the rotation set at take-off. */
   takeoffInfo(popped) {
-    const pl = this.pl;
+    const pl = this.pl, C = this.C;
     // Rolled off a crest while loaded: keep the charge (and preload / wind-up) for a late pop.
     const late = !popped && this.charging;
     const keep = late ? { charge: this.charge, flipLoad: this.flipLoad, windup: this.windup } : null;
     this._lateT = late ? P.latePopTime : 0;
     this.takeoff = { switch: this.travel < 0, popped, spin: 0, flip: 0, grabT: 0, grab: null, end: this._popEnd || 'tail' };
-    pl.flip = 0; pl.flipRate = 0;
+    // How well the set was timed: the pop's own quality, or a weaker set rolling off without a pop.
+    const q = this.popQ = popped ? clamp(pl.lastPopQ ?? 1, 0, 1) : C.rollSet;
+    pl.flip = 0; pl.flipRate = 0; pl.flipTuck = 0;
+    this.flipH = 0; this.tuckLoad = 0;
     // A preloaded backflip leaves the lip already rotating and commits to the flip.
     this._flipCommit = popped && (this.flipLoad || 0) > 0.25;
-    if (this._flipCommit) pl.flipRate = this.flipLoad * this.C.flipPreload;
+    if (this._flipCommit) this.flipH = this.flipLoad * C.flipPreload * q * this.flipCap();
     this.flipLoad = 0; pl.flipLoad = 0;
-    // W / S already held at take-off (tuck, brake, nollie) don't start a flip until pressed again.
+    // W / S already held at take-off (tuck, brake, nollie) don't throw a flip until pressed again
+    // (S held from a preload is the same throw, so it carries on).
     const c = pl._ctrl || {};
-    this._flipLock = { up: (c.up || 0) > 0.2, brake: (c.brake || 0) > 0.2 };
+    this._flipLock = { up: (c.up || 0) > 0.2, brake: (c.brake || 0) > 0.2 && !this._flipCommit };
     // Rolling off a crest / lip without popping: the turn held from the ground is carving, not a spin
     // — it only spins once steer is let go and pressed again (popped jumps spin straight away).
     this._spinLock = !popped && Math.abs(c.steer || 0) > 0.2 ? Math.sign(c.steer) : 0;
-    // Pre-wind: carry part of the ground rotation into the air.
-    // (maps with airSettleAngle: rolling off a lip by accident carries only a third of the carve into the air)
-    pl.spinRate = -this.yawRate * this.C.prewind * (popped || !P.airSettleAngle ? 1 : 0.35);
-    if (popped) pl.spinRate += -(this.windup || 0) * this.C.windupSpin * this.H.spin;
-    const cap = this.C.spinRateMax * this.H.spin;
-    pl.spinRate = clamp(pl.spinRate, -cap, cap);
-    // Spinning out of a butter pre-winds the spin.
-    if (this.butter > 0.3) pl.spinRate += -this.yawRate * 0.4;
+    // Pre-wind: carry part of the ground rotation into the air (maps with airSettleAngle: rolling off a lip
+    // by accident carries only a third of the carve into the air); the wind-up springs into the spin.
+    let h = -this.yawRate * C.prewind * (popped || !P.airSettleAngle ? 1 : 0.35);
+    if (popped) h += -(this.windup || 0) * C.windupSpin * this.H.spin * q;
+    this._spinPre = popped && Math.abs(this.windup || 0) > 0.3;   // wound up: the throw can finish a full set
+    if (this.butter > 0.3) h += -this.yawRate * 0.4;   // spinning out of a butter pre-winds the spin
+    this.spinH = clamp(h, -this.spinCap(), this.spinCap());
+    pl.spinRate = this.spinH; pl.spinTuck = 0;
     this.takeoff.end = popped ? this._popEnd : null;
+    this.takeoff.set = q;
     this.windup = 0; pl.windup = 0; pl.grabName = null;
     this.charge = 0; this.charging = false; pl.squat = 0;
     this.butter = 0; this.press = 0;
     if (keep) { Object.assign(this, keep); this.charging = true; pl.squat = this.charge; }
   }
 
+  /** Largest spin momentum (neutral-pose rad/s) a full set gives this gear. */
+  spinCap() { return this.C.spinSet * this.H.spin * (1 + flowK(this.pl, 'spinBoost')); }
+  /** Largest flip momentum (open-pose rad/s). */
+  flipCap() { return this.C.flipSet * Math.sqrt(this.H.spin) * (1 + flowK(this.pl, 'spinBoost')); }
+
   air(dt, ctrl) {
     const pl = this.pl, C = this.C;
-    const max = C.spinRateMax * this.H.spin * (1 - pl.grab * 0.15) * (1 + flowK(pl, 'spinBoost'));
     const tLand = this.timeToLand();
-    let target = 0, resp = C.spinResponse;
-    if (this._spinLock && (Math.abs(ctrl.steer) < 0.2 || Math.sign(ctrl.steer) !== this._spinLock)) this._spinLock = 0;
-    if (ctrl.active && Math.abs(ctrl.steer) > 0.2 && !this._spinLock) target = -ctrl.steer * max;
-    else if (pl.airTime > 0.1) {
-      // Stick released: within spinCheckAngle of a rideable alignment (nose, or tail if allowed, along
-      // the path) settle onto it — checking the rotation if it just went past; farther away, momentum
-      // carries the spin on to the next alignment, arriving by touchdown when that's reachable.
-      const velYaw = Math.atan2(-pl.velocity.x, -pl.velocity.z);
-      const tail = this.tailLandings();
-      let d = angleDiff(pl.heading, velYaw);
-      if (tail && Math.abs(d) > Math.PI / 2) d = angleDiff(pl.heading, velYaw + Math.PI);
-      // Not spinning (e.g. launched mid-skid): a map may let the rider square up from further out (airSettleAngle).
-      const settleA = Math.abs(pl.spinRate) < 0.8 && P.airSettleAngle ? Math.max(P.spinCheckAngle, P.airSettleAngle) : P.spinCheckAngle;
-      if (Math.abs(d) < settleA * DEG) {
-        target = Math.sign(d) * Math.min(max * 0.6, Math.abs(d) / Math.max(tLand, 0.1));
-        resp = 10;
-      } else if (Math.abs(pl.spinRate) > 0.8) {
-        const dir = Math.sign(pl.spinRate), period = tail ? Math.PI : Math.PI * 2;
-        let ahead = ((velYaw - pl.heading) * dir) % period;
-        if (ahead < 0) ahead += period;
-        target = dir * Math.min(max, ahead / Math.max(tLand, 0.12));
-        resp = 5;
-      }
-    }
-    pl.spinRate += (target - pl.spinRate) * (1 - Math.exp(-resp * dt));
-    pl.heading += pl.spinRate * dt;
+    // Grabs: reached for after the take-off, let go of just before touchdown (the legs land, not the hand).
+    const grabbing = ctrl.active && ctrl.tuck > 0.5 && pl.airTime > 0.12 && tLand > C.grabLetGo;
+    this.spinStep(dt, ctrl, grabbing, tLand);
     if (this.takeoff) this.takeoff.spin += pl.spinRate * dt;
-    const grabbing = ctrl.active && ctrl.tuck > 0.5 && pl.airTime > 0.12;
     this.flipStep(dt, ctrl, grabbing, tLand);
-    pl.grab += ((grabbing ? 1 : 0) - pl.grab) * (1 - Math.exp(-(grabbing ? 12 : 8) * dt));
+    // Grabs take a moment to reach (~0.2 s) and to let go of.
+    pl.grab += ((grabbing ? 1 : 0) - pl.grab) * (1 - Math.exp(-(grabbing ? C.grabRate : C.grabRelease) * dt));
     if (this.takeoff && pl.grab > 0.7) { this.takeoff.grabT += dt; this.takeoff.grab ||= this.grabName(); pl.grabName = this.takeoff.grab; }
     if (!grabbing && pl.grab < 0.3) pl.grabName = null;
     // Landing assist (SSX-style): stick released just before touchdown → settle onto the nearest
@@ -415,6 +415,7 @@ export class EdgePhysics {
         if (Math.abs(d) < P.landAssistAngle * DEG) {
           pl.heading += d * (1 - Math.exp(-14 * dt));
           pl.spinRate *= Math.exp(-12 * dt);
+          this.spinH *= Math.exp(-12 * dt);
         }
       }
     }
@@ -426,39 +427,117 @@ export class EdgePhysics {
     this.stop = 0;
   }
 
+  /** Spin about the vertical (see the rotation notes above). Sets pl.spinRate, pl.spinTuck (−1 open … +1 tucked). */
+  spinStep(dt, ctrl, grabbing, tLand) {
+    const pl = this.pl, C = this.C;
+    const cap = this.spinCap(), t = pl.airTime;
+    if (this._spinLock && (Math.abs(ctrl.steer) < 0.2 || Math.sign(ctrl.steer) !== this._spinLock)) this._spinLock = 0;
+    const steer = ctrl.active && !this._spinLock && Math.abs(ctrl.steer) > 0.2 ? ctrl.steer : 0;
+    let h = this.spinH || 0;
+    // The throw: early in the air the shoulders can still add to the set (less and less).
+    const throwing = steer && t < C.spinThrow;
+    if (throwing) {
+      const eff = (1 - (t / C.spinThrow) ** 2) * (0.5 + 0.5 * this.popQ);
+      // A throw alone sets less than a wound-up pop; a full set needs the pop right at the lip too.
+      const lim = (this._spinPre ? cap * (0.6 + 0.4 * this.popQ) : C.spinThrowMax * this.H.spin) * Math.sign(-steer);
+      h = approach(h, clamp(lim, -cap, cap), C.spinThrowRate * Math.abs(steer) * eff * dt);
+    }
+    // Shape: tucked (stick with the spin), open (against), grabbing = compact, released = spotting.
+    let pose = 0, rate = null;
+    const dir = Math.sign(h), spinning = Math.abs(h) > C.spinMinH;
+    if (grabbing) pose = 0.6;
+    else if (throwing) pose = 0.5;
+    else if (steer && spinning) pose = Math.sign(-steer) === dir ? 1 : -1;
+    else if (steer) rate = -steer * C.airTwist;   // no momentum: twist the hips a little (no momentum is made)
+    else if (pl.airTime > 0.1) {
+      // Spot the landing: the next rideable alignment (nose, or tail if allowed, along the path).
+      const velYaw = Math.atan2(-pl.velocity.x, -pl.velocity.z);
+      const tail = this.tailLandings();
+      let d = angleDiff(pl.heading, velYaw);
+      if (tail && Math.abs(d) > Math.PI / 2) d = angleDiff(pl.heading, velYaw + Math.PI);
+      const settleA = !spinning && P.airSettleAngle ? Math.max(P.spinCheckAngle, P.airSettleAngle) : P.spinCheckAngle;
+      const period = tail ? Math.PI : Math.PI * 2;
+      let ahead = spinning ? ((velYaw - pl.heading) * dir) % period : 0;
+      if (ahead < 0) ahead += period;
+      const need = ahead / Math.max(tLand, 0.12);   // rate that arrives on the next alignment at touchdown
+      const reach = need <= Math.abs(h) * C.spinTuckGain;
+      // The alignment just passed, if the upper body can still check back to it before touchdown.
+      const back = spinning ? period - ahead : Infinity, canCheck = back <= C.spinCheck * Math.max(tLand, 0.1);
+      if (Math.abs(d) < settleA * DEG && (!spinning || !reach || Math.abs(d) < 12 * DEG)) {
+        // Close to an alignment (or not spinning): check the spin onto it (the upper body counter-rotates).
+        rate = clamp(d / Math.max(tLand, 0.1), -C.spinCheck, C.spinCheck);
+      } else if (spinning && !reach && canCheck) {
+        // Too little spin to come round (a carve's pre-wind off a lip, an under-set): check back instead of
+        // landing sideways or backwards.
+        rate = clamp(-dir * back / Math.max(tLand, 0.1), -C.spinCheck, C.spinCheck);
+      } else if (spinning) {
+        const f = need / Math.abs(h);
+        pose = f >= 1 ? Math.min(1, (f - 1) / (C.spinTuckGain - 1)) : -Math.min(1, (1 - f) / (1 - C.spinOpen));
+      }
+    }
+    pl.spinTuck = approach(pl.spinTuck || 0, pose, dt / C.poseTime);
+    const k = pl.spinTuck >= 0 ? 1 + (C.spinTuckGain - 1) * pl.spinTuck : 1 + (1 - C.spinOpen) * pl.spinTuck;
+    const target = rate !== null ? rate : h * k;
+    pl.spinRate += (target - pl.spinRate) * (1 - Math.exp(-C.spinResponse * dt));
+    // Checking a spin (or twisting against it) bleeds the momentum off; it doesn't come back.
+    if (rate !== null && spinning) h = Math.sign(pl.spinRate) === dir ? dir * Math.min(Math.abs(h), Math.abs(pl.spinRate)) : 0;
+    this.spinH = h;
+    pl.heading += pl.spinRate * dt;
+  }
+
   /**
    * Flips about the gear's lateral axis (W = front, S = back; + flip = backflip, the leading end up).
-   * A flip is a commitment: let go of the stick far from upright and momentum carries it on to the
-   * next upright, timed to arrive by touchdown when it can; within flipSettle of upright the rider
-   * spots the landing and opens up. Combined with a spin this reads as a cork / rodeo / misty.
+   * Momentum (flipH) comes from the preload and the throw (see the rotation notes above); the key held
+   * in the flip's direction tucks (× flipTuckGain), against it opens to the layout; let go and the rider
+   * spots the landing: the tuck that brings the next upright round at touchdown, extending for the last
+   * flipSpot s. Combined with a spin this reads as a cork / rodeo / misty.
    */
   flipStep(dt, ctrl, grabbing, tLand) {
     const pl = this.pl, C = this.C;
-    const max = C.flipRateMax * Math.sqrt(this.H.spin) * (1 - pl.grab * 0.1) * (1 + flowK(pl, 'spinBoost'));
+    const cap = this.flipCap(), t = pl.airTime;
     const L = this._flipLock || (this._flipLock = {});
     if (ctrl.up < 0.2) L.up = false;
     if (ctrl.brake < 0.2) L.brake = false;
-    // No flip from a little hop (a tuck tapped over a crest): starting one needs real air ahead.
-    const canStart = Math.abs(pl.flip) > 0.3 || tLand > C.flipMinAir;
-    const raw = ctrl.active && !grabbing && pl.airTime > 0.08 && canStart ? (L.brake ? 0 : ctrl.brake) - (L.up ? 0 : ctrl.up) : 0;
-    // Wide dead zone: a stick pushed a little off-axis while spinning shouldn't start a flip (keys = full rate).
+    const raw = ctrl.active && !grabbing && pl.airTime > 0.04 ? (L.brake ? 0 : ctrl.brake) - (L.up ? 0 : ctrl.up) : 0;
+    // Wide dead zone: a stick pushed a little off-axis while spinning shouldn't flip (keys = full).
     const input = Math.sign(raw) * clamp((Math.abs(raw) - 0.4) / 0.6, 0, 1);
+    let h = this.flipH || 0;
     const rem = wrapPi(pl.flip);                       // signed distance from upright
-    // A preloaded take-off is committed through its first half turn (then momentum carries it anyway).
-    if (Math.abs(pl.flip) >= Math.PI) this._flipCommit = false;
-    const starting = this._flipCommit && Math.abs(pl.flip) < Math.PI;
-    let target = 0, resp = C.flipResponse;
-    if (Math.abs(input) > 0.2) target = input * max;
-    else if (!starting && (Math.abs(rem) < 50 * DEG || Math.abs(pl.flipRate) < 0.6)) {
-      target = clamp(-rem / Math.max(tLand, 0.15), -max * 0.7, max * 0.7);
-      resp = 6;
-    } else {
-      const dir = Math.sign(pl.flipRate);
-      const ahead = dir > 0 ? Math.PI * 2 - mod2Pi(pl.flip) : mod2Pi(pl.flip);
-      target = dir * clamp(ahead / Math.max(tLand, 0.15), 1.2, max);
-      resp = 3;
+    // The throw: early in the air W / S add to the flip (a preload already set most of it).
+    const throwing = Math.abs(input) > 0.2 && t < C.flipThrow && !(tLand < C.flipMinAir && Math.abs(h) < C.flipMinH);
+    if (throwing) {
+      const eff = (1 - (t / C.flipThrow) ** 2) * (0.5 + 0.5 * this.popQ);
+      // A throw alone sets less than a preload; a full set needs the pop right at the lip too.
+      const lim = (this._flipCommit ? cap * (0.6 + 0.4 * this.popQ) : C.flipThrowMax * Math.sqrt(this.H.spin)) * Math.sign(input);
+      h = approach(h, clamp(lim, -cap, cap), C.flipThrowRate * Math.abs(input) * eff * dt);
     }
-    pl.flipRate += (target - pl.flipRate) * (1 - Math.exp(-resp * dt));
+    const dir = Math.sign(h), flipping = Math.abs(h) > C.flipMinH;
+    let tuck = 0, rate = null;
+    if (grabbing) tuck = 0.7;                               // a grab is a tuck (and locks the shape)
+    else if (throwing) tuck = 1;
+    else if (flipping && Math.abs(input) > 0.2) tuck = Math.sign(input) === dir ? 1 : 0;
+    else if (flipping) {
+      // Spot the landing: the next upright ahead in the flip's direction, arriving at touchdown.
+      // Plan to come round early and open up (layout, legs stretched) for the last flipSpot s: the tuck
+      // needed until then is whatever the rest of the rotation asks for beyond the open rate.
+      const ahead = dir > 0 ? Math.PI * 2 - mod2Pi(pl.flip) : mod2Pi(pl.flip);
+      const tOpen = Math.min(C.flipSpot, tLand * 0.5);
+      const need = tLand > tOpen + 0.05 ? Math.max(0, ahead - Math.abs(h) * tOpen) / (tLand - tOpen) : ahead / Math.max(tLand, 0.08);
+      tuck = clamp((need / Math.abs(h) - 1) / (C.flipTuckGain - 1), 0, 1);
+      // Just past upright with the next one out of reach: stay open and ride out the small over-rotation
+      // (whichever lands closer to upright) instead of chasing a whole extra turn.
+      const past = Math.PI * 2 - ahead, over = past + Math.abs(h) * tLand;
+      const short = Math.max(0, ahead - Math.abs(h) * C.flipTuckGain * tLand);
+      if (over < short) tuck = 0;
+    } else rate = clamp(-rem / Math.max(tLand, 0.15), -C.flipCheck, C.flipCheck);   // no flip: just level out
+    // A tight tuck at speed takes real strength (the legs hold against a load ∝ ω²): it holds at full gain
+    // for flipTuckHold s, then fades over flipTuckFade s to flipTuckFloor of the tuck; opening up recovers.
+    this.tuckLoad = Math.max(0, (this.tuckLoad || 0) + (pl.flipTuck > 0.3 ? pl.flipTuck : -0.5) * dt);
+    const strength = 1 - (1 - C.flipTuckFloor) * clamp((this.tuckLoad - C.flipTuckHold) / C.flipTuckFade, 0, 1);
+    pl.flipTuck = approach(pl.flipTuck || 0, Math.min(tuck, strength), dt / C.poseTime);
+    const target = rate !== null ? rate : h * (1 + (C.flipTuckGain - 1) * pl.flipTuck);
+    pl.flipRate += (target - pl.flipRate) * (1 - Math.exp(-C.flipResponse * dt));
+    this.flipH = h;
     pl.flip += pl.flipRate * dt;
     if (this.takeoff) this.takeoff.flip = pl.flip;
   }
@@ -491,12 +570,16 @@ export class EdgePhysics {
   /** Late pop (coyote time): add the loaded wind-up / preload to the air already under way. */
   latePop() {
     const pl = this.pl, C = this.C, t = this.takeoff;
-    if (t) { t.popped = true; t.end = this._popEnd; }
-    const cap = C.spinRateMax * this.H.spin;
-    pl.spinRate = clamp(pl.spinRate - (this.windup || 0) * C.windupSpin * this.H.spin, -cap, cap);
+    // The set off a late pop is weaker the later it comes (popQ from Player.jump).
+    const q = this.popQ = clamp(pl.lastPopQ ?? 0.8, 0, 1);
+    if (t) { t.popped = true; t.end = this._popEnd; t.set = q; }
+    const cap = this.spinCap();
+    this.spinH = clamp((this.spinH || 0) - (this.windup || 0) * C.windupSpin * this.H.spin * q, -cap, cap);
+    if (Math.abs(this.windup || 0) > 0.3) this._spinPre = true;
     if ((this.flipLoad || 0) > 0.25 && Math.abs(pl.flip) < 0.3) {
       this._flipCommit = true;
-      pl.flipRate = Math.max(pl.flipRate, this.flipLoad * C.flipPreload);
+      this._flipLock.brake = false;
+      this.flipH = Math.max(this.flipH || 0, this.flipLoad * C.flipPreload * q * this.flipCap());
     }
     this.windup = 0; pl.windup = 0; this.flipLoad = 0; pl.flipLoad = 0;
     this.charge = 0; this.charging = false; pl.squat = 0; this._lateT = 0;

@@ -94,7 +94,7 @@ export class Player {
     if (prev) {
       this.dyn.edge = prev.edge;
       // Mid-air swaps keep the trick going (bookkeeping, flip commitment, input locks).
-      for (const k of ['takeoff', '_flipCommit', '_spinLock', '_flipLock']) this.dyn[k] = prev[k];
+      for (const k of ['takeoff', '_flipCommit', '_spinLock', '_flipLock', 'spinH', 'flipH', 'popQ', '_spinPre']) this.dyn[k] = prev[k];
       // New gear goes on facing the direction of travel (a switch rider swaps to forward-facing gear).
       if (prev.travel < 0) {
         this.heading += Math.PI;
@@ -184,7 +184,9 @@ export class Player {
     if (this.state !== State.AIR) { this._smT = -1; this._smArmed = true; if (this.timeScale !== 1) { this.timeScale = 1; emit('slowmo', { scale: 1 }); } return 1; }
     if (this._smT < 0 && this._smArmed && this._smCool <= 0 && this.airTime > 0.25 && this.velocity.y < 2) {
       const tLand = this.dyn.timeToLand();
-      if (tLand > S.minAir * 0.6 && this.airTime + tLand > S.minAir) { this._smT = 0; this._smArmed = false; this._smCool = S.cooldown; }
+      // Only genuinely big air: a long flight AND real height under the rider (minDrop m above the snow).
+      const above = this.position.y - this.terrain.getHeight(this.position.x, this.position.z);
+      if (tLand > S.minAir * 0.6 && this.airTime + tLand > S.minAir && above > (S.minDrop ?? 0)) { this._smT = 0; this._smArmed = false; this._smCool = S.cooldown; }
     }
     let k = 1;
     if (this._smT >= 0) {
@@ -296,7 +298,14 @@ export class Player {
         const mag = this.velocity.length();
         // Follow the terrain: rotate the velocity onto the new surface (keeps speed; a dip costs a little).
         const loss = Math.min(0.03 * mag, Math.max(0, -into - P.smoothFollow) * P.terrainImpactLoss);
-        this.velocity.addScaledVector(n2, -into).normalize().multiplyScalar(mag - loss);
+        _t1.copy(this.velocity).divideScalar(mag || 1);
+        this.velocity.addScaledVector(n2, -into).normalize();
+        // A real transition turns the path a few degrees per step; a step in the height field would
+        // turn it by tens of degrees at once and fire the rider off it like a ramp. Turn at most
+        // followMaxRate (rad/s); the rest is a bump the legs take (compression), never a launch.
+        const turn = _t1.angleTo(this.velocity), maxTurn = P.followMaxRate * dt;
+        if (turn > maxTurn) this.velocity.lerpVectors(_t1, this.velocity, maxTurn / turn).normalize();
+        this.velocity.multiplyScalar(mag - loss);
         this._followLoss = (this._followLoss || 0) + loss;
       }
       this.position.copy(np);
@@ -321,11 +330,15 @@ export class Player {
     const late = this.state === State.AIR && this.dyn._lateT > 0;
     if (this.state !== State.GROUNDED && !late) return;
     const depth = this.dyn.charge;
-    // Popping off a kicker / roller lip springs much higher than an ollie on the flat (arcade bonus).
+    // A kicker lip and speed both shorten the time the legs have to push (docs/jumps-research.md: real
+    // riders add −2.5…+1.1 m/s on a park lip): lipPopBonus on a kicker, popSpeedFade [v0, v1, share] at speed.
     const T = this.terrain;
     const feature = T.baseHeight ? T.getHeight(this.position.x, this.position.z) - T.baseHeight(this.position.x, this.position.z) : 0;
     const lip = clamp(feature / 0.5, 0, 1);
-    const pop = this.dyn.pop() * (1 + (P.lipPopBonus - 1) * lip);
+    const F = P.popSpeedFade, fade = F ? 1 + (F[2] - 1) * clamp((this.speed - F[0]) / (F[1] - F[0]), 0, 1) : 1;
+    const pop = this.dyn.pop() * (1 + (P.lipPopBonus - 1) * lip) * fade;
+    // How well the pop was timed sets the rotation (edge.js takeoffInfo): right at the lip = 1.
+    this.lastPopQ = this.popTiming(late);
     this.lastLip = lip;
     this.lastPop = pop;
     this.velocity.addScaledVector(this.groundNormal, pop);
@@ -340,6 +353,28 @@ export class Player {
     this.enterAir(true);
   }
 
+  /**
+   * Pop timing, 0..1 (scales the spin / flip set): 1 when released right at a lip (the snow falls away
+   * from the path within popLipTime), less the earlier it comes (popEarly s ahead → popEarlySet), a flat-
+   * ground pop with no lip ahead = popFlatSet, a late (coyote) pop loses up to a third by latePopTime.
+   */
+  popTiming(late) {
+    if (late) return clamp(1 - (this.airTime / P.latePopTime) * 0.35, 0.5, 1);
+    const ahead = this.lipAhead(P.popEarly + 0.2);
+    if (ahead === null) return P.popFlatSet;
+    return 1 - (1 - P.popEarlySet) * clamp((ahead - P.popLipTime) / (P.popEarly - P.popLipTime), 0, 1);
+  }
+
+  /** Seconds until the snow falls away from the rider's path (a lip / kicker end), or null within maxT. */
+  lipAhead(maxT) {
+    const T = this.terrain, p = this.position, v = this.velocity, g = P.gravity;
+    for (let t = 0.04; t <= maxT; t += 0.04) {
+      const y = p.y + v.y * t - 0.5 * g * t * t;
+      if (T.getHeight(p.x + v.x * t, p.z + v.z * t) < y - 0.12) return t;
+    }
+    return null;
+  }
+
   enterAir(popped = false) {
     this.takeoffPos = (this.takeoffPos || new THREE.Vector3()).copy(this.position);
     this._maxAbove = 0;
@@ -351,7 +386,10 @@ export class Player {
 
   airStep(dt) {
     this.velocity.y -= P.gravity * P.airGravity * dt;
-    this.velocity.multiplyScalar(1 - P.airDrag * this.velocity.length() * dt * 0.1);
+    // Aerodynamic drag a = k·v², k = ρ·CdA / 2m (PHYSICS.airDrag); a tuck or a grab is more compact.
+    const compact = Math.max(this.grab, this.flipTuck || 0);
+    const kd = P.airDrag * (1 - (1 - P.airDragCompact) * compact);
+    this.velocity.multiplyScalar(1 / (1 + kd * this.velocity.length() * dt));
     this.dyn.air(dt, this._ctrl);
     this._spinTotal += this.spinRate * dt;
     this.carve *= Math.exp(-3 * dt);
