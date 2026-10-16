@@ -33,6 +33,7 @@ export class RavenspireCourse {
     this.physics = RAVENSPIRE_PHYSICS;
     this.camera = RAVENSPIRE_CAMERA;
     this.water = -1e5;
+    this.edgeHint = 'Edge of the wild — head back onto the face';
     this.lifts = [];
     this.buildTables();
     this.buildPillows();

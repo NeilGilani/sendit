@@ -10,7 +10,7 @@ const THREE = await import('three');
 const { Player, State } = await import('../src/player.js');
 const { RavenspireCourse } = await import('../src/maps/ravenspire/course.js');
 const { START_X } = await import('../src/maps/ravenspire/layout.js');
-const { game, Mode, on } = await import('../src/state.js');
+const { game, Mode, on, emit } = await import('../src/state.js');
 const { PHYSICS } = await import('../src/config.js');
 game.mode = Mode.RIDING;
 
@@ -117,7 +117,7 @@ export function ride(type, key, style, opts = {}) {
         if (drop > (opts.popDrop ?? 6)) c.jump = !(lipNear > 1.2);
         if (style === 'trick' && drop > (opts.popDrop ?? 6)) c.brake = opts.flip ? 1 : 0;
       }
-      if (style === 'trick' && pl.state === State.AIR && pl.airTime > 0.15) {
+      if (style === 'trick' && pl.state === State.AIR && pl.airTime > 0.15 && (Math.abs(pl._spinTotal) > 0.6 || pl.dyn.timeToLand() > 1.3)) {
         if (Math.abs(pl._spinTotal) + Math.abs(pl.spinRate) * 0.3 < Math.PI * (opts.spins || 2)) c.steer = -1;
       }
       if (opts.script) opts.script(c, pl, t);
@@ -145,6 +145,8 @@ export function ride(type, key, style, opts = {}) {
     if (process.env.TRACE && Math.abs(t % 1) < DT) trace.push(`${t.toFixed(0)}s u=${u.toFixed(0)} v=${p.position.z.toFixed(0)} y=${p.position.y.toFixed(0)} spd=${p.speed.toFixed(1)} st=${p.state}`);
     if (u > 2560 || crashes > 6) break;
   }
+  emit('runComplete');
+  const judged = p.flow?.lastRun;
   for (const o of offs) o();
   p.flow?.dispose();
   const big = airSegs.filter((a) => a.air > 0.5 || /CRASH/.test(a.result));
@@ -152,7 +154,7 @@ export function ride(type, key, style, opts = {}) {
     line: key, type, style, time: +t.toFixed(1), finished: p.position.x - START_X > 2560,
     avg: +(vSum / Math.max(1, n)).toFixed(1), max: +vMax.toFixed(1), crashes,
     stumbles: events.filter((e) => e.kind === 'stumble').length, airTotal: +air.toFixed(1), airMax: +airMax.toFixed(2),
-    roofSeconds: +roofT.toFixed(1), airs: big, trace, wall, score: game.score, flow: flowEv,
+    roofSeconds: +roofT.toFixed(1), airs: big, trace, wall, score: game.score, flow: flowEv, judged,
   };
 }
 
@@ -164,6 +166,7 @@ if (process.argv[1] && process.argv[1].endsWith('map3-ride.mjs')) {
     const r = ride(ty, k, style);
     console.log(`\n${LINES[k].name} · ${ty} · ${style}: ${r.finished ? 'finished' : 'DNF'} in ${r.time}s  avg ${r.avg} m/s (${(r.avg * 2.237).toFixed(0)} mph)  max ${r.max} (${(r.max * 2.237).toFixed(0)} mph)  crashes ${r.crashes}  stumbles ${r.stumbles}  air ${r.airTotal}s (max ${r.airMax}s)  roof ${r.roofSeconds}s`);
     for (const a of r.airs) console.log(`   air @u${a.u}: ${a.air}s  drop ${a.drop} m  in ${a.v} m/s  impact ${a.impact} m/s  → ${a.result} ${a.why || ''}`);
+    if (r.judged) console.log(`   judged ${r.judged.total}/100  (line ${r.judged.line.toFixed(0)} · fluidity ${r.judged.fluidity.toFixed(0)} · control ${r.judged.control.toFixed(0)} · air & style ${r.judged.style.toFixed(0)})  biggest drop ${r.judged.biggestDrop.toFixed(0)} m, longest air ${r.judged.longestAir.toFixed(1)} s`);
     console.log(`   score ${r.score}  flow: ${r.flow.map((f) => (f.state !== undefined ? (f.state ? 'SEND-IT' : 'end') : `+${f.bonus}×${f.mult}`)).join(' ')}`);
     if (r.trace.length) console.log(r.trace.join('\n'));
   }
