@@ -347,25 +347,30 @@ checks passed.
 GPU time per frame (EXT_disjoint_timer_query around the whole composer render: shadow map, scene, every post
 pass) at 1600×900 on the integrated Intel Arc 130V, production build (`vite build` + `vite preview`), the
 rider placed at six spots down each map's course path and riding. `node web/scripts/map3-perf.mjs <url> 1600 900
-0,1,2 45 <map>`; each spot is the quietest of three windows, and the table keeps the minimum over the runs
+0,1,2 90 <map>`; each spot is the quietest of three windows, and the table keeps the minimum over the runs
 (other sessions were using the GPU; contention only ever adds time).
 
 | map | quality | GPU avg / worst spot (ms) | per spot (2 / 20 / 38 / 55 / 62 / 80 % down the run) | draws | triangles | runs |
 |---|---|---|---|---|---|---|
-| valcrest-gully | 0 | 6.6 / 8.8 | 8.8 / 7.2 / 5.7 / 5.3 / 5.3 / 7.4 | 162–368 | 1.9–2.1 M | 3 |
-| valcrest-gully | 1 | 12.7 / 15.3 | 15.3 / 14.9 / 12.8 / 9.5 / 12.6 / 11.1 | 171–381 | 2.4–2.7 M | 3 |
-| valcrest-gully | 2 | 22.0 / 29.0 | 25.5 / 29.0 / 21.3 / 18.2 / 17.9 / 20.2 | 184–399 | 2.7–3.4 M | 3 |
-| ravenspire | 0 | 6.3 / 7.6 | 5.9 / 5.9 / 6.0 / 6.3 / 6.0 / 7.6 | 169–439 | 1.3–1.4 M | 2 |
-| ravenspire | 1 | 12.9 / 16.4 | 10.4 / 10.0 / 10.8 / 16.0 / 16.4 / 14.0 | 178–464 | 1.6–1.9 M | 2 |
-| ravenspire | 2 | 24.0 / 27.9 | 20.2 / 24.6 / 23.1 / 27.9 / 23.5 / 24.7 | 194–490 | 2.0–2.5 M | 2 |
+| valcrest-gully | 0 | 9.1 / 9.7 | 9.4 / 9.4 / 8.6 / 9.7 / 8.8 / 8.5 | 160–370 | 1.9–2.1 M | 1 |
+| valcrest-gully | 1 | 10.5 / 12.8 | 12.8 / 11.8 / 9.8 / 9.0 / 9.9 / 9.5 | 167–384 | 2.4–2.8 M | 3 |
+| valcrest-gully | 2 | 16.8 / 20.1 | 20.1 / 19.4 / 16.1 / 14.7 / 14.6 / 15.7 | 184–400 | 2.9–3.4 M | 1 |
+| ravenspire | 0 | 9.0 / 9.7 | 8.3 / 8.7 / 9.4 / 9.1 / 8.8 / 9.7 | 174–445 | 1.3–1.4 M | 1 |
+| ravenspire | 1 | 9.3 / 11.2 | 8.6 / 8.4 / 8.7 / 8.9 / 10.1 / 11.2 | 176–488 | 1.6–1.9 M | 4 |
+| ravenspire | 2 | 16.4 / 18.0 | 16.9 / 15.6 / 15.7 / 16.0 / 16.0 / 18.0 | 194–515 | 2.0–2.5 M | 1 |
 
+Measured on Oct 16 around midnight, both maps back to back in the same session (the absolute numbers move with
+the GPU's clock state between sessions — an earlier session measured q1 at 12.9 / 12.7 ms average for
+Ravenspire / Valcrest — but the two maps always track each other within about 1 ms).
 
-Ravenspire costs the same as Valcrest: quality 1 (the default) averages ~13 ms with its worst spot at ~16 ms
-(the station / gondola / larch area), inside the 14–16 ms target. What it took: the wild map draws fewer
-triangles than Valcrest (no park, no crowds, no fences; 1.6–1.9 M vs 2.4–2.7 M at quality 1), and the larch
-forest is capped at 9,000 trees (`course.spawn.treeStep` 9.5 / `treeMax` 9000) — the first build scattered
-16,300 trees and measured ~14–15 ms with spikes. Draw calls peak at the summit (~460, the whole valley in
-view: mid-ring chunks, far ranges) and fall to ~180 low down. CPU per frame stays 2–5 ms.
+Ravenspire costs the same as Valcrest at every quality: at quality 1 (the default) it averages ~9–11 ms with
+its worst spot (the larch forest low on the run, 80 %) at ~11–13 ms, inside the 14–16 ms target. What it took:
+the wild map draws fewer triangles than Valcrest (no park, no crowds, no fences; 1.6–1.9 M vs 2.4–2.8 M at
+quality 1), and the larch forest is capped at 9,000 trees (`course.spawn.treeStep` 9.5 / `treeMax` 9000) — the
+first build scattered 16,300 trees and measured ~14–15 ms with spikes. The props added since (smoke: one
+instanced draw; mast, ice falls: a few draws) don't move the numbers. Draw calls peak at the summit (~490, the
+whole valley in view: mid-ring chunks, far ranges) and fall to ~175 low down. CPU per frame stays 2–3 ms
+(Valcrest 4–7 ms: its crowds and lifts). Terrain generation at boot takes ~4.5 s (node), boot to riding ~6–9 s.
 
 ---
 
