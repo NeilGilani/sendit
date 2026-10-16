@@ -65,17 +65,19 @@ export class Features {
       return;
     }
 
-    const J = JUMPS;
+    // A map may bring its own kickers ({ at, lateral?, signature?, L, H, W, name }) and JUMPS overrides.
+    const J = course.features?.jumps ? { ...JUMPS, ...course.features.jumps } : JUMPS;
+    const SIG = course.features?.kickers ?? KICKERS;
     const rnd = mulberry32(2024);
     const rr = (a) => a[0] + (a[1] - a[0]) * rnd();
     const ri = (a) => a[0] + Math.floor(rnd() * (a[1] - a[0] + 1));
     const bumps = [];   // { x, z, kind: 'roller'|'pillow', ... }
     // Signature park kickers (with crowds) near the top.
-    for (const k of KICKERS) this.planKicker(at(k.at), 0, k, true);
+    for (const k of SIG) this.planKicker(at(k.at), k.lateral ?? 0, k, k.signature ?? true);
     // Then a stream of features all the way down.
     const end = Math.min(J.endAt, course.finishAt - 60);
     for (let d = J.startAt; d < end; d += rr(J.spacing)) {
-      if (KICKERS.some((k) => Math.abs(k.at - d) < 28)) continue;
+      if (SIG.some((k) => Math.abs(k.at - d) < 28)) continue;
       if (dropsAt.some((q) => d > q - 45 && d < q + 30)) continue;
       const { p, dir } = at(d);
       const r = new THREE.Vector2(-dir.y, dir.x);

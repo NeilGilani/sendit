@@ -1,0 +1,524 @@
+// The designed forest of Blackspruce Plunge. planForest() is pure (no scene): phase by phase, each
+// with its own random stream —
+//   marker trees (tall, narrow) framing the lane mouths · trail signs in the fork wedges ·
+//   pivots (one tree / rock in a main or safe lane, placed by fairness rules) · rocks on the band ·
+//   the forest itself (variable-radius dart throwing, Poisson-disk-like, around the lanes, clearings,
+//   kickers, logs and the band; lane-edge trees are spires; the woods thin away from the lanes) ·
+//   sightline thinning (no crown hides a pivot 25–50 m before it) · stumps · lip poles on the band ·
+//   snags (dead standing spruce).
+// The headless bot (web/scripts/map2-bot.mjs) uses the same plan. populateForest() hands it to
+// scatter.js (instanced trees / boulders + collision hash) and builds the log, stump, snag, sign
+// and pole meshes.
+//
+// Hitboxes: a tree collides with its trunk and the dense inner crown (TREE_HIT), well inside the
+// branch tips — brushing needles is a close shave, not a crash. Boulders collide at their visible
+// footprint, stumps and snags at their trunk. Logs are part of the height field (you ride over
+// them); signs and lip poles are breakaway markers (no collision, like the slalom gates' poles).
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { toonMaterial, mulberry32 } from '../../world.js';
+import { SECTIONS, BAND, STUMPS, KICKERS, ROLLERS, GATES, PILLOWS } from './layout.js';
+
+export const TREE_HIT = { base: 0.2, perWidth: 0.32 };   // hitbox radius = base + perWidth · crown width scale
+const ZONE = 150;                   // |d| metres covered by the designed forest (the generic one starts beyond)
+
+const smooth = (t) => { const x = t < 0 ? 0 : t > 1 ? 1 : t; return x * x * (3 - 2 * x); };
+function sectionAt(t) { return SECTIONS.find((s) => t >= s.t0 && t < s.t1) || SECTIONS[SECTIONS.length - 1]; }
+
+/** True inside one of the course's clearing ellipses (grown by a margin `m` metres). */
+function inClearingOf(clearings, t, d, m = 0) {
+  for (const [ct, cd, a, b] of clearings) {
+    const q = ((t - ct) / (a + m)) ** 2 + ((d - cd) / (b + m)) ** 2;
+    if (q < 1) return true;
+  }
+  return false;
+}
+
+export function planForest(course) {
+  const inClearing = (t, d, m) => inClearingOf(course.clearings, t, d, m);
+  // One random stream per phase, so tuning one phase doesn't reshuffle the others.
+  let rnd = mulberry32(31337);
+  const trees = [], rocks = [], stumps = [], pivots = [];
+  // Occupancy hash of everything planted: [x, z, radius]
+  const H = 6, occ = new Map();
+  const key = (x, z) => Math.floor(x / H) * 100003 + Math.floor(z / H);
+  const put = (x, z, r) => { const k = key(x, z); if (!occ.has(k)) occ.set(k, []); occ.get(k).push([x, z, r]); };
+  const near = (x, z, R) => {
+    const cx = Math.floor(x / H), cz = Math.floor(z / H), n = Math.ceil(R / H);
+    for (let j = -n; j <= n; j++) for (let i = -n; i <= n; i++) {
+      const a = occ.get((cx + i) * 100003 + cz + j);
+      if (a) for (const o of a) if (Math.hypot(x - o[0], z - o[1]) < R) return true;
+    }
+    return false;
+  };
+  const p = { x: 0, z: 0 };
+  const lanes = course.lanes;
+  /** Distance from a lane's clear edge (negative = inside the corridor). */
+  const laneGap = (t, d) => {
+    let g = Infinity;
+    for (const L of lanes) {
+      const l = course.laneAt(L, t);
+      if (l) g = Math.min(g, Math.abs(d - l.d) - l.hw);
+    }
+    return g;
+  };
+  // Kicker footprints + run-ins + landings (run coordinates around the main line).
+  const kickZones = KICKERS.map((k) => ({ t0: k.t - 30, t1: k.t + k.L + 40, d: course.laneAt(course.mainLane, k.t).d + k.lateral, hw: k.W / 2 + 5 }));
+  const logZone = (t, d) => course.logs.some((L) => {
+    course.world(t, d, p);
+    const dx = p.x - L.x, dz = p.z - L.z;
+    return Math.abs(dx * L.ax + dz * L.az) < L.len / 2 + 0.5 && Math.abs(dx * L.nx + dz * L.nz) < 2.6;
+  });
+  const features = (t, d) => (Math.abs(t - BAND.t) < 5 && course.bandMask(d) > 0.2)
+    || kickZones.some((z) => t > z.t0 && t < z.t1 && Math.abs(d - z.d) < z.hw) || logZone(t, d);
+  const blocked = (t, d, r) => inClearing(t, d) || laneGap(t, d) < r || features(t, d);
+  const noise = (t, d) => hashNoise(t / 23, d / 23);
+
+  rnd = mulberry32(101);
+  // ---- marker trees: big trees framing each lane mouth (readable entrances)
+  for (const L of lanes) {
+    if (L.kind === 'main') continue;
+    for (const end of [L.t0 + 34, L.t1 - 22]) {   // where the lane has split off / before it merges
+      const l = course.laneAt(L, end);
+      for (const side of [-1, 1]) {
+        const sc = 1.35 + rnd() * 0.15, sx = sc * 0.6;   // tall and narrow: a landmark that doesn't hang into the lane
+        const hit = TREE_HIT.base + TREE_HIT.perWidth * sx;
+        const d = l.d + side * (l.hw + hit + 1.0);
+        if (inClearing(end, d) || laneGap(end, d) < hit * 0.9) continue;
+        course.world(end, d, p);
+        if (near(p.x, p.z, 2.5)) continue;
+        trees.push([p.x, p.z, sc, sx, sc * 1.05, 0, rnd() * 6.28, hit, 1]);
+        put(p.x, p.z, hit);
+      }
+    }
+  }
+
+  // ---- trail signs in the wedge where each side lane splits off the main line (telegraph the fork).
+  //      Breakaway markers like the slalom gates' poles: they don't collide (riders cross the wedge).
+  const signs = [];
+  for (const L of lanes) {
+    if (L.kind === 'main') continue;
+    for (let t = L.t0 + 4; t < L.t0 + 80; t++) {
+      const m = course.laneAt(course.mainLane, t), s = course.laneAt(L, t);
+      const gap = Math.abs(s.d - m.d) - s.hw - m.hw;
+      if (gap < 2.5 || inClearing(t, (s.d + m.d) / 2)) continue;
+      const sideL = s.d < m.d;
+      const d = sideL ? s.d + s.hw + gap / 2 : m.d + m.hw + gap / 2;
+      course.world(t, d, p);
+      const b = course.world(t + 6, d);
+      signs.push({ x: p.x, z: p.z, yaw: Math.atan2(-(b.x - p.x), -(b.z - p.z)), left: sideL ? L.kind : 'main', right: sideL ? 'main' : L.kind });
+      put(p.x, p.z, 1.2);
+      break;
+    }
+  }
+
+  rnd = mulberry32(202);
+  // ---- pivots: one obstacle in the middle of a main / safe lane every so often (pick a side)
+  for (const L of lanes) {
+    if (L.kind === 'slot') continue;
+    let side = rnd() < 0.5 ? -1 : 1;
+    for (let t = L.t0 + 30; t < L.t1 - 20;) {
+      const S = sectionAt(t);
+      if (!S.pivotEvery) { t += 10; continue; }
+      const l = course.laneAt(L, t);
+      // Fair pivots: seen ≥ 2 s ahead, never right after a gate, a section start, or anything that
+      // throws the rider into the air (rollers, logs, kickers, the band).
+      const ok = l.hw >= 3.7 && t > S.t0 + 30 && (L.kind === 'main' || (t > L.t0 + 60 && t < L.t1 - 30)) && !inClearing(t, l.d, 22) && !logZone(t, l.d)
+        && !course.logs.some((g) => t > g.t - 14 && t < g.t + 26)
+        && !ROLLERS.some((r) => t > r[0] - 10 && t < r[0] + 55)
+        && !PILLOWS.some(([pt, pd, R]) => t > pt - 8 && t < pt + 45 && Math.abs(pd - l.d) < l.hw + R)
+        && Math.abs(course.laneAt(L, t + 3).d - course.laneAt(L, t - 3).d) / 6 < 0.35   // not mid-traverse
+        && !GATES.some((g) => Math.abs(g[0] - t) < 25)
+        && !(t > BAND.t - 20 && t < BAND.t + 40)
+        && !kickZones.some((z) => t > z.t0 - 20 && t < z.t1 + 10);
+      if (ok) {
+        // On a curving lane the pivot sits on the inside (the apex), leaving the natural wide carving
+        // line open; on a straight one, sides alternate.
+        const bend = course.laneAt(L, t + 12).d + course.laneAt(L, t - 12).d - 2 * l.d;   // > 0: curving toward +d
+        const s = Math.abs(bend) > 0.6 ? Math.sign(bend) : side;
+        const off = s * l.hw * (0.18 + rnd() * 0.17);
+        side = -s;
+        const d = l.d + off;
+        course.world(t, d, p);
+        const r = rnd();
+        if (r < 0.72 || l.hw < 4.5) {   // rocks only where the lane is wide enough to go round them
+          const sc = S.scale[0] + (S.scale[1] - S.scale[0]) * (0.5 + 0.5 * rnd()), sx = Math.min(0.45, sc * S.slim);   // slim: the chase camera follows the rider past it
+          const hit = TREE_HIT.base + TREE_HIT.perWidth * sx;
+          trees.push([p.x, p.z, sc, sx, sc * (0.95 + rnd() * 0.2), rnd() < 0.25 ? 1 : 0, rnd() * 6.28, hit, 0]);
+          put(p.x, p.z, hit);
+          pivots.push([p.x, p.z, hit, 'tree', t, L.id]);
+        } else {
+          const sc = 0.6 + rnd() * 0.22;   // sunk 0.3·sc into the snow: hitbox ≈ the visible footprint
+          rocks.push([p.x, p.z, sc, rnd() * 6.28, Math.floor(rnd() * 3), 1.0 * sc]);
+          put(p.x, p.z, 1.0 * sc);
+          pivots.push([p.x, p.z, 1.0 * sc, 'rock', t, L.id]);
+        }
+        t += S.pivotEvery * (0.8 + rnd() * 0.4);
+      } else t += 6;
+    }
+  }
+
+  rnd = mulberry32(303);
+  // ---- the rock band: boulders on the cliff edge away from every line, and flanking the chutes
+  for (let d = -BAND.reach - 10; d < BAND.reach + 10; d += 3 + rnd() * 3.5) {
+    const m = course.bandMask(d);
+    if (m < 0.5 || laneGap(BAND.t, d) < 4 || laneGap(BAND.t + 6, d) < 4) continue;
+    const t = BAND.t + 0.5 + rnd() * 2.5;
+    const sc = 0.8 + rnd() * 0.9;
+    course.world(t, d, p);
+    rocks.push([p.x, p.z, sc, rnd() * 6.28, Math.floor(rnd() * 3), 1.1 * sc]);
+    put(p.x, p.z, 1.1 * sc);
+  }
+  for (const [c, hw] of BAND.chutes) {
+    for (const side of [-1, 1]) {
+      const d = c + side * (hw + 2.4);
+      if (laneGap(BAND.t, d) < 1.2) continue;
+      course.world(BAND.t + 2, d, p);
+      const sc = 1.1 + rnd() * 0.4;
+      rocks.push([p.x, p.z, sc, rnd() * 6.28, Math.floor(rnd() * 3), 1.1 * sc]);
+      put(p.x, p.z, 1.1 * sc);
+    }
+  }
+
+  rnd = mulberry32(404);
+  // ---- the forest: dart throwing on a jittered 2 m grid, in random order
+  const cands = [];
+  const tEnd = course.P.finishT + 320;
+  for (let t = -90; t < tEnd; t += 2) {
+    for (let d = -ZONE; d < ZONE; d += 2) cands.push([t + rnd() * 2, d + rnd() * 2, rnd()]);
+  }
+  cands.sort((a, b) => a[2] - b[2]);
+  for (const [t, d] of cands) {
+    const S = sectionAt(t);
+    const n = noise(t, d);
+    // Spacing: section base, clumped by noise, a bit denser toward the walls beyond the face.
+    const W = course.at(course.W, t);
+    const wall = smooth((Math.abs(d) - W * 0.6) / 40);
+    const g0 = laneGap(t, d);
+    let spacing = S.spacing * (0.82 + 0.4 * n) * (1 - 0.2 * wall);
+    // Perf: the woods far from every line are backdrop (hidden behind the lane-edge trees from the
+    // rider's eye), so they thin out with distance from the nearest lane.
+    spacing *= 1 + Math.min(0.9, Math.max(0, g0 - 6) * 0.06);
+    if (Math.abs(d) > W + 20) spacing = Math.max(spacing, 8.5);   // far side: cheaper, sparser
+    // Young spruce fill the understorey of the dense sections (they collide like any other tree).
+    const young = S.spacing < 6 && g0 < 9 && rnd() < 0.08;
+    const sc = young ? 0.42 + rnd() * 0.2 : S.scale[0] + (S.scale[1] - S.scale[0]) * Math.pow(rnd(), 0.9);
+    let sx = sc * S.slim * (0.9 + rnd() * 0.2);
+    // Trees lining a lane are narrow spires (a limbed glade): their crowns barely reach into the
+    // corridor, so the line stays readable and the chase camera stays out of the needles.
+    if (g0 < 4) sx = Math.min(sx, Math.max(0.36, (g0 + 0.7) / 2.6));
+    const hit = TREE_HIT.base + TREE_HIT.perWidth * sx;
+    if (blocked(t, d, hit)) continue;
+    course.world(t, d, p);
+    if (near(p.x, p.z, spacing)) continue;
+    trees.push([p.x, p.z, sc, sx, sc * (0.92 + rnd() * 0.22), rnd() < (S.name === 'Old Growth' ? 0.4 : 0.22) ? 1 : 0, rnd() * 6.28, hit, 0]);
+    put(p.x, p.z, hit);
+  }
+
+  // ---- sightline thinning (what glade crews do): every pivot must be visible from the lane
+  //      25–50 m before it (≥ 2 s at speed). Trees whose crowns block that view are removed.
+  const SIGHT = { backs: [25, 30, 35, 40, 45, 50], crown: 2.4 };   // crown radius ≈ 2.4 × width scale near the ground
+  const cut = new Set();
+  const TH = 8, th = new Map();
+  trees.forEach((tr, i) => {
+    const k = Math.floor(tr[0] / TH) * 100003 + Math.floor(tr[1] / TH);
+    if (!th.has(k)) th.set(k, []);
+    th.get(k).push(i);
+  });
+  const eye = { x: 0, z: 0 };
+  for (const [px, pz, , , pt, laneId] of pivots) {
+    const L = lanes.find((l) => l.id === laneId);
+    for (const back of SIGHT.backs) {
+      const l = course.laneAt(L, pt - back) || course.laneAt(course.mainLane, pt - back);
+      course.world(pt - back, l.d, eye);
+      for (let k = 1; k < 39; k++) {
+        const f = k / 40, x = eye.x + (px - eye.x) * f, z = eye.z + (pz - eye.z) * f;
+        const a = th.get(Math.floor(x / TH) * 100003 + Math.floor(z / TH));
+        if (a) for (const i of a) {
+          const tr = trees[i];
+          if (tr[8] || (Math.abs(tr[0] - px) < 0.01 && Math.abs(tr[1] - pz) < 0.01)) continue;   // markers, the pivot itself
+          if (pivots.some((q) => Math.abs(q[0] - tr[0]) < 0.01 && Math.abs(q[1] - tr[1]) < 0.01)) continue;
+          if (Math.hypot(x - tr[0], z - tr[1]) < SIGHT.crown * tr[3]) cut.add(i);
+        }
+      }
+    }
+  }
+  if (cut.size) {
+    const keep = trees.filter((_, i) => !cut.has(i));
+    trees.length = 0;
+    trees.push(...keep);
+  }
+
+  rnd = mulberry32(505);
+  // ---- stumps: in the woods and at lane edges (never in a lane's middle half)
+  for (const S of SECTIONS) {
+    const n = STUMPS.perSection[S.name] || 0;
+    for (let k = 0, tries = 0; k < n && tries < n * 40; tries++) {
+      const t = S.t0 + rnd() * (S.t1 - S.t0);
+      const d = (rnd() - 0.5) * 70;
+      let inLane = false;
+      for (const L of lanes) {
+        const l = course.laneAt(L, t);
+        if (l && Math.abs(d - l.d) < (L.kind === 'slot' ? l.hw + 0.6 : l.hw * 0.75)) inLane = true;
+      }
+      if (inLane || inClearing(t, d, 4) || features(t, d)) continue;
+      course.world(t, d, p);
+      if (near(p.x, p.z, 2.2)) continue;
+      const r = 0.24 + rnd() * 0.16;
+      stumps.push([p.x, p.z, r, 0.45 + rnd() * 0.4, rnd() * 6.28]);
+      put(p.x, p.z, r);
+      k++;
+    }
+  }
+  // ---- the rock band's lip: orange breakaway poles every ~5 m along the cliff (telegraph the drop
+  //      from above), never inside a lane, plus a pair framing each lane that drops the cliff.
+  const lipPoles = [];
+  for (let d = -BAND.reach; d <= BAND.reach; d += 5) {
+    if (course.bandMask(d) < 0.6 || laneGap(BAND.t - 1, d) < 0.6) continue;
+    course.world(BAND.t - 1.2, d, p);
+    lipPoles.push([p.x, p.z]);
+  }
+  for (const L of lanes) {
+    const l = course.laneAt(L, BAND.t);
+    if (!l || course.bandMask(l.d) < 0.6) continue;
+    for (const side of [-1, 1]) { course.world(BAND.t - 1.2, l.d + side * (l.hw + 0.4), p); lipPoles.push([p.x, p.z]); }
+  }
+  // ---- snags: dead standing spruce (bare, weathered, broken-topped) in Deadfall and a few in the
+  //      Gauntlet. Off the lane edges; they collide with their trunk.
+  rnd = mulberry32(606);
+  const snags = [];
+  const SNAG = { Deadfall: 0.08, 'The Gauntlet': 0.03 };
+  for (let i = trees.length - 1; i >= 0; i--) {
+    const tr = trees[i];
+    if (tr[8]) continue;
+    const t = course.tAt(tr[1]), d = course.dAt(tr[0], t);
+    const share = SNAG[sectionAt(t).name] || 0;
+    if (!share || rnd() > share || laneGap(t, d) < 1.5) continue;
+    if (pivots.some((q) => q[0] === tr[0] && q[1] === tr[1])) continue;
+    const r = 0.2 + 0.12 * tr[2];
+    snags.push([tr[0], tr[1], 4.5 + rnd() * 5 * tr[2], r, rnd() * 6.28, (rnd() - 0.5) * 0.12]);
+    trees.splice(i, 1);
+  }
+  return { trees, rocks, stumps, pivots, signs, lipPoles, snags };
+}
+
+function hashNoise(x, y) {
+  const h = (i, j) => { let v = (i * 374761393 + j * 668265263) | 0; v = Math.imul(v ^ (v >>> 13), 1274126177); return ((v ^ (v >>> 16)) >>> 0) / 4294967296; };
+  const i = Math.floor(x), j = Math.floor(y);
+  let fx = x - i, fy = y - j;
+  fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+  return (h(i, j) * (1 - fx) + h(i + 1, j) * fx) * (1 - fy) + (h(i, j + 1) * (1 - fx) + h(i + 1, j + 1) * fx) * fy;
+}
+
+/** Every collision circle of the plan: [x, z, radius, kind] (scatter.js obstacle format). */
+export function forestObstacles(course) {
+  const F = course.forest;
+  return [
+    ...F.trees.map(([x, z, , , , , , hit]) => [x, z, hit, 'tree']),
+    ...F.rocks.map(([x, z, , , , hit]) => [x, z, hit, 'rock']),
+    ...F.stumps.map(([x, z, r]) => [x, z, r + 0.05, 'stump']),
+    ...F.snags.map(([x, z, , r]) => [x, z, r + 0.08, 'tree']),
+  ];
+}
+
+// ------------------------------------------------------------------ into the scene
+export function populateForest(course, scatter) {
+  const T = scatter.terrain, F = course.forest;
+  // Keep clear of what life.js builds (the lodge's clearing): scatter.clearings = [[x, z, r]].
+  const free = (x, z) => !(scatter.clearings || []).some(([cx, cz, r]) => Math.hypot(x - cx, z - cz) < r + 3);
+  for (const [x, z, sc, sx, sy, kind, yaw] of F.trees) {
+    if (!T.isInside(x, z, 20) || !free(x, z)) continue;
+    scatter.trees.add(x, T.getHeight(x, z) - 0.3, z, yaw, sx, sy, sx, kind);
+    (scatter.wells || (scatter.wells = [])).push([x, z, sc]);
+  }
+  for (const o of forestObstacles(course)) if (free(o[0], o[1])) scatter.addObstacle(...o);
+  const q = new THREE.Quaternion(), s = new THREE.Vector3(), pv = new THREE.Vector3(), m = new THREE.Matrix4();
+  const up = new THREE.Vector3(0, 1, 0), n = new THREE.Vector3();
+  for (const [x, z, sc, yaw, variant] of F.rocks) {
+    if (!free(x, z)) continue;
+    T.getNormal(x, z, 2, n);
+    q.setFromUnitVectors(up, n).multiply(new THREE.Quaternion().setFromAxisAngle(up, yaw));
+    pv.set(x, T.getHeight(x, z) - 0.3 * sc, z);
+    s.set(sc * 1.05, sc * 0.95, sc);
+    scatter.add('rock', variant, x, z, m.compose(pv, q, s));
+  }
+  scatter.group.add(buildWood(course, T));
+  if (F.signs.length) scatter.group.add(buildSigns(F.signs, T));
+  if (F.lipPoles.length) scatter.group.add(buildLipPoles(F.lipPoles, T));
+}
+
+/** Logs (bark cylinders sitting in their drifts) and stumps, one InstancedMesh each. */
+function buildWood(course, T) {
+  const g = new THREE.Group();
+  g.name = 'Deadwood';
+  const bark = new THREE.Color('#3f3126'), barkDark = new THREE.Color('#2a211a'), snow = new THREE.Color('#eef3fa'), wood = new THREE.Color('#6e5638');
+  const paint = (geo, fn) => {
+    const pos = geo.attributes.position, nor = geo.attributes.normal;
+    const c = new Float32Array(pos.count * 3);
+    for (let k = 0; k < pos.count; k++) {
+      const col = fn(pos.getX(k), pos.getY(k), pos.getZ(k), nor.getX(k), nor.getY(k), nor.getZ(k));
+      c[k * 3] = col.r; c[k * 3 + 1] = col.g; c[k * 3 + 2] = col.b;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    return geo;
+  };
+  const mat = toonMaterial({ name: 'deadwood', vertexColors: true });
+  // Unit log along +X, radius 1 (instances scale it to length × radius), bark with patches of snow on top.
+  const logGeo = (() => {
+    const body = new THREE.CylinderGeometry(1, 1, 1, 14, 6, false).rotateZ(Math.PI / 2).toNonIndexed();
+    const p = body.attributes.position;
+    for (let k = 0; k < p.count; k++) {
+      const x = p.getX(k), y = p.getY(k), z = p.getZ(k);
+      const a = Math.atan2(z, y);
+      const r = 1 + 0.06 * Math.sin(a * 5 + x * 9) + 0.04 * Math.sin(x * 23);
+      p.setY(k, y * r); p.setZ(k, z * r);
+    }
+    body.computeVertexNormals();
+    // A log in deep snow: a white hump on top (with a few bare patches), bark below, dark cut ends.
+    paint(body, (x, y, z, nx, ny) => (Math.abs(x) > 0.49 ? barkDark : ny > 0.25 - 0.25 * Math.sin(x * 17 + 0.7) * Math.sin(x * 41) ? snow : (Math.sin(x * 40 + z * 7) > 0.6 ? barkDark : bark)));
+    return body;
+  })();
+  const stumpGeo = (() => {
+    const body = new THREE.CylinderGeometry(1, 1.15, 1, 9, 2, false).toNonIndexed();
+    body.translate(0, 0.5, 0);
+    body.computeVertexNormals();
+    paint(body, (x, y, z, nx, ny) => (ny > 0.5 ? snow : Math.sin(Math.atan2(z, x) * 7) > 0.5 ? barkDark : bark));
+    const cap = new THREE.SphereGeometry(1.08, 9, 4, 0, Math.PI * 2, 0, Math.PI / 2).toNonIndexed();
+    cap.scale(1, 0.35, 1).translate(0, 1, 0);
+    cap.computeVertexNormals();
+    paint(cap, () => snow);
+    return mergeGeometries([body, cap]);
+  })();
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
+  const logs = new THREE.InstancedMesh(logGeo, mat, course.logs.length);
+  course.logs.forEach((L, i) => {
+    // Sit the log in its drift: crest of the bump ≈ log top.
+    const base = T.getHeight(L.x + L.nx * 1.2, L.z + L.nz * 1.2);
+    const top = T.getHeight(L.x, L.z);
+    p.set(L.x, Math.max(base + L.r * 0.45, top - L.r + 0.22), L.z);   // top ≈ 0.2 m above the drift crest
+    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.atan2(L.az, L.ax));
+    s.set(L.len, L.r, L.r);
+    logs.setMatrixAt(i, m.compose(p, q, s));
+  });
+  const st = course.forest.stumps;
+  const stumps = new THREE.InstancedMesh(stumpGeo, mat, Math.max(1, st.length));
+  st.forEach(([x, z, r, h, yaw], i) => {
+    p.set(x, T.getHeight(x, z) - 0.15, z);
+    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+    s.set(r, h, r);
+    stumps.setMatrixAt(i, m.compose(p, q, s));
+  });
+  stumps.count = st.length;
+  // Snags: unit-height tapered trunk, weathered grey-brown with darker cracks, a broken top and a snow
+  // collar. Instances scale (r, h, r).
+  const snagGeo = (() => {
+    const body = new THREE.CylinderGeometry(0.55, 1, 1, 8, 8, false).toNonIndexed();
+    body.translate(0, 0.5, 0);
+    const p = body.attributes.position;
+    for (let k = 0; k < p.count; k++) {
+      const y = p.getY(k), a = Math.atan2(p.getZ(k), p.getX(k));
+      if (y > 0.99) p.setY(k, 0.94 + 0.08 * Math.sin(a * 3 + 1.2));   // jagged broken top
+      const w = 1 + 0.05 * Math.sin(a * 6 + y * 11);
+      p.setX(k, p.getX(k) * w); p.setZ(k, p.getZ(k) * w);
+    }
+    body.computeVertexNormals();
+    const grey = new THREE.Color('#7d7064'), crack = new THREE.Color('#4a4038');
+    paint(body, (x, y, z, nx, ny) => (ny > 0.6 ? snow : Math.sin(Math.atan2(z, x) * 9 + y * 3) > 0.7 ? crack : grey));
+    return body;
+  })();
+  const sn = course.forest.snags;
+  const snagsIm = new THREE.InstancedMesh(snagGeo, mat, Math.max(1, sn.length));
+  sn.forEach(([x, z, h, r, yaw, lean], i) => {
+    p.set(x, T.getHeight(x, z) - 0.3, z);
+    q.setFromEuler(new THREE.Euler(lean, yaw, lean * 0.6));
+    s.set(r, h, r);
+    snagsIm.setMatrixAt(i, m.compose(p, q, s));
+  });
+  snagsIm.count = sn.length;
+  for (const im of [logs, stumps, snagsIm]) { im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); g.add(im); }
+  return g;
+}
+
+// ------------------------------------------------------------------ trail signs at the forks
+const SIGN_KIND = {
+  slot: { label: 'SLOT', mark: 'double', bg: '#f28a1b' },
+  main: { label: 'FLOW', mark: 'diamond', bg: '#f28a1b' },
+  safe: { label: 'LONG WAY', mark: 'square', bg: '#f28a1b' },
+};
+
+function signTexture(left, right) {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#1d1a17'; g.fillRect(0, 0, 512, 256);
+  g.fillStyle = SIGN_KIND.slot.bg; g.fillRect(10, 10, 492, 236);
+  g.fillStyle = '#1d1a17'; g.fillRect(253, 26, 6, 204);
+  const mark = (kind, x, y) => {
+    const k = SIGN_KIND[kind];
+    const dia = (cx) => { g.beginPath(); g.moveTo(cx, y - 30); g.lineTo(cx + 30, y); g.lineTo(cx, y + 30); g.lineTo(cx - 30, y); g.closePath(); g.fill(); };
+    if (k.mark === 'double') { g.fillStyle = '#111'; dia(x - 34); dia(x + 34); }
+    else if (k.mark === 'diamond') { g.fillStyle = '#111'; dia(x); }
+    else { g.fillStyle = '#1f5fd1'; g.fillRect(x - 26, y - 26, 52, 52); }
+    g.fillStyle = '#111'; g.font = `bold ${k.label.length > 5 ? 40 : 54}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(k.label, x, y + 66);
+  };
+  const arrow = (x, dir) => {
+    g.fillStyle = '#111'; g.beginPath();
+    g.moveTo(x + dir * 34, 70); g.lineTo(x - dir * 4, 40); g.lineTo(x - dir * 4, 58); g.lineTo(x - dir * 34, 58);
+    g.lineTo(x - dir * 34, 82); g.lineTo(x - dir * 4, 82); g.lineTo(x - dir * 4, 100); g.closePath(); g.fill();
+  };
+  mark(left, 128, 92); arrow(56, -1);
+  mark(right, 384, 92); arrow(456, 1);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+/** A post with a two-way trail sign (left lane ← | → right lane), facing the rider. */
+function buildSigns(signs, T) {
+  const g = new THREE.Group();
+  g.name = 'TrailSigns';
+  const postG = new THREE.CylinderGeometry(0.06, 0.07, 2.6, 6);
+  postG.translate(0, 1.3, 0);
+  const postM = toonMaterial({ name: 'signPost', color: 0x4a3a2c });
+  const boardG = new THREE.PlaneGeometry(1.5, 0.75);
+  boardG.translate(0, 2.05, 0.08);
+  for (const s of signs) {
+    const y = T.getHeight(s.x, s.z) - 0.2;
+    const post = new THREE.Mesh(postG, postM);
+    post.position.set(s.x, y, s.z);
+    post.castShadow = true;
+    // The board faces up the run (toward the approaching rider).
+    const board = new THREE.Mesh(boardG, toonMaterial({ name: 'sign', map: signTexture(s.left, s.right), side: THREE.DoubleSide }));
+    board.position.set(s.x, y, s.z);
+    board.rotation.y = s.yaw;
+    board.castShadow = true;
+    g.add(post, board);
+  }
+  return g;
+}
+
+/** Orange / black banded bamboo poles along the rock band's lip (they don't collide, like gate poles). */
+function buildLipPoles(poles, T) {
+  const geo = new THREE.CylinderGeometry(0.05, 0.06, 2.2, 6, 8).toNonIndexed();
+  geo.translate(0, 1.1, 0);
+  const pos = geo.attributes.position, c = new Float32Array(pos.count * 3);
+  const orange = new THREE.Color('#ff7a1a'), black = new THREE.Color('#1d1a17');
+  for (let k = 0; k < pos.count; k++) {
+    const band = Math.floor(pos.getY(k) / 0.283 + 1e-3) % 2 ? black : orange;
+    c[k * 3] = band.r; c[k * 3 + 1] = band.g; c[k * 3 + 2] = band.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
+  geo.computeVertexNormals();
+  const im = new THREE.InstancedMesh(geo, toonMaterial({ name: 'lipPole', vertexColors: true }), poles.length);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
+  poles.forEach(([x, z], i) => {
+    q.setFromEuler(new THREE.Euler((i % 3 - 1) * 0.05, 0, ((i * 7) % 5 - 2) * 0.03));   // a little off-plumb
+    im.setMatrixAt(i, m.compose(p.set(x, T.getHeight(x, z) - 0.25, z), q, s));
+  });
+  im.castShadow = true;
+  im.computeBoundingSphere();
+  im.name = 'LipPoles';
+  return im;
+}

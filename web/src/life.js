@@ -75,7 +75,7 @@ export class Life {
   }
 
   // ---------------------------------------------------------------- skiers on the run
-  buildSkiers(n = 10) {
+  buildSkiers(n = this.course.life?.skiers ?? 10) {   // a map may set how many (course.life)
     const rnd = this.rnd, L = this.course.finishAt;
     this.skiers = [];
     for (let i = 0; i < n; i++) {

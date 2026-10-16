@@ -1,0 +1,283 @@
+# Map 2: Blackspruce Plunge
+
+A steep, fast run through dense spruce forest. It's about weaving the trees at speed, picking a
+line at each fork, and dropping the rock band. It has jumps too, but tree-dodging is the core.
+Map id `blackspruce`: `?map=blackspruce`, Maps tab in the lobby. Research behind the layout:
+docs/map2-research.md.
+
+|                 | Valcrest Gully | Blackspruce Plunge |
+|-----------------|----------------|--------------------|
+| Length (path)   | 2.46 km        | 2.05 km to the finish (fall line 1,975 m) |
+| Vertical        | 650 m          | 1,100 m (2,780 → 1,677 m) |
+| Gradient        | 7–22°          | 29–36° in the trees, 14–17° in the clearings |
+| Bot avg ground speed | 7–8 m/s (physics-course carve) | 16–18 m/s, peaks 25–28 m/s in the slots |
+| Run time (bot)  | 370–410 s      | 125–135 s (tucking, with speed control) |
+
+## How to ride it
+
+- **Pick a line at each fork.** An orange trail sign stands in the wedge where a lane splits off:
+  - **◆◆ SLOT**: tight (about 4 m free), nearly straight, fast. Tuck it and thread the trunks. Close shaves fire constantly.
+  - **◆ FLOW**: the main line, about 7 m free. It swings left and right every ~55 m, with pivot trees or rocks in the middle that force a side. Check speed before the swings.
+  - **■ LONG WAY**: the safe line, 9–11 m free. It wanders wider, has fewer pivots, and takes the chute instead of the cliff.
+
+  Every split merges back before a clearing and its gate.
+- **Clearings are the rest beats:** Start, Kicker Meadow (M kicker with a crowd plus a small side kicker), Pillow Garden (below the rock band), the Saddle, Big Air (L kicker plus a side M), and the Finish. Small glade pockets sit inside the long tree sections.
+- **The rock band** (t ≈ 812 m) is a 4.5 m cliff across the face. Orange-and-black poles mark its lip, and two of them frame the slot's drop. Drop it from the Needles slot (about 1.2 s of air), or ride the Notch (the main line) or the Ramp (the safe line's chute).
+- **Deadfall** also has snags: dead standing spruce, bare and broken-topped. They collide with their trunk.
+- **Deadfall** has fallen logs across the main line and the high line. Snow drifts up their uphill side, so each log is a small natural kicker: ollie it or roll it.
+- **Score:**
+  - Close shaves (+15 each, existing) plus **Threaded** (+30 under 0.9 m from a hitbox).
+  - **Tree slalom ×N**: close shaves chained less than 1.6 s apart bank +40·N/5 at every 5th.
+  - Everything feeds the Challenge combo multiplier.
+- **Thread a spruce** closer than 1.3 m and its branches dump their snow on your side.
+- **First rides:** a hint explains the fork signs (first three ride starts per session).
+- **Challenge:** 9 checkpoint gates (16–24 m wide, all at convergence points), a ghost, and map-specific medals (see Tunables).
+- **Snowflakes (12):** five sit on the slots, one at the apex of the cliff drop, and one each on the low line and the left Old Growth line. One is by a Drop-in pillow, one is past a Pillow Garden stack, and one is on the flow line near the finish. Two float over the kickers and need a popped jump: an unpopped arc passes under them.
+- **The lobby** stands at the top of Kicker Meadow, looking down at the kicker and its crowd.
+
+## Sections (t = metres down the fall line)
+
+| t | Section | Grade | Forest spacing | Lines / features |
+|---|---------|-------|----------------|------------------|
+| 0–70 | Start | 13–23° | 12 m | start clearing, banner |
+| 70–180 | The Drop-in | 29° | 9 m, big trees | two rollers, pillows; gate at 176 |
+| 180–430 | Spruce Gate | 32° | 5.4 m | flow / slot (left) / long way (right); glade pocket at 300 |
+| 430–550 | Kicker Meadow | 15° then 30° | clearing | M kicker + S side kicker, crowd; gates 428, 532 |
+| 550–812 | The Needles | 34° | 4.6 m | flow / slot (left, runs at the cliff) / long way (right, to the Ramp); pocket at 680 |
+| 812 | Rock band | 4.5 m cliff | — | the Notch (d ≈ 1.5), the Ramp (d ≈ 24), cliff elsewhere |
+| 840–930 | Pillow Garden | 14° | clearing | 11 pillows; gates 848, 928 |
+| 930–1230 | Deadfall | 30° | 5.0 m | flow + high line (right) with logs, low line (left); pocket at 1080 |
+| ~1228 | the Saddle | — | clearing | every Deadfall line merges; gate 1228 |
+| 1230–1475 | The Gauntlet | 36° (steepest) | 4.3 m | flow / slot (left) / long way (right); pocket at 1350 |
+| 1475–1600 | Big Air | 16° then 30° | clearing | L kicker + M side kicker, crowd; gates 1476, 1590 |
+| 1600–1900 | Old Growth | 28° | 7.2 m, big trees | flow + left line, pillows, two logs; pocket at 1750 |
+| 1900–1975 | Finish | 15° | clearing | roller, finish banner at 1975, lodge beyond |
+
+## Files
+
+```
+web/src/maps/blackspruce/
+  index.js    registerMap({ id: 'blackspruce', … }) + the SVG thumbnail (imported from maps/builtin.js)
+  layout.js   all the design data: profile, rock band, clearings, sections, lanes, pillows,
+              rollers, logs, kickers, gates, flakes, stumps
+  course.js   BlackspruceCourse: Course-compatible (path, length, dropsAt, finishAt, progress,
+              centre, height, generate, menuFocus) + the opt-in hooks below
+  forest.js   planForest (pure, shared with the bot), populateForest (into scatter.js), log /
+              stump / trail-sign meshes
+  scoring.js  Threaded / Tree slalom bonuses (listens to 'nearMiss', installed on load)
+web/scripts/map2-bot.mjs   headless bot + checks (below)
+```
+
+Run coordinates: `t` metres down the fall line (world z = startZ − t), `d` metres across it
+(+ = skier's right = world +x). Layout positions can be lane-relative (`[laneId, offset]`), so
+logs, flakes and glade pockets follow a lane when it is re-shaped.
+
+## Course hooks used by the engine (all opt-in, other maps unchanged)
+
+| Property | Read by | What |
+|----------|---------|------|
+| `key: 'blackspruce'` | activities.js `courseKey` | storage key for bests / ghost / flakes |
+| `features = { kickers, jumps }` | features.js | explicit kickers ({ at, lateral, signature, L, H, W, name }); `jumps: { endAt: 0, freePillows: 0 }` turns the random park stream off |
+| `challenge = { gates, flakes, medalSpeeds }` | activities.js | gates `{ at, lateral, width }`, flakes `{ x, z, y }`, medals |
+| `spawn = { runCorridor: 150, ridgeFenceMax: 0, runLength: 2400, treeMax: 20000 }` | scatter.js | the generic forest stays outside the designed one |
+| `populate(scatter)` | scatter.js `addEnvironment` | plants the designed forest first (trees, boulders, collision circles, logs, stumps, signs) |
+| `perf = { treeNear: 0.44, treeMid: 0.35 }` | scatter.js `setQuality` | × the quality tier's full-frond / mid tree-pool radii |
+| `life = { skiers: 0 }` | life.js | no background skiers (they would ghost through the pivots) |
+| `physics = { ski: { maxVelocity: 18 }, snowboard: { maxVelocity: 17.5 } }` | map 3's `applyMapTuning` (config.js) | see below |
+| `w` (= face half-width table) | terrain.js `sculptCliffs` | fluted rock on the outer walls only |
+
+### Physics overrides (assumption)
+
+Declared for the per-map physics hook from the map 3 session (`course.physics = { common?, ski?,
+snowboard? }`, merged over config.js PHYSICS when the map loads):
+- Ski `maxVelocity` goes from 15 to 18 m/s and snowboard from 14.5 to 17.5 m/s.
+- The soft-cap drag then starts later, so the steep slope turns into speed instead of being eaten.
+- It also lowers the speed ratio (FOV and wind streaks) at a given speed.
+
+Without the hook (this branch alone) the slope still carries the speed: bot ground averages of
+16–18 m/s and slot peaks of 25–28 m/s. With it the bot is 5–10 s faster and slots peak at ~30 m/s.
+
+An override of 20 / 19.5 was also tried: the bot reached 31 m/s and crashed 1–3 times per run, which
+is too hot for these corridors.
+
+No physics files or player.js were edited.
+
+## Tunables
+
+- **layout.js**:
+  - `BLACKSPRUCE.profile`: grade per section.
+  - `lumps` (1.0 m: kept low, because you need snow under your feet to steer in the trees) and `ribs` (0.3 m).
+  - `SECTIONS[].spacing` (forest density), `scale`, `slim` (crown width), `pivotEvery`.
+  - `LANES` control points `[t, d | 'm', hw]` plus `weave` [amplitude, wavelength]. `'m'` means on the main line, used for branch and merge points.
+  - `BAND` (cliff t, drop, chutes), `CLEARINGS`, `PILLOWS`, `ROLLERS`, `LOGS`, `KICKERS`, `GATES` (t, width), `FLAKES`, `STUMPS`.
+- **forest.js**: `TREE_HIT` (hitbox = 0.2 + 0.32 × crown width scale) and `ZONE` (|d| covered by the designed forest).
+  - Lane-edge trees are narrowed to spires: sx ≤ (gap + 0.7) / 2.6.
+  - The woods thin with distance from the nearest lane (perf).
+- **Pivot rules** (forest.js):
+  - Only in lanes with hw ≥ 3.7 m, offset 18–35 % of hw.
+  - On the inside of a curve, otherwise alternating sides.
+  - Never in a section's first 30 m, in a side lane's first 45 m or last 30 m, within 25 m of a gate, within 55 m after a roller or 45 m after a pillow on the lane, or where the lane drifts faster than 0.35 m/m (mid-traverse).
+  - Never near logs, kickers or the band.
+  - Rocks only in lanes with hw ≥ 4.5 m.
+- **course.js**: `challenge.medalSpeeds` is { gold: 16, silver: 14, bronze: 12 } m/s, i.e. 2:08 / 2:26 / 2:51. `physics`, `perf`, `spawn`.
+- **scoring.js**: `TREE_SCORING` (THREAD 0.9 m, CHAIN 1.6 s, STEP 5, points).
+
+## Fairness and collisions
+
+- Every trunk, rock and stump collides through scatter.js's circle hash, the same rule everywhere:
+  - Trees: trunk plus dense core, 0.32–0.45 m, well inside the needles. Brushing branches is a close shave.
+  - Rocks: their visible sunk footprint, 1.0–1.1 × scale.
+  - Stumps: their radius.
+- Logs have no hitbox: they are in the height field, so what you see is what you ride over.
+- Fork signs and the rock band's lip poles are breakaway markers that don't collide, like the slalom gates' poles.
+- **Sightlines:** every pivot is visible from the lane 30 m and 40 m before it (≥ 2 s at speed). Trees whose crowns would hide one are removed (sightline thinning), and lane-mouth marker trees are tall and narrow. The only view still blocked is from 50 m, behind the previous pivot (the lane's rhythm). Check: `--sight`.
+- **Lane curvature:** every lane's tightest radius is ≥ 24 m (main, safe) and ≥ 36 m (slots). Tighter merges only happen inside clearings. Rule: R ≥ v²/(2.2 g) × 1.2. Check: `node web/scripts/map2-bot.mjs --curve`.
+- **Best-line check:** dynamic programming per route finds a line with at least **1.18 m** of room to every hitbox on all three routes. Check: `--fair`.
+
+## Bot and checks (web/scripts/map2-bot.mjs)
+
+The bot rides the real Player physics on the course's height field (1.25 m grid plus the real kickers),
+through the real collision circles.
+
+```
+node web/scripts/map2-bot.mjs --verify --tuck --check             # all map guarantees in one go (exit 1 on failure)
+node web/scripts/map2-bot.mjs both all --tuck --check --splits   # ski + board × main / fast / safe
+node web/scripts/map2-bot.mjs both all --tuck --check --ovr      # with the declared physics overrides
+node web/scripts/map2-bot.mjs --curve                            # lane radii and drift
+node web/scripts/map2-bot.mjs ski all --fair                     # best-line clearance per route
+node web/scripts/map2-bot.mjs --sight                            # can riders see each pivot 30 / 40 / 50 m ahead
+node web/scripts/map2-bot.mjs both fast --tuck --check --airs --pop --flakes   # every air (feature, air time, impact, apex) + snowflakes
+node web/scripts/map2-bot.mjs both all --tuck --check --tension --cam   # rhythm per section; chase camera inside a crown (%)
+# In the real game on the GPU (dev server on 5182):
+node web/scripts/map2-play.mjs challenge http://localhost:5182 ./shots fast snowboard   # full ?challenge run, results screen
+node web/scripts/map2-play.mjs frames http://localhost:5182 ./shots main 560 14 ski    # frames every 0.4 s + contact sheet
+node web/scripts/map2-perf.mjs http://localhost:5182 blackspruce 100 1950 75 1       # GPU ms along the run (min of 60 frames per stop)
+```
+
+Jump audit, main and fast lines, both gear types; every landing clean:
+
+| Feature | Air | Air when popped | Impact |
+|---------|-----|-----------------|--------|
+| Rollers | 0.9 s | — | 4–5 m/s |
+| Logs | 0.6–0.9 s | — | 3–4 m/s |
+| Cliff (slot) | 1.2 s | — | 10 m/s |
+| M kicker | 1.5 s (apex 3.8 m) | 2.2 s (apex 6 m) | 7–9 m/s |
+| L kicker | 1.7 s (apex 4.9 m) | 2.3 s (apex 7.4 m) | 9–10 m/s |
+
+The stumble threshold is 12.5 m/s.
+
+Flags:
+- `--tuck`: tuck on straight stretches.
+- `--check`: speed control for curves ahead.
+- `--trace=<t>`: dump the 2 s before a crash near t.
+- `--line`: follow the DP line (it has no curvature cost, so it is worse than the local planner).
+
+Latest results (tucking, speed control, no overrides):
+
+| | main | fast (slots) | safe |
+|---|---|---|---|
+| ski | 143 s, 2 crashes, ~50 close shaves | 123 s, 0, 88 | 136 s, 1, ~45 |
+| snowboard | 134 s, 0 | 130 s, 0, 89 | 143 s, 1 |
+
+With the physics overrides: fast 128 s (ski 0–1 crash, board 0), safe 122–137 s, main 137–140 s.
+Untucked (no speed tricks): every route 143–155 s, 0–1 crash.
+
+- The fast line is 1–2 s quicker per tree section and earns about twice the close shaves.
+- The bot's crashes move around with small layout changes. It is a heuristic driver, so the fairness check is the real guarantee.
+- Valcrest's own bot (physics-course) and physics-fuzz are unaffected.
+
+**Rhythm** (`--tension`, skis, tucking): close shaves per second by section.
+
+| Section | Flow line | Slots | Long way |
+|---------|-----------|-------|----------|
+| Spruce Gate | 0.3 | 0.8 | 0.2 |
+| Needles | 0.4 | 1.2 | 0.35 |
+| Deadfall | 0.45 | 1.05 | 0.35 |
+| Gauntlet | 0.55 | 1.5 | 0.3 |
+| Old Growth | 0.2 | — | 0.35 |
+
+- The clearings (Kicker Meadow, the band and Pillow Garden, Big Air, Finish) are 0 for 6–9 s: rest beats.
+- Old Growth is deliberately the wide, flowing finale after the Gauntlet's peak. Narrowing it was tried and reverted.
+
+**Challenge in the real game** (in-page driver, start to finish, `?challenge`, no physics overrides):
+
+| Gear | Line | Time | Medal | Gates | Style score | Flakes |
+|------|------|------|-------|-------|-------------|--------|
+| Skis | flow | 2:13.9 | silver | 9/9 | 8,616 | — |
+| Skis | slots | 2:08.7 | silver (0.9 s off gold) | 9/9 | 18,125 | — |
+| Snowboard | slots | 2:13.8 | silver | 9/9 | 17,952 | 5/12 |
+
+No console errors. Results, best time, medal targets and the ghost save all work.
+
+**Visual playtests:** an in-page driver rides the real game (renderer, chase camera, HUD) through the Needles, band, Pillow Garden and Deadfall on skis (flow line), and from Spruce Gate through Deadfall on a snowboard (slots). Frames every 0.4 s:
+- 55–74 km/h, constant close shaves in the slots.
+- Clean "PERFECT!" landings off the M kicker, the cliff and the logs.
+- The chase camera ended up inside a crown in about 3 of 35 frames. After the pivots became slim spires it was 0 of 35 (pivots are where riders pass closest, with the camera right behind).
+
+## Performance
+
+Quality 1, 1600×900, Intel Arc 130V, GPU timer queries. The GPU was shared with other sessions' test runs most of the night, so the numbers below come from quiet windows.
+
+**Contention caveat:** single measurements varied up to 3× under load. Contention only adds time, so minimums are the honest estimate.
+
+**Before** (first dense version): 12k designed trees, 20–28 ms in the dense sections versus Valcrest's 13.9 ms (gfxperf median).
+
+**After:** `node web/scripts/map2-perf.mjs` (the minimum of 60 identical frames at each stop down the main line). Each stop takes the lowest value over passes that ran in quiet windows, and Valcrest was measured the same way in a quiet pass.
+
+| | median | p90 | max |
+|---|---|---|---|
+| Valcrest Gully (every 100 m) | 11.6 ms | 13.4 ms | 16.4 ms |
+| Blackspruce Plunge (every 75 m) | 12.4 ms | 14.6 ms | 15.6 ms (Gauntlet) |
+
+Blackspruce by section:
+
+| Section | GPU |
+|---------|-----|
+| Drop-in | 11–15 ms |
+| Spruce Gate | 13.8–14.6 ms |
+| Kicker Meadow | 11.5–12 ms |
+| Needles | 13–14 ms |
+| Pillow Garden | 8–11 ms |
+| Deadfall | 11.6–13.8 ms |
+| Gauntlet | 12.6–15.6 ms |
+| Big Air | 10.5 ms |
+| Old Growth | 10.7–11.8 ms |
+| Finish | ~10 ms |
+
+- The min-of-60 metric reads ~2 ms below gfxperf's median frame time (Valcrest: 11.6 vs 13.9 ms).
+- On the gfxperf scale Blackspruce sits at roughly 14–16 ms in the dense sections, the target, about the same as Valcrest.
+
+**Standard metric** (`gfxperf.mjs`, quiet window, riding and carving down the Needles from t 560, the densest stretch), back-to-back pairs:
+
+| Run | Blackspruce Needles | Valcrest start |
+|-----|---------------------|----------------|
+| 1 | 16.4 ms | 14.6 ms |
+| 2 | 13.9 ms | 13.4 ms |
+
+This is within the 14–16 ms target. Valcrest's original baseline was 13.9 ms.
+
+What it took:
+- The designed forest thins with distance from the lanes, starting 6 m behind a lane edge: 12k → 4.8k designed trees. Those are the woods you can't see behind the lane-edge trees.
+- `perf = { treeNear: 0.44, treeMid: 0.35 }`: full-frond trees within ~18 m instead of ~41 m, and mid trees hand over to the opaque far shells at ~91 m instead of 260 m. Not noticeable at riding speed in screenshots or playtests.
+- Fewer saplings (8 % in the dense sections).
+- Not changed: gfx/ shaders, gfx/perf.js, scene.js TREES.
+
+Cost breakdown (Gauntlet, first dense version):
+- Full-frond trees ~35 % (alpha-tested foliage filling the screen).
+- Terrain ~16 %.
+- Mid trees ~9 %.
+
+In open clearings the terrain shader dominates, as it does on Valcrest.
+
+Further levers, if needed:
+- `perf.treeNear` 0.4.
+- `SECTIONS` spacing in the Gauntlet.
+- A camera-aware foliage fade in gfx/trees.js (not done: not my file).
+
+## Known issues
+
+- The chase camera can still pass through the needles of a lane-edge tree on a hard carve: camera.js has no foliage avoidance and trees.js no near-camera fade. Lane-edge trees and pivots are slim spires, which keeps it rare.
+- Logs read best from the side. Riding straight at one, you see a dark line on a drift crest.
+- The physics overrides only apply once the map 3 hook is merged. The medal speeds sit between the bot's times with and without them.
+- The bot is a heuristic. Expect a crash or two in its runs. Real players brake, which the bot only approximates.
+- Perf numbers were taken on a shared, contended GPU; see Performance.

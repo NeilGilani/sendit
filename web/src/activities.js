@@ -29,7 +29,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage full / private */ } },
 };
 
-export function courseKey(course) { return course.meta ? `${course.meta.id}.${course.runIndex ?? 0}` : 'gully'; }
+export function courseKey(course) { return course.key ?? (course.meta ? `${course.meta.id}.${course.runIndex ?? 0}` : 'gully'); }
 export function bestFor(key) { return store.get(`sendit.best.${key}`, null); }
 export function flakesFound(key) { return store.get(`sendit.flakes.${key}`, []).length; }
 export function medalFor(time, length, M = CHALLENGE.medalSpeeds) {
@@ -129,7 +129,13 @@ export class Activities {
     this.gates = [];
     const avoid = [...(this.course.dropsAt || []), ...f.kickers.map((k) => this.course.progress ? -1 : -1)];
     let side = 1;
-    for (let s = 80; s < this.course.finishAt - 50; s += C.gateSpacing[0] + rnd() * (C.gateSpacing[1] - C.gateSpacing[0])) {
+    // A map may place its own gates: [{ at (path length), lateral, width }].
+    for (const g of this.course.challenge?.gates || []) {
+      const { p, dir } = f.at(g.at);
+      const r = new THREE.Vector2(-dir.y, dir.x);
+      this.gates.push({ s: g.at, c: p.clone().addScaledVector(r, g.lateral || 0), r, w: g.width, color: this.gates.length % 2 ? 'blue' : 'red' });
+    }
+    for (let s = 80; !this.course.challenge?.gates && s < this.course.finishAt - 50; s += C.gateSpacing[0] + rnd() * (C.gateSpacing[1] - C.gateSpacing[0])) {
       if (avoid.some((d) => d > 0 && Math.abs(d - s) < 25)) continue;
       const { p, dir } = f.at(s);
       if (f.kickers.some((k) => Math.hypot(k.o.x - p.x, k.o.y - p.y) < 22)) continue;
@@ -154,7 +160,7 @@ export class Activities {
     this.gates.forEach((g, i) => {
       const yaw = Math.atan2(-g.r.y, g.r.x);
       for (const sd of [-1, 1]) {
-        const x = g.c.x + g.r.x * sd * C.gateWidth / 2, z = g.c.y + g.r.y * sd * C.gateWidth / 2;
+        const x = g.c.x + g.r.x * sd * (g.w ?? C.gateWidth) / 2, z = g.c.y + g.r.y * sd * (g.w ?? C.gateWidth) / 2;
         const y = T.getHeight(x, z) - 0.1;
         q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw + (sd > 0 ? Math.PI : 0));
         m.compose(new THREE.Vector3(x, y, z), q, one);
@@ -248,7 +254,7 @@ export class Activities {
       while (this.nextGate < this.gates.length && prog >= this.gates[this.nextGate].s) {
         const g = this.gates[this.nextGate++];
         const off = Math.abs((pl.position.x - g.c.x) * g.r.x + (pl.position.z - g.c.y) * g.r.y);
-        if (off <= CHALLENGE.gateWidth / 2 + 0.6) { this.gatesPassed++; emit('gate', { pass: true, color: g.color }); addScore('Gate', 20); }
+        if (off <= (g.w ?? CHALLENGE.gateWidth) / 2 + 0.6) { this.gatesPassed++; emit('gate', { pass: true, color: g.color }); addScore('Gate', 20); }
         else { this.penalty += CHALLENGE.missPenalty; emit('gate', { pass: false }); }
       }
       this.lastProg = prog;
