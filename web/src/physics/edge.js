@@ -19,6 +19,9 @@
 import * as THREE from 'three';
 import { PHYSICS as P } from '../config.js';
 import { clamp, lerp, smoothstep, angleDiff, lerpAngle, approach, DEG } from './math.js';
+import { emit } from '../state.js';
+
+let lockHinted = false, lateHinted = false;   // the "held key is locked" / "too late to flip" hints show once per page
 
 const wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const mod2Pi = (a) => ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
@@ -120,7 +123,7 @@ export class EdgePhysics {
 
   tuckFromUp(ctrl) { return ctrl.up; }
   /** Space alone loads the tail (ollie); W + Space loads the nose (nollie). */
-  onChargeStart(ctrl) { this._popEnd = ctrl.up > 0.3 ? 'nose' : 'tail'; }
+  onChargeStart(ctrl) { this._popEnd = ctrl.up > 0.3 ? 'nose' : 'tail'; this._upHeld = ctrl.up > 0.3; }   // W from the start: a nollie, not a frontflip preload
   onControl() {}
 
   /**
@@ -132,7 +135,13 @@ export class EdgePhysics {
     // Flip preload (Steep / Shredders): S held while charging winds up a backflip off the tail.
     const loading = (grounded || this._lateT > 0) && this.charging;
     this.flipLoad = approach(this.flipLoad || 0, loading && ctrl.brake > 0.3 ? 1 : 0, dt / (this.charging ? 0.35 : 0.1));
-    pl.flipLoad = this.flipLoad;
+    // … and W pressed while charging winds up a frontflip, which only commits if W is still held as the
+    // rider leaves the snow. W already held when the charge starts (a tuck, or W + Space for a nollie)
+    // doesn't count until it's let go and pressed again, so tucking into a pop never frontflips.
+    if (!this.charging) this._upHeld = ctrl.up > 0.3;
+    else if (ctrl.up < 0.2) this._upHeld = false;
+    this.frontLoad = approach(this.frontLoad || 0, loading && ctrl.up > 0.3 && !this._upHeld && ctrl.brake < 0.3 ? 1 : 0, dt / (this.charging ? 0.35 : 0.1));
+    pl.flipLoad = this.flipLoad - this.frontLoad;   // signed for the rider: + arches back, − folds forward
     const pressT = grounded && this.charging ? (this._popEnd === 'nose' ? 1 : -1) * (0.4 + 0.6 * this.charge) : 0;
     this.press += (pressT - this.press) * (1 - Math.exp(-10 * dt));
     const canButter = grounded && this.charging && pl.speed < C.butterMaxSpeed;
@@ -354,21 +363,27 @@ export class EdgePhysics {
     const pl = this.pl, C = this.C;
     // Rolled off a crest while loaded: keep the charge (and preload / wind-up) for a late pop.
     const late = !popped && this.charging;
-    const keep = late ? { charge: this.charge, flipLoad: this.flipLoad, windup: this.windup } : null;
+    const keep = late ? { charge: this.charge, flipLoad: this.flipLoad, frontLoad: this.frontLoad, windup: this.windup } : null;
     this._lateT = late ? P.latePopTime : 0;
     this.takeoff = { switch: this.travel < 0, popped, spin: 0, flip: 0, grabT: 0, grab: null, end: this._popEnd || 'tail' };
     // How well the set was timed: the pop's own quality, or a weaker set rolling off without a pop.
     const q = this.popQ = popped ? clamp(pl.lastPopQ ?? 1, 0, 1) : C.rollSet;
     pl.flip = 0; pl.flipRate = 0; pl.flipTuck = 0;
     this.flipH = 0; this.tuckLoad = 0;
-    // A preloaded backflip leaves the lip already rotating and commits to the flip.
-    this._flipCommit = popped && (this.flipLoad || 0) > 0.25;
-    if (this._flipCommit) this.flipH = this.flipLoad * C.flipPreload * q * this.flipCap();
-    this.flipLoad = 0; pl.flipLoad = 0;
-    // W / S already held at take-off (tuck, brake, nollie) don't throw a flip until pressed again
-    // (S held from a preload is the same throw, so it carries on).
+    // A preloaded flip leaves the lip already rotating and commits to it: S while charging = backflip,
+    // W while charging and still held at the lip = frontflip (off the nose).
     const c = pl._ctrl || {};
-    this._flipLock = { up: (c.up || 0) > 0.2, brake: (c.brake || 0) > 0.2 && !this._flipCommit };
+    const front = popped && (this.frontLoad || 0) > 0.25 && (c.up || 0) > 0.3 && !((this.flipLoad || 0) > 0.25);
+    this._flipCommit = popped && ((this.flipLoad || 0) > 0.25 || front);
+    if (this._flipCommit) this.flipH = (front ? -this.frontLoad : this.flipLoad) * C.flipPreload * q * this.flipCap();
+    this.flipLoad = 0; this.frontLoad = 0; pl.flipLoad = 0;
+    // W / S already held at take-off (tuck, brake) don't throw a flip until pressed again — a W tuck held
+    // down a line and off a cliff mustn't flip you — but the key of a preload is the same throw, so it
+    // carries on. A re-press works at any time (the late throw, flipStep).
+    this._flipLock = { up: (c.up || 0) > 0.2 && !(front && this._flipCommit), brake: (c.brake || 0) > 0.2 && !(this._flipCommit && !front) };
+    this._lockHintT = 0;
+    // How long this air should last (sets how long the throw window stays open, flipStep / spinStep).
+    this.airPred = this.timeToLand();
     // Rolling off a crest / lip without popping: the turn held from the ground is carving, not a spin
     // — it only spins once steer is let go and pressed again (popped jumps spin straight away).
     this._spinLock = !popped && Math.abs(c.steer || 0) > 0.2 ? Math.sign(c.steer) : 0;
@@ -435,9 +450,10 @@ export class EdgePhysics {
     const steer = ctrl.active && !this._spinLock && Math.abs(ctrl.steer) > 0.2 ? ctrl.steer : 0;
     let h = this.spinH || 0;
     // The throw: early in the air the shoulders can still add to the set (less and less).
-    const throwing = steer && t < C.spinThrow;
+    const win = C.spinThrow + C.spinThrowAir * clamp((this.airPred ?? 1) - 1, 0, 2);   // longer on a bigger air
+    const throwing = steer && t < win;
     if (throwing) {
-      const eff = (1 - (t / C.spinThrow) ** 2) * (0.5 + 0.5 * this.popQ);
+      const eff = (1 - (t / win) ** 2) * (0.5 + 0.5 * this.popQ);
       // A throw alone sets less than a wound-up pop; a full set needs the pop right at the lip too.
       const lim = (this._spinPre ? cap * (0.6 + 0.4 * this.popQ) : C.spinThrowMax * this.H.spin) * Math.sign(-steer);
       h = approach(h, clamp(lim, -cap, cap), C.spinThrowRate * Math.abs(steer) * eff * dt);
@@ -498,24 +514,44 @@ export class EdgePhysics {
     const L = this._flipLock || (this._flipLock = {});
     if (ctrl.up < 0.2) L.up = false;
     if (ctrl.brake < 0.2) L.brake = false;
-    const raw = ctrl.active && !grabbing && pl.airTime > 0.04 ? (L.brake ? 0 : ctrl.brake) - (L.up ? 0 : ctrl.up) : 0;
+    // A key held through the take-off stays locked until it's pressed again: on a real air, say so (once).
+    if (ctrl.active && !lockHinted && t > 0.5 && tLand > 0.8 && ((L.up && ctrl.up > 0.5) || (L.brake && ctrl.brake > 0.5))) {
+      lockHinted = true;
+      emit('hint', 'Flip: let go of W / S and press it again in the air (held from the take-off it stays a tuck / brake)');
+    }
+    // (A grab no longer blocks the flip keys: a grabbed backflip is a tuck with a hand on the board.)
+    const raw = ctrl.active && t > 0.04 ? (L.brake ? 0 : ctrl.brake) - (L.up ? 0 : ctrl.up) : 0;
     // Wide dead zone: a stick pushed a little off-axis while spinning shouldn't flip (keys = full).
     const input = Math.sign(raw) * clamp((Math.abs(raw) - 0.4) / 0.6, 0, 1);
     let h = this.flipH || 0;
     const rem = wrapPi(pl.flip);                       // signed distance from upright
-    // The throw: early in the air W / S add to the flip (a preload already set most of it).
-    const throwing = Math.abs(input) > 0.2 && t < C.flipThrow && !(tLand < C.flipMinAir && Math.abs(h) < C.flipMinH);
+    // No new flip on a little hop or just before touchdown.
+    const room = !(tLand < C.flipMinAir && Math.abs(h) < C.flipMinH);
+    // The throw: early in the air W / S add to the flip (a preload already set most of it). The window
+    // stays open longer on a bigger air (flipThrowAir s per s of expected air beyond 1 s).
+    const win = C.flipThrow + C.flipThrowAir * clamp((this.airPred ?? 1) - 1, 0, 2);
+    const throwing = Math.abs(input) > 0.2 && t < win && room;
     if (throwing) {
-      const eff = (1 - (t / C.flipThrow) ** 2) * (0.5 + 0.5 * this.popQ);
+      const eff = (1 - (t / win) ** 2) * (0.5 + 0.5 * this.popQ);
       // A throw alone sets less than a preload; a full set needs the pop right at the lip too.
       const lim = (this._flipCommit ? cap * (0.6 + 0.4 * this.popQ) : C.flipThrowMax * Math.sqrt(this.H.spin)) * Math.sign(input);
       h = approach(h, clamp(lim, -cap, cap), C.flipThrowRate * Math.abs(input) * eff * dt);
     }
+    // The late throw: after the window W / S still start (or build) a flip — slowly, and only up to
+    // flipLateMax, so a big air allows a late single but never a set; it needs flipLateAir s of air left.
+    const late = !throwing && Math.abs(input) > 0.2 && Math.abs(h) < C.flipLateMax
+      && (Math.sign(input) === Math.sign(h) || Math.abs(h) < C.flipMinH) && (Math.abs(h) > C.flipMinH || tLand > C.flipLateAir);
+    if (late) h = approach(h, Math.sign(input) * C.flipLateMax, C.flipLateRate * Math.abs(input) * dt);
+    // Pressed too late for any flip to come round: say how it's done (once), rather than nothing at all.
+    else if (!throwing && Math.abs(input) > 0.5 && Math.abs(h) < C.flipMinH && ctrl.active && !lateHinted && t > 0.2) {
+      lateHinted = true;
+      emit('hint', 'Flips are thrown at the lip: press W / S as you pop (or hold S while loading the jump)');
+    }
     const dir = Math.sign(h), flipping = Math.abs(h) > C.flipMinH;
+    // Shape: −1 stretched layout (× flipOpen), 0 open, 1 tight tuck (× flipTuckGain).
     let tuck = 0, rate = null;
-    if (grabbing) tuck = 0.7;                               // a grab is a tuck (and locks the shape)
-    else if (throwing) tuck = 1;
-    else if (flipping && Math.abs(input) > 0.2) tuck = Math.sign(input) === dir ? 1 : 0;
+    if (throwing || late) tuck = 1;
+    else if (flipping && Math.abs(input) > 0.2) tuck = Math.sign(input) === dir ? 1 : -1;   // against the flip: stretch out
     else if (flipping) {
       // Spot the landing: the next upright ahead in the flip's direction, arriving at touchdown.
       // Plan to come round early and open up (layout, legs stretched) for the last flipSpot s: the tuck
@@ -523,19 +559,22 @@ export class EdgePhysics {
       const ahead = dir > 0 ? Math.PI * 2 - mod2Pi(pl.flip) : mod2Pi(pl.flip);
       const tOpen = Math.min(C.flipSpot, tLand * 0.5);
       const need = tLand > tOpen + 0.05 ? Math.max(0, ahead - Math.abs(h) * tOpen) / (tLand - tOpen) : ahead / Math.max(tLand, 0.08);
-      tuck = clamp((need / Math.abs(h) - 1) / (C.flipTuckGain - 1), 0, 1);
-      // Just past upright with the next one out of reach: stay open and ride out the small over-rotation
+      const f = need / Math.abs(h);
+      tuck = f >= 1 ? clamp((f - 1) / (C.flipTuckGain - 1), 0, 1) : -clamp((1 - f) / (1 - C.flipOpen), 0, 1);
+      // Just past upright with the next one out of reach: stretch out and ride out the small over-rotation
       // (whichever lands closer to upright) instead of chasing a whole extra turn.
-      const past = Math.PI * 2 - ahead, over = past + Math.abs(h) * tLand;
+      const past = Math.PI * 2 - ahead, over = past + Math.abs(h) * C.flipOpen * tLand;
       const short = Math.max(0, ahead - Math.abs(h) * C.flipTuckGain * tLand);
-      if (over < short) tuck = 0;
+      if (over < short) tuck = -1;
+      if (grabbing) tuck = Math.max(tuck, 0.1);             // a grab keeps the body compact (no stretched layout)
     } else rate = clamp(-rem / Math.max(tLand, 0.15), -C.flipCheck, C.flipCheck);   // no flip: just level out
     // A tight tuck at speed takes real strength (the legs hold against a load ∝ ω²): it holds at full gain
     // for flipTuckHold s, then fades over flipTuckFade s to flipTuckFloor of the tuck; opening up recovers.
     this.tuckLoad = Math.max(0, (this.tuckLoad || 0) + (pl.flipTuck > 0.3 ? pl.flipTuck : -0.5) * dt);
     const strength = 1 - (1 - C.flipTuckFloor) * clamp((this.tuckLoad - C.flipTuckHold) / C.flipTuckFade, 0, 1);
     pl.flipTuck = approach(pl.flipTuck || 0, Math.min(tuck, strength), dt / C.poseTime);
-    const target = rate !== null ? rate : h * (1 + (C.flipTuckGain - 1) * pl.flipTuck);
+    const k = pl.flipTuck >= 0 ? 1 + (C.flipTuckGain - 1) * pl.flipTuck : 1 + (1 - C.flipOpen) * pl.flipTuck;
+    const target = rate !== null ? rate : h * k;
     pl.flipRate += (target - pl.flipRate) * (1 - Math.exp(-C.flipResponse * dt));
     this.flipH = h;
     pl.flip += pl.flipRate * dt;
@@ -580,8 +619,12 @@ export class EdgePhysics {
       this._flipCommit = true;
       this._flipLock.brake = false;
       this.flipH = Math.max(this.flipH || 0, this.flipLoad * C.flipPreload * q * this.flipCap());
+    } else if ((this.frontLoad || 0) > 0.25 && (pl._ctrl?.up || 0) > 0.3 && Math.abs(pl.flip) < 0.3) {
+      this._flipCommit = true;
+      this._flipLock.up = false;
+      this.flipH = Math.min(this.flipH || 0, -this.frontLoad * C.flipPreload * q * this.flipCap());
     }
-    this.windup = 0; pl.windup = 0; this.flipLoad = 0; pl.flipLoad = 0;
+    this.windup = 0; pl.windup = 0; this.flipLoad = 0; this.frontLoad = 0; pl.flipLoad = 0;
     this.charge = 0; this.charging = false; pl.squat = 0; this._lateT = 0;
     this._spinLock = 0;   // a deliberate pop: the held turn spins
   }

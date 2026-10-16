@@ -16,7 +16,7 @@ const { game, Mode } = await import('../src/state.js');
 game.mode = Mode.RIDING;
 const args = process.argv.slice(2), pos = args.filter((a) => !a.startsWith('--'));
 const WHICH = pos[0] || 'all', TYPES = (pos[1] || 'both') === 'both' ? ['ski', 'snowboard'] : [pos[1]];
-const QUIET = args.includes('--quiet');
+const QUIET = args.includes('--quiet'), EASE = args.includes('--ease');
 const DT = 1 / 60, TAU = Math.PI * 2;
 const input = { strength: () => 0, justPressed: () => false };
 
@@ -37,7 +37,7 @@ function restore(p, s) {
  * load through the air: a preloaded backflip thrown and tucked to the end) or 'spin' (steer held from
  * the load: wind-up, then spin to the end). `flow` = SEND IT on. Returns { flips, spin, air }.
  */
-function replay(T, type, s, frames, trick, flow) {
+function replay(T, type, s, frames, trick, flow, pat = null) {
   const p = new Player(T, null, null, input);
   p.setEquipment(type);
   p.fadeThen = (fn) => fn();
@@ -48,6 +48,7 @@ function replay(T, type, s, frames, trick, flow) {
       pl.dyn._noInputT = -999;
       Object.assign(c, { steer: 0, brake: 0, up: 0, jump: false, tuck: 0 });
       if (pl.state === State.GROUNDED) c.jump = i < frames - 1;
+      if (pat) { pat(c, pl, i >= frames - 30); return; }   // an input pattern (--ease); its own ground and air input
       // Keys held through the take-off are locked until pressed again: let go for two frames in the air.
       const relock = pl.state === State.AIR && pl.airTime < 0.05;
       if (trick === 'flip' && !relock) c.brake = 1;
@@ -58,7 +59,9 @@ function replay(T, type, s, frames, trick, flow) {
     maxFlip = Math.max(maxFlip, Math.abs(p.flip));
     if (i > frames && p.state !== State.AIR) break;
   }
-  return { flips: maxFlip / TAU, spin: Math.abs(p._spinTotal) * 180 / Math.PI, air: p.lastLanding?.air ?? p.lastCrash?.air ?? p.airTime };
+  const crash = p.state === State.CRASH;
+  return { flips: maxFlip / TAU, spin: Math.abs(p._spinTotal) * 180 / Math.PI, air: p.lastLanding?.air ?? p.lastCrash?.air ?? p.airTime,
+    result: crash ? 'crash' : p.lastLanding?.result ?? '?', landedFlips: crash ? 0 : p.lastLanding?.flips ?? 0, flipDev: crash ? p.lastCrash?.flipDev : p.lastLanding?.flipDev };
 }
 
 /** Ride with `script(c, pl)` for at most `seconds`; records airs (and their replay snapshots). */
@@ -77,10 +80,33 @@ function rideRecord(p, script, seconds, stop = () => false) {
 }
 
 const rows = [];
+// --ease: the ways a player tries a single flip off this take-off. Each returns the ctrl for a frame;
+// `late` = the last 0.5 s on the snow. Flip keys are let go once the open-body rotation left would carry
+// the flip round by touchdown (a decent player); "dead" patterns check that a key does something.
+const skilled = (pl, turns = 1) => Math.abs(pl.flip) + Math.abs(pl.flipRate) * 0.2 + Math.abs(pl.dyn.flipH || 0) * Math.max(0, pl.dyn.timeToLand() - 0.2) < turns * TAU;
+const air = (pl) => pl.state === State.AIR;
+const PATTERNS = {
+  'S late (0.5 s in)': (c, pl) => { if (air(pl) && pl.airTime > 0.5 && skilled(pl)) c.brake = 1; },
+  'S late (1 s in)': (c, pl) => { if (air(pl) && pl.airTime > 1 && skilled(pl)) c.brake = 1; },
+  'S at the lip': (c, pl) => { if (air(pl) && pl.airTime > 0.03 && (pl.airTime < 0.2 || skilled(pl))) c.brake = 1; },
+  'S preload + hold': (c, pl, late) => { if ((!air(pl) && late) || (air(pl) && (pl.airTime < 0.2 || skilled(pl)))) c.brake = 1; },
+  'W at the lip (front)': (c, pl) => { if (air(pl) && pl.airTime > 0.03 && (pl.airTime < 0.2 || skilled(pl))) c.up = 1; },
+  'Space, then W (front preload)': (c, pl, late) => { if ((!air(pl) && late) || (air(pl) && (pl.airTime < 0.2 || skilled(pl)))) c.up = 1; },
+  'W held (tuck) all the way': (c) => { c.up = 1; },
+  'W held, re-pressed at 0.6 s': (c, pl) => { if (!air(pl) || pl.airTime < 0.3 || (pl.airTime > 0.6 && skilled(pl))) c.up = 1; },
+  'grab held + S at 0.3 s': (c, pl) => { c.tuck = 1; if (air(pl) && pl.airTime > 0.3 && skilled(pl)) c.brake = 1; },
+};
+const easeRows = [];
 function report(map, label, type, a, T, flow) {
   const mx = a.snap && a.air > 0.5 ? { f: replay(T, type, a.snap, a.frames, 'flip', flow), s: replay(T, type, a.snap, a.frames, 'spin', flow) } : null;
   rows.push({ map, label, type, flow, a, mx });
   if (!QUIET) console.log(`  ${label.padEnd(26)} ${type.padEnd(9)} ${fmtAir(a)}${mx ? `  | max ${mx.f.flips.toFixed(2)} flips (${mx.f.air.toFixed(2)} s), ${mx.s.spin.toFixed(0)}° spin` : ''}`);
+  if (EASE && a.snap && a.air > 1.0) {
+    const out = {};
+    for (const [k, pat] of Object.entries(PATTERNS)) out[k] = replay(T, type, a.snap, a.frames, null, flow, pat);
+    easeRows.push({ map, label, type, flow, air: a.air, out });
+    if (!QUIET) console.log('     ' + Object.entries(out).map(([k, r]) => `${k}: ${r.result}${r.result !== 'crash' ? ` ${r.landedFlips}f` : ''} (${r.flips.toFixed(2)})`).join(' · '));
+  }
 }
 
 // ------------------------------------------------------------------ Valcrest / Blackspruce kickers
@@ -164,5 +190,19 @@ for (const r of rows) {
 for (const [g, rs] of groups) {
   const m = (f) => Math.max(...rs.map(f));
   console.log(`  ${g.padEnd(38)} airs ${String(rs.length).padStart(2)}  v0 ≤ ${m((r) => r.a.v0).toFixed(1)} m/s  air ≤ ${m((r) => r.a.air).toFixed(2)} s (${m((r) => r.a.real).toFixed(2)} real)  h ≤ ${m((r) => r.a.h).toFixed(1)} m  apex ≤ ${m((r) => r.a.apex).toFixed(1)} m  dist ≤ ${m((r) => r.a.dist).toFixed(0)} m  max flips ${m((r) => r.mx?.f.flips ?? 0).toFixed(2)}  max spin ${m((r) => r.mx?.s.spin ?? 0).toFixed(0)}°  crashes ${rs.filter((r) => /CRASH/.test(r.a.result)).length}`);
+}
+if (EASE) {
+  console.log('\n=== flip ease (airs > 1 s): per pattern, clean single flips landed / tried · any flip landed · mean flips reached ===');
+  const groups = new Map();
+  const bucket = (t) => (t < 1.6 ? 'air < 1.6 s' : t < 2.2 ? 'air 1.6–2.2 s' : t < 2.8 ? 'air 2.2–2.8 s' : 'air ≥ 2.8 s');
+  for (const r of easeRows) { const g = `${r.map === 'ravenspire' ? 'ravenspire' : 'kickers (valcrest + blackspruce)'} ${r.type}, ${bucket(r.air)}`; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(r); }
+  for (const [g, rs] of groups) {
+    console.log(`  ${g} (${rs.length} airs, ${Math.min(...rs.map((r) => r.air)).toFixed(1)}–${Math.max(...rs.map((r) => r.air)).toFixed(1)} s)`);
+    for (const k of Object.keys(PATTERNS)) {
+      const xs = rs.map((r) => r.out[k]);
+      const clean1 = xs.filter((x) => x.result === 'clean' && x.landedFlips === 1).length, any = xs.filter((x) => x.result !== 'crash' && x.landedFlips >= 1).length;
+      console.log(`     ${k.padEnd(30)} clean 1-flip ${clean1}/${xs.length}  landed a flip ${any}/${xs.length}  reached ${(xs.reduce((a, x) => a + x.flips, 0) / xs.length).toFixed(2)} flips`);
+    }
+  }
 }
 void PHYSICS;

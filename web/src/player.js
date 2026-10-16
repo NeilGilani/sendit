@@ -94,7 +94,7 @@ export class Player {
     if (prev) {
       this.dyn.edge = prev.edge;
       // Mid-air swaps keep the trick going (bookkeeping, flip commitment, input locks).
-      for (const k of ['takeoff', '_flipCommit', '_spinLock', '_flipLock', 'spinH', 'flipH', 'popQ', '_spinPre']) this.dyn[k] = prev[k];
+      for (const k of ['takeoff', '_flipCommit', '_spinLock', '_flipLock', 'spinH', 'flipH', 'popQ', '_spinPre', 'airPred', 'tuckLoad']) this.dyn[k] = prev[k];
       // New gear goes on facing the direction of travel (a switch rider swaps to forward-facing gear).
       if (prev.travel < 0) {
         this.heading += Math.PI;

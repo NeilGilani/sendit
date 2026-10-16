@@ -248,9 +248,11 @@ export class UI {
     const tip = [
       pad ? 'Spins start at take-off: steer while holding A, keep steering off the lip'
         : 'Spins start at take-off: steer while holding Space, keep steering off the lip',
-      pad ? 'Backflip: pull back while holding A  ·  push or pull off the lip to throw a flip'
-        : 'Backflip: hold S while loading Space  ·  W or S off the lip to throw a flip',
-      'In the air: push with the spin to tuck, against it to slow, let go to land',
+      pad ? 'Flips: pull back (backflip) or push (frontflip) while holding A  ·  or push / pull off the lip'
+        : 'Flips: hold S (backflip) or W (frontflip) while loading Space  ·  or press W / S off the lip',
+      'In the air: push with the spin or flip to tuck, against it to slow, let go to land',
+      pad ? 'Big air: a late push / pull still starts a slow flip if there\'s time to come round'
+        : 'Big air: W / S late in the air still starts a slow flip if there\'s time to come round',
     ][n - 1];
     if (tip) setTimeout(() => { if (game.mode === Mode.RIDING) this.hint(tip); }, 700);
   }

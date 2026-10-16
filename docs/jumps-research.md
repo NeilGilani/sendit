@@ -182,3 +182,30 @@ little more rotation, not proportionally more.
 - The control change players will notice: **spins and flips are thrown at the lip** — steer / S while loading
   the pop, release at the lip, keep the stick in for the throw. Steering late in the air no longer starts a
   spin (only a small hip twist). The in-game hint text (ui.js, not part of this change) should say so.
+
+## 6. Follow-up: flips on big airs (easier singles, no dead keys)
+
+Players found a single flip nearly impossible on big airs and W / S sometimes did nothing mid-air. Measured
+with `node web/scripts/jumps-bench.mjs all both --quiet --ease` (every real take-off on the three maps,
+skis and board, with and without SEND IT, replayed with the inputs players actually use):
+
+| input (Ravenspire airs ≥ 2.8 s · 2.2–2.8 s) | before: clean singles | after |
+|---|---|---|
+| S pressed 0.5 s into the air | 0 % · 0 % | 100 % · 78 % |
+| S pressed 1 s into the air | 0 % · 0 % | 94 % · 9 % |
+| W held through the take-off (a tuck), re-pressed at 0.6 s | 0 % · 0 % | 100 % · 43 % |
+| a grab held + S at 0.3 s | 0 % (flip keys blocked while grabbing) | a flip lands 13 % · 83 % (sketchy: let go to spot) |
+| frontflip preload | did not exist | lands a flip 69 % (a double on the biggest airs) · 74 % |
+| S / W at the lip | 74–89 % | 88–100 % |
+| W held as a tuck all the way | 0 flips (correct) | 0 flips (correct) + a one-time hint |
+
+Kickers (1.4–2.1 s): at the lip or with a preload a single lands 70–100 % (a late press correctly does nothing
+there — not enough air left — and a one-time hint says to throw at the lip). The ceiling with perfect inputs is
+unchanged (≈ 3.1–3.6 flips on Ravenspire's biggest airs, 1.7–2.2 on the kickers).
+
+What changed (physics/edge.js, config.js): the throw window grows with the air expected at the take-off
+(`flipThrowAir` / `spinThrowAir`); a **late throw** after it (`flipLateMax` 1.8 rad/s, `flipLateRate` 4,
+needs `flipLateAir` 1.7 s left) so W / S always start a flip when one can still come round; flip keys work while
+grabbing (a grab only stops the full layout); a stretched layout (`flipOpen` 0.75) lets an over-set single
+slow down; the frontflip preload (Space, then W, still held at the lip); one-time hints for a locked held key
+and a too-late press.

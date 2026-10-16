@@ -128,6 +128,7 @@ export const PHYSICS = {
     spinTuckGain: 1.45, spinOpen: 0.6, spinResponse: 9, prewind: 0.45,
     windupSpin: 2.6,          // rad/s of spin momentum a full wind-up (steer while charging) sets at the pop
     spinThrow: 0.3,           // s after take-off the shoulders can still throw (add to) the spin …
+    spinThrowAir: 0.1,        // … + this many s per s of expected air beyond 1 s (up to +0.2 s on a 3 s air) …
     spinThrowRate: 18,        // … at this rate (rad/s²), fading over the window …
     spinThrowMax: 3.4,        // … up to this without a wind-up (rad/s)
     spinMinH: 0.5, spinCheck: 3.2, airTwist: 1.0,   // below spinMinH not spinning; check-back / hip-twist rates (rad/s)
@@ -139,6 +140,9 @@ export const PHYSICS = {
     flipTuckHold: 1.6, flipTuckFade: 1.0, flipTuckFloor: 0.2,   // s a full tuck holds, s it fades over, share left (the legs tire: ∝ ω²)
     flipPreload: 0.55,        // share of flipSet a full preload (S while charging) sets at the pop (holding S through the throw finishes it)
     flipThrow: 0.4, flipThrowRate: 11, flipThrowMax: 2.0,   // the in-air throw window (s), rate, cap without a preload
+    flipThrowAir: 0.15,       // s of extra throw window per s of expected air beyond 1 s (0.7 s on a 3 s air)
+    flipLateMax: 1.8, flipLateRate: 4, flipLateAir: 1.7,   // after the window W / S still start a flip: up to 1.8 rad/s at 4 rad/s², with ≥ 1.7 s of air left
+    flipOpen: 0.75,           // a stretched layout (key against the flip, or spotting an over-set flip) slows it to this share
     flipMinH: 0.35, flipMinAir: 0.45, flipCheck: 1.2,       // not flipping below flipMinH; no new flip with < flipMinAir s left
     flipSpot: 0.35,           // s: let go and the rider plans to come round early and open up (layout) for the last flipSpot s
     flipLandClean: 22, flipLandStumble: 42,
@@ -175,12 +179,13 @@ export const PHYSICS = {
     popMin: 2.2, popMax: 4.0, nollie: 0.88, chargeTime: 0.45,
     // Rotation (see ski): a board spins a little faster (one platform, arms free): 390°/s neutral, 565°/s tucked.
     spinSet: 6.8, spinTuckGain: 1.45, spinOpen: 0.6, spinResponse: 9, prewind: 0.55, windupSpin: 3.2,
-    spinThrow: 0.3, spinThrowRate: 20, spinThrowMax: 3.8, spinMinH: 0.5, spinCheck: 3.2, airTwist: 1.0,
+    spinThrow: 0.3, spinThrowAir: 0.1, spinThrowRate: 20, spinThrowMax: 3.8, spinMinH: 0.5, spinCheck: 3.2, airTwist: 1.0,
     poseTime: 0.22, rollSet: 0.6,
     // Flips (W = tamedog / front, S = wildcat / back, over the toe-heel axis): 185°/s open, 425°/s tucked.
     flipSet: 3.2, flipTuckGain: 2.3, flipResponse: 8, flipPreload: 0.55,
     flipTuckHold: 1.6, flipTuckFade: 1.0, flipTuckFloor: 0.2,
-    flipThrow: 0.4, flipThrowRate: 11, flipThrowMax: 2.0, flipMinH: 0.35, flipMinAir: 0.45, flipCheck: 1.2,
+    flipThrow: 0.4, flipThrowAir: 0.15, flipThrowRate: 11, flipThrowMax: 2.0, flipMinH: 0.35,
+    flipLateMax: 1.8, flipLateRate: 4, flipLateAir: 1.7, flipOpen: 0.75, flipMinAir: 0.45, flipCheck: 1.2,
     flipSpot: 0.35,
     flipLandClean: 22, flipLandStumble: 42,
     grabRate: 7, grabRelease: 9, grabLetGo: 0.22,

@@ -206,7 +206,7 @@ export class Rider {
     let crouchT = 0.45 + ratio * 0.15 + pl.tuck * 0.45 + pl.squat * 0.55 + pl.brake * 0.15;
     // In the air the crouch follows the physical tuck (player.flipTuck: the faster the flip, the tighter
     // the ball); a flip turning open is a layout: body stretched long (less crouch).
-    const flipTuckPhys = pl.flipTuck ?? Math.min(1, Math.abs(pl.flipRate || 0) / 3.5);
+    const flipTuckPhys = Math.max(0, pl.flipTuck ?? Math.min(1, Math.abs(pl.flipRate || 0) / 3.5));   // < 0 = stretched layout
     const layoutT = air && Math.abs(pl.flipRate || 0) > 1.2 ? (1 - flipTuckPhys) * (1 - pl.grab) : 0;
     p.layout = (p.layout || 0) + (layoutT - (p.layout || 0)) * k(6);
     if (air) crouchT = 0.35 + pl.grab * 0.5 + flipTuckPhys * 0.5 - p.layout * 0.25;

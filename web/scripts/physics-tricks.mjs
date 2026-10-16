@@ -33,6 +33,7 @@ function launch(type, vy, set = {}, held = {}) {
   Object.assign(p._ctrl, held);
   p.lastPopQ = set.q ?? 1;
   p.dyn.flipLoad = set.preload || 0;
+  p.dyn.frontLoad = set.front || 0;   // frontflip preload (Space, then W while loading; W still held at the lip)
   p.dyn.windup = set.windup || 0;
   p.enterAir(set.popped ?? true);
   return p;
@@ -89,6 +90,12 @@ function bench(type) {
     ['1080, wound up (vy 11)', 11, WIND, spinTo(1080)],
     ['720, thrown in the air only (vy 9)', 9, {}, spinTo(720)],
     ['backflip, too little air (vy 4)', 4, {}, () => ({ brake: 1 })],
+    // Big airs: W / S always do something — a late throw (after the window) still starts a single.
+    ['backflip pressed late, 1 s in (vy 16)', 16, {}, (p) => (p.airTime > 1 ? flipTo(1, 1)(p) : {})],
+    ['frontflip: W held from the take-off, re-pressed at 0.8 s (vy 16)', 16, {}, (p) => (p.airTime < 0.4 || p.airTime > 0.8 ? flipTo(-1, 1)(p) : {}), { up: 1 }],
+    ['W held as a tuck all the way (vy 16)', 16, {}, () => ({ up: 1 }), { up: 1 }],
+    ['frontflip preload (Space, then W) (vy 9)', 9, { front: 1 }, flipTo(-1, 1), { up: 1 }],
+    ['backflip with a grab held (vy 12)', 12, {}, flipTo(1, 1, { tuck: 1 })],
   ];
   for (const [label, vy, set, fn, held] of cases) {
     scores.length = 0;
