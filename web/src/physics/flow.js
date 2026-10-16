@@ -28,7 +28,7 @@ export const FLOW_DEFAULTS = {
   stateMax: 20,
   scoreMul: 2,
   speedBoost: 0.1,           // +10 % soft-cap speed in flow state
-  popBoost: 0.2, spinBoost: 0.15, landBoost: 0.25,
+  popBoost: 0.08, spinBoost: 0.08, landBoost: 0.25,   // small: SEND IT is energy, not a cannon (pop / rotation set, landing tolerance)
   stompBoost: 1.5,           // m/s added along the line on a stomped landing
   boostAccel: 1.8,           // m/s² of thrust while tucking in flow state (the SSX boost, kept small)
 };

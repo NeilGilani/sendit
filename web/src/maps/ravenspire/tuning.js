@@ -17,11 +17,13 @@ export const RAVENSPIRE_PHYSICS = {
     landRedirect: 30,             // land on a ravine sidewall lined up: the skis pivot into the new line
     landSpeedCap: 34,             // no 130 mph moments after a 40 m drop: the excess goes into the powder
     flow: { enabled: true },      // line chains, flow meter, SEND IT state (physics/flow.js)
-    slowmo: { minAir: 2.4, scale: 0.45, easeIn: 0.15, hold: 0.5, easeOut: 0.35, cooldown: 5 },   // apex slow motion on huge airs
+    // A touch of apex slow motion on genuinely big air only (≥ 2.8 s and ≥ 10 m above the snow): 0.7×,
+    // ~0.8 s of wall-clock in all, never in the last 0.45 s (docs/jumps-research.md: ≤ 0.6–0.7×, ≤ 1 s).
+    slowmo: { minAir: 2.8, minDrop: 10, scale: 0.7, easeIn: 0.2, hold: 0.3, easeOut: 0.3, cooldown: 6 },
     // Speed: the soft cap starts at each gear's maxVelocity (below); terminal speed on the 41° face
     // ≈ 31–32 m/s tucked, ≈ 27 upright; ≈ 27 / 21 on the 27° lower bowl.
     softCapDrag: 0.06,
-    airDrag: 0.004,
+    airDrag: 0.0025,              // k = ρ·CdA / 2m: thinner air up here (ρ ≈ 0.9), CdA 0.42 m²
     // Deep powder everywhere (no pistes): slow skis plough, fast ones plane.
     powderDepth: 0.6,
     frictionPowder: 0.06,
@@ -34,9 +36,8 @@ export const RAVENSPIRE_PHYSICS = {
     compressionCrash: 17,
     // Natural air: legs absorb a bit more before leaving the snow (fewer micro hops at 30 m/s).
     liftOffGrip: 1.5,
-    // Big air: slightly floaty, deep-powder landings (absorb), forgiving thresholds; less sideways
-    // tolerance the faster you land.
-    airGravity: 0.9,
+    // Big air: real gravity (no float), deep-powder landings (absorb), forgiving thresholds; less
+    // sideways tolerance the faster you land.
     landPowderAbsorb: 5,
     landPowderScrub: 0.012,
     hardLanding: 17,
@@ -54,7 +55,7 @@ export const RAVENSPIRE_PHYSICS = {
     latG: 2.0,
     turnRateFast: 1.15,
     popMin: 2.2, popMax: 4.2,
-    spinRateMax: 7.2, flipRateMax: 6.0, windupSpin: 3.0,
+    spinSet: 6.0, flipSet: 3.2, windupSpin: 3.0,   // a strong set (big-mountain riders), still physics-limited
     landClean: 18, landStumble: 32, landCrash: 40,
     powderFloat: 1.1,
   },
@@ -65,7 +66,7 @@ export const RAVENSPIRE_PHYSICS = {
     latGToe: 1.75, latGHeel: 1.6,
     turnRateFast: 1.25,
     popMin: 2.5, popMax: 4.6,
-    spinRateMax: 8.2, flipRateMax: 6.2, windupSpin: 3.4,
+    spinSet: 6.8, flipSet: 3.3, windupSpin: 3.4,
     landClean: 18, landStumble: 46,
     powderFloat: 1.8,
   },

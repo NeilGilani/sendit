@@ -360,11 +360,14 @@ export class RavenspireCourse {
       h *= taper;
       if (h < 0.05) continue;
       add += cliff(u, uc, h, Math.max(B.bench, h * BENCH_PER_M));   // taller cliffs get a longer, gentler bench
-      // Rock teeth just over the lip: dark knobs that mark the edge when you look down from above.
+      // Rock teeth just over the lip: dark knobs that mark the edge when you look down from above. A knob
+      // under you is a kicker (1–2.6 m kicked a 30 m/s take-off 10–15° flatter: +1 s and +30 m of flight),
+      // so they stay 14 m clear of the canonical lines — those take-offs are clean; elsewhere you see them.
       if (h > 5 && u > uc - 2.5 && u < uc + 1) {
         const cell = Math.floor(v / 9), f = v / 9 - cell;
         const hk = hash1(cell * 7 + B.seed * 131);
-        if (hk > 0.55) add += (0.8 + 1.8 * hk) * Math.sin(Math.PI * f) ** 2 * Math.exp(-(((u - uc + 0.7) / 0.9) ** 2));
+        const clear = hk > 0.55 ? sstep(12, 18, this.lineDist(u, v)) : 0;   // faded, never a step in the snow
+        if (clear > 0) add += clear * (0.8 + 1.8 * hk) * Math.sin(Math.PI * f) ** 2 * Math.exp(-(((u - uc + 0.7) / 0.9) ** 2));
       }
     }
     return add;
@@ -659,20 +662,25 @@ export class RavenspireCourse {
 
 // ------------------------------------------------------------------ shapes
 /**
- * A cliff band at `uc` (lip), height h, with a bench of length L above it: the approach flattens
- * toward a slightly kicked, rounded lip, then the face drops h (near vertical) onto the unchanged
- * steep landing below.
+ * A cliff band at `uc` (lip), height h, with a bench of length L above it: the approach flattens,
+ * then rolls over toward the lip, then the face drops h (near vertical) onto the unchanged steep
+ * landing below.
  */
+const LIP_ROLL = 0.2;      // slope (rise/run) the last LIP_ROLL_LEN m of a bench roll back over by
+const LIP_ROLL_LEN = 24;   // m — a ≥ 120 m radius: a rider at 35 m/s still follows it (natural lift-off needs v²κ > 1.5 g cos θ)
 function cliff(u, uc, h, L) {
   const wF = Math.max(1.4, h * 0.11);                 // face width: taller cliffs lean back a little
   if (u >= uc) return u > uc + wF ? 0 : h * (1 - smooth((u - uc) / wF));
   const t = (u - (uc - L)) / L;
   if (t <= 0) return 0;
-  // The bench flattens steadily toward the lip (flattest at the lip: a clean take-off, never a kicker).
-  // Lip slope reduction = 1.25·h/L; with L = 4·h that is ≈0.31 (41° → ~30°).
-  const r = Math.pow(t, 1.25);
-  const lip = Math.min(0.5, 0.15 + h * 0.02) * Math.exp(-(((u - uc + 2.0) / 1.6) ** 2));   // rounded snow lip, not a kicker
-  return h * r + lip;
+  // The bench flattens steadily toward the lip: slope reduction 1.25·hb/L; with L = 4·h that is ≈0.33
+  // (41° → ~29°). Its last metres roll back over (convex, never a kicker) so the take-off points down
+  // the 41° landing (≈36°) instead of out over it: a fast rider no longer sails 100 m off a 20 m
+  // cliff (it used to end in a 0.15–0.5 m snow bump that worked as a 10–15° kicker at 30 m/s).
+  // The bench is raised by the roll-over's depth, so the face still drops h.
+  const Lr = Math.min(L * 0.5, LIP_ROLL_LEN), drop = Lr * LIP_ROLL / 2;
+  const s = Math.max(0, (u - (uc - Lr)) / Lr);
+  return (h + drop) * Math.pow(t, 1.25) - drop * s * s;
 }
 
 /** Bench raise for a ledge in a channel floor (same idea as cliff, shorter). */
