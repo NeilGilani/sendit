@@ -1,7 +1,7 @@
 # Sendit rider look: outfit system
 
-The rider wears a modern, baggy freeride kit: a long 3-layer shell with a dropped back hem, a high
-collar, a stowed hood and a fleece gaiter pulled up under the goggle; a wide straight-leg bib that
+The rider wears a modern, baggy freeride kit: a roomy 3-layer shell that ends at the upper thigh with a
+dropped back hem, a high collar, a stowed hood and a fleece gaiter pulled up under the goggle; a wide straight-leg bib that
 stacks over the boots; leather mitts with nylon gauntlets; and a low-profile matte helmet with a big
 frameless mirror goggle on a wide strap. Everything is built procedurally around the Quaternius body
 when the rider loads, skinned to the same bones the animation drives, and coloured from data. The
@@ -51,7 +51,8 @@ All geometry is made in the body's **bind pose** (T-pose, Y up, facing +Z, metre
    to the armholes, the pant leg never narrows below the knee, the sleeve cuff cinches to the wrist.
 3. **Folds.** Radial offsets from periodic noise and sine stacks: drape folds below the chest, bunching
    above the hips, elbow compression rings, wrist bunching, knee folds, three stacked rolls above the boot,
-   a pre-bent knee. Lengths live in the cut (`hemFront/hemBack`, `cuffY`, `stack`, …).
+   a pre-bent knee. Lengths live in the cut (`hemFront/hemBack`, `cuffY`, `stack`, …). The jacket's
+   ease ramp, drape fade and hem flare are placed relative to the hem, so any `hemFront/hemBack` works.
 4. **Sweep.** `sweep()` turns the rings into a grid (duplicated seam column for UVs), adds rolled edges
    (`lipEnd/lipStart`: the shell turns over and runs back inside, drawn as lining), rounded caps (mitt
    tips) or a gaiter cuff (`gaiterEnd`: an inner elastic gaiter that closes onto the boot).
@@ -113,7 +114,7 @@ wrinkle detail fades out by itself with distance.
 
 | slot | default | what the cut / shape controls |
 |---|---|---|
-| jacket | `tuff-shell`, `storm-shell` | `hemFront`, `hemBack`, `jacketEase {shoulder, chest, hem}`, `sleeveEase {upper, elbow, forearm}`, `sleeveEnd`, `collarTop`, `hood: 'down' \| 'up'`, `gaiter`, `gaiterTop` |
+| jacket | `tuff-shell`, `storm-shell` | `hemFront`, `hemBack` (hem height above the ground, see below), `hemFlare`, `jacketEase {shoulder, chest, hem}`, `sleeveEase {upper, elbow, forearm}`, `sleeveEnd`, `collarTop`, `hood: 'down' \| 'up'`, `gaiter`, `gaiterTop` |
 | pants | `tuff-bib` | `pantsEase {thigh, knee, cuff}`, `cuffY`, `stack {y0, y1, n, amp}` |
 | gloves | `tuff-mitt` | `mittLength` (|x| where the fist ends; wrist at 0.706), `gauntlet [start |x|, ease at the open end]` |
 | helmet | `tuff-helmet` | `shape {width, front, back, top, brim}` |
@@ -126,9 +127,26 @@ helmet {base, liner, accent}, goggles {lens, lensBase, strap, strapLogo}, gloves
 | colourway | look |
 |---|---|
 | `tuff` (default) | olive shell, tan yoke, carob bib, charcoal helmet, gold mirror, blaze-orange accents |
-| `nightshift` | all black, tonal panels, acid-mint lens and accents |
+| `nightshift` | all black, tonal panels, graphite bib, acid-mint lens and accents |
 | `arcade` | retro park: teal + magenta, cream pants, white helmet, violet lens, yellow mitts |
 | `summit` | pro team: brick red under a black yoke, white helmet, sapphire lens |
+
+**Jacket length.** `hemFront` / `hemBack` are the hem's height above the ground in the bind pose
+(1.8 m rider: hip joint 0.97, crotch ≈ 0.86, knee 0.54). The default shell sits at **0.83 front /
+0.78 back**: just below the crotch in front, and the 5 cm dropped tail covers the seat when the rider
+crouches or tucks. `hemFlare` is how far the last 12 cm flare out (default 0.012; the shell uses 0.006
+so it hangs straight instead of belling out like a skirt). It used to be 0.68 / 0.64 (mid-thigh on a real body), but over
+the game's bulky proportions and pre-bent knees it read as a coat that reached almost to the knees.
+Lengths tried, compared in the lobby (standing, crouch, tuck, carve; front, side, back) and the chase cam:
+
+| front / back | read |
+|---|---|
+| 0.68 / 0.64 (old) | dress / parka; the crouch hides most of the thigh |
+| 0.76 / 0.72 | still long, a car coat |
+| 0.80 / 0.75 | close, but the back still reaches the upper thigh |
+| **0.83 / 0.78** | freeride shell (Sabre / Rush): the bib shows from the upper thigh down, seat covered |
+| 0.85 / 0.80, 0.86 / 0.82 | ends at the crotch; starts to read as a short street jacket |
+| 0.90 / 0.86 | cropped: the pants take over the silhouette |
 
 `storm-shell` ("Tuff Shell, hood up") is the same cut with the helmet-compatible hood pulled up over the
 helmet: a shell offset 1.9 cm off the helmet surface (`helmetFit()` in helmet.js), a stiff rolled brim
@@ -198,12 +216,18 @@ whole-frame numbers swung by 10–20 ms between runs; the per-draw timer numbers
 ones (re-measured on the final build: outfit 0.07–0.09 ms + 0.04 ms shadow at every quality). The geometry is built once per page (about 50–150 ms on
 first load, shared by both riders) and adds two draw calls (outfit + lens) to the main and shadow passes.
 
+The shorter jacket (October 2026) has the same vertex count (rings per piece are fixed): outfit 0.10 + 0.03 ms
+per draw after vs 0.09 + 0.04 ms before, whole frame 13.9 ms GPU at quality 1 before and after (best runs).
+
 No new asset files: everything is generated in code, so CREDITS.md is unchanged.
 
 ## Known issues / limits
 
 - Shells are single layers skinned with blended weights, so extreme poses (deep crashes, big grabs) can
   still stretch folds or push one layer into another for a frame.
+- In a deep crouch the thighs pass in front of the jacket's front hem instead of lifting it (the shell
+  doesn't collide with the legs). The shorter hem makes this much smaller than it was, and it reads as the
+  hem tucked behind the thighs. From the front, the back hem shows between the legs as a thin olive edge.
 - The hood worn up is rigid on the head; it doesn't sway or crease with fast head turns.
 - The goggle reflection is a stylised environment (sky gradient, skyline, snow), not a real reflection
   of the scene.

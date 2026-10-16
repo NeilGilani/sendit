@@ -12,9 +12,11 @@ export const GARMENTS = {
   jacket: {
     'tuff-shell': {
       name: 'Tuff Shell',
-      blurb: 'Long, roomy 3-layer freeride shell: dropped back hem, high collar, stowed hood.',
+      blurb: 'Roomy 3-layer freeride shell to the upper thigh: dropped back hem, high collar, stowed hood.',
       cut: {
-        hemFront: 0.68, hemBack: 0.64,            // mid-thigh, the back drops 4 cm
+        // Length: the hem's height above the ground (hip joint 0.97, crotch ~0.86, knee 0.54). Upper
+        // thigh in front, and the back drops 5 cm to cover the seat. hemFlare = outward flare at the hem.
+        hemFront: 0.83, hemBack: 0.78, hemFlare: 0.006,
         jacketEase: { shoulder: 0.016, chest: 0.036, hem: 0.062 },   // how far the shell stands off the skin
         sleeveEase: { upper: 0.012, elbow: 0.026, forearm: 0.022 },
         sleeveEnd: 0.69,                           // |x| of the cuff in the T-pose (wrist at 0.706)
@@ -25,7 +27,7 @@ export const GARMENTS = {
     },
     'storm-shell': {
       name: 'Tuff Shell, hood up',
-      blurb: 'The same long shell with its helmet-compatible hood pulled up over the lid.',
+      blurb: 'The same roomy shell with its helmet-compatible hood pulled up over the lid.',
       cut: null,                                   // filled in below: tuff-shell with the hood up
     },
   },
@@ -86,7 +88,7 @@ export const COLORWAYS = {
   nightshift: {
     name: 'Nightshift', blurb: 'All black, tonal panels, an acid-mint lens.',
     jacket: { base: '#25272b', panel: '#3b3f45', accent: '#2bf0c8', gaiter: '#34373c', style: 0 },
-    pants: { base: '#1d1f22', cuff: '#0e0f11' },
+    pants: { base: '#33363b', cuff: '#141517' },
     helmet: { base: '#24262a', liner: '#0f1012', accent: '#2bf0c8' },
     goggles: { lens: '#2bf0c8', lensBase: '#0e5e52', strap: '#0b0b0c', strapLogo: '#2bf0c8' },
     gloves: { base: '#1e1e1e', cuff: '#111112' },
