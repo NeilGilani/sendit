@@ -14,6 +14,7 @@ http://localhost:5183/?map=ravenspire&ride&equip=snowboard
 node web/scripts/map3-ride.mjs both all send       bot rides every line (styles: send, control, carve, trick)
 node web/scripts/map3-structures.mjs               walls solid, roofs rideable (skis + board)
 node web/scripts/map3-obstacles.mjs obs.json      dump the real trees / rocks; then OBSTACLES=obs.json node web/scripts/map3-ride.mjs ...
+OUT=shots node web/scripts/map3-e2e.mjs stacks skis   end to end in the real game: heli drop → valley, run summary, line goals, errors
 node web/scripts/map3-fuzz.mjs                     random inputs from random starts: no NaN, never below the snow, never stuck
 node web/scripts/map3-unit.mjs                     tuning hook, structures, flow layer, snowflake spots
 node web/scripts/map3-perf.mjs http://localhost:5183 1600 900 0,1,2 90   GPU / CPU / draws at six spots
@@ -333,6 +334,11 @@ the upper lines, and larches across every runout (bots crashed 3–7 times per r
 (`RIDE_LINES` in layout.js) run through 10–30 m wandering glades in the larches (`pisteAt`), and rock clusters stay
 off the lines, the drop zones and the ravine floor (`rockOk`, an opt-in hook in scatter.js): send and control
 runs through the real forest finish with the same numbers as above (only the Hammer full-pop crash).
+
+**End to end in the real game** (web/scripts/map3-e2e.mjs: the dev server, the GPU, the real forest, a scripted
+rider at ~20 m/s from the heli drop to the valley): The Stacks on skis — The Classic, judged 93, no crash; the
+Ravine on a board — Into the Gorge, judged 80, no crash; Station Cliff on skis — Station to Station, judged
+84–91; no console errors in any run.
 
 ### Terminal speeds (web/scripts/map3-speeds.mjs: 60 s straight down a powder plane)
 
