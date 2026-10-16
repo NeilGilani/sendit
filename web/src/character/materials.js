@@ -218,7 +218,12 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
           wr = 1.4;
         } else if (id < 5.5) {
           // ---------------- fleece gaiter
-          c = uGaiter * (0.94 + 0.06 * chNoise(vec2(u * 40.0, v * 90.0)));
+          // Heathered knit with fine vertical ribs and a small accent tag on the left.
+          float heather = chNoise(vec2(u * 90.0, v * 160.0)) * 0.4 + chNoise(vec2(u * 23.0, v * 50.0)) * 0.6;
+          c = uGaiter * (0.93 + 0.08 * heather);
+          float rib = u * 6.2831853 * 110.0;
+          fabH += sin(rib) * 0.00009 * (1.0 - smoothstep(0.3, 0.8, fwidth(rib)));
+          c = mix(c, uAccent, 1.0 - step(0.0, chBox(vec2((uc - 0.2) * 0.5, v - 1.6), vec2(0.008, 0.005), 0.002)));
           fabRough = 0.95; fabSheen = 0.6; fabSheenRough = 0.8; fabSpec = 0.05;
           wr = 0.7;
         } else if (id < 6.5) {
@@ -386,6 +391,18 @@ float fabRough = 0.62, fabSheen = 0.08, fabSheenRough = 0.5, fabSpec = 0.32, fab
           fabH += pad * 0.002 * (1.0 - length(ep) * 0.5);
           fabH -= chLine(ed, 0.03) * step(hw * 0.75, abs(p.x)) * 0.0015;
           fabRough = mix(0.62, 0.95, pad); fabSpec = mix(0.32, 0.05, pad); fabSheen = mix(0.08, 0.4, pad);
+          // Hybrid shell: a hard top shell over a slightly glossier lower band, split by a parting
+          // groove that sweeps down from the temples to the nape.
+          float ang = atan(p.x, p.z - cz);                       // 0 = front
+          float splitY = uHelm.w - 0.004 - 0.022 * smoothstep(0.9, 2.6, abs(ang));
+          float lower = 1.0 - smoothstep(-0.0015, 0.0015, p.y - splitY);
+          fabH -= chLine(p.y - splitY, 0.0012) * 0.0012 * (1.0 - pad);
+          c = mix(c, c * 0.82, lower * (1.0 - pad) * (1.0 - vent));
+          fabRough = mix(fabRough, 0.42, lower * (1.0 - pad));
+          fabSpec = mix(fabSpec, 0.55, lower * (1.0 - pad));
+          // Side mark: a small accent tab on the lower band behind the temple.
+          vec2 sm2 = vec2(p.z - cz + 0.02, p.y - splitY + 0.012);
+          c = mix(c, uHAccent, (1.0 - step(0.0, chBox(sm2, vec2(0.012, 0.003), 0.0015))) * step(hw * 0.8, abs(p.x)) * (1.0 - pad));
           // Fine matte texture of the shell paint.
           fabH += chNoise(p.xz * 700.0 + p.y * 300.0) * 0.00004;
           // A small accent mark low on the back, a thin parting line over the crown.
@@ -399,12 +416,13 @@ float fabRough = 0.62, fabSheen = 0.08, fabSheenRough = 0.5, fabSpec = 0.32, fab
           float cell = fract(x / 0.13);
           float li = floor(cell * 13.0);
           float lx = fract(cell * 13.0);
-          float word = step(0.12, cell) * step(cell, 0.74);
+          float word = step(0.12, cell) * step(cell, 0.74) * step(0.06, abs(fract(x / 0.39 + 0.25) - 0.5));   // gaps between wordmarks
           float hseed = fract(sin(li * 12.9898) * 43758.5453);
           float glyph = step(0.22, lx) * step(lx, 0.78) * step(abs(y), 0.3);
           glyph *= 1.0 - step(0.55, hseed) * step(abs(y), 0.12) * step(0.4, lx) * step(lx, 0.6);   // counters
           c = mix(uStrap, uStrapLogo, word * glyph * 0.85);
           c = mix(c, uStrap * 1.8 + 0.01, (1.0 - step(abs(y), 0.84)) * step(abs(y), 0.94));
+          fabH += (1.0 - smoothstep(0.8, 0.95, abs(y))) * 0.0003;   // padded strap, rounded edges
           fabRough = 0.7; fabSpec = 0.15; fabSheen = 0.2;
         } else if (r < 3.5) {
           c = vec3(0.03); fabRough = 0.8; fabSpec = 0.1;

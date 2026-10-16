@@ -21,7 +21,7 @@ export function buildOutfitGeometry(body, cut) {
   const B = (re) => body.bones(re);
   const J = body.joint;
 
-  let collarRings = null;
+  let collarRings = null, jacketRings = null;
   // ---------------------------------------------------------------- collar (zipped to the chin)
   {
     const segs = 40;
@@ -110,6 +110,7 @@ export function buildOutfitGeometry(body, cut) {
       }
     }
     // Only the top of the shoulder rides on the upper arm (like a deltoid); the armpit stays with the trunk.
+    jacketRings = rings;
     pieces.push(sweep(rings, {
       id: PIECE.jacket, side: 0, ...frame('y'), lipEnd: true, skinBones: bones,
       skinMask: (b, x, y) => !b.startsWith('upperarm') || (y > 1.45 && Math.abs(x) > 0.13),
@@ -219,18 +220,18 @@ export function buildOutfitGeometry(body, cut) {
     const segs = 40;
     const bones = B(/^(neck_01|Head)$/);
     const rings = bodyRings(body, {
-      axis: 'y', t0: 1.555, t1: cut.gaiterTop, rings: 14, segs, half: 0.016, bones,
+      axis: 'y', t0: 1.555, t1: cut.gaiterTop, rings: 16, segs, half: 0.016, bones,
       axisPoint: (t) => new THREE.Vector3(0, t, 0),
       filter: (x, y, z, b) => b === 'Head' || b === 'neck_01',
       centre: (t, c) => new THREE.Vector3(0, t, c.z),
       smoothA: 2, smoothT: 2, minEase: 0.008,
-      ease: (t) => THREE.MathUtils.lerp(0.02, 0.011, smooth(1.6, 1.65, t)),
+      ease: (t) => THREE.MathUtils.lerp(0.005, 0.011, smooth(1.6, 1.645, t)),   // tucked tight into the collar below the jaw
     });
     for (const r of rings) for (let k = 0; k < segs; k++) {
       const u = k / segs;
       r.r[k] += Math.sin((r.t - 1.58) * TAU / 0.03 + pnoise(u * 5, 9.1, 5) * 2) * 0.003 * bump(r.t, 1.59, 0.03);
     }
-    pieces.push(sweep(rings, { id: PIECE.gaiter, side: 0, ...frame('y'), lipEnd: true, skinBones: bones }));
+    pieces.push(sweep(rings, { id: PIECE.gaiter, side: 0, ...frame('y'), lipEnd: true, skinBones: bones, anchor: { bone: body.bone('neck_01'), y0: 1.595, y1: 1.64 } }));
   }
 
   // ---------------------------------------------------------------- stowed hood (a thick roll behind the neck)
@@ -239,10 +240,22 @@ export function buildOutfitGeometry(body, cut) {
     const rings = [];
     const e1s = [], e2s = [];
     const pts = [];
+    // The roll lies on the yoke against the back of the collar: its centre sits just inside the jacket
+    // surface (measured from the jacket's own rings), so most of it stands proud.
+    const torsoAt = (y, th) => {
+      let best = jacketRings[0];
+      for (const r of jacketRings) if (Math.abs(r.t - y) < Math.abs(best.t - y)) best = r;
+      const S = best.r.length, x = (((th / TAU) % 1) + 1) % 1 * S, k0 = Math.floor(x) % S, fx = x - Math.floor(x);
+      const rr = best.r[k0] * (1 - fx) + best.r[(k0 + 1) % S] * fx;
+      return new THREE.Vector3(Math.sin(th) * rr, y, best.c.z + Math.cos(th) * rr);
+    };
     for (let i = 0; i < n; i++) {
       const f = (i / (n - 1)) * 2 - 1;                      // −1 … 1 across the back
-      const a = f * THREE.MathUtils.degToRad(100);
-      pts.push(new THREE.Vector3(Math.sin(a) * 0.125, 1.548 - f * f * 0.035 + (1 - f * f) * 0.01, -0.03 - Math.cos(a) * 0.14 + f * f * 0.025));
+      const a = f * THREE.MathUtils.degToRad(95);
+      const y = 1.553 - f * f * 0.03;
+      const surf = torsoAt(y, Math.PI - a);
+      const outw = new THREE.Vector3(surf.x, 0, surf.z - jacketRings[0].c.z).normalize();
+      pts.push(surf.clone().addScaledVector(outw, -0.012 * (1 - f * f * 0.5)));
     }
     for (let i = 0; i < n; i++) {
       const f = (i / (n - 1)) * 2 - 1;

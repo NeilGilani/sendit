@@ -18,7 +18,7 @@ export const GARMENTS = {
         jacketEase: { shoulder: 0.016, chest: 0.036, hem: 0.062 },   // how far the shell stands off the skin
         sleeveEase: { upper: 0.012, elbow: 0.026, forearm: 0.022 },
         sleeveEnd: 0.69,                           // |x| of the cuff in the T-pose (wrist at 0.706)
-        collarTop: 1.615,                          // zipped up under the jaw
+        collarTop: 1.628,                          // zipped up under the jaw
         hood: 'down',                              // 'down' = thick roll behind the neck
         gaiter: true, gaiterTop: 1.69,            // fleece gaiter pulled up under the goggle
       },
