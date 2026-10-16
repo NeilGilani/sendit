@@ -280,7 +280,23 @@ export function planForest(course) {
     if (!l || course.bandMask(l.d) < 0.6) continue;
     for (const side of [-1, 1]) { course.world(BAND.t - 1.2, l.d + side * (l.hw + 0.4), p); lipPoles.push([p.x, p.z]); }
   }
-  return { trees, rocks, stumps, pivots, signs, lipPoles };
+  // ---- snags: dead standing spruce (bare, weathered, broken-topped) in Deadfall and a few in the
+  //      Gauntlet. Off the lane edges; they collide with their trunk.
+  rnd = mulberry32(606);
+  const snags = [];
+  const SNAG = { Deadfall: 0.08, 'The Gauntlet': 0.03 };
+  for (let i = trees.length - 1; i >= 0; i--) {
+    const tr = trees[i];
+    if (tr[8]) continue;
+    const t = course.tAt(tr[1]), d = course.dAt(tr[0], t);
+    const share = SNAG[sectionAt(t).name] || 0;
+    if (!share || rnd() > share || laneGap(t, d) < 1.5) continue;
+    if (pivots.some((q) => q[0] === tr[0] && q[1] === tr[1])) continue;
+    const r = 0.2 + 0.12 * tr[2];
+    snags.push([tr[0], tr[1], 4.5 + rnd() * 5 * tr[2], r, rnd() * 6.28, (rnd() - 0.5) * 0.12]);
+    trees.splice(i, 1);
+  }
+  return { trees, rocks, stumps, pivots, signs, lipPoles, snags };
 }
 
 function hashNoise(x, y) {
@@ -298,6 +314,7 @@ export function forestObstacles(course) {
     ...F.trees.map(([x, z, , , , , , hit]) => [x, z, hit, 'tree']),
     ...F.rocks.map(([x, z, , , , hit]) => [x, z, hit, 'rock']),
     ...F.stumps.map(([x, z, r]) => [x, z, r + 0.05, 'stump']),
+    ...F.snags.map(([x, z, , r]) => [x, z, r + 0.08, 'tree']),
   ];
 }
 
@@ -389,7 +406,33 @@ function buildWood(course, T) {
     stumps.setMatrixAt(i, m.compose(p, q, s));
   });
   stumps.count = st.length;
-  for (const im of [logs, stumps]) { im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); g.add(im); }
+  // Snags: unit-height tapered trunk, weathered grey-brown with darker cracks, a broken top and a snow
+  // collar. Instances scale (r, h, r).
+  const snagGeo = (() => {
+    const body = new THREE.CylinderGeometry(0.55, 1, 1, 8, 8, false).toNonIndexed();
+    body.translate(0, 0.5, 0);
+    const p = body.attributes.position;
+    for (let k = 0; k < p.count; k++) {
+      const y = p.getY(k), a = Math.atan2(p.getZ(k), p.getX(k));
+      if (y > 0.99) p.setY(k, 0.94 + 0.08 * Math.sin(a * 3 + 1.2));   // jagged broken top
+      const w = 1 + 0.05 * Math.sin(a * 6 + y * 11);
+      p.setX(k, p.getX(k) * w); p.setZ(k, p.getZ(k) * w);
+    }
+    body.computeVertexNormals();
+    const grey = new THREE.Color('#7d7064'), crack = new THREE.Color('#4a4038');
+    paint(body, (x, y, z, nx, ny) => (ny > 0.6 ? snow : Math.sin(Math.atan2(z, x) * 9 + y * 3) > 0.7 ? crack : grey));
+    return body;
+  })();
+  const sn = course.forest.snags;
+  const snagsIm = new THREE.InstancedMesh(snagGeo, mat, Math.max(1, sn.length));
+  sn.forEach(([x, z, h, r, yaw, lean], i) => {
+    p.set(x, T.getHeight(x, z) - 0.3, z);
+    q.setFromEuler(new THREE.Euler(lean, yaw, lean * 0.6));
+    s.set(r, h, r);
+    snagsIm.setMatrixAt(i, m.compose(p, q, s));
+  });
+  snagsIm.count = sn.length;
+  for (const im of [logs, stumps, snagsIm]) { im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); g.add(im); }
   return g;
 }
 
