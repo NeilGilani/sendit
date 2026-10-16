@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { vnoise, noise1, fbm, ridged, smooth, sstep, mulberry32, hash1 } from './noise.js';
 import {
-  TILE, START_X, TOP, FINISH_U, PROFILE, BEHIND, FACE, BANDS, SPINES, PILLOWS, RAVINE, HITS, BUILDINGS, GONDOLA, BUTTRESSES,
+  TILE, START_X, TOP, FINISH_U, PROFILE, BEHIND, FACE, BANDS, SPINES, PILLOWS, RAVINE, HITS, BUILDINGS, GONDOLA, BUTTRESSES, DROP_ZONES,
 } from './layout.js';
 import { Structure } from './structures.js';
 import { RAVENSPIRE_PHYSICS, RAVENSPIRE_CAMERA } from './tuning.js';
@@ -28,7 +28,9 @@ export class RavenspireCourse {
     this.meta = { id: 'ravenspire' };   // activities / leaderboard key
     this.park = false;                  // no kickers, rollers, banners or crowds (features.js)
     this.life = { skiers: 0, lodge: false };   // no other people, no lodge (life.js)
-    this.spawn = { rockClusterChance: 0.035, rockScale: [0.7, 2.2], rockMinSlope: 20 };   // scatter.js overrides
+    // scatter.js overrides: fewer, smaller boulders on the face; a sparser larch forest (trees are the most
+    // expensive thing in the frame, docs/graphics-perf.md) — ~8k trees instead of 16k.
+    this.spawn = { rockClusterChance: 0.035, rockScale: [0.7, 2.2], rockMinSlope: 20, treeStep: 9.5, treeMax: 9000 };
     this.challenge = { medalSpeeds: { gold: 24, silver: 20, bronze: 16 } };
     this.physics = RAVENSPIRE_PHYSICS;
     this.camera = RAVENSPIRE_CAMERA;
@@ -40,6 +42,8 @@ export class RavenspireCourse {
     this.buildStructures();
     this.buildPath();
     this.treeline = this.profileAt(1640) + 40;
+    // Drop zones (player.js): { name, x, z, heading }.
+    this.dropZones = DROP_ZONES.map(([name, u, v]) => ({ name, x: START_X + u, z: v === 'ravine' ? this.rvAt(this.rv.c, u) : v, heading: -Math.PI / 2 }));
   }
 
   // ---------------------------------------------------------------- tables

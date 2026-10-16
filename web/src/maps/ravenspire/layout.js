@@ -107,3 +107,16 @@ export const BUTTRESSES = [
   { name: 'Spine Rib', u0: 70, u1: 560, v0: -290, v1: -345, w: 42, h: 24, seed: 2 },
   { name: 'West Spur', u0: 1280, u1: 1760, v0: -640, v1: -575, w: 62, h: 30, seed: 3 },
 ];
+
+// Drop zones (Steep-style): keys 1–8 or the d-pad ◀ ▶ while riding fade you to the top of a line.
+// [name, u, v]; 'ravine' places you on the ravine's centre line. Everyone faces down the fall line.
+export const DROP_ZONES = [
+  ['Heli Drop', 30, 0],
+  ['Spine Wall', 150, -300],
+  ['The Couloir', 345, 'ravine'],
+  ['The Stacks', 880, -40],
+  ['The Hammer', 720, 700],
+  ['Station Cliff', 1310, 290],
+  ['The Ravine', 1050, 'ravine'],
+  ['Lower Bowl', 1560, -60],
+];
