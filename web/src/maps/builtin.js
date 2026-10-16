@@ -67,3 +67,4 @@ registerMap({
     return RealCourse.load(variant.resort, Number(variant.run) || 0);
   },
 });
+import './blackspruce/index.js';   // map 2: Blackspruce Plunge (steep tree run)
