@@ -299,42 +299,47 @@ starts it holds a moment, lifts and banks away past the spire with a synthesized
 
 Styles: **send** = tucked straight down the line, popping every cliff; **trick** = spins (360+) off every real air, grabs; (also **control** = speed checks above 21 m/s, **carve** = linked turns every 1.5 s). "max" is the top ground speed: 34–39 m/s for a moment after the biggest drops (the fall turns into speed along the 41° landing; `landSpeedCap` puts most of the excess over 34 m/s into the powder); sustained speeds on the big lines are 22–31 m/s.
 
-| line | gear | style | result | time | avg speed | crashes | stumbles | air total (longest) | biggest drop | judged |
+| line | gear | style | time | avg speed | crashes | stumbles | air total (longest) | biggest drop | judged | line goals |
 |---|---|---|---|---|---|---|---|---|---|---|
-| The Stacks (cliff into cliff) | ski | send | finished | 104.4 s | 28 m/s (63 mph) | 0 | 1 | 24 s (5.25 s) | 30 m | 99 |
-| The Stacks (cliff into cliff) | snowboard | send | finished | 116.3 s | 25 m/s (56 mph) | 0 | 1 | 23.3 s (5.24 s) | 29 m | 99 |
-| Spine Wall → pillows → ledges | ski | send | finished | 133.4 s | 23 m/s (51 mph) | 0 | 1 | 52.1 s (4.85 s) | 35 m | 99 |
-| Spine Wall → pillows → ledges | snowboard | send | finished | 136.6 s | 22.4 m/s (50 mph) | 0 | 0 | 44.8 s (4.6 s) | 29 m | 97 |
-| The Ravine | ski | send | finished | 149.5 s | 21.1 m/s (47 mph) | 0 | 3 | 33.6 s (4.84 s) | 6 m | 71 |
-| The Ravine | snowboard | send | finished | 147.8 s | 21.6 m/s (48 mph) | 0 | 0 | 26.5 s (3.5 s) | 18 m | 88 |
-| Station Cliff → roof | ski | send | finished | 119.5 s | 26.2 m/s (59 mph) | 0 | 0 | 20.2 s (4.35 s) | 29 m | 96 |
-| Station Cliff → roof | snowboard | send | finished | 135.3 s | 23.3 m/s (52 mph) | 0 | 2 | 21.8 s (4.57 s) | 28 m | 95 |
-| The Hammer (36 m) | ski | send | finished | 150.1 s | 22.6 m/s (51 mph) | 1 | 3 | 36.2 s (6.85 s) | 7 m | 68 |
-| The Hammer (36 m) | snowboard | send | finished | 140 s | 22.2 m/s (50 mph) | 0 | 1 | 27.6 s (5.07 s) | 28 m | 87 |
-| Bowl → refuge roof | ski | send | finished | 118.1 s | 26.2 m/s (59 mph) | 0 | 0 | 27.6 s (4.54 s) | 33 m | 99 |
-| Bowl → refuge roof | snowboard | send | finished | 121.4 s | 24.9 m/s (56 mph) | 0 | 1 | 21.3 s (4.72 s) | 34 m | 96 |
-| The Stacks (cliff into cliff) | ski | trick | finished | 146 s | 20.2 m/s (45 mph) | 0 | 0 | 21.2 s (4.75 s) | 41 m | 96 |
-| The Stacks (cliff into cliff) | snowboard | trick | finished | 143 s | 20.6 m/s (46 mph) | 0 | 0 | 21.6 s (4.9 s) | 43 m | 96 |
-| Spine Wall → pillows → ledges | ski | trick | finished | 170.8 s | 17.8 m/s (40 mph) | 0 | 2 | 47.2 s (3.94 s) | 22 m | 88 |
-| Spine Wall → pillows → ledges | snowboard | trick | finished | 164.1 s | 18.4 m/s (41 mph) | 0 | 0 | 48.2 s (3.9 s) | 22 m | 90 |
-| The Ravine | ski | trick | finished | 179.9 s | 17.8 m/s (40 mph) | 0 | 0 | 21.9 s (4.35 s) | 17 m | 86 |
-| The Ravine | snowboard | trick | finished | 176.6 s | 18.3 m/s (41 mph) | 0 | 1 | 24.2 s (4.65 s) | 32 m | 94 |
-| Station Cliff → roof | ski | trick | finished | 168.1 s | 18.9 m/s (42 mph) | 0 | 1 | 18.3 s (4.5 s) | 28 m | 93 |
-| Station Cliff → roof | snowboard | trick | finished | 163.8 s | 19.5 m/s (44 mph) | 0 | 0 | 20.3 s (4.84 s) | 32 m | 95 |
-| The Hammer (36 m) | ski | trick | finished | 175.6 s | 18.2 m/s (41 mph) | 0 | 1 | 22.4 s (4.92 s) | 20 m | 78 |
-| The Hammer (36 m) | snowboard | trick | finished | 171.6 s | 18.7 m/s (42 mph) | 0 | 1 | 22.4 s (4.97 s) | 19 m | 78 |
-| Bowl → refuge roof | ski | trick | finished | 152.7 s | 19.9 m/s (45 mph) | 0 | 0 | 18.1 s (4.4 s) | 31 m | 88 |
-| Bowl → refuge roof | snowboard | trick | finished | 149 s | 20.4 m/s (46 mph) | 0 | 0 | 16.3 s (4.45 s) | 32 m | 88 |
+| The Stacks (cliff into cliff) | ski | send | 103.6 s | 28.1 m/s (63 mph) | 0 | 0 | 23.9 s (5.34 s) | 48 m | 100 | The Classic |
+| The Stacks (cliff into cliff) | snowboard | send | 115 s | 25.3 m/s (57 mph) | 0 | 0 | 23.1 s (5.27 s) | 47 m | 100 | The Classic |
+| Spine Wall → pillows → ledges | ski | send | 141.5 s | 21.7 m/s (49 mph) | 0 | 0 | 50.3 s (4.85 s) | 35 m | 97 | Pillow Talk |
+| Spine Wall → pillows → ledges | snowboard | send | 137.1 s | 22.2 m/s (50 mph) | 0 | 0 | 43.2 s (4.6 s) | 29 m | 97 | Pillow Talk |
+| The Ravine | ski | send | 143.2 s | 22.4 m/s (50 mph) | 0 | 2 | 28.5 s (3.75 s) | 19 m | 90 | - |
+| The Ravine | snowboard | send | 146.5 s | 22 m/s (49 mph) | 0 | 0 | 25.9 s (3.4 s) | 17 m | 88 | - |
+| Station Cliff → roof | ski | send | 119.2 s | 26.2 m/s (59 mph) | 0 | 0 | 24.2 s (4.44 s) | 30 m | 99 | - |
+| Station Cliff → roof | snowboard | send | 135.8 s | 22.7 m/s (51 mph) | 0 | 1 | 21.7 s (4.57 s) | 29 m | 98 | Station to Station |
+| The Hammer (36 m) | ski | send | 152.2 s | 22.3 m/s (50 mph) | 1 | 0 | 35.1 s (6.04 s) | 51 m | 97 | Hammer Time |
+| The Hammer (36 m) | snowboard | send | 140 s | 22.2 m/s (50 mph) | 0 | 1 | 27.8 s (5.25 s) | 28 m | 89 | - |
+| Bowl → refuge roof | ski | send | 118.2 s | 26.2 m/s (59 mph) | 0 | 0 | 27.7 s (4.54 s) | 33 m | 99 | - |
+| Bowl → refuge roof | snowboard | send | 121.6 s | 24.9 m/s (56 mph) | 0 | 1 | 21.3 s (4.72 s) | 34 m | 98 | - |
+| The Stacks (cliff into cliff) | ski | trick | 145.9 s | 20.3 m/s (45 mph) | 0 | 0 | 20.8 s (4.75 s) | 41 m | 96 | The Classic |
+| The Stacks (cliff into cliff) | snowboard | trick | 143 s | 20.7 m/s (46 mph) | 0 | 0 | 21.3 s (4.9 s) | 43 m | 96 | The Classic |
+| Spine Wall → pillows → ledges | ski | trick | 167.8 s | 17.9 m/s (40 mph) | 0 | 1 | 44.3 s (3.94 s) | 22 m | 88 | Pillow Talk |
+| Spine Wall → pillows → ledges | snowboard | trick | 163.4 s | 18.5 m/s (41 mph) | 0 | 0 | 47.1 s (3.9 s) | 22 m | 90 | Pillow Talk |
+| The Ravine | ski | trick | 180.4 s | 17.8 m/s (40 mph) | 0 | 1 | 22.2 s (4.72 s) | 13 m | 75 | - |
+| The Ravine | snowboard | trick | 176.7 s | 18.1 m/s (40 mph) | 0 | 0 | 24.2 s (3.72 s) | 16 m | 89 | Into the Gorge |
+| Station Cliff → roof | ski | trick | 166.6 s | 19 m/s (43 mph) | 0 | 0 | 21.6 s (4.5 s) | 28 m | 95 | Station to Station |
+| Station Cliff → roof | snowboard | trick | 161.4 s | 19.4 m/s (43 mph) | 0 | 0 | 21.3 s (4.84 s) | 32 m | 95 | Station to Station |
+| The Hammer (36 m) | ski | trick | 180.5 s | 17.9 m/s (40 mph) | 0 | 0 | 27.9 s (6.57 s) | 49 m | 93 | Hammer Time |
+| The Hammer (36 m) | snowboard | trick | 171.8 s | 18.7 m/s (42 mph) | 0 | 1 | 22.4 s (4.97 s) | 19 m | 78 | - |
+| Bowl → refuge roof | ski | trick | 151.5 s | 20 m/s (45 mph) | 0 | 0 | 19.2 s (4.4 s) | 31 m | 94 | - |
+| Bowl → refuge roof | snowboard | trick | 149.5 s | 20.4 m/s (46 mph) | 0 | 0 | 17.1 s (4.45 s) | 32 m | 94 | - |
 
-All 24 runs reach the valley; the one crash is the Hammer sent with a full pop (by design: roll it). Carve style (12 more runs): 15–17 m/s average, all finish; its 3 crashes are a wide turn into the couloir wall and turns into the refuge's solid chimney while riding its roof. Every drop zone rides cleanly: 9 zones × 2 gears, the first 200 m from each with the control bot, no crashes (a stumble off Station Cliff).
+All 24 runs reach the valley — ridden through the real forest and rocks (`OBSTACLES=`, below). The one crash
+is the Hammer sent with a full pop (a 6 s air: by design, roll it). Control style (12 more runs, speed checks
+above 21 m/s): all finish, 0 crashes, 5 stumbles, 16.4–18.0 m/s average. Carve style (12 runs, linked turns
+every 1.5 s): all finish, 2 stumbles, 2 crashes — a wide turn into the couloir wall and one into the station's side
+wall. Every drop zone rides cleanly: 9 zones × 2 gears, the first 200 m from each with the control bot, no
+crashes (a stumble off Station Cliff).
 
 **With the real forest.** The headless bots normally ride without trees (scatter is browser-only); with
 `OBSTACLES=<dump>` (web/scripts/map3-obstacles.mjs) they ride the browser's actual 8,800 larches, 1,570 rocks
 and the gondola towers. The first such run found a minefield: random rock clusters in the couloir throat and on
 the upper lines, and larches across every runout (bots crashed 3–7 times per run). Now the canonical lines
 (`RIDE_LINES` in layout.js) run through 16–32 m wandering glades in the larches (`pisteAt`), and rock clusters stay
-off the lines, the drop zones and the ravine floor (`rockOk`, an opt-in hook in scatter.js): send and control
-runs through the real forest finish with the same numbers as above (only the Hammer full-pop crash).
+off the lines, the drop zones and the ravine floor (`rockOk`, an opt-in hook in scatter.js). Every number in
+the table above is ridden through the real forest this way.
 
 **End to end in the real game** (web/scripts/map3-e2e.mjs: the dev server, the GPU, the real forest, a scripted
 rider at ~20 m/s from the heli drop to the valley): The Stacks on skis — The Classic, judged 93, no crash; the
