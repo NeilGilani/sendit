@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toonMaterial } from '../../world.js';
+import { RAVINE, START_X } from './layout.js';
 import { snowUniforms, SNOW_COMMON_PARS, SNOW_BAND_GLSL } from '../../gfx/snow.js';
 import { on, emit } from '../../state.js';
 
@@ -16,6 +17,7 @@ export function buildRavenspireProps(course, { terrain }) {
   group.add(buildGondola(course, M, terrain));
   group.add(buildHeli(course, terrain));
   group.add(buildRavens(course, terrain));
+  group.add(buildIceFalls(course, terrain));
   group.traverse((o) => { if (o.isMesh && !o.material.transparent) { o.castShadow = true; o.receiveShadow = true; } });
   return group;
 }
@@ -556,5 +558,67 @@ function buildRavens(course, terrain) {
     }
   };
   lead.frustumCulled = false;
+  return g;
+}
+
+// ------------------------------------------------------------------ frozen falls
+/**
+ * The named ledges in the ravine floor are frozen waterfalls: a sheet of blue ice over the ledge face and
+ * a fringe of icicles hanging off the lip (visual; the ledge itself is terrain).
+ */
+function buildIceFalls(course, terrain) {
+  const g = new THREE.Group();
+  g.name = 'IceFalls';
+  // Glacial ice: pale blue-white with vertical melt streaks, a touch of inner glow.
+  const tex = canvasTex(128, 256, (c, w, h) => {
+    const r = rand(21);
+    c.fillStyle = '#cfe6f2'; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 90; i++) {
+      const x = r() * w, ww = 1 + r() * 6, l = 150 + r() * 90;
+      c.fillStyle = r() < 0.55 ? `rgba(120,180,215,${0.15 + r() * 0.3})` : `rgba(255,255,255,${0.2 + r() * 0.4})`;
+      c.fillRect(x, r() * h * 0.3, ww, h * (0.4 + r() * 0.7));
+      void l;
+    }
+  });
+  const ice = toonMaterial({ name: 'ice', map: tex, rim: 0.4, frag: 'toonEmissive = vec3(0.02, 0.05, 0.08);' });
+  const iceTip = toonMaterial({ name: 'icicle', color: 0xe6f4fb, rim: 0.5 });
+  const geos = [], cones = [];
+  for (const [ul, h, name] of RAVINE.ledges) {
+    if (!name) continue;
+    const vc = course.rvAt(course.rv.c, ul), half = course.rvAt(course.rv.f, ul) + 3;
+    const x0 = START_X + ul;
+    // Ice sheet: a grid over the ledge face (u from just above the lip to the foot), lifted off the rock.
+    const nu = 8, nv = 24, pos = [], idx = [], uvs = [];
+    for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
+      const u = ul - 0.6 + (h * 0.12 + 1.6) * i / nu, v = vc - half + 2 * half * j / nv;
+      const x = START_X + u, y = terrain.baseHeight(x, v) + 0.12 + 0.08 * Math.sin(j * 1.7 + i);
+      pos.push(x + 0.15, y, v);
+      uvs.push(j / nv * 4, i / nu);
+    }
+    for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
+      const k = j * (nu + 1) + i;
+      idx.push(k, k + 1, k + nu + 1, k + 1, k + nu + 2, k + nu + 1);
+    }
+    const sheet = new THREE.BufferGeometry();
+    sheet.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    sheet.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    sheet.setIndex(idx);
+    sheet.computeVertexNormals();
+    if (sheet.attributes.normal.getY(0) < 0 && sheet.attributes.normal.getX(0) < 0) { sheet.setIndex(idx.map((_, i) => idx[i - (i % 3) + [0, 2, 1][i % 3]])); sheet.computeVertexNormals(); }
+    geos.push(sheet);
+    // Icicles hanging off the lip, pointing down the face.
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let v = vc - half + 0.5; v < vc + half - 0.5; v += 0.5 + rnd() * 0.7) {
+      const len = 0.8 + rnd() * rnd() * h * 0.45, r = 0.12 + rnd() * 0.18;
+      const c = new THREE.ConeGeometry(r, len, 5);
+      c.rotateX(Math.PI);                                   // tip down
+      const x = x0 + 0.4 + rnd() * 0.5, top = terrain.baseHeight(x0 - 0.3, v);
+      c.translate(x, top - len / 2 + 0.1, v);
+      cones.push(c.toNonIndexed());
+    }
+  }
+  if (geos.length) g.add(new THREE.Mesh(mergeGeometries(geos), ice));
+  if (cones.length) g.add(new THREE.Mesh(mergeGeometries(cones), iceTip));
   return g;
 }

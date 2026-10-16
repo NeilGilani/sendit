@@ -68,7 +68,7 @@ export const RAVINE = {
   floor: (u) => 7 + 10 * smoothRange(u, 560, 900) + 5 * smoothRange(u, 1800, 2100),
   depth: (u) => 54 * smoothRange(u, 400, 760) * (1 - smoothRange(u, 1700, 2260)),
   wall: (u) => 9 + 26 * (0.5 + 0.5 * Math.sin(u / 170 + 2.1)),
-  ledges: [[880, 5], [1135, 4], [1330, 6], [1690, 4.5]],   // [u, drop m]
+  ledges: [[880, 5], [1135, 4], [1330, 9, 'Frozen Falls'], [1690, 4.5]],   // [u, drop m, name?] — frozen waterfalls in the floor
 };
 
 // Natural hits: rollers (symmetric) and wind lips (gentle up, abrupt down) across the fall line.
@@ -129,7 +129,7 @@ export const LINE_GOALS = [
   ['The Classic', 2500, 'Band A', 'The First Stack', 'The Throne', 'The Last Stack'],
   ['Station to Station', 1500, 'Station Cliff', 'Old Lift Station'],
   ['Spine Tingler', 1500, 'Spine Wall', 'West Ledges', 'Pillow Stacks'],
-  ['Into the Gorge', 1200, 'The Couloir', 'The Ravine'],
+  ['Into the Gorge', 1500, 'The Couloir', 'The Ravine', 'Frozen Falls'],
   ['Hammer Time', 2000, 'The Hammer'],
   ['Roof Hopper', 1800, 'Old Lift Station', 'Corvo Refuge'],
 ];

@@ -83,7 +83,7 @@ export class RavenspireCourse {
       this.rv.c[i] = R.centre(u); this.rv.f[i] = R.floor(u); this.rv.d[i] = R.depth(u); this.rv.w[i] = R.wall(u);
       // Frozen ledges in the floor: a short bench above each step (raise), dropping at the ledge.
       let l = 0;
-      for (const [ul, h] of R.ledges) l += benchRaise(u, ul, h, 24, 1.4);
+      for (const [ul, h] of R.ledges) l += benchRaise(u, ul, h, Math.max(24, h * 4), 1.4 + h * 0.06);
       this.rv.l[i] = l;
     }
   }
@@ -428,7 +428,10 @@ export class RavenspireCourse {
     }
     if (u > RAVINE.u0 && u < RAVINE.u1 && this.rvAt(this.rv.d, u) > 8) {
       const dv = Math.abs(v - this.rvAt(this.rv.c, u));
-      if (dv < this.rvAt(this.rv.f, u) + this.rvAt(this.rv.w, u)) return u < 760 ? 'The Couloir' : 'The Ravine';
+      if (dv < this.rvAt(this.rv.f, u) + this.rvAt(this.rv.w, u)) {
+        for (const [ul, , name] of RAVINE.ledges) if (name && u > ul - 30 && u < ul + 4) return name;
+        return u < 760 ? 'The Couloir' : 'The Ravine';
+      }
     }
     const W = FACE.halfWidth(u);
     if (u > SPINES.u0 && u < SPINES.u1 && v > SPINES.v0 * W - 10 && v < SPINES.v1 * W + 10) return 'Spine Wall';
