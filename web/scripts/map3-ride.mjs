@@ -105,7 +105,8 @@ export function ride(type, key, style, opts = {}) {
   game.score = 0;
   let t = 0, vSum = 0, n = 0, vMax = 0, crashes = 0, air = 0, airMax = 0, takeY = 0, drops = [], airSegs = [];
   let wasAir = false, takeU = 0, roofT = 0, wall = 0, vMaxAt = "", wasAirPrev = false;
-  const flakes = course.flakeSpots ? course.flakeSpots() : [], got = new Set();   // golden snowflakes picked up
+  // Golden snowflakes (course.challenge.flakes: y is metres above the snow there), and which were picked up.
+  const flakes = (course.challenge?.flakes || []).map((f) => ({ x: f.x, z: f.z, y: T.getHeight(f.x, f.z) + f.y })), got = new Set();
   const near = flakes.map(() => ({ d: 1e9, dy: 0 }));
   const DT = 1 / 60;
   const trace = [];

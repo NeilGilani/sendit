@@ -94,10 +94,12 @@ const near = (a, b, e = 1e-9) => Math.abs(a - b) <= e;
 {
   const { RavenspireCourse } = await import('../src/maps/ravenspire/course.js');
   const c = new RavenspireCourse();
-  const spots = c.flakeSpots();
+  const spots = c.challenge.flakes;
   ok('12 flake spots, all finite', spots.length === 12 && spots.every((f) => [f.x, f.y, f.z].every(Number.isFinite)), spots.length);
-  const above = spots.map((f) => f.y - Math.max(c.height(f.x, f.z), c.heightAt(f.x, f.z) ?? -1e9));
-  ok('flakes float above the snow (0.3–45 m: lip flakes hang over the drop)', above.every((h) => h > 0.3 && h < 45), above.map((h) => h.toFixed(1)).join(' '));
+  ok('flakes float 0.8–1.5 m above the snow or roof', spots.every((f) => f.y >= 0.8 && f.y <= 1.5), spots.map((f) => f.y).join(' '));
+  // Each lip flake sits on the bench just above the face: the snow 3 m further on is much lower.
+  const lips = spots.filter((f) => f.y === 1.0 && c.height(f.x + 3, f.z) < c.height(f.x, f.z) - 2.5);
+  ok('lip flakes are on the edge of a drop', lips.length >= 6, lips.length);
 }
 
 console.log(fails ? `\n${fails} of ${n} FAILED` : `\nall ${n} passed`);

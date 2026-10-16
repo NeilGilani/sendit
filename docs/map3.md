@@ -153,7 +153,7 @@ snow** on convex crests (Laplacian) — packed snow is faster and lands harder (
 | scatter.js | `spawn: {...}` (SPAWN overrides), `forestAt / pisteAt / treeline` | fewer, smaller boulders on the face; larches only low, clearings around buildings and under the gondola, 16–32 m glades along the canonical lines |
 | scatter.js | `rockOk(x, z)` | rock clusters stay off the lines, drop zones and ravine floor |
 | activities.js | `challenge: { medalSpeeds }` | medal speeds for a fast map (24 / 20 / 16 m/s) |
-| activities.js | `flakeSpots()` | the 12 golden snowflakes at hand-picked spots instead of along the course path |
+| activities.js | `challenge.flakes: [{ x, z, y above the snow }]` | the 12 golden snowflakes at hand-picked spots instead of along the course path (the same hook and code as map 2) |
 | player.js | `edgeHint` | the "edge of the map" hint text |
 
 ---
@@ -264,9 +264,9 @@ Game feel at speed: wind roar (noise through a low-pass sweeping 300 Hz → 6 kH
 lag, the big-air side swing, landing shake scaled by impact, apex slow-mo (lens tightens, wind drops in
 pitch), controller rumble building with speed, wind streaks in the corners above 24 m/s.
 
-**Golden snowflakes** (`course.flakeSpots()`): the game's 12 per-run collectibles are placed by hand across
-every line, Steep-style: just out over the big lips where a popped rider flies (Band A, First Stack, the Throne,
-the Hammer, Station Cliff, Frozen Falls, a bowl wind lip), on the station and refuge roofs, on a spine crest, in
+**Golden snowflakes** (`course.challenge.flakes`, from `course.placeFlakes()`): the game's 12 per-run collectibles
+are placed by hand across every line, Steep-style: on the edge of the big lips, where you go over (Band A, First
+Stack, the Throne, the Hammer, Station Cliff, Frozen Falls, a bowl wind lip), on the station and refuge roofs, on a spine crest, in
 the gorge and on the pillow stacks. They glow, so they double as markers for where the good lips are.
 
 **Drop zones** (Steep-style, `course.dropZones`): keys **1–9** (or the d-pad ◀ ▶) fade you to the top of a
@@ -284,7 +284,7 @@ starts it holds a moment, lifts and banks away past the spire with a synthesized
 |---|---|
 | feature placement, heights, widths, buildings, gondola | `maps/ravenspire/layout.js` |
 | drop zones, line goals, the canonical lines (glades through the larches, rocks kept off) | `layout.js` (`DROP_ZONES`, `LINE_GOALS`, `RIDE_LINES`); glade width in `course.pisteAt`, rock margins in `course.rockOk` |
-| snowflake spots | `course.js` (`flakeSpots()`) |
+| snowflake spots | `course.js` (`placeFlakes()`) |
 | chimney smoke, mast, ice falls | `props.js` (`buildSmoke`, `buildMast`, `buildIceFalls`) |
 | bench length per metre of cliff (`BENCH_PER_M` = 4), lip shape, rock teeth | `course.js` (`cliff()`, `bands()`) |
 | speeds, landings, powder, slow-mo, flow on/off, camera | `maps/ravenspire/tuning.js` |

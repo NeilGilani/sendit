@@ -46,6 +46,7 @@ export class RavenspireCourse {
     this.lineGoals = LINE_GOALS.map(([name, bonus, ...features]) => ({ name, bonus, features }));
     // Drop zones (player.js): { name, x, z, heading }.
     this.dropZones = DROP_ZONES.map(([name, u, v]) => ({ name, x: START_X + u, z: v === 'ravine' ? this.rvAt(this.rv.c, u) : v, heading: -Math.PI / 2 }));
+    this.challenge.flakes = this.placeFlakes();   // hand-placed golden snowflakes (activities.js)
   }
 
   // ---------------------------------------------------------------- tables
@@ -537,30 +538,30 @@ export class RavenspireCourse {
   lobbySpot() { return { x: START_X + 22, z: -18, heading: -Math.PI / 2 - 0.18 }; }
 
   /**
-   * Golden snowflakes (activities.js), placed by hand across every line instead of along one path: just
-   * off the big lips (you pick them up as you send it), on the roofs, in the gorge, on a spine crest.
-   * Returns [{ x, y, z }] in world space.
+   * Golden snowflakes (activities.js `course.challenge.flakes`, the same hook map 2 uses), placed by hand
+   * across every line instead of along one path: on the big lips (you pick them up as you go over the edge),
+   * on the roofs, in the gorge, on a spine crest, on the pillows. Returns [{ x, z, y }] with x / z in world
+   * metres and y in metres above the snow (or roof) there.
    */
-  flakeSpots() {
+  placeFlakes() {
     const H = (u, v) => this.height(START_X + u, v);
-    // The lip near u0 at v: where the snow falls away hardest; the flake hangs just out over the edge,
-    // on the path of a rider who pops off the lip.
+    // The lip near u0 at v: find where the snow falls away hardest, then walk back up the face to its top
+    // (the last point still under ~40°); the flake floats on the edge, where a rider goes over it.
     const lip = (u0, v, span = 25) => {
       let best = u0, drop = -1e9;
       for (let u = u0 - span; u < u0 + span; u += 0.5) {
         const d = H(u, v) - H(u + 1.5, v);
         if (d > drop) { drop = d; best = u; }
       }
-      // Walk back up the face to its top (the last point that is still bench, under ~40°).
       let top = best;
       while (top > best - 12 && H(top - 0.5, v) - H(top, v) > 0.42) top -= 0.5;
-      return { x: START_X + top + 3, y: H(top, v) + 0.4, z: v };
+      return { x: START_X + top - 0.5, z: v, y: 1.0 };
     };
-    const on = (u, v, up = 1.2) => ({ x: START_X + u, y: H(u, v) + up, z: v });
+    const on = (u, v, up = 1.2) => ({ x: START_X + u, z: v, y: up });
     const roof = (id) => {
       const s = this.structures.find((k) => k.id === id);
       const [x, z] = s.world(s.hl * 0.2, 0);
-      return { x, y: s.surface(x, z) + 1.2, z };
+      return { x, z, y: 1.2 };
     };
     const rv = (u) => this.rvAt(this.rv.c, u);
     // Crest of the spine nearest v at u (the highest point across ±15 m).
