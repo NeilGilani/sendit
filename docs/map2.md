@@ -147,6 +147,11 @@ node web/scripts/map2-bot.mjs --curve                            # lane radii an
 node web/scripts/map2-bot.mjs ski all --fair                     # best-line clearance per route
 node web/scripts/map2-bot.mjs --sight                            # can riders see each pivot 30 / 40 / 50 m ahead
 node web/scripts/map2-bot.mjs both fast --tuck --check --airs --pop --flakes   # every air (feature, air time, impact, apex) + snowflakes
+node web/scripts/map2-bot.mjs both all --tuck --check --tension --cam   # rhythm per section; chase camera inside a crown (%)
+# In the real game on the GPU (dev server on 5182):
+node web/scripts/map2-play.mjs challenge http://localhost:5182 ./shots fast snowboard   # full ?challenge run, results screen
+node web/scripts/map2-play.mjs frames http://localhost:5182 ./shots main 560 14 ski    # frames every 0.4 s + contact sheet
+node web/scripts/map2-perf.mjs http://localhost:5182 blackspruce 100 1950 75 1       # GPU ms along the run (min of 60 frames per stop)
 ```
 
 Jump audit, main and fast lines, both gear types; every landing clean:
