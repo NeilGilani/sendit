@@ -41,7 +41,7 @@ export const BANDS = [
   { name: 'The First Stack', uc: 990, v0: -215, v1: 170, h: 15, var: 4, bench: 50, wob: 6, seed: 2, gaps: [[60, 16]] },
   { name: 'The Throne', uc: 1160, v0: -250, v1: 185, h: 18, var: 5, bench: 55, wob: 5, seed: 3, gaps: [[-200, 18], [150, 16]], peak: [-40, 10, 38] },
   { name: 'The Last Stack', uc: 1370, v0: -190, v1: 150, h: 14, var: 5, bench: 48, wob: 6, seed: 4, gaps: [[-150, 16]] },
-  { name: 'Station Cliff', uc: 1418, v0: 205, v1: 362, h: 17, var: 2, bench: 46, wob: 3, seed: 5, gaps: [] },
+  { name: 'Station Cliff', uc: 1418, v0: 205, v1: 340, fadeOut: 12, h: 17, var: 2, bench: 46, wob: 3, seed: 5, gaps: [] },
   { name: 'The Hammer', uc: 905, v0: 630, v1: 775, h: 36, var: 6, bench: 70, wob: 6, seed: 6, gaps: [] },
   { name: 'Left Ledges', uc: 1150, v0: -490, v1: -265, h: 10, var: 4, bench: 40, wob: 8, seed: 7, gaps: [[-420, 15], [-330, 12]] },
   { name: 'Beak Steps', uc: 765, v0: 215, v1: 350, h: 8, var: 3, bench: 35, wob: 6, seed: 8, gaps: [[300, 12]] },

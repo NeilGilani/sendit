@@ -318,7 +318,8 @@ export class RavenspireCourse {
       if (u < uc - Math.max(B.bench, (B.h + B.var + (B.peak ? B.peak[1] : 0)) * BENCH_PER_M) - 2 || u > uc + 40) continue;
       let h = B.h + B.var * (noise1(v / 58, B.seed) * 2 - 1);
       if (B.peak) h += B.peak[1] * Math.exp(-(((v - B.peak[0]) / B.peak[2]) ** 2));
-      let taper = sstep(B.v0 - 40, B.v0 + 25, v) * (1 - sstep(B.v1 - 25, B.v1 + 40, v));
+      const fo = B.fadeOut ?? 40;   // a short fade where a band meets the ravine rim
+      let taper = sstep(B.v0 - 40, B.v0 + 25, v) * (1 - sstep(B.v1 - 25, B.v1 + fo, v));
       for (const [gv, gw] of B.gaps) taper *= sstep(gw * 0.35, gw, Math.abs(v - gv));
       h *= taper;
       if (h < 0.05) continue;
