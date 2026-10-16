@@ -61,10 +61,10 @@ export const PILLOWS = [
 
 // The ravine: centre line v(u), floor half-width, depth, natural ledges in the floor.
 export const RAVINE = {
-  u0: 400, u1: 2180,
+  u0: 400, u1: 2260,
   centre: (u) => 405 + 62 * Math.sin((u - 400) / 230) + 22 * Math.sin(u / 83 + 1) + 70 * bump(u, 1495, 120),
   floor: (u) => 7 + 10 * smoothRange(u, 560, 900) + 5 * smoothRange(u, 1800, 2100),
-  depth: (u) => 54 * smoothRange(u, 400, 760) * (1 - smoothRange(u, 1880, 2180)),
+  depth: (u) => 54 * smoothRange(u, 400, 760) * (1 - smoothRange(u, 1700, 2260)),
   wall: (u) => 9 + 26 * (0.5 + 0.5 * Math.sin(u / 170 + 2.1)),
   ledges: [[880, 5], [1135, 4], [1330, 6], [1690, 4.5]],   // [u, drop m]
 };

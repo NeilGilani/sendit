@@ -11,6 +11,7 @@
 export const RAVENSPIRE_PHYSICS = {
   common: {
     trickStyle: true,             // more grabs, tweaks
+    airSettleAngle: 100,          // launched mid-skid: square up in the air
     flow: { enabled: true },      // line chains, flow meter, SEND IT state (physics/flow.js)
     slowmo: { minAir: 2.4, scale: 0.45, easeIn: 0.15, hold: 0.5, easeOut: 0.35, cooldown: 5 },   // apex slow motion on huge airs
     // Speed: the soft cap starts at each gear's maxVelocity (below); terminal speed on the 41° face
