@@ -233,6 +233,8 @@ spin, W / S to flip; Shift grabs. On this map (trickStyle):
 - **Drops**: the greatest height above the snow in an air (≥ 6 m) scores `12/m` (+10/m beyond 15 m), named
   after what you launched off (`course.featureAt`): "The Throne · 26 m drop", "Spine Wall · 14 m drop".
   Landing on a roof scores **Roof landing · Old Lift Station** (+200).
+- **Pillow line**: clean landings off pillow after pillow (each within 3 s of the last) score **Pillow line ×N**
+  from the third on (40 × N, capped at ×6, times the flow multiplier); a full send down the stacks chains ×9–×12.
 - **Stomp boost** (flow maps): a STOMPED landing pushes you out 1.5 m/s faster along the line
   (`flow.stompBoost`), with its own sound; finishing a line goal plays a fanfare.
 - **Line goals** (`course.lineGoals`, Steep "Mountain Stories" style): hit named features in order in one

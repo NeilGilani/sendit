@@ -486,6 +486,13 @@ export class Player {
     const roof = flow && clean && C?.roofAt ? C.roofAt(this.position.x, this.position.z) : null;
     if (flow && clean && drop >= 6) addScore(`${feature ? `${feature} · ` : ''}${Math.round(drop)} m drop`, Math.round((drop * 12 + Math.max(0, drop - 15) * 10) * flow.scoreMul()));
     if (roof && this.airTime > 0.5) addScore(`Roof landing · ${roof}`, Math.round(200 * flow.scoreMul()));
+    // Pillow line: clean landings off pillow after pillow (each within 3 s of the last) count up.
+    if (flow && clean && feature === 'Pillow Stacks' && this.airTime > 0.35) {
+      const t = flow.run?.time ?? 0;
+      this._pillows = t - (this._pillowT ?? -99) < 3 ? (this._pillows || 0) + 1 : 1;
+      this._pillowT = t;
+      if (this._pillows >= 3) addScore(`Pillow line ×${this._pillows}`, Math.round(40 * Math.min(6, this._pillows) * flow.scoreMul()));
+    }
     if (flow && this.airTime > 0.35) emit('landingGrade', { grade, drop, impact, rawImpact, air: this.airTime, trick, perfect, feature, roof });
     this.airTime = 0;
     this._maxAbove = 0;
