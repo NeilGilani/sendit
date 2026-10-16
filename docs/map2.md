@@ -193,6 +193,16 @@ Untucked (no speed tricks): every route 143–155 s, 0–1 crash.
 - The clearings (Kicker Meadow, the band and Pillow Garden, Big Air, Finish) are 0 for 6–9 s: rest beats.
 - Old Growth is deliberately the wide, flowing finale after the Gauntlet's peak. Narrowing it was tried and reverted.
 
+**Challenge in the real game** (in-page driver, start to finish, `?challenge`, no physics overrides):
+
+| Gear | Line | Time | Medal | Gates | Style score | Flakes |
+|------|------|------|-------|-------|-------------|--------|
+| Skis | flow | 2:13.9 | silver | 9/9 | 8,616 | — |
+| Skis | slots | 2:08.7 | silver (0.9 s off gold) | 9/9 | 18,125 | — |
+| Snowboard | slots | 2:13.8 | silver | 9/9 | 17,952 | 5/12 |
+
+No console errors. Results, best time, medal targets and the ghost save all work.
+
 **Visual playtests:** an in-page driver rides the real game (renderer, chase camera, HUD) through the Needles, band, Pillow Garden and Deadfall on skis (flow line), and from Spruce Gate through Deadfall on a snowboard (slots). Frames every 0.4 s:
 - 55–74 km/h, constant close shaves in the slots.
 - Clean "PERFECT!" landings off the M kicker, the cliff and the logs.
