@@ -31,4 +31,6 @@ registerMap({
   tags: ['handmade', 'trees', 'steep'],
   describe: () => 'Steep tree run · 2 km · 1,100 m vertical',
   load: async () => new BlackspruceCourse(),
+  // The lobby stands at the top of Kicker Meadow, looking down at the kicker, the crowd and the forest.
+  lobby: ({ course }) => { const c = course.centre(424); return { x: c.x, z: c.z, heading: c.heading }; },
 });
