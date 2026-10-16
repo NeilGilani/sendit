@@ -95,6 +95,7 @@ export class SoundScape {
     on('flowLost', () => this.oneShot('combo_lost', 0.45, 0.9));
     on('slowmo', ({ scale }) => { this.slow = scale; });   // apex slow motion: wind and snow drop in pitch
     on('heliDrop', () => this.heli());   // a map's heli-drop intro (maps/ravenspire/props.js)
+    on('ravenCaw', (p) => this.caw(p));   // ravens around a map's summit
     // A board's tail slap pops lower than a skier's hop.
     on('jumped', (d) => this.oneShot('jump_pop', 0.4 + d * 0.5, (this.skier.equipment?.type === 'snowboard' ? 0.78 : 0.95) + Math.random() * 0.15));
     on('nearMiss', () => this.oneShot('near_miss', 0.55, 0.95 + Math.random() * 0.2));
@@ -152,6 +153,31 @@ export class SoundScape {
       g.gain.exponentialRampToValueAtTime(0.0005, t + i * 0.06 + 0.6);
       o.connect(g); g.connect(this.sfx); o.start(t + i * 0.06); o.stop(t + i * 0.06 + 0.65);
     });
+  }
+
+  /** A raven's call: two or three hoarse 'kraa's (a buzzy saw tone with a falling pitch through a
+   *  nasal band-pass), placed in 3D at the bird. */
+  caw(p) {
+    const c = this.ctx;
+    if (!c) return;
+    const pan = c.createPanner();
+    pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.refDistance = 40; pan.maxDistance = 900;
+    if (pan.positionX) { pan.positionX.value = p.x; pan.positionY.value = p.y; pan.positionZ.value = p.z; } else pan.setPosition(p.x, p.y, p.z);
+    const out = c.createGain(); out.gain.value = 0.5;
+    pan.connect(out); out.connect(this.sfx);
+    const n = 2 + Math.floor(Math.random() * 2), base = 330 + Math.random() * 80;
+    for (let i = 0; i < n; i++) {
+      const t = c.currentTime + i * (0.32 + Math.random() * 0.08), d = 0.2 + Math.random() * 0.06;
+      const o = c.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(base * 1.25, t); o.frequency.exponentialRampToValueAtTime(base * 0.8, t + d);
+      const am = c.createOscillator(); am.frequency.value = 55 + Math.random() * 20;   // the rasp
+      const amG = c.createGain(); amG.gain.value = 0.35; am.connect(amG);
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1150; bp.Q.value = 2.5;
+      const g = c.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.5, t + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t + d);
+      amG.connect(g.gain);
+      o.connect(bp); bp.connect(g); g.connect(pan);
+      o.start(t); am.start(t); o.stop(t + d + 0.05); am.stop(t + d + 0.05);
+    }
   }
 
   /** Helicopter leaving after the drop: rotor 'whup' pulses (noise through a low-pass, gated at ~6 Hz)
