@@ -133,6 +133,7 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
 1. **Edge angle.** The steer input sets the target `θ_t = steer · maxEdge`. The edge follows with a first-order lean response, rate-limited by the edge-switch time: 0.30 s for skis; 0.38 s heel→toe and 0.46 s toe→heel on the board.
    - **You need speed to get on edge.** The edge angle is the body's lean plus angulation (knees, hips, ankles), and the lean needs a turn force to lean against: `tan φ = a / g`. So `maxEdge` is capped at the largest θ with `θ ≤ atan(min(v²/(R_eff·cos θ), a_max)/g) + angulation`, found by bisection. Angulation is 26° for skis and 24° for the board.
    - In practice: about 29° at 3 m/s, 35–44° at 5 m/s, and the full 64–68° from about 8 m/s. Slow turns therefore come from the rotary pivot (a skid), not a deep carve. Turn rate when slow is unchanged.
+   - **Letting go.** With the keys or stick back at neutral (|steer| < 0.05), the input relaxes at `steerRelease` instead of `steerResponse`, and the edge flattens at `edgeRelease` instead of `edgeResponse` (skis 22 / 22 vs 14 / 14, board 18 / 15 vs 11 / 9). A released turn stops about 40% sooner (`node web/scripts/physics-release.mjs`: skis 0.22 → 0.13 s, board 0.32 → 0.20 s at 12 m/s; edge flat 0.33 → 0.22 s and 0.47 → 0.28 s). Turn-in, linked turns (one key straight into the other) and partial stick steering are unchanged. At high speed (Ravenspire) the skis still realign onto their path for a further ~0.1–0.2 s, a slow counter-swing under 10°/s.
 2. **Sidecut carving.** Path curvature is `κ = engage(θ) / (R_eff · cos θ)`.
    - `engage` blends in from 3° to 14° of edge.
    - `R_eff = R_sidecut · (1 + k·smoothstep(v))`. Per the research, gear bent at speed carves longer arcs than its printed radius.
@@ -236,8 +237,8 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
 
   | Group | Keys |
   |---|---|
-  | Speed and steering | `maxVelocity` (also the HUD/FX speed ratio), `steerResponse` |
-  | Edge | `maxEdge` (`maxEdgeToe`/`maxEdgeHeel`), `edgeSwitchTime` (`heelToToe`/`toeToHeel`), `edgeResponse`, `engage` |
+  | Speed and steering | `maxVelocity` (also the HUD/FX speed ratio), `steerResponse`, `steerRelease` (back to neutral once let go) |
+  | Edge | `maxEdge` (`maxEdgeToe`/`maxEdgeHeel`), `edgeSwitchTime` (`heelToToe`/`toeToHeel`), `edgeResponse`, `edgeRelease` (flattening with the input released), `engage` |
   | Grip and sidecut | `latG` (toe/heel), `speedRadius`/`speedRadiusV`, `carveAssist` |
   | Redirect | `gripRate`, `flatGrip`, `carveEff`, `skidEff`, `skidMu`, `carvePump` |
   | Pivot | `pivotRate`, `turnRateFast`, `pivotFade`, `betaMax`, `selfAlign` |
@@ -253,11 +254,12 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
   | Landing | `landClean`/`landStumble`/`landCrash`/`landSlide`, `switchLand` |
 - `ANIM`:
   - Lean and edge caps: `maxLean`, `maxGearEdge`.
-  - `angulation`, `polePlantTime`.
+  - `angulation`, `angulationReverse` (the share kept when the edge is below the lean, 0.25), `polePlantTime`.
+  - Letting go: `rollRelease` (the lean eases back up, 15 vs `rollResponse` 10) and `leadRelease` (the upper-body turn lead, 10 vs 6), used only while the steer is released and the value is heading back to neutral.
   - Skis: `skiPressPitch`, `skiPressShift`, `skiPopSnap`.
   - Flips: `flipPivot` (centre of mass height), `flipTuckLift`, `flipLoadArch`.
   - `gearSinkVisual`: the share of the physics powder sink that is drawn (0.15). The course reads as packed snow, so the gear rides on top instead of disappearing.
-  - `ANIM.board`: crouch, shoulder and hip opening, head turn, turn lead, heel sit, toe drive, press shift and pitch, air and grab tuck, `handDragEdge`.
+  - `ANIM.board`: crouch, `crouchHinge` (hip fold per unit crouch), shoulder and hip opening, head turn, turn lead, heel sit, toe drive, press shift and pitch, air and grab tuck, `handDragEdge`.
 
 ## Adding a ski or board model
 
@@ -287,15 +289,16 @@ At runtime, `registerVariant(type, spec)` adds a model (for DLC or user presets)
   - The gear rolls further, to the physics edge angle, with the board pivoting about its biting edge.
   - Squash and stretch, chatter, sink, neon, lift seat, crash tumble.
 - **Skis:**
-  - Angulation: the hips move inside and the spine counter-rolls, so the upper body stays upright.
+  - Angulation: the hips move inside and the spine counter-rolls, so the upper body stays upright. Only edge beyond the lean angulates. When the lean is bigger than the edge (riding across a cross-slope, or a turn being let go while the body is still leaned in), only `angulationReverse` of it is used. Before, the spine rolled further into the lean there: the head tipped uphill by about twice the cross-slope on a straight run, and swung further into the turn just after letting go (head tilt peak 42° → 35°, settled in 0.62 → 0.40 s).
   - Hockey-stop counter-rotation: the torso keeps facing down the path.
   - Pole plant on every edge change at speed, a double-pole cycle when pushing with W, snowplough wedge, tuck, grabs.
   - When leaning, the inside ski is lifted back to the snow (inside knee flexes, outside leg extends).
 - **Snowboard:**
   - Sideways stance: the chest faces the toe edge, with binding angles on the feet and knees toward the toes.
   - Hips and shoulders open toward the nose; the head turns toward the travel direction, over the back shoulder when switch.
-  - The upper body leads the turn.
+  - The upper body leads the turn, and comes back square at `leadRelease` once the steer is let go.
   - Toe side: knees drive and the torso stays tall. Heel side: sits down with the arms forward.
+  - Crouching (speed, W) mostly bends the knees; the hips fold `crouchHinge` (0.19 rad) per unit crouch. A straight run holding W leans the torso about 28° over the toes (it was 33°, which read as a sideways lean from the chase camera).
   - Pressing shifts the pelvis to the pressed end and flexes the board up at the other end. The ollie crouch loads the tail.
   - A wind-up counter-rotates the shoulders against the coming spin; in the air the shoulders lead the spin.
   - Pushing with W when slow: a one-foot skate cycle with the rear foot unstrapped, pushing on the toe side, and the body opened toward the nose.

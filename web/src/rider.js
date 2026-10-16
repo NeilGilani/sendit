@@ -229,7 +229,9 @@ export class Rider {
     // turnInput get a matching lean from it.
     const lat = ground ? (pl.simulated ? pl.gearLatAccel : (pl.turnInput || 0) * 4) : 0;
     const leanT = THREE.MathUtils.clamp(Math.atan2(lat, PHYSICS.gravity), -ANIM.maxLean, ANIM.maxLean);
-    p.lean += (leanT - p.lean) * k(ANIM.rollResponse);
+    // Steer let go: the body comes back up faster than it tips into a turn.
+    const released = Math.abs(pl._ctrl?.steer || 0) < 0.05;
+    p.lean += (leanT - p.lean) * k(released && Math.abs(leanT) < Math.abs(p.lean) ? ANIM.rollRelease : ANIM.rollResponse);
     const edgeNose = ground ? pl.edgeAngle * pl.travelSign : 0;
     const edgeT = THREE.MathUtils.clamp(edgeNose, -ANIM.maxGearEdge, ANIM.maxGearEdge);
     p.edge += (edgeT - p.edge) * k(14);
@@ -246,7 +248,8 @@ export class Rider {
     // Wind-up: while loading a pop and steering, the shoulders counter-rotate against the coming spin.
     // The upper body leads edge changes: follow the raw input (ahead of the smoothed edge) by ~0.1 s.
     const leadGround = pl.squat > 0.05 && Math.abs(pl.windup || 0) > 0.05 ? (pl.windup || 0) * 1.4 : -(pl._ctrl?.steer || pl.turnInput || 0);
-    p.lead += ((ground ? leadGround : air ? THREE.MathUtils.clamp(pl.spinRate * 0.12, -0.6, 0.6) : 0) - p.lead) * k(6);
+    const leadT = ground ? leadGround : air ? THREE.MathUtils.clamp(pl.spinRate * 0.12, -0.6, 0.6) : 0;
+    p.lead += (leadT - p.lead) * k(ground && released && Math.abs(leadT) < Math.abs(p.lead) ? ANIM.leadRelease : 6);
     // Double-pole push on skis (W when slow): a looping reach-plant-push cycle.
     const pushing = ground && !board && pl._ctrl?.up > 0.3 && pl.speed < (pl.dyn?.C.pushMaxSpeed ?? 8);
     p.push = (p.push || 0) + ((pushing ? 1 : 0) - (p.push || 0)) * k(6);
@@ -516,7 +519,10 @@ export class Rider {
     const drop = p.crouch * 0.38 + p.tuck * 0.1;
     const hipPitch = THREE.MathUtils.degToRad(10 + p.crouch * 22 + p.tuck * 22) * ns;
     // Angulation: hips move to the inside of the turn, upper body stays more upright than the legs.
-    const angul = (p.edge - p.lean) * ANIM.angulation * (1 - p.air);
+    // Only edge beyond the lean angulates: leaning with less edge under it (a cross-slope, a turn being
+    // let go) would otherwise roll the spine further into the lean and tip the head uphill.
+    const ang = p.edge - p.lean;
+    const angul = ang * (ang * p.lean < 0 ? ANIM.angulationReverse : 1) * ANIM.angulation * (1 - p.air);
     // Hockey stop / skid: upper body keeps facing down the path while the skis pivot across it.
     const counter = (pl.state === State.GROUNDED ? pl.skidAngle : 0) * 0.75 + p.lead * 0.12;
     // Pressing shifts the hips over the pressed end (tails: back, tips: forward).
@@ -552,8 +558,9 @@ export class Rider {
     );
     const hipYaw = nx * BA.hipOpen * ns;
     // The whole body already rolls onto the edge (visual lean), so toe side keeps the torso tall
-    // (knees and hips drive forward) and heel side sits down without folding.
-    const hipPitch = (0.12 + p.crouch * 0.25 - p.toe * 0.06 + p.heel * 0.05 + p.grab * 0.22) * ns;
+    // (knees and hips drive forward) and heel side sits down without folding. Crouching (speed, W)
+    // mostly bends the knees: the hips fold only a little, so a straight run doesn't hunch over the toes.
+    const hipPitch = (0.12 + p.crouch * BA.crouchHinge - p.toe * 0.06 + p.heel * 0.05 + p.grab * 0.22) * ns;
     const wob = p.stumble * Math.sin(p.t * 9) * 0.25;
     // Shoulders open toward the nose, rotation leads the turn; in the air the spin leads.
     const lead = p.lead * BA.turnLead;
@@ -561,7 +568,7 @@ export class Rider {
     off.x += nx * 0.08 * sk;                                  // weight over the front foot while skating
     const spineTwist = (nx * (BA.shoulderOpen - BA.hipOpen) + lead + nx * 0.45 * sk) * ns;
     // A preloaded backflip arches the chest up and back (the shoulders throw first).
-    const bend = (0.1 + p.crouch * 0.2 - p.toe * 0.04 + p.heel * 0.12 + p.grab * 0.26) * ns - p.flipLoad * ANIM.flipLoadArch - (p.tweak || 0) * 0.3;
+    const bend = (0.1 + p.crouch * BA.crouchHinge * 0.8 - p.toe * 0.04 + p.heel * 0.12 + p.grab * 0.26) * ns - p.flipLoad * ANIM.flipLoadArch - (p.tweak || 0) * 0.3;
     // Head: look down the direction of travel (nose, or over the back shoulder when switch).
     const headYaw = (nx * p.look * BA.headTurn - nx * BA.shoulderOpen - lead - nx * 0.5 * sk) * ns;
     this.trunk(off, hipYaw + nx * 0.3 * sk, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist, wob - p.lean * 0.15, headYaw, -(hipPitch + bend) * 0.6);

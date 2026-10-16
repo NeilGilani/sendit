@@ -158,6 +158,8 @@ export const ANIM = {
   maxRollAngle: 0.5,          // legacy: the lean now comes from the contact force (maxLean below)
   skiStance: 0.13,            // metres from centre to each ski
   rollResponse: 10,
+  rollRelease: 15,            // 1/s the lean eases back up once the steer is let go (rollResponse tipping in)
+  leadRelease: 10,            // 1/s the upper-body turn lead eases back to neutral once the steer is let go (6 leading in)
   squatMax: 0.25,             // pre-jump Y compression (25%)
   squatXZ: 0.12,              // X/Z expansion while squatting (volume preservation)
   landSquashPerMs: 0.035,     // squash per m/s of vertical landing speed
@@ -176,6 +178,7 @@ export const ANIM = {
   maxLean: 0.8,               // rad body inclination cap
   maxGearEdge: 1.05,          // rad visual edge angle cap
   angulation: 0.75,           // share of (edge − lean) the ski rider takes up in the spine (upright upper body)
+  angulationReverse: 0.25,    // … share kept when the edge is below the lean (cross-slopes, a turn being let go): no banking further in
   polePlantTime: 0.38,        // s a pole touch lasts (triggered on edge changes)
   skiPressPitch: 0.14,        // rad the skis pitch up while pressing the tails / tips (butters, ollie load)
   skiPressShift: 0.09,        // m hips over the pressed end
@@ -187,6 +190,7 @@ export const ANIM = {
   board: {
     crouch: 0.17,             // m pelvis drop at rest (riders stand lower than skiers)
     crouchSpeed: 0.08,        // extra drop at speed
+    crouchHinge: 0.19,        // rad of hip fold per unit crouch (the spine bends 0.8 × this): a crouch mostly bends the knees
     shoulderOpen: 0.42,       // rad shoulders open toward the nose
     hipOpen: 0.16,            // rad hips open toward the nose
     headTurn: 1.3,            // rad total head yaw toward the direction of travel
