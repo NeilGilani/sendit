@@ -375,7 +375,9 @@ export class EdgePhysics {
       const tail = this.tailLandings();
       let d = angleDiff(pl.heading, velYaw);
       if (tail && Math.abs(d) > Math.PI / 2) d = angleDiff(pl.heading, velYaw + Math.PI);
-      if (Math.abs(d) < P.spinCheckAngle * DEG) {
+      // Not spinning (e.g. launched mid-skid): a map may let the rider square up from further out (airSettleAngle).
+      const settleA = Math.abs(pl.spinRate) < 0.8 && P.airSettleAngle ? Math.max(P.spinCheckAngle, P.airSettleAngle) : P.spinCheckAngle;
+      if (Math.abs(d) < settleA * DEG) {
         target = Math.sign(d) * Math.min(max * 0.6, Math.abs(d) / Math.max(tLand, 0.1));
         resp = 10;
       } else if (Math.abs(pl.spinRate) > 0.8) {

@@ -311,7 +311,7 @@ export class Rider {
     this.chatter.rotation.x = chat * ANIM.chatterRotAmp * (Math.sin(tt * 2.3 + 0.5) * 0.7 + Math.sin(tt * 5.3) * 0.3);
 
     // Neon trims glow with speed and air time.
-    const glowT = ratio * 1.2 + (air ? 1.4 : 0) + pl.tuck * 0.5;
+    const glowT = ratio * 1.2 + (air ? 1.4 : 0) + pl.tuck * 0.5 + (pl.flowBoost || 0) * 2.2;   // SEND IT: the trims flare
     this.neon += (glowT - this.neon) * k(4);
     if (this.suit) this.suit.userData.uniforms.uEmissiveBoost.value = this.neon * 1.6;
     this.gear.userData.setNeon(this.neon * 1.6);
