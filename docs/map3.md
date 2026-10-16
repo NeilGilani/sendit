@@ -150,7 +150,7 @@ snow** on convex crests (Laplacian) — packed snow is faster and lands harder (
 | features.js | `heightAt(x, z, base)`, `blockAt(...)` | rideable roofs, solid walls (`terrain.features.heightAt / blockAt`) |
 | features.js | `buildProps({ terrain })`, `obstacles` | the map's meshes; gondola tower collision circles |
 | life.js | `life: { skiers: 0, lodge: false }` | no other riders, no lodge (birds stay) |
-| scatter.js | `spawn: {...}` (SPAWN overrides), `forestAt / pisteAt / treeline` | fewer, smaller boulders on the face; larches only low, clearings around buildings and under the gondola, 10–30 m glades along the canonical lines |
+| scatter.js | `spawn: {...}` (SPAWN overrides), `forestAt / pisteAt / treeline` | fewer, smaller boulders on the face; larches only low, clearings around buildings and under the gondola, 16–32 m glades along the canonical lines |
 | scatter.js | `rockOk(x, z)` | rock clusters stay off the lines, drop zones and ravine floor |
 | activities.js | `challenge: { medalSpeeds }` | medal speeds for a fast map (24 / 20 / 16 m/s) |
 | activities.js | `flakeSpots()` | the 12 golden snowflakes at hand-picked spots instead of along the course path |
@@ -332,7 +332,7 @@ All 24 runs reach the valley; the one crash is the Hammer sent with a full pop (
 `OBSTACLES=<dump>` (web/scripts/map3-obstacles.mjs) they ride the browser's actual 8,800 larches, 1,570 rocks
 and the gondola towers. The first such run found a minefield: random rock clusters in the couloir throat and on
 the upper lines, and larches across every runout (bots crashed 3–7 times per run). Now the canonical lines
-(`RIDE_LINES` in layout.js) run through 10–30 m wandering glades in the larches (`pisteAt`), and rock clusters stay
+(`RIDE_LINES` in layout.js) run through 16–32 m wandering glades in the larches (`pisteAt`), and rock clusters stay
 off the lines, the drop zones and the ravine floor (`rockOk`, an opt-in hook in scatter.js): send and control
 runs through the real forest finish with the same numbers as above (only the Hammer full-pop crash).
 

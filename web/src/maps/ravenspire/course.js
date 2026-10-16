@@ -481,7 +481,7 @@ export class RavenspireCourse {
     // Clearings around the old buildings, and the gondola corridor (cut decades ago) stay free of trees.
     // The canonical lines run through ~22 m glades in the larches (you can ride the lower bowl at speed).
     const u = x - START_X;
-    if (u > 1500 && this.lineDist(u, z) < 10 + 5 * (noise1(u / 41 + z / 57, 77) * 2 - 1)) return 1;   // 5–15 m half-width, wandering
+    if (u > 1500 && this.lineDist(u, z) < 12 + 4 * (noise1(u / 41 + z / 57, 77) * 2 - 1)) return 1;   // 8–16 m half-width, wandering
     for (const s of this.structures) if (Math.hypot(x - s.x, z - s.z) < s.R + 12) return 1;
     const G = GONDOLA;
     const ax = START_X + G.from[0], az = G.from[1], bx = START_X + G.to[0], bz = G.to[1];
