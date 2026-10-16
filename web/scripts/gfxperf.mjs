@@ -24,7 +24,7 @@ for (const q of qs.split(',').map(Number)) {
     window.__cpu = [];
     window.requestAnimationFrame = (cb) => raf((t) => { const a = performance.now(); cb(t); if (window.__cpuOn) window.__cpu.push(performance.now() - a); });
   });
-  await page.goto(`${base}/?ride&quality=${q}`);
+  await page.goto(`${base}/?ride&quality=${q}${process.env.MAP ? `&map=${process.env.MAP}` : ''}`);   // MAP=<id> loads another map
   await page.waitForFunction(() => window.__sendit && window.__post, null, { timeout: 300000 });
   await page.keyboard.down('ArrowUp');
   await page.waitForTimeout(5000);
@@ -63,7 +63,7 @@ for (const q of qs.split(',').map(Number)) {
   }, Number(N));
   await carving;
   const frame = Math.max(r.gpu, r.cpu);
-  console.log(`quality ${q} @ ${r.px}: GPU ${r.gpu.toFixed(1)} ms (p95 ${r.gpu95.toFixed(1)}), CPU ${r.cpu.toFixed(1)} ms (p95 ${r.cpu95.toFixed(1)}) → frame ${frame.toFixed(1)} ms ≈ ${(1000 / frame).toFixed(0)} fps; sync ${r.sync.toFixed(1)} ms; ${r.n} frames${r.disjoint ? ' (GPU disjoint!)' : ''}; errors ${errs.length}`);
+  console.log(`quality ${q} @ ${r.px}: GPU ${r.gpu.toFixed(1)} ms (p95 ${r.gpu95.toFixed(1)}), CPU ${r.cpu.toFixed(1)} ms (p95 ${r.cpu95.toFixed(1)}) → frame ${frame.toFixed(1)} ms ≈ ${(1000 / frame).toFixed(0)} fps; sync ${r.sync.toFixed(1)} ms; ${r.calls} draws, ${(r.tris / 1e6).toFixed(2)} M tris; ${r.n} frames${r.disjoint ? ' (GPU disjoint!)' : ''}; errors ${errs.length}`);
   for (const e of errs.slice(0, 3)) console.log('   ', e);
   await page.close();
 }

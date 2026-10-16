@@ -11,7 +11,7 @@
 // Events: flowChain {mult, pts, n, items}, flowBanked {bonus, mult, pts}, flowLost {pts},
 //         flowMeter {value}, flowState {on}, landingGrade {grade, label, drop, impact}
 import { PHYSICS as P } from '../config.js';
-import { emit, on, addScore } from '../state.js';
+import { emit, on, addScore, game } from '../state.js';
 
 export const FLOW_DEFAULTS = {
   enabled: false,
@@ -37,13 +37,17 @@ export class Flow {
     this.C = { ...FLOW_DEFAULTS, ...(P.flow || {}), fill: { ...FLOW_DEFAULTS.fill, ...(P.flow?.fill || {}) } };
     this.meter = 0; this.stateT = 0; this.boost = 0;
     this.chain = null; this.idle = 0;
+    this.newRun();
     this.offs = [
       on('score', (e) => this.onScore(e)),
       on('landed', (e) => this.onLanded(e)),
       on('crashed', () => this.onCrash()),
       on('nearMiss', () => this.addMeter(this.C.fill.nearMiss)),
       on('respawned', () => this.reset(false)),
-      on('rideStarted', () => this.reset(true)),
+      on('rideStarted', () => { this.reset(true); this.newRun(); }),
+      on('resetTop', () => this.newRun()),
+      on('runComplete', () => this.finishRun()),
+      on('stumble', () => { if (this.run) this.run.stumbles++; }),
     ];
   }
 
@@ -100,11 +104,13 @@ export class Flow {
       addScore(`Line ×${trim(s.mult)}`, bonus);
       this._banking = false;
       emit('flowBanked', { bonus, mult: s.mult, pts: s.pts });
+      if (this.run) this.run.bestLine = Math.max(this.run.bestLine, bonus);
     } else emit('flowBanked', { bonus: 0, mult: s.mult, pts: s.pts });
     emit('flowChain', null);
   }
 
   onCrash() {
+    if (this.run) this.run.crashes++;
     if (this.chain) emit('flowLost', { pts: this.chain.pts });
     this.chain = null;
     emit('flowChain', null);
@@ -115,6 +121,11 @@ export class Flow {
 
   onLanded(e) {
     const F = this.C.fill;
+    const r = this.run;
+    if (r && e.air > 0.35) {
+      r.longestAir = Math.max(r.longestAir, e.air);
+      if (e.clean) { r.biggestDrop = Math.max(r.biggestDrop, e.drop || 0); r.airs++; if (e.drop >= 10) r.drops++; r.trickPts += e.points || 0; if (e.trick) { r.tricks++; r.trickOnly += e.points || 0; } if (e.grade === 'stomped') r.stomps++; }
+    }
     if (!e.clean) return;
     if (e.trick || e.air > 0.7) {
       this.addMeter(F.trick + (e.points || 0) * F.perPoint);
@@ -127,6 +138,11 @@ export class Flow {
   /** Per physics step. */
   update(dt) {
     const pl = this.pl, C = this.C;
+    const r = this.run;
+    if (r) {
+      r.time += dt;
+      if (pl.state === 1) { r.ground += dt; r.speedSum += pl.speed * dt; r.topSpeed = Math.max(r.topSpeed, pl.speed); if (pl.speed < 3) r.slow += dt; }
+    }
     const air = pl.state === 2;   // State.AIR
     if (this.chain && !air) {
       this.idle += dt;
@@ -155,6 +171,36 @@ export class Flow {
 
   /** Trick-score multiplier while in flow state. */
   scoreMul() { return this.stateT > 0 ? this.C.scoreMul : 1; }
+
+  // ---------------------------------------------------------------- run summary (FWT-style judging)
+  newRun() {
+    this.run = { time: 0, ground: 0, speedSum: 0, topSpeed: 0, slow: 0, longestAir: 0, biggestDrop: 0, airs: 0, drops: 0,
+      tricks: 0, trickPts: 0, trickOnly: 0, stomps: 0, bestLine: 0, crashes: 0, stumbles: 0, score0: game.score };
+  }
+
+  /**
+   * Freeride World Tour judges one overall impression from Line, Fluidity, Control and Air & Style
+   * (docs/map3-research.md). Here each is 0–25 from what the run measured:
+   *   Line      — big drops and how many real features (drops ≥ 10 m) the line linked
+   *   Fluidity  — average speed on the snow, minus time spent crawling (< 3 m/s)
+   *   Control   — 25 minus crashes and stumbles; stomped landings earn back a little
+   *   Air & Style — points from real tricks (spins, flips, grabs) and how many; plain airs count a little
+   */
+  finishRun() {
+    const r = this.run;
+    if (!r || r.time < 5) return;
+    const avg = r.speedSum / Math.max(1, r.ground);
+    const clamp25 = (x) => Math.max(0, Math.min(25, x));
+    const line = clamp25(r.biggestDrop * 0.45 + r.drops * 2.2);
+    const fluidity = clamp25(avg / 24 * 25 - (r.slow / Math.max(1, r.time)) * 40);
+    const control = clamp25(25 - r.crashes * 7 - r.stumbles * 2.5 + r.stomps * 0.8);
+    const style = clamp25(r.trickOnly / 120 + r.tricks * 1.2 + r.airs * 0.25);   // real tricks (spins, flips, grabs) count; plain airs a little
+    const total = Math.round(line + fluidity + control + style);
+    const summary = { ...r, avg, line, fluidity, control, style, total, score: game.score - r.score0 };
+    this.lastRun = summary;
+    emit('runSummary', summary);
+    this.newRun();
+  }
 }
 
 /** Group score labels into "moves" for the variety rule ("Perfect FS 540 Indy" and "FS 540" are the same move). */

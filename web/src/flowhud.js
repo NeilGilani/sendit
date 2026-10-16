@@ -33,6 +33,21 @@ const CSS = /* css */`
 #flowHud .vig { position: absolute; inset: 0; opacity: 0; transition: opacity .6s; box-shadow: inset 0 0 140px 30px rgba(255, 120, 60, 0.28); }
 #flowHud .vig.on { opacity: 1; }
 body.fp #flowHud .fm { bottom: 46px; }
+#flowHud .rs { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(.96); min-width: 360px; padding: 22px 28px 20px; border-radius: 16px;
+  background: rgba(12, 16, 30, 0.62); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 18px 60px rgba(0,0,0,0.35);
+  opacity: 0; transition: opacity .45s, transform .45s; font-style: normal; font-family: "Inter", "Segoe UI", sans-serif; color: #fffaf0; }
+#flowHud .rs.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+#flowHud .rs h3 { margin: 0 0 4px; font-family: "Arial Black", Impact, sans-serif; font-style: italic; font-size: 22px; letter-spacing: 0.06em; color: #ffe14d; }
+#flowHud .rs .sub { font-size: 12px; letter-spacing: 0.22em; color: rgba(250,248,243,0.6); margin-bottom: 12px; }
+#flowHud .rs .row { display: flex; justify-content: space-between; gap: 24px; font-size: 14px; padding: 3px 0; }
+#flowHud .rs .row b { font-weight: 800; }
+#flowHud .rs .row small { opacity: 0.6; font-weight: 600; }
+#flowHud .rs .judge { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.14); }
+#flowHud .rs .bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,0.15); margin: 2px 0 6px; overflow: hidden; }
+#flowHud .rs .bar i { display: block; height: 100%; background: linear-gradient(90deg, #2ff5d6, #7a5cff); }
+#flowHud .rs .tot { display: flex; align-items: baseline; justify-content: space-between; margin-top: 10px; }
+#flowHud .rs .tot b { font-family: "Arial Black", Impact, sans-serif; font-style: italic; font-size: 46px; color: #ffe14d; line-height: 1; }
+#flowHud .rs .tot span { font-size: 13px; letter-spacing: 0.18em; color: rgba(250,248,243,0.7); }
 `;
 
 const GRADES = { stomped: ['STOMPED', '#ffe14d'], clean: ['CLEAN', '#2ff5d6'], sketchy: ['SKETCHY', '#ff6bb0'] };
@@ -50,7 +65,8 @@ export function mountFlowHud(player) {
     <div class="fm"><div class="lab">FLOW</div><div class="bar"><div class="fill"></div></div><div class="send">SEND IT</div></div>
     <div class="ch"><div class="mult">×1<small>0</small></div><div class="items"></div><div class="tim"><i></i></div></div>
     <div class="bank"></div>
-    <div class="gr"><div class="g"></div><div class="d"></div></div>`;
+    <div class="gr"><div class="g"></div><div class="d"></div></div>
+    <div class="rs"></div>`;
   host.appendChild(root);
   const $ = (s) => root.querySelector(s);
   const fm = $('.fm'), fill = $('.fill'), ch = $('.ch'), mult = $('.mult'), items = $('.items'), tim = $('.tim i');
@@ -89,6 +105,28 @@ export function mountFlowHud(player) {
     $('.d').textContent = [drop >= 4 ? `${Math.round(drop)} M DROP` : null, `${air.toFixed(1)} S AIR`].filter(Boolean).join('  ·  ');
     restart(gr);
   });
+  // End of run: the numbers and an FWT-style judged score (physics/flow.js finishRun).
+  const rs = $('.rs');
+  let rsT = 0;
+  on('runSummary', (r) => {
+    const kmh = (v) => `${Math.round(v * 3.6)} km/h <small>${Math.round(v * 2.237)} mph</small>`;
+    const t = `${Math.floor(r.time / 60)}:${String(Math.floor(r.time % 60)).padStart(2, '0')}`;
+    const bar = (k, v) => `<div class="row"><span>${k}</span><b>${v.toFixed(1)}</b></div><div class="bar"><i style="width:${v * 4}%"></i></div>`;
+    const rating = r.total >= 85 ? 'LEGENDARY' : r.total >= 70 ? 'PRO LINE' : r.total >= 55 ? 'SOLID' : r.total >= 40 ? 'GETTING THERE' : 'KEEP SENDING';
+    rs.innerHTML = `<h3>RUN COMPLETE</h3><div class="sub">FREERIDE · JUDGED LIKE THE FWT</div>
+      <div class="row"><span>Time</span><b>${t}</b></div>
+      <div class="row"><span>Average speed</span><b>${kmh(r.avg)}</b></div>
+      <div class="row"><span>Top speed</span><b>${kmh(r.topSpeed)}</b></div>
+      <div class="row"><span>Biggest drop</span><b>${Math.round(r.biggestDrop)} m</b></div>
+      <div class="row"><span>Longest air</span><b>${r.longestAir.toFixed(1)} s</b></div>
+      <div class="row"><span>Best line bonus</span><b>+${fmt(r.bestLine)}</b></div>
+      <div class="row"><span>Score</span><b>${fmt(r.score)}</b></div>
+      <div class="judge">${bar('Line', r.line)}${bar('Fluidity', r.fluidity)}${bar('Control', r.control)}${bar('Air &amp; style', r.style)}</div>
+      <div class="tot"><span>${rating}</span><b>${r.total}</b></div>`;
+    rs.classList.add('on');
+    rsT = performance.now() + 7000;
+  });
+  setInterval(() => { if (rsT && performance.now() > rsT) { rs.classList.remove('on'); rsT = 0; } }, 250);
   const show = () => { root.style.display = game.mode === Mode.RIDING || game.mode === Mode.LIFT ? '' : 'none'; };
   on('mode', show);
   show();
