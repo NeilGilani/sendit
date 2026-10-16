@@ -23,6 +23,7 @@ export const PHYSICS = {
   latePopTime: 0.15,          // s after rolling off a crest while loaded that releasing still pops (coyote time)           // m/s per step of separation below which the rider just stays on (no micro-hops)
   terrainImpactLoss: 0.5,     // share of an abrupt impact into the terrain (beyond smoothFollow) lost as speed
   smoothFollow: 0.25,         // m/s per step of normal velocity absorbed loss-free (smooth rolls and dips)
+  followMaxRate: 12,          // rad/s the terrain can turn the path upward on the ground (a height-field step is a bump, not a ramp)
   lipPopBonus: 1.0,           // pop multiplier on a kicker lip (1 = a plain ollie; the pop already rides the ramp's launch angle)
   airDrag: 0.006,
   landAssistTime: 0.25,       // s before touchdown when a released stick lets the gear settle onto its path …

@@ -19,6 +19,15 @@ const smooth01 = (t) => { const x = Math.min(1, Math.max(0, t)); return x * x * 
 // Shaped sidewalls: real kickers are cut with ~40° raked walls, rounded into the table and the ground.
 const sideRun = (k) => Math.max(1.0, k.H * 1.1);
 const sideFactor = (k, b) => { const hw = k.W / 2; return b <= hw ? 1 : 1 - smooth01((b - hw) / sideRun(k)); };
+/**
+ * Kicker surface over the local snow `base` at along-ramp `a`, across-ramp share `side` (sideFactor).
+ * The table is built level across (from the centre-line ground `g`), but that levelling fades in over
+ * the first 80 % of the in-run (no crest for a hop) and out across the sidewalls, so on a cross-slope
+ * the ramp starts flush with the snow. (It used to start from `g` everywhere: off-centre on the downhill side that was a
+ * 0.4–1.1 m vertical step at the very start of the ramp, which the lip normal turned into a 60–70°
+ * launch — the "shot into the sky at the start of the jump" bug; web/scripts/jumps-valcrest.mjs.)
+ */
+const kickerY = (k, a, side, g, base) => base + ((g - base) * smooth01(a / (0.8 * k.L)) + k.H * Math.pow(a / k.L, 1.7)) * side;
 
 export class Features {
   constructor(terrain) {
@@ -237,9 +246,8 @@ export class Features {
       const b = Math.abs(dx * k.r.x + dz * k.r.y);
       if (b > k.W / 2 + sideRun(k)) continue;
       const side = sideFactor(k, b);
-      const shape = k.H * Math.pow(a / k.L, 1.7) * side;
       const g = this.terrain.baseHeight(k.o.x + k.f.x * a, k.o.y + k.f.y * a);
-      return Math.max(base, g + shape);
+      return Math.max(base, kickerY(k, a, side, g, base));
     }
     return null;
   }
@@ -258,7 +266,8 @@ export class Features {
       const x = k.o.x + k.f.x * aG + k.r.x * b, z = k.o.y + k.f.y * aG + k.r.y * b;
       const side = Math.max(0, sideFactor(k, Math.abs(b)));
       const g = T.baseHeight(k.o.x + k.f.x * a, k.o.y + k.f.y * a);
-      const y = (lift ? g + k.H * Math.pow(a / k.L, 1.7) * side : T.baseHeight(x, z) - 0.3) + 0.03;
+      const bxz = T.baseHeight(x, z);
+      const y = (lift ? Math.max(bxz, kickerY(k, a, side, g, bxz)) : bxz - 0.3) + 0.03;
       pos.push(x, y, z);
       const lip = a > k.L - 0.35 && lift ? 1 : 0;
       col.push(lip ? 0.86 : 1.0, lip ? 0.92 : 1.0, lip ? 1.0 : 1.0);   // icy, blue-ish lip

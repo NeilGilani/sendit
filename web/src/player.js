@@ -296,7 +296,14 @@ export class Player {
         const mag = this.velocity.length();
         // Follow the terrain: rotate the velocity onto the new surface (keeps speed; a dip costs a little).
         const loss = Math.min(0.03 * mag, Math.max(0, -into - P.smoothFollow) * P.terrainImpactLoss);
-        this.velocity.addScaledVector(n2, -into).normalize().multiplyScalar(mag - loss);
+        _t1.copy(this.velocity).divideScalar(mag || 1);
+        this.velocity.addScaledVector(n2, -into).normalize();
+        // A real transition turns the path a few degrees per step; a step in the height field would
+        // turn it by tens of degrees at once and fire the rider off it like a ramp. Turn at most
+        // followMaxRate (rad/s); the rest is a bump the legs take (compression), never a launch.
+        const turn = _t1.angleTo(this.velocity), maxTurn = P.followMaxRate * dt;
+        if (turn > maxTurn) this.velocity.lerpVectors(_t1, this.velocity, maxTurn / turn).normalize();
+        this.velocity.multiplyScalar(mag - loss);
         this._followLoss = (this._followLoss || 0) + loss;
       }
       this.position.copy(np);
