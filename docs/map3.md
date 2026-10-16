@@ -216,7 +216,14 @@ spin, W / S to flip; Shift grabs. On this map (trickStyle):
   skis crossed hard, body arched); held over 0.9 s it scores as **Tweaked …** with +50 % grab points.
 - **Landing grades** (`landingGrade` event): **STOMPED** (perfect alignment, impact < 55 % of hardLanding),
   **CLEAN**, **SKETCHY** (stumble) — shown with the drop height and air time.
-- **Drops**: the greatest height above the snow in an air (≥ 6 m) scores `12/m` (+10/m beyond 15 m).
+- **Drops**: the greatest height above the snow in an air (≥ 6 m) scores `12/m` (+10/m beyond 15 m), named
+  after what you launched off (`course.featureAt`): "The Throne · 26 m drop", "Spine Wall · 14 m drop".
+  Landing on a roof scores **Roof landing · Old Lift Station** (+200).
+- **Line goals** (`course.lineGoals`, Steep "Mountain Stories" style): hit named features in order in one
+  clean run — **The Classic** (Band A → First Stack → Throne → Last Stack, +2500), **Station to Station**
+  (Station Cliff → the station roof, +1500), **Spine Tingler** (Spine Wall → West Ledges → Pillow Stacks),
+  **Into the Gorge** (the Couloir → the Ravine), **Hammer Time** (land the Hammer clean, +2000), **Roof
+  Hopper** (the station roof and the refuge roof). Progress ticks show in the chain area; a crash resets it.
 - **Line chain** (physics/flow.js): every scored move keeps the chain alive; the multiplier grows ×0.25 per
   *different* move (repeats count half) up to ×5; the chain banks as a **Line ×N** bonus 3.2 s after the last
   move on the snow (the air keeps it alive) and is lost on a crash.
@@ -226,8 +233,9 @@ spin, W / S to flip; Shift grabs. On this map (trickStyle):
   boost (1.8 m/s² of thrust); the
   music lifts (the upbeat track), a FoV kick and shake, an orange vignette, the suit's trims flare, a rumble.
 - **Run summary** at the valley (zen runs): time, average / top speed, biggest drop, longest air, best line,
-  score, and a **judged score out of 100** like the Freeride World Tour — Line, Fluidity, Control,
-  Air & Style, 0–25 each.
+  score, the named features linked and the line goals completed, and a **judged score out of 100** like the
+  Freeride World Tour — Line (biggest drop, real drops, different named features linked), Fluidity,
+  Control, Air & Style, 0–25 each.
 
 Game feel at speed: wind roar (noise through a low-pass sweeping 300 Hz → 6 kHz with speed, silent below
 16 m/s), the lens opening in the top of the speed range, a continuous speed shake, closer camera with less
@@ -317,7 +325,28 @@ checks passed.
 
 ### Performance
 
-PERF_TABLE
+GPU time per frame (EXT_disjoint_timer_query around the whole composer render: shadow map, scene, every post
+pass) at 1600×900 on the integrated Intel Arc 130V, production build (`vite build` + `vite preview`), the
+rider placed at six spots down each map's course path and riding. `node web/scripts/map3-perf.mjs <url> 1600 900
+0,1,2 45 <map>`; each spot is the quietest of three windows, and the table keeps the minimum over the runs
+(other sessions were using the GPU; contention only ever adds time).
+
+| map | quality | GPU avg / worst spot (ms) | per spot (2 / 20 / 38 / 55 / 62 / 80 % down the run) | draws | triangles | runs |
+|---|---|---|---|---|---|---|
+| valcrest-gully | 0 | 6.6 / 8.8 | 8.8 / 7.2 / 5.7 / 5.3 / 5.3 / 7.4 | 162–368 | 1.9–2.1 M | 3 |
+| valcrest-gully | 1 | 12.7 / 15.3 | 15.3 / 14.9 / 12.8 / 9.5 / 12.6 / 11.1 | 171–381 | 2.4–2.7 M | 3 |
+| valcrest-gully | 2 | 22.0 / 29.0 | 25.5 / 29.0 / 21.3 / 18.2 / 17.9 / 20.2 | 184–399 | 2.7–3.4 M | 3 |
+| ravenspire | 0 | 6.3 / 7.6 | 5.9 / 5.9 / 6.0 / 6.3 / 6.0 / 7.6 | 169–439 | 1.3–1.4 M | 2 |
+| ravenspire | 1 | 12.9 / 16.4 | 10.4 / 10.0 / 10.8 / 16.0 / 16.4 / 14.0 | 178–464 | 1.6–1.9 M | 2 |
+| ravenspire | 2 | 24.0 / 27.9 | 20.2 / 24.6 / 23.1 / 27.9 / 23.5 / 24.7 | 194–490 | 2.0–2.5 M | 2 |
+
+
+Ravenspire costs the same as Valcrest: quality 1 (the default) averages ~13 ms with its worst spot at ~16 ms
+(the station / gondola / larch area), inside the 14–16 ms target. What it took: the wild map draws fewer
+triangles than Valcrest (no park, no crowds, no fences; 1.6–1.9 M vs 2.4–2.7 M at quality 1), and the larch
+forest is capped at 9,000 trees (`course.spawn.treeStep` 9.5 / `treeMax` 9000) — the first build scattered
+16,300 trees and measured ~14–15 ms with spikes. Draw calls peak at the summit (~460, the whole valley in
+view: mid-ring chunks, far ranges) and fall to ~180 low down. CPU per frame stays 2–5 ms.
 
 ---
 
@@ -339,9 +368,10 @@ PERF_TABLE
   original scoring (by design, so its feel is unchanged). They could be switched on for other maps through
   `physics.common.flow` / `course.dropZones`.
 - **Challenge mode** works (gates along the hero line, medals at 24 / 20 / 16 m/s average) but slalom gates on
-  a 41° face are an odd fit; a Steep-style "line challenge" (pass named features in order) would suit better.
+  a 41° face are an odd fit; the zen-mode line goals (§4) are the better freeride challenge — a timed
+  "line challenge" mode built on them would be the next step.
 - The lobby UI, ui.js and main.js were not touched: the flow HUD is its own overlay (`flowhud.js`), and the
   physics hook is applied from the Player constructor, so no boot-code change was needed.
 
-Ideas: a "line challenge" mode (hit the Stacks, the Throne and the station roof in one run), sluff and small
-slab slides on the Spine Wall, ravens circling the spire, a replay camera for the biggest air of a run.
+Ideas: a timed challenge built on the line goals, sluff and small slab slides on the Spine Wall, a replay
+camera for the biggest air of a run, binocular-style unlocks for the drop zones.
