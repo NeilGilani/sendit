@@ -371,8 +371,8 @@ function buildWood(course, T) {
       p.setY(k, y * r); p.setZ(k, z * r);
     }
     body.computeVertexNormals();
-    // Bark dominates (a dark line across the snow reads from far away); snow only in patches along the top.
-    paint(body, (x, y, z, nx, ny) => (Math.abs(x) > 0.49 ? wood : ny > 0.8 && Math.sin(x * 23) + Math.sin(x * 57 + 1.3) > 0.2 ? snow : (Math.sin(x * 40 + z * 7) > 0.6 ? barkDark : bark)));
+    // A log in deep snow: a white hump on top (with a few bare patches), bark below, dark cut ends.
+    paint(body, (x, y, z, nx, ny) => (Math.abs(x) > 0.49 ? barkDark : ny > 0.25 - 0.25 * Math.sin(x * 17 + 0.7) * Math.sin(x * 41) ? snow : (Math.sin(x * 40 + z * 7) > 0.6 ? barkDark : bark)));
     return body;
   })();
   const stumpGeo = (() => {
