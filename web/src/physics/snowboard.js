@@ -90,15 +90,15 @@ export class SnowboardPhysics extends EdgePhysics {
   }
 
   /** Boards land with either end leading; sideways landings slide out before they crash. */
-  land(devNose) {
+  land(devNose, tol = 1) {
     const C = this.C;
     const dn = devNose / DEG;
     const sw = dn > 90;
     const dev = sw ? 180 - dn : dn;
     let result = 'crash';
-    if (dev <= C.landClean) result = 'clean';
-    else if (dev <= C.landStumble) result = 'stumble';
-    else if (dev <= C.landSlide) result = 'slide';
+    if (dev <= C.landClean * tol) result = 'clean';
+    else if (dev <= C.landStumble * tol) result = 'stumble';
+    else if (dev <= C.landSlide * tol) result = 'slide';
     return { result, switch: sw, dev };
   }
 

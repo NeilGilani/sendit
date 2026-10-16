@@ -5,7 +5,7 @@
 // SkiPhysics or SnowboardPhysics instance (physics/), chosen with setEquipment(type, variant).
 // Tunables: PHYSICS (+ PHYSICS.ski / PHYSICS.snowboard) in config.js.
 import * as THREE from 'three';
-import { PHYSICS as P, FX } from './config.js';
+import { PHYSICS as P, FX, applyMapTuning } from './config.js';
 import { game, Mode, setMode, emit, addScore } from './state.js';
 import { angleDiff, lerpAngle, clamp } from './physics/math.js';
 import { SkiPhysics } from './physics/ski.js';
@@ -20,6 +20,9 @@ const _n = new THREE.Vector3(), _v = new THREE.Vector3(), _t1 = new THREE.Vector
 export class Player {
   constructor(terrain, scatter, lifts, input) {
     Object.assign(this, { terrain, scatter, lifts, input });
+    // Per-map physics (course.physics, config.js applyMapTuning): only for a real world terrain, so lobby
+    // previews on a flat stand-in never reset the loaded map's tuning.
+    if (terrain && terrain.course !== undefined) applyMapTuning(terrain.course);
     this.state = State.FROZEN;
     this.position = new THREE.Vector3();
     this.velocity = new THREE.Vector3();
@@ -225,6 +228,11 @@ export class Player {
     this.velocity.copy(v);
     this.speed = v.length();
     const np = this.position.clone().addScaledVector(v, dt);
+    // Solid walls (buildings): blocked before the height lookup, which would otherwise lift the rider onto the roof.
+    if (T.features?.blockAt) {
+      const b = T.features.blockAt(np.x, this.position.y, np.z, this.position.x, this.position.y, this.position.z);
+      if (b && this.hitWall(np, b)) return;
+    }
     const gh = T.getHeight(np.x, np.z);
     if (np.y - gh > P.takeoffGap && this.speed > 4) {
       this.position.copy(np);
@@ -244,6 +252,8 @@ export class Player {
         this.trackProgress(dt);
         return;
       }
+      // Compression: normal velocity the legs absorb over the last ~0.12 s (a flat bottom at speed piles up).
+      this.compression = (this.compression || 0) * Math.exp(-dt / 0.12) + Math.max(0, -into);
       if (into < 0) {
         const mag = this.velocity.length();
         // Follow the terrain: rotate the velocity onto the new surface (keeps speed; a dip costs a little).
@@ -252,7 +262,19 @@ export class Player {
         this._followLoss = (this._followLoss || 0) + loss;
       }
       this.position.copy(np);
+      if (this.compression > P.compressionCrash) {
+        this.lastCrash = { reason: 'compression', impact: this.compression, air: 0, spins: 0, flips: 0 };
+        this.compression = 0;
+        this.crash('compression');
+        return;
+      }
+      if (this.compression > P.compressionStumble && this.stumbleT <= 0 && !(this._landGrace > 0)) {
+        this.stumbleT = P.stumbleTime * 0.7;
+        this.velocity.multiplyScalar(0.9);
+        emit('stumble', 'compression');
+      }
     }
+    this._landGrace = Math.max(0, (this._landGrace || 0) - dt);
     this.trackProgress(dt);
     this.checkLift();
   }
@@ -281,6 +303,7 @@ export class Player {
   }
 
   enterAir(popped = false) {
+    this.takeoffPos = (this.takeoffPos || new THREE.Vector3()).copy(this.position);
     this.state = State.AIR; this.airTime = 0; this._spinTotal = 0; this.spinRate = 0; this.turnVelocity = 0;
     this.grab = 0; this.stop = 0; this.butter = 0; this.press = 0;
     this.dyn.takeoffInfo(popped);
@@ -288,7 +311,7 @@ export class Player {
   }
 
   airStep(dt) {
-    this.velocity.y -= P.gravity * dt;
+    this.velocity.y -= P.gravity * P.airGravity * dt;
     this.velocity.multiplyScalar(1 - P.airDrag * this.velocity.length() * dt * 0.1);
     this.dyn.air(dt, this._ctrl);
     this._spinTotal += this.spinRate * dt;
@@ -297,7 +320,14 @@ export class Player {
     this.skid *= Math.exp(-4 * dt);
     this.airTime += dt;
     this.speed = this.velocity.length();
+    const px = this.position.x, py = this.position.y, pz = this.position.z;
     this.position.addScaledVector(this.velocity, dt);
+    // Flying into a wall from the side (landing on a roof from above is fine).
+    const blockAt = this.terrain.features?.blockAt;
+    if (blockAt) {
+      const b = blockAt(this.position.x, this.position.y, this.position.z, px, py, pz);
+      if (b && this.hitWall(this.position, b)) return;
+    }
     const gh = this.terrain.getHeight(this.position.x, this.position.z);
     if (this.position.y <= gh) {
       this.position.y = gh;
@@ -311,14 +341,23 @@ export class Player {
   land() {
     const n = this.normalAt(this.position.x, this.position.z, this.groundNormal);
     const vn = this.velocity.dot(n);
-    const impact = Math.max(0, -vn);
-    this.landingVy = impact;
+    const rawImpact = Math.max(0, -vn);
+    // Deep powder soaks up part of the hit (big-mountain maps; 0 by default). Roofs and rock don't.
+    const surf = this.terrain.getSurface(this.position.x, this.position.z, this.surface);
+    const onRoof = this.terrain.baseHeight ? this.terrain.getHeight(this.position.x, this.position.z) - this.terrain.baseHeight(this.position.x, this.position.z) > 0.3 : false;
+    const soft = onRoof ? 0.5 : clamp(surf.y + surf.w, 0, 1);
+    const impact = Math.max(0, rawImpact - P.landPowderAbsorb * soft);
+    this.landingVy = rawImpact;
     this.velocity.addScaledVector(n, -vn);
+    if (P.landPowderScrub) this.velocity.multiplyScalar(Math.max(0.55, 1 - P.landPowderScrub * rawImpact * soft));
     const velYaw = Math.atan2(-this.velocity.x, -this.velocity.z);
     const devNose = Math.abs(angleDiff(this.heading, velYaw));
     const spins = Math.round(Math.abs(this._spinTotal) / Math.PI);  // 180s
-    const slow = this.velocity.length() < 1.5;
-    const ev = slow ? { result: 'clean', switch: this.isSwitch, dev: 0 } : this.dyn.land(devNose);
+    const landSpeed = this.velocity.length();
+    const slow = landSpeed < 1.5;
+    // Fast landings forgive less sideways (landYawSpeed: tolerances × scale from v0 → v1).
+    const ys = P.landYawSpeed ? 1 + (P.landYawSpeed[2] - 1) * clamp((landSpeed - P.landYawSpeed[0]) / (P.landYawSpeed[1] - P.landYawSpeed[0]), 0, 1) : 1;
+    const ev = slow ? { result: 'clean', switch: this.isSwitch, dev: 0 } : this.dyn.land(devNose, ys);
     // Pitch: a flip has to come round to (near) upright; the worse of yaw and pitch decides.
     const fl = this.dyn.landFlip();
     if (fl.result === 'crash') ev.result = 'crash';
@@ -340,6 +379,7 @@ export class Player {
     this.dyn.travel = ev.switch ? -1 : 1;
     this.travelSign = this.dyn.travel;
     this.state = State.GROUNDED;
+    this.compression = 0; this._landGrace = 0.3;   // the landing itself was judged above
     this._alignTimer = 0.35;
     this.landingEvent++;
     const clean = ev.result === 'clean';
@@ -401,10 +441,40 @@ export class Player {
     this._busy = false;
   }
 
+  /**
+   * A building wall (terrain.features.blockAt): push out along the wall normal and keep the speed along
+   * the wall, so a glancing touch slides past instead of snagging; hitting it square at speed knocks the
+   * rider down. `pos` is corrected in place. Returns true when the step should end here.
+   */
+  hitWall(pos, b) {
+    pos.x += b.nx * (b.depth + 0.03);
+    pos.z += b.nz * (b.depth + 0.03);
+    const into = -(this.velocity.x * b.nx + this.velocity.z * b.nz);
+    if (into > 0) {
+      this.velocity.x += b.nx * into * 1.15;
+      this.velocity.z += b.nz * into * 1.15;
+      if (into > P.wallCrashSpeed) {
+        this.position.copy(pos);
+        if (this.state === State.GROUNDED) this.position.y = this.terrain.getHeight(pos.x, pos.z);
+        this.velocity.multiplyScalar(0.4);
+        this.lastCrash = { reason: b.kind, impact: into, air: this.airTime, spins: 0, flips: 0 };
+        this.crash(b.kind);
+        return true;
+      }
+      emit('bump', into);
+    }
+    return false;
+  }
+
   collide() {
     if (!this.scatter) return;
     const o = this.scatter.findObstacle(this.position, 0.35);
     if (!o) return;
+    // Obstacles have a height (opt-in): flying well over a tree crown or a boulder clears it.
+    if (P.obstacleHeights && this.state === State.AIR) {
+      const top = o[3] === 'tree' ? o[2] * 26 : o[3] === 'rock' ? o[2] * 1.1 + 0.3 : o[3] === 'tower' ? 15 : 2;
+      if (this.position.y - this.terrain.getHeight(o[0], o[1]) > top) return;
+    }
     const away = new THREE.Vector3(this.position.x - o[0], 0, this.position.z - o[1]);
     if (away.lengthSq() < 1e-4) away.copy(this.forward()).negate();
     away.normalize();

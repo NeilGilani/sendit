@@ -76,16 +76,16 @@ export class SkiPhysics extends EdgePhysics {
   grabName() { return this.pl.turnInput > 0.2 ? 'Japan' : this.pl.turnInput < -0.2 ? 'Mute' : 'Safety'; }
 
   /** Skis: only the tips may lead; backwards landings work on twin tips (switch), else stumble/crash. */
-  land(devNose) {
+  land(devNose, tol = 1) {
     const C = this.C;
     const dn = devNose / DEG, dt = 180 - dn;
     if (dt <= C.switchLand) {
-      if (this.H.twin) return { result: dt <= C.landClean ? 'clean' : 'stumble', switch: true, dev: dt };
-      return { result: dt <= C.landClean ? 'stumble' : 'crash', switch: true, dev: dt };
+      if (this.H.twin) return { result: dt <= C.landClean * tol ? 'clean' : 'stumble', switch: true, dev: dt };
+      return { result: dt <= C.landClean * tol ? 'stumble' : 'crash', switch: true, dev: dt };
     }
-    if (dn <= C.landClean) return { result: 'clean', switch: false, dev: dn };
-    if (dn <= C.landStumble) return { result: 'stumble', switch: false, dev: dn };
-    if (dn <= C.landCrash) return { result: 'slide', switch: false, dev: dn };
+    if (dn <= C.landClean * tol) return { result: 'clean', switch: false, dev: dn };
+    if (dn <= C.landStumble * tol) return { result: 'stumble', switch: false, dev: dn };
+    if (dn <= C.landCrash * tol) return { result: 'slide', switch: false, dev: dn };
     return { result: 'crash', switch: false, dev: dn };
   }
 

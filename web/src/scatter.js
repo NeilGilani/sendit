@@ -105,7 +105,7 @@ export class Scatter {
     const thinFrom = real ? course.treeline - 250 : SPAWN.treeThinFrom;
     const T = this.terrain;
     const rnd = mulberry32(911);
-    const S = SPAWN;
+    const S = { ...SPAWN, ...(course?.spawn || {}) };   // a course may override spawning (course.spawn)
     // Path samples (every 6 m) in a coarse hash for fast "distance to run" queries.
     const samples = [];
     let run = 0;

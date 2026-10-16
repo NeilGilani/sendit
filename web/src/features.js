@@ -58,6 +58,13 @@ export class Features {
     };
     this.at = at;
 
+    // A course with `park: false` (e.g. a wild freeride face) gets no kickers, rollers, pillows,
+    // banners or crowds; it can still add its own rideable surfaces (course.heightAt / blockAt).
+    if (course.park === false) {
+      this.bumps = [];
+      T.features = this.terrainHooks();
+      return;
+    }
     const J = JUMPS;
     const rnd = mulberry32(2024);
     const rr = (a) => a[0] + (a[1] - a[0]) * rnd();
@@ -101,7 +108,14 @@ export class Features {
     }
     this.bakeBumps(bumps);
     this.bumps = bumps;
-    T.features = { heightAt: (x, z, base) => this.heightAt(x, z, base) };
+    T.features = this.terrainHooks();
+  }
+
+  /** terrain.features: heightAt (park features + the course's own surfaces) and, if the course has walls, blockAt. */
+  terrainHooks() {
+    const hooks = { heightAt: (x, z, base) => this.heightAt(x, z, base) };
+    if (this.course?.blockAt) hooks.blockAt = (x, y, z, px, py, pz) => this.course.blockAt(x, y, z, px, py, pz);
+    return hooks;
   }
 
   planKicker({ p, dir }, lateral, k, signature) {
@@ -155,6 +169,13 @@ export class Features {
 
   /** Meshes for the planned features (after the terrain is built). */
   build() {
+    if (this.course?.park === false) {
+      // Wild map: only the course's own props (buildings, ruins…) and its obstacles.
+      if (this.course.buildProps) this.group.add(this.course.buildProps({ terrain: this.terrain }));
+      this.obstaclePoints = (this.course.obstacles || []).slice();
+      this.addFogPockets();
+      return;
+    }
     // Shaped park snow: packed, shovel-smoothed, glazed lip (same optics as the terrain snow).
     const snowMat = toonMaterial({
       name: 'kicker', vertexColors: true,
@@ -202,6 +223,10 @@ export class Features {
 
   /** Height of park features at x/z (null if none). */
   heightAt(x, z, base) {
+    if (this.course?.heightAt) {
+      const y = this.course.heightAt(x, z, base);
+      if (y !== null && y > base) return y;
+    }
     for (const k of this.kickers) {
       if (x < k.box[0] || x > k.box[1] || z < k.box[2] || z > k.box[3]) continue;
       const dx = x - k.o.x, dz = z - k.o.y;

@@ -68,9 +68,9 @@ export class Life {
     scene.add(this.group);
     this.rnd = mulberry32(99);
     this.mat = toonMaterial({ name: 'people', vertexColors: true, rim: 0.4 });
-    this.buildSkiers();
+    this.buildSkiers(course?.life?.skiers ?? 10);   // a course can opt out of people (course.life)
     this.buildChairRiders();
-    this.buildLodge();
+    if (course?.life?.lodge !== false) this.buildLodge();
     this.buildBirds();
   }
 

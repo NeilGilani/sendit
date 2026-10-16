@@ -35,6 +35,15 @@ export const PHYSICS = {
   crashImpact: 18,            // m/s into the slope
   treeCrashSpeed: 9,
   tumbleTime: 1.4,
+  // Big-mountain landing / terrain model (off by default; maps turn them on through their physics hook).
+  landPowderAbsorb: 0,        // m/s of landing impact (into the slope) deep powder soaks up before it counts
+  landPowderScrub: 0,         // share of speed lost per m/s of landing impact in deep powder (the snow explodes, you sink)
+  landYawSpeed: null,         // [v0, v1, scale]: yaw landing tolerances shrink to `scale` × from v0 → v1 m/s
+  compressionStumble: Infinity,   // m/s: abrupt compression on the ground (a flat bottom at speed) that buckles the knees …
+  compressionCrash: Infinity,     // … or slams the rider
+  airGravity: 1,              // gravity multiplier in the air (< 1 = floatier, longer hang time)
+  obstacleHeights: false,     // obstacles have a height: flying well above a tree or rock clears it
+  wallCrashSpeed: 9,          // m/s into a building wall that knocks the rider down
   // Aerodynamic auto-tuck
   autoTuckDelay: 2.5,         // seconds without directional input
   autoTuckSpeedRatio: 0.6,
@@ -241,6 +250,50 @@ export const ART = {
   windSpeed: 1.3,
   windIntensity: 0.05,
 };
+
+// ------------------------------------------------------------------ Per-map tuning hook
+// A Course-compatible object may carry
+//   physics = { common?: {...}, ski?: {...}, snowboard?: {...} }   → PHYSICS / PHYSICS.ski / PHYSICS.snowboard
+//   camera  = {...}                                                → CAMERA
+// applyMapTuning(course) first restores every value to the defaults above, then applies the map's
+// overrides, so loading another map always starts clean. Values are written into the existing
+// objects (the physics modules hold references to PHYSICS.ski / .snowboard), nested plain objects
+// merge, arrays and scalars replace. Unknown keys are allowed (new map-only tunables).
+const DEFAULTS = { PHYSICS: deepClone(PHYSICS), CAMERA: deepClone(CAMERA) };
+export let mapTuning = null;     // the overrides currently applied (null = defaults)
+
+export function applyMapTuning(course) {
+  restore(PHYSICS, DEFAULTS.PHYSICS);
+  restore(CAMERA, DEFAULTS.CAMERA);
+  const ph = course?.physics, cam = course?.camera;
+  if (ph?.common) merge(PHYSICS, ph.common);
+  if (ph?.ski) merge(PHYSICS.ski, ph.ski);
+  if (ph?.snowboard) merge(PHYSICS.snowboard, ph.snowboard);
+  if (cam) merge(CAMERA, cam);
+  mapTuning = ph || cam ? { physics: ph || null, camera: cam || null } : null;
+  return mapTuning;
+}
+
+function deepClone(o) {
+  if (Array.isArray(o)) return o.map(deepClone);
+  if (o && typeof o === 'object') return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, deepClone(v)]));
+  return o;
+}
+function isPlain(o) { return o && typeof o === 'object' && !Array.isArray(o); }
+function merge(dst, src) {
+  for (const [k, v] of Object.entries(src)) {
+    if (isPlain(v) && isPlain(dst[k])) merge(dst[k], v);
+    else dst[k] = deepClone(v);
+  }
+}
+/** Put `dst` back to `def` in place: same nested objects, default values, map-only keys removed. */
+function restore(dst, def) {
+  for (const k of Object.keys(dst)) if (!(k in def)) delete dst[k];
+  for (const [k, v] of Object.entries(def)) {
+    if (isPlain(v) && isPlain(dst[k])) restore(dst[k], v);
+    else dst[k] = deepClone(v);
+  }
+}
 
 // ------------------------------------------------------------------ HUD
 export const HUD = {

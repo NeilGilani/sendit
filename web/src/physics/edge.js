@@ -467,7 +467,7 @@ export class EdgePhysics {
     // the height above the snow right below suggests).
     const pl = this.pl, T = pl.terrain;
     if (!T) return 0.6;
-    const g = P.gravity, h = 0.04;
+    const g = P.gravity * (P.airGravity ?? 1), h = 0.04;
     let x = pl.position.x, y = pl.position.y, z = pl.position.z, vy = pl.velocity.y;
     const vx = pl.velocity.x, vz = pl.velocity.z;
     for (let t = h; t <= 3; t += h) {
@@ -500,7 +500,7 @@ export class EdgePhysics {
    * Landing evaluation. `devNose` = |yaw between the nose and the path| (0..π).
    * Returns { result: 'clean'|'stumble'|'slide'|'crash', switch, dev (deg) }.
    */
-  land(devNose) { void devNose; return { result: 'clean', switch: false, dev: 0 }; }
+  land(devNose, tol = 1) { void devNose; void tol; return { result: 'clean', switch: false, dev: 0 }; }
 
   /** Trick name for the score popup. */
   trickLabel(t, spins) { return spins >= 1 ? `${spins * 180}` : ''; }

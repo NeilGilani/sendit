@@ -32,9 +32,9 @@ const store = {
 export function courseKey(course) { return course.meta ? `${course.meta.id}.${course.runIndex ?? 0}` : 'gully'; }
 export function bestFor(key) { return store.get(`sendit.best.${key}`, null); }
 export function flakesFound(key) { return store.get(`sendit.flakes.${key}`, []).length; }
-export function medalFor(time, length) {
+export function medalFor(time, length, speeds = CHALLENGE.medalSpeeds) {
   const v = length / Math.max(time, 1);
-  const M = CHALLENGE.medalSpeeds;
+  const M = speeds;
   return v >= M.gold ? 'gold' : v >= M.silver ? 'silver' : v >= M.bronze ? 'bronze' : null;
 }
 export function fmtTime(t) {
@@ -71,6 +71,7 @@ export class Activities {
   constructor({ scene, course, features, terrain, player, fx }) {
     Object.assign(this, { scene, course, features, terrain, player, fx });
     this.key = courseKey(course);
+    this.medalSpeeds = course.challenge?.medalSpeeds ?? CHALLENGE.medalSpeeds;   // fast maps set their own (course.challenge)
     this.group = new THREE.Group();
     this.group.name = 'Activities';
     scene.add(this.group);
@@ -321,7 +322,7 @@ export class Activities {
     this.state = 'finished';
     const total = this.time + this.penalty;
     const length = this.course.finishAt;
-    const medal = medalFor(total, length);
+    const medal = medalFor(total, length, this.medalSpeeds);
     const prev = bestFor(this.key);
     const isBestTime = !prev || total < prev.time;
     const best = {
@@ -334,7 +335,7 @@ export class Activities {
     const res = {
       time: total, raw: this.time, penalty: this.penalty, medal, best, isBestTime, isBestScore: this.runScore >= best.score && this.runScore > 0,
       score: this.runScore, gates: this.gatesPassed, gateTotal: this.gates.length, flakes: this.found.size, flakeTotal: this.flakes.length,
-      targets: Object.fromEntries(Object.entries(CHALLENGE.medalSpeeds).map(([k, v]) => [k, length / v])),
+      targets: Object.fromEntries(Object.entries(this.medalSpeeds).map(([k, v]) => [k, length / v])),
     };
     emit('runFinished', res);
     return res;
