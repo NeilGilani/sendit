@@ -21,7 +21,8 @@ export function installScoring() {
       if (dist < S.THREAD) addScore('Threaded', S.threadPoints);
       if (chain % S.STEP === 0) {
         addScore(`Tree slalom ×${chain}`, S.stepPoints * (chain / S.STEP));
-        emit('hint', chain >= 15 ? 'Untouchable in the trees!' : 'Keep weaving — the chain is building');
+        if (chain === 10) emit('hint', 'Tree slalom ×10 — keep weaving');
+        if (chain === 20) emit('hint', 'Untouchable in the trees!');
       }
     }),
     on('crashed', () => { chain = 0; }),

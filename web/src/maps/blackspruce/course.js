@@ -390,7 +390,7 @@ export class BlackspruceCourse {
       flakes: FLAKES.map(([t, d, y]) => { const w = this.world(t, d); return { x: w.x, z: w.z, y }; }),
       // Average m/s over the run (finishAt / time incl. penalties). Calibrated with the bot
       // (web/scripts/map2-bot.mjs) and test rides: see docs/map2.md.
-      medalSpeeds: { gold: 15.5, silver: 13.5, bronze: 11.5 },
+      medalSpeeds: { gold: 16, silver: 14, bronze: 12 },
     };
     // The generic background forest stays outside the designed one.
     this.spawn = { runCorridor: 150, ridgeFenceMax: 0, runLength: 2400, treeMax: 20000 };

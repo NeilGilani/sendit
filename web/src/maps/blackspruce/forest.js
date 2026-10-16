@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toonMaterial, mulberry32 } from '../../world.js';
-import { SECTIONS, CLEARINGS, BAND, STUMPS, KICKERS, ROLLERS, GATES } from './layout.js';
+import { SECTIONS, CLEARINGS, BAND, STUMPS, KICKERS, ROLLERS, GATES, PILLOWS } from './layout.js';
 
 export const TREE_HIT = { base: 0.2, perWidth: 0.32 };   // hitbox radius = base + perWidth · crown width scale
 const ZONE = 150;                   // |d| metres covered by the designed forest (the generic one starts beyond)
@@ -86,14 +86,15 @@ export function planForest(course) {
     }
   }
 
-  // ---- trail signs in the wedge where each side lane splits off the main line (telegraph the fork)
+  // ---- trail signs in the wedge where each side lane splits off the main line (telegraph the fork).
+  //      Breakaway markers like the slalom gates' poles: they don't collide (riders cross the wedge).
   const signs = [];
   for (const L of lanes) {
     if (L.kind === 'main') continue;
-    for (let t = L.t0 + 4; t < L.t0 + 60; t++) {
+    for (let t = L.t0 + 4; t < L.t0 + 80; t++) {
       const m = course.laneAt(course.mainLane, t), s = course.laneAt(L, t);
       const gap = Math.abs(s.d - m.d) - s.hw - m.hw;
-      if (gap < 1.6 || inClearing(t, (s.d + m.d) / 2)) continue;
+      if (gap < 2.5 || inClearing(t, (s.d + m.d) / 2)) continue;
       const sideL = s.d < m.d;
       const d = sideL ? s.d + s.hw + gap / 2 : m.d + m.hw + gap / 2;
       course.world(t, d, p);
@@ -118,12 +119,17 @@ export function planForest(course) {
       const ok = l.hw >= 3.7 && t > S.t0 + 30 && !inClearing(t, l.d, 22) && !logZone(t, l.d)
         && !course.logs.some((g) => t > g.t - 14 && t < g.t + 26)
         && !ROLLERS.some((r) => t > r[0] - 10 && t < r[0] + 55)
+        && !PILLOWS.some(([pt, pd, R]) => t > pt - 8 && t < pt + 45 && Math.abs(pd - l.d) < l.hw + R)
         && !GATES.some((g) => Math.abs(g[0] - t) < 25)
         && !(t > BAND.t - 20 && t < BAND.t + 40)
         && !kickZones.some((z) => t > z.t0 - 20 && t < z.t1 + 10);
       if (ok) {
-        const off = side * l.hw * (0.18 + rnd() * 0.17);
-        side = -side;
+        // On a curving lane the pivot sits on the inside (the apex), leaving the natural wide carving
+        // line open; on a straight one, sides alternate.
+        const bend = course.laneAt(L, t + 12).d + course.laneAt(L, t - 12).d - 2 * l.d;   // > 0: curving toward +d
+        const s = Math.abs(bend) > 0.6 ? Math.sign(bend) : side;
+        const off = s * l.hw * (0.18 + rnd() * 0.17);
+        side = -s;
         const d = l.d + off;
         course.world(t, d, p);
         const r = rnd();
@@ -241,7 +247,6 @@ export function forestObstacles(course) {
     ...F.trees.map(([x, z, , , , , , hit]) => [x, z, hit, 'tree']),
     ...F.rocks.map(([x, z, , , , hit]) => [x, z, hit, 'rock']),
     ...F.stumps.map(([x, z, r]) => [x, z, r + 0.05, 'stump']),
-    ...F.signs.map((s) => [s.x, s.z, 0.12, 'sign']),   // the post
   ];
 }
 
