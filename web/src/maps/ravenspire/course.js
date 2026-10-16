@@ -514,8 +514,13 @@ function benchRaise(u, uc, h, L, wF) {
 function horn(e, x, z, hx, hz, peak, slope, twist) {
   const dx = x - hx, dz = z - hz;
   const c = Math.cos(twist), s = Math.sin(twist);
-  const r = Math.max(Math.abs(dx * c + dz * s), Math.abs(-dx * s + dz * c)) * 0.82 + Math.hypot(dx, dz) * 0.18;
-  const top = peak - r * slope + (ridged(dx / 520, dz / 520, 3) - 0.5) * 180 * sstep(60, 500, r);
+  // A lobed footprint (aretes and faces, not a pyramid) and radial gullies / ribs down its faces.
+  const ang = Math.atan2(dz, dx);
+  const lobes = 1 + 0.09 * Math.sin(ang * 3 + twist * 5) + 0.05 * Math.sin(ang * 7 + twist * 3);
+  const r = (Math.max(Math.abs(dx * c + dz * s), Math.abs(-dx * s + dz * c)) * 0.7 + Math.hypot(dx, dz) * 0.3) * lobes;
+  if (peak - r * slope + 120 <= e) return e;
+  const gullies = (ridged(ang * 5.5 + twist, r / 140, 2) - 0.45) * 55 * sstep(25, 160, r);
+  const top = peak - r * slope + (ridged(dx / 260, dz / 260, 4) - 0.5) * 150 * sstep(30, 300, r) + gullies;
   if (top <= e) return e;
   return e + (top - e) * smooth((top - e) / 50);
 }
