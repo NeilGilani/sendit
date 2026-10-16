@@ -184,10 +184,13 @@ GPU timer queries per draw (`web/scripts/gfxgpu.mjs`, quality 1, 1600×900, chas
 | helmet + lens (3.1 k + 1.1 k vertices) | < 0.01 | 0.01 |
 | rider total | ≈ 0.10 ms (+0.17 ms eyebrow shadow artefact in both) | ≈ 0.20 ms |
 
-Whole-frame `gfxperf.mjs` (quality 0/1/2): 9.1 / 14.2 / 27.1 ms GPU before; afterwards the same within
-run-to-run noise (other sessions were sharing the GPU, so whole-frame numbers swung by ±10 ms; the
-per-draw timer numbers above are the reliable ones). The geometry is built once per page (about 50–150 ms on
+Whole-frame `gfxperf.mjs` (quality 0/1/2): 9.1 / 14.2 / 27.1 ms GPU before; after, 8.7 / 14.2–16.2 /
+23.4 ms in the quieter runs. Other sessions were sharing the GPU (up to five headless browsers), so
+whole-frame numbers swung by 10–20 ms between runs; the per-draw timer numbers above are the reliable
+ones (re-measured on the final build: outfit 0.07–0.09 ms + 0.04 ms shadow at every quality). The geometry is built once per page (about 50–150 ms on
 first load, shared by both riders) and adds two draw calls (outfit + lens) to the main and shadow passes.
+
+No new asset files: everything is generated in code, so CREDITS.md is unchanged.
 
 ## Known issues / limits
 
@@ -199,3 +202,5 @@ first load, shared by both riders) and adds two draw calls (outfit + lens) to th
 - Poles and skis / board keep their equipment-catalog colours (pink poles), which can clash with
   earth-tone colourways; equipment colours are the equipment code's business.
 - Logos are abstract marks (no text rendering); the strap wordmark is blocky glyphs.
+- Helmet cam: the bulkier sleeves and gauntlets now hide most of the pole shafts, which `placePoles()`
+  runs along the forearms (animation code, untouched here).
