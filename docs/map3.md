@@ -315,7 +315,7 @@ Styles: **send** = tucked straight down the line, popping every cliff; **trick**
 | Bowl → refuge roof | ski | trick | finished | 152.7 s | 19.9 m/s (45 mph) | 0 | 0 | 18.1 s (4.4 s) | 31 m | 88 |
 | Bowl → refuge roof | snowboard | trick | finished | 149 s | 20.4 m/s (46 mph) | 0 | 0 | 16.3 s (4.45 s) | 32 m | 88 |
 
-All 24 runs reach the valley; the one crash is the Hammer sent with a full pop (by design: roll it). Carve style (12 more runs): 15–17 m/s average, all finish; its 3 crashes are a wide turn into the couloir wall and turns into the refuge's solid chimney while riding its roof. Every drop zone starts cleanly (9 zones × 2 gears, 8 s straight-line from each).
+All 24 runs reach the valley; the one crash is the Hammer sent with a full pop (by design: roll it). Carve style (12 more runs): 15–17 m/s average, all finish; its 3 crashes are a wide turn into the couloir wall and turns into the refuge's solid chimney while riding its roof. Every drop zone rides cleanly: 9 zones × 2 gears, the first 200 m from each with the control bot, no crashes (a stumble off Station Cliff and one in the pillows).
 
 ### Terminal speeds (web/scripts/map3-speeds.mjs: 60 s straight down a powder plane)
 
