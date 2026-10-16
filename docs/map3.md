@@ -149,6 +149,7 @@ snow** on convex crests (Laplacian) — packed snow is faster and lands harder (
 | features.js | `buildProps({ terrain })`, `obstacles` | the map's meshes; gondola tower collision circles |
 | life.js | `life: { skiers: 0, lodge: false }` | no other riders, no lodge (birds stay) |
 | scatter.js | `spawn: {...}` (SPAWN overrides), `forestAt / pisteAt / treeline` | fewer, smaller boulders on the face; larches only low, clearings around buildings and under the gondola |
+| scatter.js | `rockOk(x, z)` | rock clusters stay off the lines, drop zones and ravine floor |
 | activities.js | `challenge: { medalSpeeds }` | medal speeds for a fast map (24 / 20 / 16 m/s) |
 | activities.js | `flakeSpots()` | the 12 golden snowflakes at hand-picked spots instead of along the course path |
 | player.js | `edgeHint` | the "edge of the map" hint text |
