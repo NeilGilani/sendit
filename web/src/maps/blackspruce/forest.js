@@ -1,13 +1,19 @@
-// The designed forest of Blackspruce Plunge. planForest() is pure (no scene, no terrain): it plants
-// trees by variable-radius dart throwing (Poisson-disk-like) over the face, keeping the lanes,
-// clearings, kickers, logs and the rock band clear, then puts pivot obstacles in the lanes, marker
-// trees at the lane mouths, stumps and band rocks. The headless bot uses the same plan.
-// populateForest() hands it to scatter.js (instanced trees / boulders + collision hash) and builds
-// the log and stump meshes.
+// The designed forest of Blackspruce Plunge. planForest() is pure (no scene): phase by phase, each
+// with its own random stream —
+//   marker trees (tall, narrow) framing the lane mouths · trail signs in the fork wedges ·
+//   pivots (one tree / rock in a main or safe lane, placed by fairness rules) · rocks on the band ·
+//   the forest itself (variable-radius dart throwing, Poisson-disk-like, around the lanes, clearings,
+//   kickers, logs and the band; lane-edge trees are spires; the woods thin away from the lanes) ·
+//   sightline thinning (no crown hides a pivot 25–50 m before it) · stumps · lip poles on the band ·
+//   snags (dead standing spruce).
+// The headless bot (web/scripts/map2-bot.mjs) uses the same plan. populateForest() hands it to
+// scatter.js (instanced trees / boulders + collision hash) and builds the log, stump, snag, sign
+// and pole meshes.
 //
 // Hitboxes: a tree collides with its trunk and the dense inner crown (TREE_HIT), well inside the
 // branch tips — brushing needles is a close shave, not a crash. Boulders collide at their visible
-// footprint, stumps at their radius. Logs are part of the height field (you ride over them).
+// footprint, stumps and snags at their trunk. Logs are part of the height field (you ride over
+// them); signs and lip poles are breakaway markers (no collision, like the slalom gates' poles).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toonMaterial, mulberry32 } from '../../world.js';
@@ -200,8 +206,7 @@ export function planForest(course) {
     let sx = sc * S.slim * (0.9 + rnd() * 0.2);
     // Trees lining a lane are narrow spires (a limbed glade): their crowns barely reach into the
     // corridor, so the line stays readable and the chase camera stays out of the needles.
-    const g = g0;
-    if (g < 4) sx = Math.min(sx, Math.max(0.36, (g + 0.7) / 2.6));
+    if (g0 < 4) sx = Math.min(sx, Math.max(0.36, (g0 + 0.7) / 2.6));
     const hit = TREE_HIT.base + TREE_HIT.perWidth * sx;
     if (blocked(t, d, hit)) continue;
     course.world(t, d, p);
@@ -212,7 +217,7 @@ export function planForest(course) {
 
   // ---- sightline thinning (what glade crews do): every pivot must be visible from the lane
   //      25–50 m before it (≥ 2 s at speed). Trees whose crowns block that view are removed.
-  const SIGHT = { backs: [25, 30, 35, 40, 45, 50], eye: 1.7, crown: 2.4 };
+  const SIGHT = { backs: [25, 30, 35, 40, 45, 50], crown: 2.4 };   // crown radius ≈ 2.4 × width scale near the ground
   const cut = new Set();
   const TH = 8, th = new Map();
   trees.forEach((tr, i) => {
@@ -223,7 +228,6 @@ export function planForest(course) {
   const eye = { x: 0, z: 0 };
   for (const [px, pz, , , pt, laneId] of pivots) {
     const L = lanes.find((l) => l.id === laneId);
-    const ty = course.height(px, pz) + 1.0;
     for (const back of SIGHT.backs) {
       const l = course.laneAt(L, pt - back) || course.laneAt(course.mainLane, pt - back);
       course.world(pt - back, l.d, eye);
@@ -238,7 +242,6 @@ export function planForest(course) {
         }
       }
     }
-    void ty;
   }
   if (cut.size) {
     const keep = trees.filter((_, i) => !cut.has(i));
