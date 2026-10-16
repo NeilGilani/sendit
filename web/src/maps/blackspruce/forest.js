@@ -75,9 +75,9 @@ export function planForest(course) {
     for (const end of [L.t0 + 34, L.t1 - 22]) {   // where the lane has split off / before it merges
       const l = course.laneAt(L, end);
       for (const side of [-1, 1]) {
-        const sc = 1.35 + rnd() * 0.15, sx = sc * 0.82;
+        const sc = 1.35 + rnd() * 0.15, sx = sc * 0.6;   // tall and narrow: a landmark that doesn't hang into the lane
         const hit = TREE_HIT.base + TREE_HIT.perWidth * sx;
-        const d = l.d + side * (l.hw + hit + 0.4);
+        const d = l.d + side * (l.hw + hit + 1.0);
         if (inClearing(end, d) || laneGap(end, d) < hit * 0.9) continue;
         course.world(end, d, p);
         if (near(p.x, p.z, 2.5)) continue;
@@ -117,7 +117,7 @@ export function planForest(course) {
       const l = course.laneAt(L, t);
       // Fair pivots: seen ≥ 2 s ahead, never right after a gate, a section start, or anything that
       // throws the rider into the air (rollers, logs, kickers, the band).
-      const ok = l.hw >= 3.7 && t > S.t0 + 30 && (L.kind === 'main' || (t > L.t0 + 45 && t < L.t1 - 30)) && !inClearing(t, l.d, 22) && !logZone(t, l.d)
+      const ok = l.hw >= 3.7 && t > S.t0 + 30 && (L.kind === 'main' || (t > L.t0 + 60 && t < L.t1 - 30)) && !inClearing(t, l.d, 22) && !logZone(t, l.d)
         && !course.logs.some((g) => t > g.t - 14 && t < g.t + 26)
         && !ROLLERS.some((r) => t > r[0] - 10 && t < r[0] + 55)
         && !PILLOWS.some(([pt, pd, R]) => t > pt - 8 && t < pt + 45 && Math.abs(pd - l.d) < l.hw + R)
@@ -208,6 +208,42 @@ export function planForest(course) {
     if (near(p.x, p.z, spacing)) continue;
     trees.push([p.x, p.z, sc, sx, sc * (0.92 + rnd() * 0.22), rnd() < (S.name === 'Old Growth' ? 0.4 : 0.22) ? 1 : 0, rnd() * 6.28, hit, 0]);
     put(p.x, p.z, hit);
+  }
+
+  // ---- sightline thinning (what glade crews do): every pivot must be visible from the lane
+  //      25–50 m before it (≥ 2 s at speed). Trees whose crowns block that view are removed.
+  const SIGHT = { backs: [25, 30, 35, 40, 45, 50], eye: 1.7, crown: 2.4 };
+  const cut = new Set();
+  const TH = 8, th = new Map();
+  trees.forEach((tr, i) => {
+    const k = Math.floor(tr[0] / TH) * 100003 + Math.floor(tr[1] / TH);
+    if (!th.has(k)) th.set(k, []);
+    th.get(k).push(i);
+  });
+  const eye = { x: 0, z: 0 };
+  for (const [px, pz, , , pt, laneId] of pivots) {
+    const L = lanes.find((l) => l.id === laneId);
+    const ty = course.height(px, pz) + 1.0;
+    for (const back of SIGHT.backs) {
+      const l = course.laneAt(L, pt - back) || course.laneAt(course.mainLane, pt - back);
+      course.world(pt - back, l.d, eye);
+      for (let k = 1; k < 39; k++) {
+        const f = k / 40, x = eye.x + (px - eye.x) * f, z = eye.z + (pz - eye.z) * f;
+        const a = th.get(Math.floor(x / TH) * 100003 + Math.floor(z / TH));
+        if (a) for (const i of a) {
+          const tr = trees[i];
+          if (tr[8] || (Math.abs(tr[0] - px) < 0.01 && Math.abs(tr[1] - pz) < 0.01)) continue;   // markers, the pivot itself
+          if (pivots.some((q) => Math.abs(q[0] - tr[0]) < 0.01 && Math.abs(q[1] - tr[1]) < 0.01)) continue;
+          if (Math.hypot(x - tr[0], z - tr[1]) < SIGHT.crown * tr[3]) cut.add(i);
+        }
+      }
+    }
+    void ty;
+  }
+  if (cut.size) {
+    const keep = trees.filter((_, i) => !cut.has(i));
+    trees.length = 0;
+    trees.push(...keep);
   }
 
   rnd = mulberry32(505);

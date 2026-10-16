@@ -4,6 +4,7 @@
 // The bot picks a route (which lanes it prefers), looks ~1 s ahead along its lane, and steers for
 // the lateral offset with the most clearance to the obstacles ahead — a skilled, not perfect, rider.
 // Usage: node web/scripts/map2-bot.mjs [ski|snowboard|both] [main|fast|safe|all] [--ovr] [--brake=<m/s>] [--splits]
+//   --sight   can riders see each pivot 30 / 40 / 50 m ahead? (crowns and crests block)
 //   --curve   print each lane's tightest radius and exit
 //   --line    follow the planned best line (planLine) instead of searching locally
 //   --fair    print each route's bottlenecks: where even the best line has < 0.3 m clearance
@@ -29,7 +30,7 @@ const args = process.argv.slice(2);
 const flag = (k, d) => { const a = args.find((x) => x.startsWith(`--${k}`)); return a ? (a.includes('=') ? a.split('=')[1] : true) : d; };
 const pos = args.filter((a) => !a.startsWith('--'));
 const which = pos[0] || 'both', routeArg = pos[1] || 'main';
-const GAIN = Number(flag('gain', 6)), LINE = !!flag('line', false), FAIR = !!flag('fair', false), TRACE = Number(flag('trace', 0)) || 0, CHECK = !!flag('check', false), TUCK = !!flag('tuck', false), SPLITS = !!flag('splits', false), OVR = !!flag('ovr', false), BRAKE = Number(flag('brake', 0)) || 0;
+const XTRACK = Number(flag('xtrack', 0.25)), GAIN = Number(flag('gain', 6)), LINE = !!flag('line', false), FAIR = !!flag('fair', false), TRACE = Number(flag('trace', 0)) || 0, CHECK = !!flag('check', false), TUCK = !!flag('tuck', false), SPLITS = !!flag('splits', false), OVR = !!flag('ovr', false), BRAKE = Number(flag('brake', 0)) || 0;
 
 const course = new BlackspruceCourse();
 const CLEARINGS = course.clearings;
@@ -204,6 +205,10 @@ function ride(type, route) {
       off = bestO;
       course.world(ta, l.d + off, tmp);
       steerTo(c, pl, tmp, bestClear);
+      // Cross-track correction: lean back toward the chosen line when the slope pushes the rider off it.
+      const ln = course.laneAt(lane, tt) || course.laneAt(course.mainLane, tt);
+      const e = course.dAt(pl.position.x, tt) - (ln.d + off);
+      if (pl.state === State.GROUNDED && XTRACK) c.steer = Math.max(-1, Math.min(1, c.steer - Math.max(-0.6, Math.min(0.6, e * XTRACK))));
       if (BRAKE && pl.speed > BRAKE) c.brake = Math.min(1, (pl.speed - BRAKE) / 3);
       // Speed control (what a skilled player does): brake for lane curves ahead tighter than the grip allows.
       if (CHECK && pl.state === State.GROUNDED) {
@@ -258,6 +263,54 @@ function curvature() {
   }
 }
 if (flag('curve', false)) { curvature(); process.exit(0); }
+
+/**
+ * Sightlines: can a rider on the lane see each pivot 30 / 40 / 50 m before it? A line from the eye
+ * (1.7 m up, on the lane centre) to the pivot's trunk (1 m up) is blocked by another tree's crown
+ * (radius ≈ 2.4 × crown width scale near the ground) or by the snow itself (a crest).
+ */
+function sightlines() {
+  const TH = 8, th = new Map();
+  for (const tr of course.forest.trees) {
+    const k = `${Math.floor(tr[0] / TH)},${Math.floor(tr[1] / TH)}`;
+    if (!th.has(k)) th.set(k, []);
+    th.get(k).push(tr);
+  }
+  const eye = {}, bad = [];
+  let total = 0, seen = 0;
+  for (const [px, pz, , kind, pt, laneId] of course.forest.pivots) {
+    const L = course.lanes.find((l) => l.id === laneId);
+    const res = [];
+    for (const back of [30, 40, 50]) {
+      const l = course.laneAt(L, pt - back) || course.laneAt(course.mainLane, pt - back);
+      course.world(pt - back, l.d, eye);
+      const ey = terrain.getHeight(eye.x, eye.z) + 1.7, ty = terrain.getHeight(px, pz) + 1.0;
+      let blocked = null;
+      for (let k = 1; k < 40 && !blocked; k++) {
+        const f = k / 40, x = eye.x + (px - eye.x) * f, z = eye.z + (pz - eye.z) * f, y = ey + (ty - ey) * f;
+        if (terrain.getHeight(x, z) > y + 0.1) { blocked = 'crest'; break; }
+        const a = th.get(`${Math.floor(x / TH)},${Math.floor(z / TH)}`);
+        if (a) for (const tr of a) {
+          if (Math.abs(tr[0] - px) < 0.01 && Math.abs(tr[1] - pz) < 0.01) continue;   // the pivot itself
+          if (Math.hypot(x - tr[0], z - tr[1]) < 2.4 * tr[3] && f < 0.97) {
+            // Another pivot in the way is the lane's rhythm (you pass it first), not a hidden hazard.
+            const piv = course.forest.pivots.some((q) => q[0] === tr[0] && q[1] === tr[1]);
+            if (piv && f < 0.12) continue;   // the eye point sits on the previous pivot: a rider is beside it
+            blocked = piv ? 'pivot' : 'crown';
+            if (process.env.WHO) console.log('    blocker for', laneId, Math.round(pt), 'from', back, 'm:', tr[8] ? 'MARKER' : piv ? 'PIVOT' : 'tree', 'f', f.toFixed(2), 'sx', tr[3].toFixed(2));
+            break;
+          }
+        }
+      }
+      res.push(blocked ? { crest: 'k', crown: 'c', pivot: 'p' }[blocked] : '+');
+      total++; if (!blocked || blocked === 'pivot') seen++;
+    }
+    if (/[ck]/.test(res[0] + res[1])) bad.push(`${laneId}@${Math.round(pt)}(${kind}):${res.join('')}`);
+  }
+  console.log(`  sightlines: ${seen}/${total} clear (30/40/50 m before each of ${course.forest.pivots.length} pivots; + clear, p behind the previous pivot (rhythm), c crown, k crest)`);
+  if (bad.length) console.log('  not visible from 30 or 40 m: ' + bad.join('  '));
+}
+if (flag('sight', false)) { sightlines(); process.exit(0); }
 const lines = {};
 if (LINE || FAIR) for (const r of routes) {
   lines[r] = planLine(r);

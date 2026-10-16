@@ -76,7 +76,7 @@ logs, flakes and glade pockets follow a lane when it is re-shaped.
 | `challenge = { gates, flakes, medalSpeeds }` | activities.js | gates `{ at, lateral, width }`, flakes `{ x, z, y }`, medals |
 | `spawn = { runCorridor: 150, ridgeFenceMax: 0, runLength: 2400, treeMax: 20000 }` | scatter.js | the generic forest stays outside the designed one |
 | `populate(scatter)` | scatter.js `addEnvironment` | plants the designed forest first (trees, boulders, collision circles, logs, stumps, signs) |
-| `perf = { treeNear: 0.55, treeMid: 0.5 }` | scatter.js `setQuality` | × the quality tier's full-frond / mid tree-pool radii |
+| `perf = { treeNear: 0.48, treeMid: 0.35 }` | scatter.js `setQuality` | × the quality tier's full-frond / mid tree-pool radii |
 | `life = { skiers: 0 }` | life.js | no background skiers (they would ghost through the pivots) |
 | `physics = { ski: { maxVelocity: 18 }, snowboard: { maxVelocity: 17.5 } }` | map 3's `applyMapTuning` (config.js) | see below |
 | `w` (= face half-width table) | terrain.js `sculptCliffs` | fluted rock on the outer walls only |
@@ -111,7 +111,7 @@ No physics files or player.js were edited.
 - **Pivot rules** (forest.js):
   - Only in lanes with hw ≥ 3.7 m, offset 18–35 % of hw.
   - On the inside of a curve, otherwise alternating sides.
-  - Never in a section's first 30 m, in a side lane's first 45 m or last 30 m, within 25 m of a gate, or within 55 m after a roller or 45 m after a pillow on the lane.
+  - Never in a section's first 30 m, in a side lane's first 45 m or last 30 m, within 25 m of a gate, within 55 m after a roller or 45 m after a pillow on the lane, or where the lane drifts faster than 0.35 m/m (mid-traverse).
   - Never near logs, kickers or the band.
   - Rocks only in lanes with hw ≥ 4.5 m.
 - **course.js**: `challenge.medalSpeeds` is { gold: 16, silver: 14, bronze: 12 } m/s, i.e. 2:08 / 2:26 / 2:51. `physics`, `perf`, `spawn`.
@@ -150,8 +150,11 @@ Latest results (tucking, speed control, no overrides):
 
 | | main | fast (slots) | safe |
 |---|---|---|---|
-| ski | 130 s, 0 crashes, 53 close shaves | 125 s, 0, 96 | 130 s, 0, 51 |
-| snowboard | 131–153 s, 0–2 | 132 s, 0, 98 | 136 s, 0, 46 |
+| ski | 143 s, 2 crashes, ~50 close shaves | 123 s, 0, 88 | 136 s, 1, ~45 |
+| snowboard | 134 s, 0 | 130 s, 0, 89 | 143 s, 1 |
+
+With the physics overrides: fast 128 s (ski 0–1 crash, board 0), safe 122–137 s, main 137–140 s.
+Untucked (no speed tricks): every route 143–155 s, 0–1 crash.
 
 - The fast line is 1–2 s quicker per tree section and earns about twice the close shaves.
 - The bot's crashes move around with small layout changes. It is a heuristic driver, so the fairness check is the real guarantee.
@@ -173,7 +176,7 @@ Quality 1, 1600×900, Intel Arc 130V, GPU timer queries.
 
 What it took:
 - The designed forest thins with distance from the lanes (12k → 5.2k trees; the woods you can't see behind the lane-edge trees).
-- `perf = { treeNear: 0.55, treeMid: 0.5 }`: full-frond trees within ~22 m instead of ~41 m, and mid trees hand over to the opaque far shells at ~130 m. The swap was not noticeable in screenshots at riding speed.
+- `perf = { treeNear: 0.48, treeMid: 0.35 }`: full-frond trees within ~19.5 m instead of ~41 m, and mid trees hand over to the opaque far shells at ~91 m instead of 260 m.
 - Fewer saplings (8 % in the dense sections).
 - Not changed: gfx/ shaders, gfx/perf.js, scene.js TREES.
 
@@ -183,7 +186,7 @@ Cost breakdown (Gauntlet, before the last two steps):
 - Mid trees ~9 %.
 
 Further levers, if needed:
-- `perf.treeNear` 0.45.
+- `perf.treeNear` 0.4.
 - `SECTIONS` spacing in the Needles and Gauntlet.
 - A camera-aware foliage fade in gfx/trees.js (not done: not my file).
 
