@@ -179,6 +179,24 @@ Untucked (no speed tricks): every route 143–155 s, 0–1 crash.
 - The bot's crashes move around with small layout changes. It is a heuristic driver, so the fairness check is the real guarantee.
 - Valcrest's own bot (physics-course) and physics-fuzz are unaffected.
 
+**Rhythm** (`--tension`, skis, tucking): close shaves per second by section.
+
+| Section | Flow line | Slots | Long way |
+|---------|-----------|-------|----------|
+| Spruce Gate | 0.3 | 0.8 | 0.2 |
+| Needles | 0.4 | 1.2 | 0.35 |
+| Deadfall | 0.45 | 1.05 | 0.35 |
+| Gauntlet | 0.55 | 1.5 | 0.3 |
+| Old Growth | 0.2 | — | 0.35 |
+
+- The clearings (Kicker Meadow, the band and Pillow Garden, Big Air, Finish) are 0 for 6–9 s: rest beats.
+- Old Growth is deliberately the wide, flowing finale after the Gauntlet's peak. Narrowing it was tried and reverted.
+
+**Visual playtests:** an in-page driver rides the real game (renderer, chase camera, HUD) through the Needles, band, Pillow Garden and Deadfall on skis (flow line), and from Spruce Gate through Deadfall on a snowboard (slots). Frames every 0.4 s:
+- 55–74 km/h, constant close shaves in the slots.
+- Clean "PERFECT!" landings off the M kicker, the cliff and the logs.
+- The chase camera ends up inside a crown in about 3 of 35 frames.
+
 ## Performance
 
 Quality 1, 1600×900, Intel Arc 130V, GPU timer queries.
