@@ -251,7 +251,7 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
           wr = 0.8;
         }
         // Rolled edges / linings
-        if (vLin > 0.5) { c = ((id > 2.5 && id < 3.5) || id > 7.5) ? uAccent : c * 0.55; seam = 0.0; zip = 0.0; }
+        if (vLin > 0.5) { c = (id > 2.5 && id < 3.5) ? uAccent : c * 0.5; seam = 0.0; zip = 0.0; }
         // Zips: dark coil, smoother
         c = mix(c, vec3(0.025), clamp(zip, 0.0, 1.0));
         fabRough = mix(fabRough, 0.45, clamp(zip, 0.0, 1.0));

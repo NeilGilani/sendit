@@ -282,7 +282,7 @@ export function buildOutfitGeometry(body, cut) {
     const off = 0.019;                                        // clears the shell, strap and vents
     // Face opening / lower edge over |θ|: a stiff brim above the goggle, down the cheeks behind the
     // goggle's sides, then around the nape into the collar.
-    const edge = [[0, 1.79], [36, 1.782], [52, 1.735], [64, 1.66], [78, 1.6], [110, 1.575], [180, 1.565]];
+    const edge = [[0, 1.776], [34, 1.772], [52, 1.732], [64, 1.66], [78, 1.6], [110, 1.575], [180, 1.565]];
     const cols = 65, rowsS = 28, lipRows = 3, rows = rowsS + lipRows;
     const P = new Float32Array(rows * cols * 3), G = new Float32Array(rows * cols * 4), L = new Float32Array(rows * cols);
     // A point `extra` metres off the helmet shell (offset away from a centre inside the head, so the
