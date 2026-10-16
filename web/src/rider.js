@@ -232,6 +232,9 @@ export class Rider {
     p.press += ((ground ? pl.press : 0) - p.press) * k(12);
     p.flipLoad = (p.flipLoad || 0) + (((ground ? pl.flipLoad : 0) || 0) - (p.flipLoad || 0)) * k(10);
     p.grab += ((air ? pl.grab : 0) - p.grab) * k(14);
+    // Tweak: a grab held past ~0.4 s gets style — the board is pushed out / the skis cross, the body arches.
+    const grabT = pl.dyn?.takeoff?.grabT || 0;
+    p.tweak = (p.tweak || 0) + ((air && pl.grab > 0.6 ? THREE.MathUtils.smoothstep(grabT, 0.35, 0.9) : 0) - (p.tweak || 0)) * k(6);
     // Flipping: knees pulled up, hands in toward the shins (a tuck spins faster and reads as a flip).
     p.flipTuck = (p.flipTuck || 0) + ((air ? THREE.MathUtils.clamp(Math.abs(pl.flipRate || 0) / 3.5, 0, 1) * (1 - pl.grab) : 0) - (p.flipTuck || 0)) * k(8);
     p.stanceYaw += (this.stanceYawTarget() * (1 - p.sit) - p.stanceYaw) * k(10);
@@ -348,6 +351,14 @@ export class Rider {
     R.position.set(wide, lift, 0.0); R.rotation.set(p.pitch, p.plow * 0.28, gearRoll * -1, 'YXZ');
     // In the air with a grab, cross the skis a little (Japan / mute flavour).
     if (p.grab > 0.01) { L.rotation.y += p.grab * 0.25; R.rotation.y -= p.grab * 0.1; }
+    // Tweaked: skis crossed hard (Japan / Mute / Safety), tips pulled up (Truck driver) or tails (Tail grab).
+    const tw = p.tweak || 0;
+    if (tw > 0.01) {
+      const gn = pl.grabName || '';
+      if (gn === 'Truck driver') { L.rotation.x += tw * 0.45; R.rotation.x += tw * 0.45; }
+      else if (gn === 'Tail grab') { L.rotation.x -= tw * 0.35; R.rotation.x -= tw * 0.35; L.rotation.y -= tw * 0.2; R.rotation.y += tw * 0.2; }
+      else { L.rotation.y += tw * 0.45; R.rotation.y -= tw * 0.35; L.rotation.z += tw * 0.25; R.rotation.z += tw * 0.2; }
+    }
     // Inner edge stays on the snow: pivot the roll about the edge.
     const off = Math.abs(Math.sin(gearRoll)) * 0.045;
     // The body rolls about the centre line, which would push the inside ski into the snow: lift each
@@ -366,7 +377,8 @@ export class Rider {
     // Roll about the edge that's in the snow, pitch about the end that's pressed.
     const hw = spec.waist * 0.5;
     const roll = -gearRoll;
-    B.rotation.set(p.pitch, 0, roll, 'ZXY');
+    const tw = p.tweak || 0, tsg = /Melon|Tail/.test(this.player.grabName || '') ? -1 : 1;
+    B.rotation.set(p.pitch + tw * 0.22, tw * 0.5 * tsg, roll + tw * 0.38 * tsg, 'ZXY');
     B.position.set(0, lift + Math.abs(Math.sin(roll)) * hw + Math.abs(Math.sin(p.pitch)) * spec.length * 0.38, 0);
   }
 
@@ -566,7 +578,7 @@ export class Rider {
     off.x += nx * 0.08 * sk;                                  // weight over the front foot while skating
     const spineTwist = (nx * (BA.shoulderOpen - BA.hipOpen) + lead + nx * 0.45 * sk) * ns;
     // A preloaded backflip arches the chest up and back (the shoulders throw first).
-    const bend = (0.1 + p.crouch * 0.2 - p.toe * 0.04 + p.heel * 0.12 + p.grab * 0.26) * ns - p.flipLoad * ANIM.flipLoadArch;
+    const bend = (0.1 + p.crouch * 0.2 - p.toe * 0.04 + p.heel * 0.12 + p.grab * 0.26) * ns - p.flipLoad * ANIM.flipLoadArch - (p.tweak || 0) * 0.3;
     // Head: look down the direction of travel (nose, or over the back shoulder when switch).
     const headYaw = (nx * p.look * BA.headTurn - nx * BA.shoulderOpen - lead - nx * 0.5 * sk) * ns;
     this.trunk(off, hipYaw + nx * 0.3 * sk, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist, wob - p.lean * 0.15, headYaw, -(hipPitch + bend) * 0.6);
@@ -664,10 +676,13 @@ export class Rider {
     // Grab: Safety = left hand to the left ski; Mute = right hand across to the left ski; Japan = left
     // hand behind to the front of the crossed skis.
     const name = pl.grabName || 'Safety';
+    // Tail grab = left hand back to the ski tail; Truck driver = both hands to the tips.
     const grabHand = name === 'Mute' ? -1 : 1;
-    const upG = name === 'Mute' ? V(0.2, -0.9, 0.35) : name === 'Japan' ? V(side * 0.15, -0.95, 0.15) : V(side * 0.3, -0.9, 0.3);
-    const loG = name === 'Mute' ? V(0.35, -0.85, 0.3) : name === 'Japan' ? V(-side * 0.1, -0.9, 0.35) : V(side * 0.1, -0.9, 0.3);
-    const g = side === grabHand ? p.grab : 0;
+    const upG = name === 'Mute' ? V(0.2, -0.9, 0.35) : name === 'Japan' ? V(side * 0.15, -0.95, 0.15) : name === 'Tail grab' ? V(side * 0.3, -0.8, -0.35)
+      : name === 'Truck driver' ? V(side * 0.22, -0.72, 0.62) : V(side * 0.3, -0.9, 0.3);
+    const loG = name === 'Mute' ? V(0.35, -0.85, 0.3) : name === 'Japan' ? V(-side * 0.1, -0.9, 0.35) : name === 'Tail grab' ? V(side * 0.12, -0.75, -0.6)
+      : name === 'Truck driver' ? V(side * 0.08, -0.6, 0.78) : V(side * 0.1, -0.9, 0.3);
+    const g = side === grabHand || name === 'Truck driver' ? p.grab : 0;
     // Double-pole push: reach forward and up, then plant and drive the hands back past the hips.
     const ph = p.pushPhase || 0, reachF = ph < 0.4 ? ph / 0.4 : 1 - (ph - 0.4) / 0.6;
     const upP = V(side * 0.3, -0.75 + reachF * 0.45, -0.25 + reachF * 1.0), loP = V(side * 0.1, -0.5 + reachF * 0.3, 0.2 + reachF * 0.7);

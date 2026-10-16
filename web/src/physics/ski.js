@@ -73,7 +73,11 @@ export class SkiPhysics extends EdgePhysics {
 
   tailLandings() { return this.H.twin; }
 
-  grabName() { return this.pl.turnInput > 0.2 ? 'Japan' : this.pl.turnInput < -0.2 ? 'Mute' : 'Safety'; }
+  grabName() {
+    // Big-mountain maps (PHYSICS.trickStyle) add Tail grab (S) and Truck driver (W, both tips).
+    if (P.trickStyle) { const c = this.pl._ctrl || {}; if (c.brake > 0.3) return 'Tail grab'; if (c.up > 0.3) return 'Truck driver'; }
+    return this.pl.turnInput > 0.2 ? 'Japan' : this.pl.turnInput < -0.2 ? 'Mute' : 'Safety';
+  }
 
   /** Skis: only the tips may lead; backwards landings work on twin tips (switch), else stumble/crash. */
   land(devNose, tol = 1) {
@@ -100,7 +104,7 @@ export class SkiPhysics extends EdgePhysics {
       if (spins >= 2) parts.push(`${dir} ${n}${flip.back ? 'Cork' : 'Misty'} ${spins * 180}`);
       else parts.push(`${n}${flip.back ? 'Backflip' : 'Frontflip'}`);
     } else if (spins >= 1) parts.push(`${dir} ${spins * 180}`);
-    if (t.grab && t.grabT > 0.25) parts.push(t.grab);
+    if (t.grab && t.grabT > 0.25) parts.push(P.trickStyle && t.grabT > 0.9 ? `Tweaked ${t.grab}` : t.grab);   // held long: tweaked (trickStyle maps)
     return parts.join(' ');
   }
 }

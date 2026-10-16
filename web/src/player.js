@@ -427,7 +427,7 @@ export class Player {
     const perfect = clean && ev.dev < 8 && fl.dev < 10 && this.airTime > 0.6;
     const trick = this.dyn.trickLabel(t, spins, fl);
     const scored = clean && (this.airTime > 0.7 || (trick && this.airTime > 0.35));
-    const grabPts = t.grab && t.grabT > 0.25 ? 40 + Math.floor(t.grabT * 60) : 0;
+    const grabPts = t.grab && t.grabT > 0.25 ? Math.floor((40 + Math.floor(t.grabT * 60)) * (P.trickStyle && t.grabT > 0.9 ? 1.5 : 1)) : 0;
     let points = scored ? Math.floor(this.airTime * 80) + spins * 90 + fl.flips * 150 + grabPts + (t.switch ? 30 : 0) + (perfect ? 50 : 0) : 0;
     // Big-mountain extras (flow maps): the drop (greatest height above the snow in this air), a landing
     // grade, and flow-state trick points.

@@ -119,7 +119,7 @@ export class SnowboardPhysics extends EdgePhysics {
       else parts.push(`${n}${flip.back ? 'Wildcat' : 'Tamedog'}`);
     } else if (spins >= 1) parts.push(side === 'Half-Cab' ? 'Half-Cab' : `${side} ${spins * 180}`);
     else if (t.end === 'tail' && !t.grab) parts.push('Ollie');
-    if (t.grab && t.grabT > 0.25) parts.push(t.grab);
+    if (t.grab && t.grabT > 0.25) parts.push(P.trickStyle && t.grabT > 0.9 ? `Tweaked ${t.grab}` : t.grab);   // held long: tweaked (trickStyle maps)
     return parts.join(' ');
   }
 }

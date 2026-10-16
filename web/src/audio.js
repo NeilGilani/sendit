@@ -94,6 +94,7 @@ export class SoundScape {
     on('flowBanked', ({ bonus, mult }) => { if (bonus) this.oneShot('combo_bank', 0.55, 0.9 + Math.min(mult, 5) * 0.05); });
     on('flowLost', () => this.oneShot('combo_lost', 0.45, 0.9));
     on('slowmo', ({ scale }) => { this.slow = scale; });   // apex slow motion: wind and snow drop in pitch
+    on('heliDrop', () => this.heli());   // a map's heli-drop intro (maps/ravenspire/props.js)
     // A board's tail slap pops lower than a skier's hop.
     on('jumped', (d) => this.oneShot('jump_pop', 0.4 + d * 0.5, (this.skier.equipment?.type === 'snowboard' ? 0.78 : 0.95) + Math.random() * 0.15));
     on('nearMiss', () => this.oneShot('near_miss', 0.55, 0.95 + Math.random() * 0.2));
@@ -151,6 +152,31 @@ export class SoundScape {
       g.gain.exponentialRampToValueAtTime(0.0005, t + i * 0.06 + 0.6);
       o.connect(g); g.connect(this.sfx); o.start(t + i * 0.06); o.stop(t + i * 0.06 + 0.65);
     });
+  }
+
+  /** Helicopter leaving after the drop: rotor 'whup' pulses (noise through a low-pass, gated at ~6 Hz)
+   * that fade and drop in pitch as it flies away. */
+  heli() {
+    const c = this.ctx;
+    if (!c) return;
+    const t = c.currentTime, sr = c.sampleRate;
+    const b = c.createBuffer(1, sr * 2, sr), d = b.getChannelData(0);
+    let lp = 0;
+    for (let i = 0; i < d.length; i++) { lp += (Math.random() * 2 - 1 - lp) * 0.2; d[i] = lp; }
+    const src = c.createBufferSource(); src.buffer = b; src.loop = true;
+    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 520; f.Q.value = 2;
+    const gate = c.createGain(); gate.gain.value = 0;
+    const lfo = c.createOscillator(); lfo.type = 'square'; lfo.frequency.setValueAtTime(6.4, t); lfo.frequency.linearRampToValueAtTime(5.6, t + 10);
+    const lfoAmp = c.createGain(); lfoAmp.gain.value = 0.5;
+    lfo.connect(lfoAmp); lfoAmp.connect(gate.gain);
+    const out = c.createGain();
+    out.gain.setValueAtTime(0.0001, t); out.gain.linearRampToValueAtTime(0.9, t + 0.2);
+    out.gain.setValueAtTime(0.9, t + 1.4); out.gain.exponentialRampToValueAtTime(0.0005, t + 11);
+    f.frequency.setValueAtTime(520, t + 1.2); f.frequency.exponentialRampToValueAtTime(180, t + 11);
+    src.connect(f); f.connect(gate); gate.connect(out); out.connect(this.sfx);
+    const off = c.createConstantSource ? c.createConstantSource() : null;
+    if (off) { off.offset.value = 0.5; off.connect(gate.gain); off.start(t); off.stop(t + 11.5); }
+    src.start(t); lfo.start(t); src.stop(t + 11.5); lfo.stop(t + 11.5);
   }
 
   /** Snow clump sliding off a branch: a soft low thud. */

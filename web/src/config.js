@@ -44,6 +44,7 @@ export const PHYSICS = {
   airGravity: 1,              // gravity multiplier in the air (< 1 = floatier, longer hang time)
   obstacleHeights: false,     // obstacles have a height: flying well above a tree or rock clears it
   wallCrashSpeed: 9,          // m/s into a building wall that knocks the rider down
+  trickStyle: false,          // big-mountain trick extras: Tail grab / Truck driver on skis, tweaked grabs (labels, +50 % grab points)
   slowmo: null,               // { minAir, scale, easeIn, hold, easeOut, cooldown }: apex slow motion on huge airs (player.js)
   flow: null,                 // { enabled, … } turns on the flow layer (physics/flow.js: line chains, flow meter, SEND IT state)
   // Aerodynamic auto-tuck
