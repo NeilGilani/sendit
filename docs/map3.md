@@ -146,6 +146,7 @@ snow** on convex crests (Laplacian) — packed snow is faster and lands harder (
 | life.js | `life: { skiers: 0, lodge: false }` | no other riders, no lodge (birds stay) |
 | scatter.js | `spawn: {...}` (SPAWN overrides), `forestAt / pisteAt / treeline` | fewer, smaller boulders on the face; larches only low, clearings around buildings and under the gondola |
 | activities.js | `challenge: { medalSpeeds }` | medal speeds for a fast map (24 / 20 / 16 m/s) |
+| activities.js | `flakeSpots()` | the 12 golden snowflakes at hand-picked spots instead of along the course path |
 | player.js | `edgeHint` | the "edge of the map" hint text |
 
 ---
@@ -251,6 +252,11 @@ Game feel at speed: wind roar (noise through a low-pass sweeping 300 Hz → 6 kH
 16 m/s), the lens opening in the top of the speed range, a continuous speed shake, closer camera with less
 lag, the big-air side swing, landing shake scaled by impact, apex slow-mo (lens tightens, wind drops in
 pitch), controller rumble building with speed, wind streaks in the corners above 24 m/s.
+
+**Golden snowflakes** (`course.flakeSpots()`): the game's 12 per-run collectibles are placed by hand across
+every line, Steep-style: just out over the big lips where a popped rider flies (Band A, First Stack, the Throne,
+the Hammer, Station Cliff, Frozen Falls, a bowl wind lip), on the station and refuge roofs, on a spine crest, in
+the gorge and on the pillow stacks. They glow, so they double as markers for where the good lips are.
 
 **Drop zones** (Steep-style, `course.dropZones`): keys **1–8** (or the d-pad ◀ ▶) fade you to the top of a
 line — 1 Heli Drop, 2 Spine Wall, 3 the Couloir, 4 the Stacks, 5 the Hammer, 6 Station Cliff, 7 the Ravine,
