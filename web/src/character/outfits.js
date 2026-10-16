@@ -12,11 +12,12 @@ export const GARMENTS = {
   jacket: {
     'tuff-shell': {
       name: 'Tuff Shell',
-      blurb: 'Roomy 3-layer freeride shell to the upper thigh: dropped back hem, high collar, stowed hood.',
+      blurb: 'Roomy 3-layer freeride shell to the upper thigh: straight hem, high collar, stowed hood.',
       cut: {
-        // Length: the hem's height above the ground (hip joint 0.97, crotch ~0.86, knee 0.54). Upper
-        // thigh in front, and the back drops 5 cm to cover the seat. hemFlare = outward flare at the hem.
-        hemFront: 0.83, hemBack: 0.78, hemFlare: 0.006,
+        // Length: the hem's height above the ground (hip joint 0.97, crotch ~0.86, knee 0.54). A level
+        // hem at the upper thigh and seat: a lower back (dropped tail) read as a dress from the chase cam.
+        // hemBack < hemFront drops the back, > lifts it. hemFlare = outward flare over the last 12 cm.
+        hemFront: 0.84, hemBack: 0.84, hemFlare: 0.006,
         jacketEase: { shoulder: 0.016, chest: 0.036, hem: 0.062 },   // how far the shell stands off the skin
         sleeveEase: { upper: 0.012, elbow: 0.026, forearm: 0.022 },
         sleeveEnd: 0.69,                           // |x| of the cuff in the T-pose (wrist at 0.706)

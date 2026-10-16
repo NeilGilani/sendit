@@ -115,7 +115,7 @@ Common look across these: a **frameless or rimless face** with the lens covering
 All values are in metres for a **1.80 m rider** standing in a T/A-pose. "Offset" means the distance the shell surface stands off the **skin** surface along the vertex normal, after skinning. Values are **already exaggerated about 1.3×** over a real baggy fit for chase-camera readability (§3). Scale everything by `riderHeight / 1.8`.
 
 ### 6.1 Jacket (shell)
-1. **Hem height:** back hem **0.64 m** above ground, front hem **0.68 m**, so the back drops 0.04 m (dropped tail). Centre-back length from C7 is ~0.89 m. *(In the game this read as knee-length over the stylised body; the shipped cut uses 0.83 front / 0.78 back, see character.md, "Jacket length".)*
+1. **Hem height:** back hem **0.64 m** above ground, front hem **0.68 m**, so the back drops 0.04 m (dropped tail). Centre-back length from C7 is ~0.89 m. *(In the game this read as knee-length over the stylised body; and a dropped back read as a tail from the chase camera; the shipped cut uses a level 0.84 hem, see character.md, "Jacket length".)*
 2. **Offsets:**
 
 | Location | Offset (m) |

@@ -1,7 +1,7 @@
 # Sendit rider look: outfit system
 
-The rider wears a modern, baggy freeride kit: a roomy 3-layer shell that ends at the upper thigh with a
-dropped back hem, a high collar, a stowed hood and a fleece gaiter pulled up under the goggle; a wide straight-leg bib that
+The rider wears a modern, baggy freeride kit: a roomy 3-layer shell with a straight hem at the
+upper thigh, a high collar, a stowed hood and a fleece gaiter pulled up under the goggle; a wide straight-leg bib that
 stacks over the boots; leather mitts with nylon gauntlets; and a low-profile matte helmet with a big
 frameless mirror goggle on a wide strap. Everything is built procedurally around the Quaternius body
 when the rider loads, skinned to the same bones the animation drives, and coloured from data. The
@@ -132,21 +132,32 @@ helmet {base, liner, accent}, goggles {lens, lensBase, strap, strapLogo}, gloves
 | `summit` | pro team: brick red under a black yoke, white helmet, sapphire lens |
 
 **Jacket length.** `hemFront` / `hemBack` are the hem's height above the ground in the bind pose
-(1.8 m rider: hip joint 0.97, crotch ≈ 0.86, knee 0.54). The default shell sits at **0.83 front /
-0.78 back**: just below the crotch in front, and the 5 cm dropped tail covers the seat when the rider
-crouches or tucks. `hemFlare` is how far the last 12 cm flare out (default 0.012; the shell uses 0.006
-so it hangs straight instead of belling out like a skirt). It used to be 0.68 / 0.64 (mid-thigh on a real body), but over
-the game's bulky proportions and pre-bent knees it read as a coat that reached almost to the knees.
-Lengths tried, compared in the lobby (standing, crouch, tuck, carve; front, side, back) and the chase cam:
+(1.8 m rider: hip joint 0.97, crotch ≈ 0.86, knee 0.54). `hemBack` below `hemFront` drops the back (a
+dropped tail), above it lifts the back; the difference is level across the back third and changes over
+the sides. The default shell has a **level hem at 0.84**: the upper thigh in front, the seat behind.
+`hemFlare` is how far the last 12 cm flare out (default 0.012; the shell uses 0.006 so it hangs straight
+instead of belling out like a skirt).
+
+History: the first cut was 0.68 / 0.64 (mid-thigh on a real body), which over the game's bulky
+proportions and pre-bent knees read as a coat reaching almost to the knees. A first pass went to 0.83
+front / 0.78 back. From the chase camera the low back still hung like a tail: in a crouch or tuck the
+seat drops toward knee height, so a back hem that covers the seat reaches the knee line on screen. A
+level hem shows the seat and the bib below it. Front / back lengths tried, in the lobby (standing,
+crouch, tuck, carve; front, side, back, plus a chase-cam angle), in the inspect camera (`?ride&cam=back`)
+and in the chase cam, on skis and snowboard:
 
 | front / back | read |
 |---|---|
-| 0.68 / 0.64 (old) | dress / parka; the crouch hides most of the thigh |
+| 0.68 / 0.64 (first cut) | dress / parka; the crouch hides most of the thigh |
 | 0.76 / 0.72 | still long, a car coat |
-| 0.80 / 0.75 | close, but the back still reaches the upper thigh |
-| **0.83 / 0.78** | freeride shell (Sabre / Rush): the bib shows from the upper thigh down, seat covered |
+| 0.80 / 0.75 | the back still reaches the upper thigh |
+| 0.83 / 0.78 (first pass) | good from the front and side, but a tail from behind in the chase cam |
+| 0.83 / 0.81 | a smaller tail, same read |
+| **0.84 / 0.84** | freeride shell (Sabre / Rush): straight hem, the seat and bib show from behind |
+| 0.83 / 0.86, 0.84 / 0.88, 0.84 / 0.90 | short at the back, but from behind the centre back cuts up between two lower side corners (a cutaway look) |
 | 0.85 / 0.80, 0.86 / 0.82 | ends at the crotch; starts to read as a short street jacket |
 | 0.90 / 0.86 | cropped: the pants take over the silhouette |
+| 0.84 / 0.84, hem ease 0.052 | no visible difference from 0.062, so the baggier ease stays |
 
 `storm-shell` ("Tuff Shell, hood up") is the same cut with the helmet-compatible hood pulled up over the
 helmet: a shell offset 1.9 cm off the helmet surface (`helmetFit()` in helmet.js), a stiff rolled brim

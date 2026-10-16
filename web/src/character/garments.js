@@ -47,7 +47,7 @@ export function buildOutfitGeometry(body, cut) {
   {
     const segs = 56;
     const hemF = cut.hemFront, hemB = cut.hemBack;
-    const top = 1.575, bot = Math.max(hemF, hemB);
+    const top = 1.575, bot = hemF;   // the rings end at the front hem; the back moves by hemB − hemF
     const bones = B(/^(pelvis|spine_0[123]|neck_01|clavicle_[lr]|upperarm_[lr]|thigh_[lr])$/);
     const rings = bodyRings(body, {
       axis: 'y', t0: top, t1: bot, rings: 62, segs, half: 0.03, bones,
@@ -99,9 +99,10 @@ export function buildOutfitGeometry(body, cut) {
       const below = smooth(1.22, bot + 0.04, r.t);
       for (let k = 0; k < S; k++) {
         const th = (k / S) * TAU, u = k / S;
-        // Dropped back hem: the lowest rings sag toward the back.
+        // Back hem: the lowest rings sag toward the back (dropped tail) or lift (hemBack above hemFront).
+        // Level across the back third, changing over the sides (no point at the centre back).
         const back = (1 - Math.cos(th)) / 2;
-        r.off[k] = -(hemF - hemB) * back * smooth(1.05, bot, r.t);
+        r.off[k] = (hemB - hemF) * smooth(0.2, 0.8, back) * smooth(1.05, bot, r.t);
         // Vertical drape folds below the chest, horizontal bunching above the hips at the back/sides.
         const drape = pnoise(u * 9 + r.t * 1.5, r.t * 2.5, 9) * 0.009 + Math.sin(th * 7 + pnoise(u * 3, r.t * 3, 3) * 2.5) * 0.007;
         const bunch = Math.sin((r.t - 1.0) * TAU / 0.06 + pnoise(u * 6, 1.7, 6) * 2) * 0.007 * bump(r.t, 1.05, 0.13) * (0.3 + back * 0.7);
