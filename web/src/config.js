@@ -44,6 +44,8 @@ export const PHYSICS = {
   airGravity: 1,              // gravity multiplier in the air (< 1 = floatier, longer hang time)
   obstacleHeights: false,     // obstacles have a height: flying well above a tree or rock clears it
   wallCrashSpeed: 9,          // m/s into a building wall that knocks the rider down
+  landRedirect: 0,            // deg: landing lined up with the flight, this much of the surface bending the path (a sidewall) is absorbed
+  microHop: 0,                // s: airs shorter than this (a bump skimmed at speed) re-ground quietly instead of being judged as landings
   airSettleAngle: 0,          // deg: with no spin going, a released stick squares the gear up to the path from this far out (0 = spinCheckAngle only)
   trickStyle: false,          // big-mountain trick extras: Tail grab / Truck driver on skis, tweaked grabs (labels, +50 % grab points)
   slowmo: null,               // { minAir, scale, easeIn, hold, easeOut, cooldown }: apex slow motion on huge airs (player.js)

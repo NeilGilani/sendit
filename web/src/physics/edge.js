@@ -349,7 +349,8 @@ export class EdgePhysics {
     // — it only spins once steer is let go and pressed again (popped jumps spin straight away).
     this._spinLock = !popped && Math.abs(c.steer || 0) > 0.2 ? Math.sign(c.steer) : 0;
     // Pre-wind: carry part of the ground rotation into the air.
-    pl.spinRate = -this.yawRate * this.C.prewind;
+    // (maps with airSettleAngle: rolling off a lip by accident carries only a third of the carve into the air)
+    pl.spinRate = -this.yawRate * this.C.prewind * (popped || !P.airSettleAngle ? 1 : 0.35);
     if (popped) pl.spinRate += -(this.windup || 0) * this.C.windupSpin * this.H.spin;
     const cap = this.C.spinRateMax * this.H.spin;
     pl.spinRate = clamp(pl.spinRate, -cap, cap);

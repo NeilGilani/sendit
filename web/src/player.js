@@ -380,6 +380,7 @@ export class Player {
 
   land() {
     const n = this.normalAt(this.position.x, this.position.z, this.groundNormal);
+    this._preLandYaw = Math.atan2(-this.velocity.x, -this.velocity.z);
     const vn = this.velocity.dot(n);
     const rawImpact = Math.max(0, -vn);
     // Deep powder soaks up part of the hit (big-mountain maps; 0 by default). Roofs and rock don't.
@@ -389,8 +390,27 @@ export class Player {
     const impact = Math.max(0, rawImpact - P.landPowderAbsorb * soft);
     this.landingVy = rawImpact;
     this.velocity.addScaledVector(n, -vn);
+    // A hop of a step or two at speed (a bump skimmed mid-carve) isn't a landing: whatever skid angle the
+    // rider had stays a skid, not a sideways touchdown (PHYSICS.microHop seconds, 0 = off).
+    if (P.microHop && this.airTime < P.microHop * (this.dyn.takeoff?.popped ? 1 : 2.5) && rawImpact < P.hardLanding * 0.5 && !this.flip) {
+      this.state = State.GROUNDED;
+      this.compression = 0; this._landGrace = 0.15;
+      this.airTime = 0; this._maxAbove = 0; this.grab = 0;
+      return;
+    }
     if (P.landPowderScrub) this.velocity.multiplyScalar(Math.max(0.55, 1 - P.landPowderScrub * rawImpact * soft));
     const velYaw = Math.atan2(-this.velocity.x, -this.velocity.z);
+    // Landing on a sidewall bends the path; a rider lined up with the flight pivots into the new line
+    // (PHYSICS.landRedirect degrees absorbed, 0 = off). preYaw = the flight direction before touchdown.
+    if (P.landRedirect && this._preLandYaw !== undefined) {
+      const tailOk = this.dyn.tailLandings();
+      const near = (yaw) => { let d = angleDiff(this.heading, yaw); if (tailOk && Math.abs(d) > Math.PI / 2) d = angleDiff(this.heading, yaw + Math.PI); return d; };
+      const pre = near(this._preLandYaw), post = near(velYaw);
+      if (Math.abs(pre) < 15 * Math.PI / 180 && Math.abs(post) > Math.abs(pre)) {
+        const turn = Math.sign(post) * Math.min(Math.abs(post) - Math.abs(pre), P.landRedirect * Math.PI / 180);
+        this.heading += turn;
+      }
+    }
     const devNose = Math.abs(angleDiff(this.heading, velYaw));
     const spins = Math.round(Math.abs(this._spinTotal) / Math.PI);  // 180s
     const landSpeed = this.velocity.length();
