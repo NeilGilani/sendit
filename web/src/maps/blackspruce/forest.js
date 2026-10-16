@@ -267,7 +267,20 @@ export function planForest(course) {
       k++;
     }
   }
-  return { trees, rocks, stumps, pivots, signs };
+  // ---- the rock band's lip: orange breakaway poles every ~5 m along the cliff (telegraph the drop
+  //      from above), never inside a lane, plus a pair framing each lane that drops the cliff.
+  const lipPoles = [];
+  for (let d = -BAND.reach; d <= BAND.reach; d += 5) {
+    if (course.bandMask(d) < 0.6 || laneGap(BAND.t - 1, d) < 0.6) continue;
+    course.world(BAND.t - 1.2, d, p);
+    lipPoles.push([p.x, p.z]);
+  }
+  for (const L of lanes) {
+    const l = course.laneAt(L, BAND.t);
+    if (!l || course.bandMask(l.d) < 0.6) continue;
+    for (const side of [-1, 1]) { course.world(BAND.t - 1.2, l.d + side * (l.hw + 0.4), p); lipPoles.push([p.x, p.z]); }
+  }
+  return { trees, rocks, stumps, pivots, signs, lipPoles };
 }
 
 function hashNoise(x, y) {
@@ -311,6 +324,7 @@ export function populateForest(course, scatter) {
   }
   scatter.group.add(buildWood(course, T));
   if (F.signs.length) scatter.group.add(buildSigns(F.signs, T));
+  if (F.lipPoles.length) scatter.group.add(buildLipPoles(F.lipPoles, T));
 }
 
 /** Logs (bark cylinders sitting in their drifts) and stumps, one InstancedMesh each. */
@@ -437,4 +451,28 @@ function buildSigns(signs, T) {
     g.add(post, board);
   }
   return g;
+}
+
+/** Orange / black banded bamboo poles along the rock band's lip (they don't collide, like gate poles). */
+function buildLipPoles(poles, T) {
+  const geo = new THREE.CylinderGeometry(0.05, 0.06, 2.2, 6, 8).toNonIndexed();
+  geo.translate(0, 1.1, 0);
+  const pos = geo.attributes.position, c = new Float32Array(pos.count * 3);
+  const orange = new THREE.Color('#ff7a1a'), black = new THREE.Color('#1d1a17');
+  for (let k = 0; k < pos.count; k++) {
+    const band = Math.floor(pos.getY(k) / 0.283 + 1e-3) % 2 ? black : orange;
+    c[k * 3] = band.r; c[k * 3 + 1] = band.g; c[k * 3 + 2] = band.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
+  geo.computeVertexNormals();
+  const im = new THREE.InstancedMesh(geo, toonMaterial({ name: 'lipPole', vertexColors: true }), poles.length);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
+  poles.forEach(([x, z], i) => {
+    q.setFromEuler(new THREE.Euler((i % 3 - 1) * 0.05, 0, ((i * 7) % 5 - 2) * 0.03));   // a little off-plumb
+    im.setMatrixAt(i, m.compose(p.set(x, T.getHeight(x, z) - 0.25, z), q, s));
+  });
+  im.castShadow = true;
+  im.computeBoundingSphere();
+  im.name = 'LipPoles';
+  return im;
 }
