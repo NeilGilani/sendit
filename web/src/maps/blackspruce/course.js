@@ -5,10 +5,13 @@
 //   features       { kickers, jumps } — explicit kickers, no random park stream (features.js)
 //   challenge      { gates, flakes, medalSpeeds } — checkpoints at the clearings (activities.js)
 //   spawn          SPAWN overrides for the generic background forest (scatter.js)
-//   populate(...)  plants the designed forest, logs, stumps and rocks (scatter.js)
-//   life           { skiers, spread } — fewer, tighter background skiers (life.js)
+//   populate(...)  plants the designed forest, logs, stumps, snags, rocks, signs (scatter.js)
+//   perf           { treeNear, treeMid } — smaller tree-pool radii for this dense map (scatter.js)
+//   life           { skiers: 0 } — no background skiers (life.js)
 //   physics        per-map PHYSICS / equipment overrides (applied by the per-map physics hook)
-// Layout data: layout.js. Forest planning and meshes: forest.js.
+//   w              the face half-width table, so terrain.js sculpts rock on the outer walls only
+// Layout data: layout.js (positions may be lane-relative: resolveD). Forest planning and meshes:
+// forest.js. Scoring and juice: scoring.js. Docs: docs/map2.md.
 import * as THREE from 'three';
 import { BLACKSPRUCE, BAND, CLEARINGS, LANES, PILLOWS, ROLLERS, LOGS, KICKERS, GATES, FLAKES } from './layout.js';
 import { planForest, populateForest } from './forest.js';
