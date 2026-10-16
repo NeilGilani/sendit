@@ -86,6 +86,24 @@ export function planForest(course) {
     }
   }
 
+  // ---- trail signs in the wedge where each side lane splits off the main line (telegraph the fork)
+  const signs = [];
+  for (const L of lanes) {
+    if (L.kind === 'main') continue;
+    for (let t = L.t0 + 4; t < L.t0 + 60; t++) {
+      const m = course.laneAt(course.mainLane, t), s = course.laneAt(L, t);
+      const gap = Math.abs(s.d - m.d) - s.hw - m.hw;
+      if (gap < 1.6 || inClearing(t, (s.d + m.d) / 2)) continue;
+      const sideL = s.d < m.d;
+      const d = sideL ? s.d + s.hw + gap / 2 : m.d + m.hw + gap / 2;
+      course.world(t, d, p);
+      const b = course.world(t + 6, d);
+      signs.push({ x: p.x, z: p.z, yaw: Math.atan2(-(b.x - p.x), -(b.z - p.z)), left: sideL ? L.kind : 'main', right: sideL ? 'main' : L.kind });
+      put(p.x, p.z, 1.2);
+      break;
+    }
+  }
+
   rnd = mulberry32(202);
   // ---- pivots: one obstacle in the middle of a main / safe lane every so often (pick a side)
   for (const L of lanes) {
@@ -205,7 +223,7 @@ export function planForest(course) {
       k++;
     }
   }
-  return { trees, rocks, stumps, pivots };
+  return { trees, rocks, stumps, pivots, signs };
 }
 
 function hashNoise(x, y) {
@@ -223,6 +241,7 @@ export function forestObstacles(course) {
     ...F.trees.map(([x, z, , , , , , hit]) => [x, z, hit, 'tree']),
     ...F.rocks.map(([x, z, , , , hit]) => [x, z, hit, 'rock']),
     ...F.stumps.map(([x, z, r]) => [x, z, r + 0.05, 'stump']),
+    ...F.signs.map((s) => [s.x, s.z, 0.12, 'sign']),   // the post
   ];
 }
 
@@ -245,13 +264,14 @@ export function populateForest(course, scatter) {
     scatter.add('rock', variant, x, z, m.compose(pv, q, s));
   }
   scatter.group.add(buildWood(course, T));
+  if (F.signs.length) scatter.group.add(buildSigns(F.signs, T));
 }
 
 /** Logs (bark cylinders sitting in their drifts) and stumps, one InstancedMesh each. */
 function buildWood(course, T) {
   const g = new THREE.Group();
   g.name = 'Deadwood';
-  const bark = new THREE.Color('#4a3a2c'), barkDark = new THREE.Color('#33281f'), snow = new THREE.Color('#eef3fa'), wood = new THREE.Color('#6e5638');
+  const bark = new THREE.Color('#3f3126'), barkDark = new THREE.Color('#2a211a'), snow = new THREE.Color('#eef3fa'), wood = new THREE.Color('#6e5638');
   const paint = (geo, fn) => {
     const pos = geo.attributes.position, nor = geo.attributes.normal;
     const c = new Float32Array(pos.count * 3);
@@ -263,9 +283,9 @@ function buildWood(course, T) {
     return geo;
   };
   const mat = toonMaterial({ name: 'deadwood', vertexColors: true });
-  // Unit log along +X, radius 1, with a snow crest on top and a few broken branch stubs.
+  // Unit log along +X, radius 1 (instances scale it to length × radius), bark with patches of snow on top.
   const logGeo = (() => {
-    const body = new THREE.CylinderGeometry(1, 1, 1, 10, 6, false).rotateZ(Math.PI / 2).toNonIndexed();
+    const body = new THREE.CylinderGeometry(1, 1, 1, 14, 6, false).rotateZ(Math.PI / 2).toNonIndexed();
     const p = body.attributes.position;
     for (let k = 0; k < p.count; k++) {
       const x = p.getX(k), y = p.getY(k), z = p.getZ(k);
@@ -276,12 +296,7 @@ function buildWood(course, T) {
     body.computeVertexNormals();
     // Bark dominates (a dark line across the snow reads from far away); snow only in patches along the top.
     paint(body, (x, y, z, nx, ny) => (Math.abs(x) > 0.49 ? wood : ny > 0.8 && Math.sin(x * 23) + Math.sin(x * 57 + 1.3) > 0.2 ? snow : (Math.sin(x * 40 + z * 7) > 0.6 ? barkDark : bark)));
-    const stub = new THREE.CylinderGeometry(0.08, 0.16, 1.1, 5).toNonIndexed();
-    stub.rotateZ(0.9).translate(0.2, 0.8, 0.3);
-    stub.computeVertexNormals();
-    paint(stub, () => barkDark);
-    const stub2 = stub.clone().rotateY(2.4).translate(-0.6, 0, 0);
-    return mergeGeometries([body, stub, stub2]);
+    return body;
   })();
   const stumpGeo = (() => {
     const body = new THREE.CylinderGeometry(1, 1.15, 1, 9, 2, false).toNonIndexed();
@@ -315,5 +330,65 @@ function buildWood(course, T) {
   });
   stumps.count = st.length;
   for (const im of [logs, stumps]) { im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); g.add(im); }
+  return g;
+}
+
+// ------------------------------------------------------------------ trail signs at the forks
+const SIGN_KIND = {
+  slot: { label: 'SLOT', mark: 'double', bg: '#f28a1b' },
+  main: { label: 'FLOW', mark: 'diamond', bg: '#f28a1b' },
+  safe: { label: 'LONG WAY', mark: 'square', bg: '#f28a1b' },
+};
+
+function signTexture(left, right) {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#1d1a17'; g.fillRect(0, 0, 512, 256);
+  g.fillStyle = SIGN_KIND.slot.bg; g.fillRect(10, 10, 492, 236);
+  g.fillStyle = '#1d1a17'; g.fillRect(253, 26, 6, 204);
+  const mark = (kind, x, y) => {
+    const k = SIGN_KIND[kind];
+    const dia = (cx) => { g.beginPath(); g.moveTo(cx, y - 30); g.lineTo(cx + 30, y); g.lineTo(cx, y + 30); g.lineTo(cx - 30, y); g.closePath(); g.fill(); };
+    if (k.mark === 'double') { g.fillStyle = '#111'; dia(x - 34); dia(x + 34); }
+    else if (k.mark === 'diamond') { g.fillStyle = '#111'; dia(x); }
+    else { g.fillStyle = '#1f5fd1'; g.fillRect(x - 26, y - 26, 52, 52); }
+    g.fillStyle = '#111'; g.font = `bold ${k.label.length > 5 ? 40 : 54}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(k.label, x, y + 66);
+  };
+  const arrow = (x, dir) => {
+    g.fillStyle = '#111'; g.beginPath();
+    g.moveTo(x + dir * 34, 70); g.lineTo(x - dir * 4, 40); g.lineTo(x - dir * 4, 58); g.lineTo(x - dir * 34, 58);
+    g.lineTo(x - dir * 34, 82); g.lineTo(x - dir * 4, 82); g.lineTo(x - dir * 4, 100); g.closePath(); g.fill();
+  };
+  mark(left, 128, 92); arrow(56, -1);
+  mark(right, 384, 92); arrow(456, 1);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+/** A post with a two-way trail sign (left lane ← | → right lane), facing the rider. */
+function buildSigns(signs, T) {
+  const g = new THREE.Group();
+  g.name = 'TrailSigns';
+  const postG = new THREE.CylinderGeometry(0.06, 0.07, 2.6, 6);
+  postG.translate(0, 1.3, 0);
+  const postM = toonMaterial({ name: 'signPost', color: 0x4a3a2c });
+  const boardG = new THREE.PlaneGeometry(1.5, 0.75);
+  boardG.translate(0, 2.05, 0.08);
+  for (const s of signs) {
+    const y = T.getHeight(s.x, s.z) - 0.2;
+    const post = new THREE.Mesh(postG, postM);
+    post.position.set(s.x, y, s.z);
+    post.castShadow = true;
+    // The board faces up the run (toward the approaching rider).
+    const board = new THREE.Mesh(boardG, toonMaterial({ name: 'sign', map: signTexture(s.left, s.right), side: THREE.DoubleSide }));
+    board.position.set(s.x, y, s.z);
+    board.rotation.y = s.yaw;
+    board.castShadow = true;
+    g.add(post, board);
+  }
   return g;
 }
