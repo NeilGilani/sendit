@@ -1,0 +1,323 @@
+// The baggy freeride outfit as procedural shells around the Quaternius body (bind pose, metres).
+// Each piece samples the body's outline (body.js), smooths it into fabric, adds ease (how far the
+// cloth stands off the skin), drape and folds, and copies skin weights from the nearest skin so the
+// shell follows the same bones the animation drives. See docs/character.md for the numbers.
+//
+// Piece ids (aG.x in the shader): 0 jacket body, 1 sleeve, 2 pant leg, 3 collar, 4 stowed hood,
+// 5 gaiter, 6 mitt, 7 gauntlet.
+import * as THREE from 'three';
+import { bodyRings, hang, sweep, skinPiece, mergePieces, frame, pnoise, vnoise, smooth, bump } from './tube.js';
+
+export const PIECE = { jacket: 0, sleeve: 1, pants: 2, collar: 3, hood: 4, gaiter: 5, mitt: 6, gauntlet: 7 };
+const TAU = Math.PI * 2;
+
+/**
+ * Build the outfit geometry. `cut` (from outfits.js) sets lengths and ease:
+ *   { hemFront, hemBack, jacketEase, sleeveEase, pantsEase, cuffY, stack, gaiter, hood, mitts }
+ */
+export function buildOutfitGeometry(body, cut) {
+  const pieces = [];
+  const B = (re) => body.bones(re);
+  const J = body.joint;
+
+  // ---------------------------------------------------------------- jacket body
+  {
+    const segs = 56;
+    const hemF = cut.hemFront, hemB = cut.hemBack;
+    const top = 1.585, bot = Math.max(hemF, hemB);
+    const bones = B(/^(pelvis|spine_0[123]|neck_01|clavicle_[lr]|upperarm_[lr]|thigh_[lr])$/);
+    const rings = bodyRings(body, {
+      axis: 'y', t0: top, t1: bot, rings: 46, segs, half: 0.03, bones,
+      axisPoint: (t) => new THREE.Vector3(0, t, 0),
+      filter: (x, y, z, b) => (b.startsWith('upperarm') ? Math.abs(x) < 0.2 : b.startsWith('neck') ? y < 1.56 : true),
+      centre: (t, c) => new THREE.Vector3(0, t, c.z),
+      smoothA: 3, smoothT: 3, minEase: 0.014,
+      ease: (t, th) => {
+        const back = (1 - Math.cos(th)) / 2;            // 0 front … 1 back
+        const side = Math.abs(Math.sin(th));
+        let e = THREE.MathUtils.lerp(cut.jacketEase.chest, cut.jacketEase.hem, smooth(1.3, 0.75, t));
+        e = THREE.MathUtils.lerp(cut.jacketEase.shoulder, e, smooth(1.53, 1.42, t));
+        return e + back * 0.012 + side * 0.006;
+      },
+      post: (rings, S) => {
+        // Fabric drops straight from the chest and shoulder blades: never nipped in at the waist.
+        hang(rings, S, 1.32, 0.05);
+        // Shoulder line: the shell slopes from the collar down to the armholes (no boxy epaulettes).
+        for (const r of rings) {
+          const k = smooth(1.36, 1.6, r.t) * 0.52;
+          for (let q = 0; q < S; q++) {
+            const sd = Math.pow(Math.abs(Math.sin((q / S) * TAU)), 1.6);
+            r.r[q] = Math.max(r.r[q] * (1 - k * sd), r.raw[q] + 0.004);
+          }
+        }
+        // Hem: a little flare.
+        for (const r of rings) {
+          const f = smooth(0.8, bot, r.t) * 0.012;
+          for (let k = 0; k < S; k++) r.r[k] += f;
+        }
+      },
+    });
+    const S = segs;
+    for (const r of rings) {
+      r.off = new Float32Array(S);
+      const below = smooth(1.22, 0.8, r.t);
+      for (let k = 0; k < S; k++) {
+        const th = (k / S) * TAU, u = k / S;
+        // Dropped back hem: the lowest rings sag toward the back.
+        const back = (1 - Math.cos(th)) / 2;
+        r.off[k] = -(hemF - hemB) * back * smooth(1.05, bot, r.t);
+        // Vertical drape folds below the chest, horizontal bunching above the hips at the back/sides.
+        const drape = pnoise(u * 9 + r.t * 1.5, r.t * 2.5, 9) * 0.006 + Math.sin(th * 7 + pnoise(u * 3, r.t * 3, 3) * 2.5) * 0.0035;
+        const bunch = Math.sin((r.t - 1.0) * TAU / 0.055 + pnoise(u * 6, 1.7, 6) * 2) * 0.0035 * bump(r.t, 1.05, 0.12) * (0.4 + back * 0.6);
+        const lump = pnoise(u * 5, r.t * 4 + 3.1, 5) * 0.004;
+        r.r[k] += drape * below + bunch + lump * smooth(1.45, 1.2, r.t);
+      }
+    }
+    pieces.push(sweep(rings, { id: PIECE.jacket, side: 0, ...frame('y'), lipEnd: true, skinBones: bones }));
+  }
+
+  // ---------------------------------------------------------------- sleeves
+  for (const s of [1, -1]) {
+    const segs = 28;
+    const sd = s > 0 ? 'l' : 'r';
+    const bones = B(new RegExp(`^(upperarm_${sd}|lowerarm_${sd}|clavicle_${sd})$`));
+    const t0 = 0.165, t1 = cut.sleeveEnd;
+    const rings = bodyRings(body, {
+      axis: 'x', side: s, t0, t1, rings: 34, segs, half: 0.022, bones,
+      axisPoint: (t) => new THREE.Vector3(s * t, J['upperarm_' + sd].y, J['upperarm_' + sd].z),
+      filter: (x, y) => y > 1.3,
+      smoothA: 2, smoothT: 3, minEase: 0.012,
+      ease: (t) => {
+        let e = THREE.MathUtils.lerp(cut.sleeveEase.upper, cut.sleeveEase.elbow, smooth(0.25, 0.46, t));
+        e = THREE.MathUtils.lerp(e, cut.sleeveEase.forearm, smooth(0.48, 0.6, t));
+        return e;
+      },
+      post: (rings, S) => {
+        // Cinched cuff: the last few cm pull in to the wrist (Velcro tab), the fabric above bunches.
+        for (const r of rings) {
+          const w = smooth(t1 - 0.06, t1, r.t);
+          for (let k = 0; k < S; k++) r.r[k] = THREE.MathUtils.lerp(r.r[k], r.raw[k] + 0.014, w * 0.85);
+          // Near the armhole the top of the sleeve follows the sloped shoulder line of the body shell.
+          if (r.t < 0.34) {
+            const lim = 1.575 - (r.t - 0.08) * 0.42 - r.c.y - 0.02 * smooth(0.3, 0.2, r.t);
+            for (let k = 0; k < S; k++) {
+              const up = Math.cos((k / S) * TAU);
+              if (up > 0.05) r.r[k] = Math.max(Math.min(r.r[k], lim / up), r.raw[k] - 0.01);
+            }
+          }
+        }
+      },
+    });
+    for (const r of rings) {
+      for (let k = 0; k < segs; k++) {
+        const th = (k / segs) * TAU, u = k / segs;
+        const inner = Math.max(0, Math.sin(th));          // front of the arm = inside of the elbow bend
+        const elbow = Math.sin((r.t - 0.46) * TAU / 0.05 + pnoise(u * 4, 2.3, 4) * 1.5) * 0.006 * bump(r.t, 0.46, 0.08) * (0.35 + inner * 0.9);
+        const wrist = Math.sin((r.t - t1) * TAU / 0.028 + pnoise(u * 5, 4.1, 5) * 2.2) * 0.006 * bump(r.t, t1 - 0.07, 0.05);
+        const twist = pnoise(u * 4 + r.t * 3, r.t * 5, 4) * 0.004;
+        r.r[k] += elbow + wrist + twist;
+      }
+    }
+    pieces.push(sweep(rings, { id: PIECE.sleeve, side: s, ...frame('x', s), lipEnd: true, skinBones: B(new RegExp(`^(upperarm_${sd}|lowerarm_${sd}|clavicle_${sd}|spine_03|hand_${sd})$`)) }));
+  }
+
+  // ---------------------------------------------------------------- pant legs
+  for (const s of [1, -1]) {
+    const segs = 36;
+    const sd = s > 0 ? 'l' : 'r';
+    const bones = B(new RegExp(`^(thigh_${sd}|calf_${sd}|foot_${sd}|ball_${sd}|pelvis)$`));
+    const t0 = 1.02, t1 = cut.cuffY;
+    const knee = J['calf_' + sd].y;
+    const rings = bodyRings(body, {
+      axis: 'y', t0, t1, rings: 52, segs, half: 0.025, bones,
+      axisPoint: (t) => new THREE.Vector3(s * 0.114, t, -0.04),
+      filter: (x, y, z, b) => (b === 'pelvis' ? x * s > 0.015 : true) && (y > 0.14 || z < 0.0),
+      smoothA: 3, smoothT: 4, smoothC: 5, minEase: 0.015,
+      ease: (t) => {
+        let e = THREE.MathUtils.lerp(cut.pantsEase.thigh, cut.pantsEase.knee, smooth(0.8, knee, t));
+        e = THREE.MathUtils.lerp(e, cut.pantsEase.cuff, smooth(knee, 0.25, t));
+        return e;
+      },
+      post: (rings, S) => {
+        // Straight, wide leg: below the knee the leg never narrows (bootcut over the boot).
+        hang(rings, S, knee + 0.05, 0.04);
+      },
+    });
+    for (const r of rings) {
+      for (let k = 0; k < segs; k++) {
+        const th = (k / segs) * TAU, u = k / segs;
+        const back = (1 - Math.cos(th)) / 2;
+        // Boot stack: soft stacked rolls where the long inseam piles up on the boot.
+        const st = cut.stack;
+        const stackY = (r.t - st.y0) / (st.y1 - st.y0);
+        const roll = stackY > -0.1 && stackY < 1.1 ? Math.pow(Math.max(0, Math.sin(stackY * Math.PI * st.n + pnoise(u * 5, 7.3 + s, 5) * 0.9)), 1.5) * st.amp : 0;
+        // Knee: compression folds behind the knee, softer ones in front.
+        const kf = Math.sin((r.t - knee) * TAU / 0.045 + pnoise(u * 4, 3.3 + s, 4) * 2) * bump(r.t, knee + 0.02, 0.09) * (0.002 + back * 0.006);
+        // Long drape folds down the thigh and shin, a slight twist.
+        const drape = pnoise(u * 6 + r.t * 2.2 * s, r.t * 2, 6) * 0.006;
+        r.r[k] += roll + kf + drape;
+        // Pre-bent knee: the fabric hangs forward of the kneecap.
+        if (Math.cos(th) > 0) r.r[k] += Math.cos(th) * 0.012 * bump(r.t, knee, 0.12);
+      }
+    }
+    pieces.push(sweep(rings, { id: PIECE.pants, side: s, ...frame('y'), lipEnd: true, skinBones: B(new RegExp(`^(thigh_${sd}|calf_${sd}|foot_${sd}|pelvis)$`)) }));
+  }
+
+  // ---------------------------------------------------------------- collar (zipped to the chin)
+  {
+    const segs = 40;
+    const bones = B(/^(neck_01)$/);
+    const rings = bodyRings(body, {
+      axis: 'y', t0: 1.535, t1: cut.collarTop, rings: 10, segs, half: 0.025, bones,
+      axisPoint: (t) => new THREE.Vector3(0, t, -0.02),
+      filter: (x) => Math.abs(x) < 0.1,
+      centre: (t, c) => new THREE.Vector3(0, t, c.z),
+      smoothA: 4, smoothT: 4, minEase: 0.02,
+      ease: (t, th) => 0.026 + smooth(1.56, cut.collarTop, t) * 0.012 + Math.max(0, Math.cos(th)) * 0.01,
+      post: (rings, S) => {
+        // A collar is a smooth funnel: lean toward the widest outline over its height.
+        const mx = new Float32Array(S);
+        for (const r of rings) for (let k = 0; k < S; k++) mx[k] = Math.max(mx[k], r.r[k]);
+        for (const r of rings) for (let k = 0; k < S; k++) r.r[k] = THREE.MathUtils.lerp(r.r[k], mx[k], 0.4) - smooth(1.575, 1.54, r.t) * 0.016;
+      },
+    });
+    pieces.push(sweep(rings, { id: PIECE.collar, side: 0, ...frame('y'), lipEnd: true, skinBones: B(/^(neck_01|spine_03|Head)$/) }));
+  }
+
+  // ---------------------------------------------------------------- gaiter (pulled up under the goggle)
+  if (cut.gaiter) {
+    const segs = 40;
+    const bones = B(/^(neck_01|Head)$/);
+    const rings = bodyRings(body, {
+      axis: 'y', t0: 1.555, t1: cut.gaiterTop, rings: 14, segs, half: 0.016, bones,
+      axisPoint: (t) => new THREE.Vector3(0, t, 0),
+      filter: (x, y, z, b) => b === 'Head' || b === 'neck_01',
+      centre: (t, c) => new THREE.Vector3(0, t, c.z),
+      smoothA: 2, smoothT: 2, minEase: 0.008,
+      ease: (t) => THREE.MathUtils.lerp(0.02, 0.011, smooth(1.6, 1.65, t)),
+    });
+    for (const r of rings) for (let k = 0; k < segs; k++) {
+      const u = k / segs;
+      r.r[k] += Math.sin((r.t - 1.58) * TAU / 0.03 + pnoise(u * 5, 9.1, 5) * 2) * 0.003 * bump(r.t, 1.59, 0.03);
+    }
+    pieces.push(sweep(rings, { id: PIECE.gaiter, side: 0, ...frame('y'), lipEnd: true, skinBones: bones }));
+  }
+
+  // ---------------------------------------------------------------- stowed hood (a thick roll behind the neck)
+  if (cut.hood === 'down') {
+    const segs = 18, n = 22;
+    const rings = [];
+    const e1s = [], e2s = [];
+    const pts = [];
+    for (let i = 0; i < n; i++) {
+      const f = (i / (n - 1)) * 2 - 1;                      // −1 … 1 across the back
+      const a = f * THREE.MathUtils.degToRad(118);
+      pts.push(new THREE.Vector3(Math.sin(a) * 0.125, 1.548 - f * f * 0.035 + (1 - f * f) * 0.01, -0.03 - Math.cos(a) * 0.14 + f * f * 0.025));
+    }
+    for (let i = 0; i < n; i++) {
+      const f = (i / (n - 1)) * 2 - 1;
+      const T = pts[Math.min(n - 1, i + 1)].clone().sub(pts[Math.max(0, i - 1)]).normalize();
+      const out = new THREE.Vector3(pts[i].x, 0, pts[i].z + 0.03).normalize();
+      const up = new THREE.Vector3().crossVectors(T, out).normalize();
+      const o2 = new THREE.Vector3().crossVectors(up, T).normalize();
+      const r = new Float32Array(segs);
+      const thick = 0.036 * (1 - f * f * 0.55), tall = 0.046 * (1 - f * f * 0.45);
+      for (let k = 0; k < segs; k++) {
+        const th = (k / segs) * TAU;
+        const ex = Math.cos(th), ey = Math.sin(th);
+        r[k] = 1 / Math.sqrt((ex * ex) / (thick * thick) + (ey * ey) / (tall * tall)) + pnoise(k / segs * 4, f * 3, 4) * 0.004;
+      }
+      rings.push({ c: pts[i], r, t: f, e1: o2, e2: up });
+      e1s.push(o2); e2s.push(up);
+    }
+    pieces.push(sweepFrames(rings, { id: PIECE.hood, side: 0, capStart: true, capEnd: true, skinBones: B(/^(spine_03|neck_01|clavicle_[lr])$/) }));
+  }
+
+  // ---------------------------------------------------------------- mitts + gauntlets
+  for (const s of [1, -1]) {
+    const sd = s > 0 ? 'l' : 'r';
+    const hand = body.bone('hand_' + sd);
+    {
+      const segs = 24;
+      const bones = B(new RegExp(`^(hand_${sd}|(index|middle|ring|pinky|thumb)_0[1-4](_leaf)?_${sd})$`));
+      const rings = bodyRings(body, {
+        axis: 'x', side: s, t0: 0.695, t1: 0.928, rings: 18, segs, half: 0.02, bones,
+        axisPoint: (t) => new THREE.Vector3(s * t, 1.43, -0.05),
+        smoothA: 2, smoothT: 2, minEase: 0.01,
+        ease: () => cut.mittEase,
+      });
+      for (const r of rings) for (let k = 0; k < segs; k++) r.r[k] += pnoise(k / segs * 4, r.t * 30, 4) * 0.0025;
+      pieces.push(sweep(rings, { id: PIECE.mitt, side: s, ...frame('x', s), capEnd: true, capLen: 0.75, rigid: hand }));
+    }
+    {
+      const segs = 24;
+      const bones = B(new RegExp(`^(lowerarm_${sd}|hand_${sd})$`));
+      const a0 = cut.gauntlet[0], a1 = 0.72;
+      const rings = bodyRings(body, {
+        axis: 'x', side: s, t0: a0, t1: a1, rings: 10, segs, half: 0.02, bones,
+        axisPoint: (t) => new THREE.Vector3(s * t, 1.44, -0.07),
+        filter: (x) => Math.abs(x) < 0.72,
+        smoothA: 3, smoothT: 2, minEase: 0.012,
+        ease: (t) => THREE.MathUtils.lerp(cut.gauntlet[1], 0.016, smooth(a0 + 0.03, a1 - 0.01, t)),
+      });
+      for (const r of rings) for (let k = 0; k < segs; k++) r.r[k] += Math.sin(r.t * TAU / 0.03 + k) * 0.0015;
+      pieces.push(sweep(rings, { id: PIECE.gauntlet, side: s, ...frame('x', s), lipStart: true, skinBones: bones }));
+    }
+  }
+
+  for (const p of pieces) skinPiece(p, body);
+  return mergePieces(pieces);
+}
+
+/** sweep() for rings that carry their own frames (curved pieces). */
+function sweepFrames(rings, meta) {
+  // Re-express each ring on a shared frame by resampling: simplest is to build directly.
+  const segs = rings[0].r.length, cols = segs + 1;
+  const R = rings.slice();
+  if (meta.capStart || meta.capEnd) {
+    const capR = (base, dir) => {
+      const out = [];
+      const T = base.e1.clone().cross(base.e2).normalize();
+      const avg = base.r.reduce((a, b) => a + b, 0) / segs;
+      for (let j = 1; j <= 4; j++) {
+        const a = (j / 4) * Math.PI / 2;
+        out.push({ ...base, c: base.c.clone().addScaledVector(T, Math.sin(a) * avg * 0.8 * dir), r: base.r.map((x) => x * Math.cos(a) + 0.0005) });
+      }
+      return out;
+    };
+    const tDir = (i, j) => Math.sign(rings[j].c.clone().sub(rings[i].c).dot(rings[i].e1.clone().cross(rings[i].e2))) || 1;
+    if (meta.capStart) R.unshift(...capR(rings[0], -tDir(0, 1)).reverse());
+    if (meta.capEnd) R.push(...capR(rings[rings.length - 1], tDir(rings.length - 2, rings.length - 1)));
+  }
+  const nr = R.length;
+  const P = new Float32Array(nr * cols * 3);
+  for (let i = 0; i < nr; i++) for (let k = 0; k <= segs; k++) {
+    const th = (k / segs) * TAU, ring = R[i], r = ring.r[k % segs];
+    const p = ring.c.clone().addScaledVector(ring.e1, Math.cos(th) * r).addScaledVector(ring.e2, Math.sin(th) * r);
+    P.set([p.x, p.y, p.z], (i * cols + k) * 3);
+  }
+  const N = new Float32Array(P.length);
+  const at = (i, k) => { i = Math.min(nr - 1, Math.max(0, i)); k = ((k % segs) + segs) % segs; return new THREE.Vector3().fromArray(P, (i * cols + k) * 3); };
+  const mid = Math.floor(nr / 2);
+  const tst = at(mid + 1, 0).sub(at(mid - 1, 0)).cross(at(mid, 1).sub(at(mid, -1)));
+  const orient = tst.dot(at(mid, 0).sub(R[mid].c)) < 0 ? -1 : 1;
+  for (let i = 0; i < nr; i++) for (let k = 0; k <= segs; k++) {
+    const n = at(i + 1, k).sub(at(i - 1, k)).cross(at(i, k + 1).sub(at(i, k - 1)));
+    if (n.lengthSq() < 1e-14) n.copy(at(i, k).sub(R[i].c)).multiplyScalar(orient);
+    n.normalize().multiplyScalar(orient);
+    N.set([n.x, n.y, n.z], (i * cols + k) * 3);
+  }
+  const G = new Float32Array(nr * cols * 4), L = new Float32Array(nr * cols);
+  for (let i = 0; i < nr; i++) for (let k = 0; k <= segs; k++) {
+    const o = i * cols + k;
+    G.set([meta.id, k / segs, i / (nr - 1), meta.side ?? 0], o * 4);
+  }
+  const idx = [];
+  for (let i = 0; i < nr - 1; i++) for (let k = 0; k < segs; k++) {
+    const a = i * cols + k, b = (i + 1) * cols + k, c = i * cols + k + 1, d = (i + 1) * cols + k + 1;
+    if (orient > 0) idx.push(a, b, c, c, b, d); else idx.push(a, c, b, c, d, b);
+  }
+  return { pos: P, nrm: N, g: G, lin: L, idx, rows: nr, cols, skinBones: meta.skinBones };
+}
+
+void vnoise;

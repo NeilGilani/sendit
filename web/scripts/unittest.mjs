@@ -58,7 +58,7 @@ await test('sanitize repairs bad equipment, unknown items, wrong slots and varia
   const s = schema.sanitize(p);
   assert.equal(s.loadout.equipment, 'skis');
   assert.equal(s.loadout.slots.skis.item, 'skis-northwake-carver');
-  assert.equal(s.loadout.slots.helmet.item, 'helmet-dome-pink');
+  assert.equal(s.loadout.slots.helmet.item, 'helmet-tuff');
   assert.equal(s.loadout.slots.board.variant, 'sunset');
   assert.equal(s.displayName, 'Rider');
 });
