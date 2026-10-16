@@ -67,3 +67,4 @@ registerMap({
     return RealCourse.load(variant.resort, Number(variant.run) || 0);
   },
 });
+import './ravenspire/index.js';
