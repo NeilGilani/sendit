@@ -4,6 +4,8 @@
 // The bot picks a route (which lanes it prefers), looks ~1 s ahead along its lane, and steers for
 // the lateral offset with the most clearance to the obstacles ahead — a skilled, not perfect, rider.
 // Usage: node web/scripts/map2-bot.mjs [ski|snowboard|both] [main|fast|safe|all] [--ovr] [--brake=<m/s>] [--splits]
+//   --airs    list every air > 0.45 s by what launched it (t:air/impact!result)
+//   --pop     charge and pop off kicker lips
 //   --sight   can riders see each pivot 30 / 40 / 50 m ahead? (crowns and crests block)
 //   --curve   print each lane's tightest radius and exit
 //   --line    follow the planned best line (planLine) instead of searching locally
@@ -20,7 +22,7 @@ const { Player, State } = await import('../src/player.js');
 const { PHYSICS } = await import('../src/config.js');
 const { BlackspruceCourse } = await import('../src/maps/blackspruce/course.js');
 const { forestObstacles } = await import('../src/maps/blackspruce/forest.js');
-const { GATES } = await import('../src/maps/blackspruce/layout.js');
+const { GATES, BAND, PILLOWS, ROLLERS } = await import('../src/maps/blackspruce/layout.js');
 const GATE_T = GATES.map((g) => g[0]);
 const { Features } = await import('../src/features.js');
 const { game, Mode, on } = await import('../src/state.js');
@@ -30,7 +32,7 @@ const args = process.argv.slice(2);
 const flag = (k, d) => { const a = args.find((x) => x.startsWith(`--${k}`)); return a ? (a.includes('=') ? a.split('=')[1] : true) : d; };
 const pos = args.filter((a) => !a.startsWith('--'));
 const which = pos[0] || 'both', routeArg = pos[1] || 'main';
-const XTRACK = Number(flag('xtrack', 0.25)), GAIN = Number(flag('gain', 6)), LINE = !!flag('line', false), FAIR = !!flag('fair', false), TRACE = Number(flag('trace', 0)) || 0, CHECK = !!flag('check', false), TUCK = !!flag('tuck', false), SPLITS = !!flag('splits', false), OVR = !!flag('ovr', false), BRAKE = Number(flag('brake', 0)) || 0;
+const AIRS = !!flag('airs', false), POP = !!flag('pop', false), XTRACK = Number(flag('xtrack', 0.25)), GAIN = Number(flag('gain', 6)), LINE = !!flag('line', false), FAIR = !!flag('fair', false), TRACE = Number(flag('trace', 0)) || 0, CHECK = !!flag('check', false), TUCK = !!flag('tuck', false), SPLITS = !!flag('splits', false), OVR = !!flag('ovr', false), BRAKE = Number(flag('brake', 0)) || 0;
 
 const course = new BlackspruceCourse();
 const CLEARINGS = course.clearings;
@@ -73,7 +75,21 @@ const scatter = {
 };
 
 const events = [];
-on('landed', (e) => events.push({ kind: 'land', ...e }));
+on('landed', (e) => events.push({ kind: 'land', ...e, from: lastTakeoff }));
+let lastTakeoff = null;
+/** What threw the rider into the air at (x, z): a kicker, the rock band, a log, a pillow, a roller or the terrain. */
+function featureAt(x, z) {
+  const t = course.tAt(z), d = course.dAt(x, t);
+  for (const k of features.kickers) {
+    const a = (x - k.o.x) * k.f.x + (z - k.o.y) * k.f.y, b = Math.abs((x - k.o.x) * k.r.x + (z - k.o.y) * k.r.y);
+    if (a > -4 && a < k.L + 4 && b < k.W / 2 + 3) return 'kicker ' + k.name;
+  }
+  if (Math.abs(t - BAND.t) < 8) return course.bandMask(d) > 0.5 ? 'cliff' : 'chute';
+  for (const L of course.logs) if (Math.hypot(x - L.x, z - L.z) < L.len / 2 + 2 && Math.abs((x - L.x) * L.nx + (z - L.z) * L.nz) < 4) return 'log';
+  for (const [pt, pd, R] of PILLOWS) { const w = course.world(pt, pd); if (Math.hypot(x - w.x, z - w.z) < R + 2) return 'pillow'; }
+  for (const [rt] of ROLLERS) if (Math.abs(t - rt) < 14) return 'roller';
+  return 'terrain';
+}
 on('crashed', (k) => events.push({ kind: 'crash', k }));
 on('stumble', (r) => events.push({ kind: 'stumble', r }));
 on('nearMiss', (e) => events.push({ ...e, kind: 'near' }));
@@ -174,12 +190,26 @@ function ride(type, route) {
     const tt = course.tAt(p.position.z);
     p.script = (c, pl) => {
       p.dyn._noInputT = -999;
-      Object.assign(c, { steer: 0, brake: 0, up: 0, jump: false, tuck: 0 });
+      Object.assign(c, { steer: 0, brake: 0, up: 0, jump: !!p._popHold, tuck: 0 });
       lane = laneFor(route, tt + 12);
       laneId = lane.id;
       const look = Math.max(9, pl.speed * 1.05);
       const ta = tt + look;
       const l = course.laneAt(lane, ta) || course.laneAt(course.mainLane, ta);
+      // Send the clearing's kicker (main and fast routes): line up on its centre from 60 m out.
+      if (route !== 'safe' && pl.state === State.GROUNDED) {
+        for (const k of features.kickers) {
+          if (!k.signature) continue;
+          const ka = (pl.position.x - k.o.x) * k.f.x + (pl.position.z - k.o.y) * k.f.y;
+          const kb = Math.abs((pl.position.x - k.o.x) * k.r.x + (pl.position.z - k.o.y) * k.r.y);
+          if (ka > -60 && ka < k.L && kb < 16) {
+            tmp.x = k.o.x + k.f.x * (k.L + 6); tmp.z = k.o.y + k.f.y * (k.L + 6);
+            steerTo(c, pl, tmp, 3);
+            c.tuck = 0;
+            return;
+          }
+        }
+      }
       if (line) {
         // Follow the planned line (smoothed over ±4 m), no local search.
         let dd = 0;
@@ -220,9 +250,19 @@ function ride(type, route) {
       if (CHECK && bestClear < 0.55 && pl.speed > 14 && !c.brake) { c.brake = Math.min(1, (0.55 - bestClear) * 2.5); c.tuck = 0; }
     };
     const was = p.state;
+    if (POP) {
+      // Charge on the run-in to a kicker, release at the lip (what a player does to send it).
+      let k = null, a = 0;
+      for (const q of features.kickers) {
+        const aa = (p.position.x - q.o.x) * q.f.x + (p.position.z - q.o.y) * q.f.y, b = Math.abs((p.position.x - q.o.x) * q.r.x + (p.position.z - q.o.y) * q.r.y);
+        if (aa > -14 && aa < q.L && b < q.W / 2) { k = q; a = aa; }
+      }
+      p._popHold = !!(k && a < k.L - Math.max(0.6, p.speed * 0.05));
+    }
     if (TRACE) { trace.push(`${t.toFixed(2)} t=${tt.toFixed(1)} d=${course.dAt(p.position.x, tt).toFixed(2)} lane=${laneId} v=${p.speed.toFixed(1)} st=${p.state} steer=${(p._ctrl?.steer ?? 0).toFixed(2)} off=${off.toFixed(1)} near=${(scatter.nearest(p.position, 6)?.dist ?? 9).toFixed(2)}`); if (trace.length > 150) trace.shift(); }
     p.step(DT);
     t += DT;
+    if (was !== State.AIR && p.state === State.AIR) lastTakeoff = { t: course.tAt(p.position.z), what: featureAt(p.position.x, p.position.z), v: p.speed };
     if (p.state === State.CRASH && was !== State.CRASH) { crashes++; if (TRACE && Math.abs(tt - TRACE) < 15) { console.log(trace.filter((_, i) => i % 6 === 0).join(String.fromCharCode(10))); } { const k = events.filter((e) => e.kind === 'crash').slice(-1)[0]?.k; crashAt.push(`${Math.round(tt)}${k === 'landing' ? 'L:' + p.lastCrash?.reason + ':' + (p.lastCrash?.impact ?? 0).toFixed(0) : k?.[0] || ''}`); } }
     if (p.state === State.AIR) airMax = Math.max(airMax, p.airTime);
     if (p.state === State.GROUNDED) { vSum += p.speed; n++; vMax = Math.max(vMax, p.speed); }
@@ -238,6 +278,14 @@ function ride(type, route) {
   const lands = events.filter((e) => e.kind === 'land' && e.air > 0.45);
   const avg = course.finishAt / t;
   console.log(`  ${type.padEnd(9)} ${route.padEnd(5)} ${finished ? 'FINISH' : 'DNF   '} ${t.toFixed(1)} s, run avg ${avg.toFixed(1)} m/s (ground ${(vSum / Math.max(1, n)).toFixed(1)}), max ${vMax.toFixed(1)} m/s, crashes ${crashes} [${crashAt.join(' ')}], stumbles ${events.filter((e) => e.kind === 'stumble').length}, near misses ${nears}, min clearance ${minClear.toFixed(2)} m, max air ${airMax.toFixed(1)} s, big airs ${lands.length}, score ${scoreSum}`);
+  if (AIRS) {
+    const by = {};
+    for (const l of events.filter((e) => e.kind === 'land' && e.air > 0.45)) {
+      const w = l.from?.what || '?';
+      (by[w] || (by[w] = [])).push(`${Math.round(l.from?.t ?? 0)}:${l.air.toFixed(1)}s/${l.impact.toFixed(0)}${l.result && l.result !== 'clean' ? '!' + l.result : ''}`);
+    }
+    for (const [w, a] of Object.entries(by)) console.log(`            ${w.padEnd(10)} ${a.join(' ')}`);
+  }
   if (SPLITS) console.log(`            splits: ${splits.map((x, i) => (x - (splits[i - 1] ?? 0)).toFixed(1)).join(' | ')} | ${(t - (splits[splits.length - 1] ?? 0)).toFixed(1)}`);
   for (const k of ['ski', 'snowboard']) Object.assign(PHYSICS[k], saved[k]);
   return { t, crashes, finished };
