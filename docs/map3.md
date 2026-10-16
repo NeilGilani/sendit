@@ -1,7 +1,7 @@
 # Map 3: Ravenspire — big-mountain freeride
 
 An isolated big-mountain face in the spirit of Steep: you are dropped by helicopter on a shoulder under a
-430 m horn and ride 1,670 m of vertical to the valley — stacked cliff bands (cliff into cliff), a spine
+430 m horn and ride 1,640 m of vertical to the valley — stacked cliff bands (cliff into cliff), a spine
 wall, terraced pillow stacks, a deep ravine with frozen ledges, rock buttresses, wind lips, and old
 buildings whose snowy roofs you can ride. No lifts, no banners, no crowds: wilderness, big peaks on every
 horizon, an abandoned gondola rusting between two old stations, ravens riding the updraft round the spire.

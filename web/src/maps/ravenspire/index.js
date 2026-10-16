@@ -35,7 +35,7 @@ registerMap({
   thumbnail: RAVENSPIRE_THUMB,
   order: 3,
   tags: ['handmade', 'freeride', 'big-mountain'],
-  describe: () => 'Big-mountain freeride · 1,650 m vertical · cliffs, spines, ravine',
+  describe: () => 'Big-mountain freeride · 1,640 m vertical · cliffs, spines, ravine',
   load: async () => {
     const course = new RavenspireCourse();
     // Props (buildings, the old gondola) need the renderer-side modules: loaded only in the browser.
