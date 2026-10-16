@@ -100,6 +100,11 @@ const near = (a, b, e = 1e-9) => Math.abs(a - b) <= e;
   // Each lip flake sits on the bench just above the face: the snow 3 m further on is much lower.
   const lips = spots.filter((f) => f.y === 1.0 && c.height(f.x + 3, f.z) < c.height(f.x, f.z) - 2.5);
   ok('lip flakes are on the edge of a drop', lips.length >= 6, lips.length);
+  // Cornices are visual only: none on the lines, the drop zones or the huts' drifts; still allowed on the far crests.
+  const S = -1260;   // START_X (layout.js): world x of u = 0
+  const bad = [[S + 26, -63], [S + 986, -31], [S + 1876, -179], [S + 1584, 276], c.dropZones[0] && [c.dropZones[0].x, c.dropZones[0].z]].filter(Boolean).filter(([x, z]) => c.corniceOk(x, z));
+  ok('no cornices on the lines, drop zones or huts', bad.length === 0, JSON.stringify(bad));
+  ok('cornices still allowed on the framing crests', c.corniceOk(S + 1860, -1101) && c.corniceOk(S - 300, -1150));
 }
 
 console.log(fails ? `\n${fails} of ${n} FAILED` : `\nall ${n} passed`);

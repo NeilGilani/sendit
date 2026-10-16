@@ -292,7 +292,9 @@ export class Scatter {
     this.flush();
     this.trees.build();
     this.buildTreeMask();
-    const corn = buildCornices(T, { minX, maxX, minZ, maxZ }, runDist, T.terrainUniforms?.noiseTex.value);
+    // A map may say where cornices may form (course.corniceOk; they are visual only, so not where you ride).
+    const cornKeep = course?.corniceOk ? (x, z) => (course.corniceOk(x, z) ? runDist(x, z) : 0) : runDist;
+    const corn = buildCornices(T, { minX, maxX, minZ, maxZ }, cornKeep, T.terrainUniforms?.noiseTex.value);
     if (corn) this.group.add(corn);
     this.envStats = { trees, formations, fences: posts.length, crestSegs, cornices: corn ? corn.userData.count : 0 };
   }
