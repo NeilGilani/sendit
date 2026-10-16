@@ -1,7 +1,8 @@
 // Ravenspire (map 3) frame cost on the real GPU (headless Chromium, ANGLE D3D11): for each quality, the
 // rider is placed at several spots down the face (riding down it with tuck), and for each spot we measure
 // GPU ms per frame (EXT_disjoint_timer_query_webgl2 around the whole composer render), CPU ms per rAF,
-// draw calls and triangles of the full frame (renderer.info summed over every pass).
+// draw calls and triangles of the full frame (renderer.info summed over every pass). Each spot is measured
+// in three windows and the quietest counts (other GPU work on the machine only ever adds time).
 // Usage: node scripts/map3-perf.mjs [baseUrl] [W H] [qualities] [frames per spot] [map]
 //   e.g. node web/scripts/map3-perf.mjs http://localhost:5183 1600 900 0,1,2 90
 //   map defaults to ravenspire; pass valcrest-gully to compare (spots are then along its path).
@@ -52,12 +53,19 @@ for (const q of qs.split(',').map(Number)) {
           gl.deleteQuery(pending[k]); pending.splice(k, 1);
         }
       };
+      // Three back-to-back windows; the quietest one counts (other GPU work on the machine only adds time).
+      const med0 = (x) => { x = x.slice().sort((p, q) => p - q); return x[x.length >> 1]; };
+      let best = Infinity;
       window.__cpu.length = 0; window.__cpuOn = true;
-      await new Promise((res) => { const chk = () => (gpu.length >= N ? res() : setTimeout(chk, 30)); chk(); });
+      for (let w = 0; w < 3; w++) {
+        gpu.length = 0;
+        await new Promise((res) => { const chk = () => (gpu.length >= N ? res() : setTimeout(chk, 30)); chk(); });
+        best = Math.min(best, med0(gpu));
+      }
       window.__cpuOn = false;
       P.composer.render = orig; R.info.autoReset = true;
       const med = (x) => { x = x.slice().sort((p, q) => p - q); return x[x.length >> 1]; };
-      return { gpu: med(gpu), cpu: med(window.__cpu), calls: med(calls), tris: med(tris), v: pl.speed, st: pl.state, x: pl.position.x, y: pl.position.y };
+      return { gpu: best, cpu: med(window.__cpu), calls: med(calls), tris: med(tris), v: pl.speed, st: pl.state, x: pl.position.x, y: pl.position.y };
     }, { f, N: Number(N) });
     rows.push({ f, ...r });
   }
