@@ -75,9 +75,11 @@ export const PHYSICS = {
   ski: {
     maxVelocity: 15,          // speed ratio reference (HUD / FX / camera); soft cap starts here
     steerResponse: 14,        // 1/s input smoothing (the edge roll rate does the rest)
+    steerRelease: 22,         // 1/s … back to neutral once the keys / stick are let go (the turn settles sooner)
     maxEdge: 68,              // deg — carving edge angle at full input
     edgeSwitchTime: 0.3,      // s full edge → full edge (short turns 0.25)
     edgeResponse: 14,         // 1/s first-order lean response on top of the rate limit
+    edgeRelease: 22,          // 1/s … flattening the edge with the input released
     engage: [3, 22],          // deg — edge angle range over which the gear decambers into its sidecut arc
     angulation: 26,           // deg the knees / hips add beyond the body's lean: max edge ≈ lean + this (slow = low edge)
     latG: 1.8,                // sustained lateral g before the edges let go
@@ -120,10 +122,10 @@ export const PHYSICS = {
   },
   snowboard: {
     maxVelocity: 14.5,
-    steerResponse: 11,
+    steerResponse: 11, steerRelease: 18,      // 1/s input smoothing; back to neutral once let go
     maxEdgeToe: 64, maxEdgeHeel: 55,
     edgeSwitchTime: 0.42, heelToToe: 0.3, toeToHeel: 0.4,   // s full edge to full edge (rate limit; with the lean response ≈0.38 / 0.46 s)
-    edgeResponse: 9,
+    edgeResponse: 9, edgeRelease: 15,         // 1/s lean response; flattening with the input released
     engage: [3, 24],
     angulation: 24,           // deg beyond the lean (ankles / knees); slow riders can't get high on edge
     latGToe: 1.6, latGHeel: 1.45,

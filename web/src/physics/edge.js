@@ -84,7 +84,11 @@ export class EdgePhysics {
       this._holdSign = Math.sign(steer);
       steer = Math.sign(steer) * Math.min(1, P.digitalSteerStart + this._holdT / P.digitalSteerRamp * (1 - P.digitalSteerStart));
     } else { this._holdT = 0; this._holdSign = 0; }
-    pl.turnInput += (steer - pl.turnInput) * (1 - Math.exp(-(C.steerResponse ?? P.steerResponse) * pl.handling * dt));
+    // Letting go (input back at neutral) relaxes faster than a turn builds, so the turn settles
+    // instead of fading out; steering itself keeps the normal response.
+    this.released = Math.abs(ctrl.steer) < 0.05;
+    const resp = this.released ? (C.steerRelease ?? C.steerResponse ?? P.steerResponse) : (C.steerResponse ?? P.steerResponse);
+    pl.turnInput += (steer - pl.turnInput) * (1 - Math.exp(-resp * pl.handling * dt));
     // S while charging a pop is a backflip preload, not a brake.
     const brakeIn = this.charging ? 0 : ctrl.brake;
     pl.brake += (brakeIn - pl.brake) * (1 - Math.exp(-6 * dt));
@@ -193,8 +197,10 @@ export class EdgePhysics {
     const mode = this.modes(dt, ctx) || {};
     if (mode.edge !== undefined) edgeT = mode.edge;
     const rate = this.edgeRate(this.edge, edgeT);
-    // First-order lean response, rate-limited by how fast the rider can roll edge to edge.
-    this.edge = approach(this.edge, lerp(this.edge, edgeT, 1 - Math.exp(-C.edgeResponse * dt)), rate * dt);
+    // First-order lean response, rate-limited by how fast the rider can roll edge to edge. With the
+    // input released (and no stop / plough / butter setting the edge) the gear flattens at edgeRelease.
+    const er = this.released && mode.edge === undefined ? (C.edgeRelease ?? C.edgeResponse) : C.edgeResponse;
+    this.edge = approach(this.edge, lerp(this.edge, edgeT, 1 - Math.exp(-er * dt)), rate * dt);
 
     // --- 2. heading: sidecut carve + rotary pivot + mode yaw
     //   R = R_eff · cos θ, where R_eff grows with speed (the gear is bent less at speed, research: ×1.6+),
