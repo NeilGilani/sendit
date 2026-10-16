@@ -259,7 +259,7 @@ export class EdgePhysics {
     speed = v.length();
     let decel = mu * g * n.y;
     decel += lerp(C.dragUpright, C.dragTuck, pl.tuck) * speed * speed;
-    decel += P.softCapDrag * Math.max(0, speed - C.maxVelocity) ** 2;
+    decel += P.softCapDrag * Math.max(0, speed - C.maxVelocity * (1 + flowK(pl, 'speedBoost'))) ** 2;
     const skidMu = this.stop > 0 ? lerp(C.skidMu, this.stopMu(), this.stop) : C.skidMu;
     // Slow pivots are steering more than scraping; real scrub builds with speed (stops excepted).
     const slowSkid = lerp(smoothstep(1.5, 8, speed) * 0.7 + 0.3, 1, this.stop);
@@ -323,7 +323,7 @@ export class EdgePhysics {
   // ------------------------------------------------------------------ air
   pop() {
     const C = this.C, H = this.H;
-    const v = (C.popMin + (C.popMax - C.popMin) * this.charge) * H.pop;
+    const v = (C.popMin + (C.popMax - C.popMin) * this.charge) * H.pop * (1 + flowK(this.pl, 'popBoost'));
     return this._popEnd === 'nose' && C.nollie ? v * C.nollie : v;   // the nose is shorter / softer than the tail
   }
 
@@ -362,7 +362,7 @@ export class EdgePhysics {
 
   air(dt, ctrl) {
     const pl = this.pl, C = this.C;
-    const max = C.spinRateMax * this.H.spin * (1 - pl.grab * 0.15);
+    const max = C.spinRateMax * this.H.spin * (1 - pl.grab * 0.15) * (1 + flowK(pl, 'spinBoost'));
     const tLand = this.timeToLand();
     let target = 0, resp = C.spinResponse;
     if (this._spinLock && (Math.abs(ctrl.steer) < 0.2 || Math.sign(ctrl.steer) !== this._spinLock)) this._spinLock = 0;
@@ -423,7 +423,7 @@ export class EdgePhysics {
    */
   flipStep(dt, ctrl, grabbing, tLand) {
     const pl = this.pl, C = this.C;
-    const max = C.flipRateMax * Math.sqrt(this.H.spin) * (1 - pl.grab * 0.1);
+    const max = C.flipRateMax * Math.sqrt(this.H.spin) * (1 - pl.grab * 0.1) * (1 + flowK(pl, 'spinBoost'));
     const L = this._flipLock || (this._flipLock = {});
     if (ctrl.up < 0.2) L.up = false;
     if (ctrl.brake < 0.2) L.brake = false;
@@ -505,3 +505,6 @@ export class EdgePhysics {
   /** Trick name for the score popup. */
   trickLabel(t, spins) { return spins >= 1 ? `${spins * 180}` : ''; }
 }
+
+/** Flow-state boost for a tunable (physics/flow.js): 0 unless the map runs the flow layer and it is on. */
+function flowK(pl, key) { return pl.flowBoost ? pl.flowBoost * (pl.flow?.C[key] || 0) : 0; }

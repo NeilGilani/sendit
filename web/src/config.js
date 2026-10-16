@@ -44,6 +44,8 @@ export const PHYSICS = {
   airGravity: 1,              // gravity multiplier in the air (< 1 = floatier, longer hang time)
   obstacleHeights: false,     // obstacles have a height: flying well above a tree or rock clears it
   wallCrashSpeed: 9,          // m/s into a building wall that knocks the rider down
+  slowmo: null,               // { minAir, scale, easeIn, hold, easeOut, cooldown }: apex slow motion on huge airs (player.js)
+  flow: null,                 // { enabled, … } turns on the flow layer (physics/flow.js: line chains, flow meter, SEND IT state)
   // Aerodynamic auto-tuck
   autoTuckDelay: 2.5,         // seconds without directional input
   autoTuckSpeedRatio: 0.6,
@@ -212,6 +214,16 @@ export const CAMERA = {
   landTrauma: 0.06,           // trauma per m/s of landing impact above 4 m/s
   crashTrauma: 0.8,
   obstacleTrauma: 0.35,
+  // High-speed feel (off by default; big-mountain maps turn them on through course.camera):
+  fovCurve: 1,                // FoV bonus = maxFovBonus · speedRatio^fovCurve (> 1 = the lens opens in the top of the range)
+  speedShake: 0,              // continuous shake (trauma units) at top speed on the snow …
+  speedShakeFrom: 0.7,        // … starting at this speed ratio
+  heightAtSpeed: 0,           // extra camera height (m) at top speed
+  steepLift: 0,               // extra height (m) per 10° of slope beyond 30° (see the rollover on steep faces)
+  steepPitch: 0,              // extra downward pitch (deg) per 10° beyond 30°
+  flowFov: 0,                 // FoV kick (deg) entering the flow state (physics/flow.js), half of it held while it lasts
+  airLook: 0,                 // in big air, look this share further down toward the landing (0..1)
+  airFollowY: null,           // s: vertical follow smoothing in the air (null = followSmooth · 1.8)
 };
 
 // ------------------------------------------------------------------ FXManager

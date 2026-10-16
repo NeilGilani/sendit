@@ -56,6 +56,16 @@ export class SoundScape {
     const ss = c.createBufferSource(); ss.buffer = sugar; ss.loop = true; ss.connect(bp); bp.connect(sg); sg.connect(this.sfx); ss.start();
     this.layers.sugar = { gain: sg, src: ss, level: 0 };
     this.sugarFilter = bp;
+    // Wind roar at big-mountain speed: noise through a low-pass whose cutoff sweeps 300 Hz → 6 kHz with
+    // speed; silent below 16 m/s (so slower maps sound exactly as before), loudest in the air.
+    const rb = c.createBuffer(1, sr * 3, sr), rd = rb.getChannelData(0);
+    let pink = 0;
+    for (let i = 0; i < rd.length; i++) { pink = pink * 0.97 + (Math.random() * 2 - 1) * 0.03; rd[i] = pink * 6 + (Math.random() * 2 - 1) * 0.08; }
+    const rg = c.createGain(); rg.gain.value = 0;
+    const rf = c.createBiquadFilter(); rf.type = 'lowpass'; rf.frequency.value = 300; rf.Q.value = 1.4;
+    const rs = c.createBufferSource(); rs.buffer = rb; rs.loop = true; rs.connect(rf); rf.connect(rg); rg.connect(this.sfx); rs.start();
+    this.layers.roar = { gain: rg, src: rs, level: 0 };
+    this.roarFilter = rf;
     on('activity', ({ type }) => { this.track = type; });
     on('countdown', (n) => this.oneShot(n > 0 ? 'count_beep' : 'count_go', 0.6, 1));
     on('gate', ({ pass }) => (pass ? this.oneShot('gate', 0.5, 0.95 + Math.random() * 0.1) : this.oneShot('combo_lost', 0.5, 0.8)));
@@ -80,6 +90,10 @@ export class SoundScape {
       if (perfect) this.oneShot('perfect', 0.6, 1);
     });
     on('crashed', () => this.oneShot('crash', 0.8, 1));
+    on('flowState', ({ on: st }) => { this.flowOn = st; if (st) { this.oneShot('boost', 0.7, 1); this.oneShot('whoosh_slow', 0.6, 1.3); } });
+    on('flowBanked', ({ bonus, mult }) => { if (bonus) this.oneShot('combo_bank', 0.55, 0.9 + Math.min(mult, 5) * 0.05); });
+    on('flowLost', () => this.oneShot('combo_lost', 0.45, 0.9));
+    on('slowmo', ({ scale }) => { this.slow = scale; });   // apex slow motion: wind and snow drop in pitch
     // A board's tail slap pops lower than a skier's hop.
     on('jumped', (d) => this.oneShot('jump_pop', 0.4 + d * 0.5, (this.skier.equipment?.type === 'snowboard' ? 0.78 : 0.95) + Math.random() * 0.15));
     on('nearMiss', () => this.oneShot('near_miss', 0.55, 0.95 + Math.random() * 0.2));
@@ -169,7 +183,7 @@ export class SoundScape {
       turn = Math.min(1, Math.abs(s.carve) * 0.7 + s.skid * 0.6);
       air = s.state === State.AIR;
     }
-    const s01 = Math.min(1, speed / 15);
+    const s01 = Math.min(1, speed / Math.max(15, s.dyn?.maxVelocity ?? 15));   // fast maps (higher top speed) keep the wind building
     const moving = smooth(0.4, 5, speed);
     const onSnow = grounded && !paused ? 1 : 0;
     const level = moving * (0.3 + 0.7 * s01) * onSnow;
@@ -179,13 +193,16 @@ export class SoundScape {
     this.set('snow_carve', onSnow * moving * turn * (0.25 + 0.75 * s01) * 0.7, 0.25);
     this.set('wind_speed', paused ? 0 : Math.pow(s01, 1.4) * (air ? 0.95 : 0.75), 0.4);
     this.set('wind_ambient', paused ? 0.18 : 0.32, 1.2);
+    const roar = paused || menu ? 0 : smooth(16, 32, speed);
+    this.set('roar', roar * (air ? 0.55 : 0.4), 0.25);
+    if (roar > 0 || this.layers.roar.level > 0) this.roarFilter.frequency.setTargetAtTime(300 * Math.pow(20, smooth(8, 34, speed)) * (air ? 1.15 : 1), c.currentTime, 0.2);
     // Sugar crunch: louder in deep, soft snow and when sinking in; brighter with speed and carving.
     const deep = menu ? 0 : Math.min(1, (s.powder ?? soft) * (0.5 + (s.sink || 0) * 3));
     this.set('sugar', level * deep * (0.35 + turn * 0.6) * 0.9, 0.15);
     this.sugarFilter.frequency.setTargetAtTime(1800 + 2200 * s01 + turn * 1200, c.currentTime, 0.2);
     this.layers.snow_powder.src.playbackRate.setTargetAtTime(0.92 + 0.2 * s01, c.currentTime, 0.3);
     this.layers.snow_groomed.src.playbackRate.setTargetAtTime(0.9 + 0.25 * s01, c.currentTime, 0.3);
-    this.layers.wind_speed.src.playbackRate.setTargetAtTime(0.85 + 0.35 * s01, c.currentTime, 0.5);
+    this.layers.wind_speed.src.playbackRate.setTargetAtTime((0.85 + 0.35 * s01) * (0.55 + 0.45 * (this.slow ?? 1)), c.currentTime, this.slow < 1 ? 0.12 : 0.5);
     // Edge sound: a board's single wide edge growls lower; slide / hockey stops scrape brighter.
     const board = s.equipment?.type === 'snowboard';
     this.layers.snow_carve.src.playbackRate.setTargetAtTime((board ? 0.8 : 1.0) + 0.15 * s01 + (s.stop || 0) * 0.18, c.currentTime, 0.2);
@@ -198,7 +215,7 @@ export class SoundScape {
     if (this.musicRest > 0) { this.musicRest -= dt; target = 0; }
     const rate = target > this.musicLevel ? 0.25 : 0.18;
     this.musicLevel += Math.sign(target - this.musicLevel) * Math.min(Math.abs(target - this.musicLevel), rate * dt);
-    const up = this.track === 'challenge' && !menu ? 1 : 0;
+    const up = (this.track === 'challenge' || this.flowOn) && !menu ? 1 : 0;   // the SEND IT flow state lifts the music too
     this.upLevel += (up - this.upLevel) * Math.min(1, dt * 0.8);
     this.musicGain.gain.setTargetAtTime(this.musicLevel ** 1.6 * (1 - this.upLevel), c.currentTime, 0.1);
     this.upbeatGain.gain.setTargetAtTime((paused ? 0.45 : 0.75) * this.upLevel, c.currentTime, 0.1);

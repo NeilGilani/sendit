@@ -10,6 +10,7 @@ import { game, Mode, setMode, emit, addScore } from './state.js';
 import { angleDiff, lerpAngle, clamp } from './physics/math.js';
 import { SkiPhysics } from './physics/ski.js';
 import { SnowboardPhysics } from './physics/snowboard.js';
+import { Flow } from './physics/flow.js';
 import { getEquipmentSpec, deriveHandling, normalizeType } from './equipment/registry.js';
 
 export const State = { FROZEN: 0, GROUNDED: 1, AIR: 2, CRASH: 3, LIFT: 4 };
@@ -23,6 +24,8 @@ export class Player {
     // Per-map physics (course.physics, config.js applyMapTuning): only for a real world terrain, so lobby
     // previews on a flat stand-in never reset the loaded map's tuning.
     if (terrain && terrain.course !== undefined) applyMapTuning(terrain.course);
+    this.flow = terrain && terrain.course !== undefined && P.flow?.enabled ? new Flow(this) : null;   // SSX-style energy layer (opt-in)
+    if (this.flow && typeof document !== 'undefined') import('./flowhud.js').then((m) => m.mountFlowHud(this)).catch((e) => console.warn('[flow] HUD failed', e));
     this.state = State.FROZEN;
     this.position = new THREE.Vector3();
     this.velocity = new THREE.Vector3();
@@ -151,6 +154,7 @@ export class Player {
     this.prevOrient.copy(this.orient);
     this.prevFlip = this.visFlip;
     if (this.state === State.FROZEN || this.debugFreeze) return;   // debugFreeze: hold a pose for inspection
+    if (P.slowmo) dt *= this.slowmoScale(dt);                      // huge airs: a moment of slow motion (opt-in)
     this.readInput(dt);
     switch (this.state) {
       case State.GROUNDED: this.groundStep(dt); break;
@@ -160,8 +164,37 @@ export class Player {
     }
     if (this.state === State.GROUNDED || this.state === State.AIR) { this.collide(); this.keepInside(); this.nearMiss(dt); }
     this.stumbleT = Math.max(0, this.stumbleT - dt);
+    if (this.flow) this.flow.update(dt);
     this._hintCool = Math.max(0, this._hintCool - dt);
     this.applyOrient(dt);
+  }
+
+  /**
+   * Apex slow motion (PHYSICS.slowmo = { minAir, scale, easeIn, hold, easeOut, cooldown }, real seconds):
+   * once per air, when the predicted flight is longer than minAir, time eases down to `scale` near the
+   * top of the arc and back before the landing. Returns this step's time scale; emits 'slowmo' {scale}.
+   */
+  slowmoScale(realDt) {
+    const S = P.slowmo;
+    this._smCool = Math.max(0, (this._smCool || 0) - realDt);
+    if (this.state !== State.AIR) { this._smT = -1; this._smArmed = true; if (this.timeScale !== 1) { this.timeScale = 1; emit('slowmo', { scale: 1 }); } return 1; }
+    if (this._smT < 0 && this._smArmed && this._smCool <= 0 && this.airTime > 0.25 && this.velocity.y < 2) {
+      const tLand = this.dyn.timeToLand();
+      if (tLand > S.minAir * 0.6 && this.airTime + tLand > S.minAir) { this._smT = 0; this._smArmed = false; this._smCool = S.cooldown; }
+    }
+    let k = 1;
+    if (this._smT >= 0) {
+      this._smT += realDt;
+      const t = this._smT;
+      const a = t < S.easeIn ? t / S.easeIn : t < S.easeIn + S.hold ? 1 : 1 - (t - S.easeIn - S.hold) / S.easeOut;
+      const w = Math.max(0, Math.min(1, a));
+      k = 1 - (1 - S.scale) * w * w * (3 - 2 * w);
+      // Never slow the last moments before touchdown (the landing needs real-time control).
+      if (this.dyn.timeToLand() < 0.45) k = Math.max(k, 0.9);
+      if (t > S.easeIn + S.hold + S.easeOut) this._smT = -2;
+    }
+    if (Math.abs(k - (this.timeScale ?? 1)) > 0.01 || (k === 1 && this.timeScale !== 1)) { this.timeScale = k; emit('slowmo', { scale: k }); }
+    return k;
   }
 
   interpolate(alpha) {
@@ -304,6 +337,7 @@ export class Player {
 
   enterAir(popped = false) {
     this.takeoffPos = (this.takeoffPos || new THREE.Vector3()).copy(this.position);
+    this._maxAbove = 0;
     this.state = State.AIR; this.airTime = 0; this._spinTotal = 0; this.spinRate = 0; this.turnVelocity = 0;
     this.grab = 0; this.stop = 0; this.butter = 0; this.press = 0;
     this.dyn.takeoffInfo(popped);
@@ -329,6 +363,7 @@ export class Player {
       if (b && this.hitWall(this.position, b)) return;
     }
     const gh = this.terrain.getHeight(this.position.x, this.position.z);
+    if (this.position.y - gh > (this._maxAbove || 0)) this._maxAbove = this.position.y - gh;
     if (this.position.y <= gh) {
       this.position.y = gh;
       // Just popped on a rising ramp and still moving away from the surface: ride up it airborne.
@@ -356,7 +391,8 @@ export class Player {
     const landSpeed = this.velocity.length();
     const slow = landSpeed < 1.5;
     // Fast landings forgive less sideways (landYawSpeed: tolerances × scale from v0 → v1).
-    const ys = P.landYawSpeed ? 1 + (P.landYawSpeed[2] - 1) * clamp((landSpeed - P.landYawSpeed[0]) / (P.landYawSpeed[1] - P.landYawSpeed[0]), 0, 1) : 1;
+    const ys = (P.landYawSpeed ? 1 + (P.landYawSpeed[2] - 1) * clamp((landSpeed - P.landYawSpeed[0]) / (P.landYawSpeed[1] - P.landYawSpeed[0]), 0, 1) : 1)
+      * (1 + (this.flowBoost || 0) * (this.flow?.C.landBoost || 0));   // flow state: a little more forgiving
     const ev = slow ? { result: 'clean', switch: this.isSwitch, dev: 0 } : this.dyn.land(devNose, ys);
     // Pitch: a flip has to come round to (near) upright; the worse of yaw and pitch decides.
     const fl = this.dyn.landFlip();
@@ -390,16 +426,30 @@ export class Player {
     }
     const perfect = clean && ev.dev < 8 && fl.dev < 10 && this.airTime > 0.6;
     const trick = this.dyn.trickLabel(t, spins, fl);
-    this.lastLanding = { ...ev, impact, air: this.airTime, spins, flips: fl.flips, trick };
-    emit('landed', { impact, air: this.airTime, clean, perfect, switch: ev.switch, result: ev.result, trick });
-    if (clean && (this.airTime > 0.7 || (trick && this.airTime > 0.35))) {
+    const scored = clean && (this.airTime > 0.7 || (trick && this.airTime > 0.35));
+    const grabPts = t.grab && t.grabT > 0.25 ? 40 + Math.floor(t.grabT * 60) : 0;
+    let points = scored ? Math.floor(this.airTime * 80) + spins * 90 + fl.flips * 150 + grabPts + (t.switch ? 30 : 0) + (perfect ? 50 : 0) : 0;
+    // Big-mountain extras (flow maps): the drop (greatest height above the snow in this air), a landing
+    // grade, and flow-state trick points.
+    const flow = this.flow;
+    const drop = this._maxAbove || 0;
+    let grade = null;
+    if (flow) {
+      grade = !clean ? 'sketchy' : perfect && impact <= P.hardLanding * 0.55 ? 'stomped' : 'clean';
+      points = Math.round(points * flow.scoreMul());
+    }
+    this.lastLanding = { ...ev, impact, air: this.airTime, spins, flips: fl.flips, trick, drop, grade, rawImpact };
+    emit('landed', { impact, air: this.airTime, clean, perfect, switch: ev.switch, result: ev.result, trick, drop, grade, points, rawImpact });
+    if (scored) {
       let label = trick || `Air ${this.airTime.toFixed(1)}s`;
       if (perfect) label = `Perfect ${label}`;
       game.airTotal += this.airTime;
-      const grabPts = t.grab && t.grabT > 0.25 ? 40 + Math.floor(t.grabT * 60) : 0;
-      addScore(label, Math.floor(this.airTime * 80) + spins * 90 + fl.flips * 150 + grabPts + (t.switch ? 30 : 0) + (perfect ? 50 : 0));
+      addScore(label, points);
     }
+    if (flow && clean && drop >= 6) addScore(`${Math.round(drop)} m drop`, Math.round((drop * 12 + Math.max(0, drop - 15) * 10) * flow.scoreMul()));
+    if (flow && this.airTime > 0.35) emit('landingGrade', { grade, drop, impact, rawImpact, air: this.airTime, trick, perfect });
     this.airTime = 0;
+    this._maxAbove = 0;
   }
 
   crash(kind) {

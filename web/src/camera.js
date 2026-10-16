@@ -35,6 +35,8 @@ export class CameraController {
     on('landed', ({ impact }) => this.addTrauma(Math.max(0, impact - 4) * C.landTrauma));
     on('crashed', () => { this.addTrauma(C.crashTrauma); this.snapT = 0.6; });
     on('hardBrake', () => { this.snapT = 0.35; this.addTrauma(0.12); });
+    on('flowState', ({ on: st }) => { if (st) { this.flowKick = 1; this.addTrauma(0.25); } this.flowHold = st ? 0.5 : 0; });
+    on('slowmo', ({ scale }) => { this.slow = 1 - scale; });   // apex slow motion: the lens tightens a touch
     on('bump', (v) => this.addTrauma(Math.min(1, v * 0.06) * C.obstacleTrauma));
     on('stumble', () => this.addTrauma(0.25));
     on('landed', ({ impact }) => { this.fpDipV = (this.fpDipV || 0) + Math.min(2.2, impact * 0.16); });
@@ -104,12 +106,16 @@ export class CameraController {
 
   follow(dt) {
     const s = this.player;
-    const target = s.renderPos.clone().add(new THREE.Vector3(0, C.height, 0));
+    // Big-mountain framing (CAMERA.heightAtSpeed / steepLift, 0 by default): higher at speed and on steep faces.
+    const steep = Math.max(0, THREE.MathUtils.radToDeg(Math.acos(Math.min(1, s.groundNormal.y))) - 30) / 10;
+    this.steep = (this.steep || 0) + (steep - (this.steep || 0)) * (1 - Math.exp(-2 * dt));
+    const target = s.renderPos.clone().add(new THREE.Vector3(0, C.height + s.speedRatio * C.heightAtSpeed + this.steep * C.steepLift, 0));
     const lift = s.state === State.LIFT;
     const sm = lift ? 0.35 : C.followSmooth;
     this.pos.x = this.damp(this.pos.x, target.x, 0, sm, dt);
     this.pos.z = this.damp(this.pos.z, target.z, 2, sm, dt);
-    this.pos.y = this.damp(this.pos.y, target.y, 1, sm * 1.8, dt);
+    // CAMERA.airFollowY: a tighter vertical follow in the air (long drops would leave the rider at the frame edge).
+    this.pos.y = this.damp(this.pos.y, target.y, 1, s.state === State.AIR && C.airFollowY != null ? C.airFollowY : sm * 1.8, dt);
     if (this.pos.distanceTo(target) > 40) this.snap();
 
     const speed = s.speed;
@@ -158,7 +164,7 @@ export class CameraController {
     const n = s.groundNormal;
     const rise = -back.dot(new THREE.Vector3(n.x, 0, n.z)) / Math.max(n.y, 0.2);
     const slopeDeg = THREE.MathUtils.radToDeg(Math.atan(Math.max(rise, 0)));
-    let wantPitch = C.pitch - r * 5 - slopeDeg * 0.75 * (1 - this.side) + this.lookPitch;
+    let wantPitch = C.pitch - r * 5 - slopeDeg * 0.75 * (1 - this.side) + this.lookPitch - this.steep * C.steepPitch;
     wantPitch = wantPitch * (1 - this.side) + (-4 + this.lookPitch) * this.side;
     if (orbiting) wantPitch = -8 + this.lookPitch;
     if (lift) wantPitch = -9 + this.lookPitch;
@@ -182,14 +188,16 @@ export class CameraController {
     const cp = this.pos.clone().addScaledVector(dir, this.arm);
     cp.y = Math.max(cp.y, this.terrain.getHeight(cp.x, cp.z) + 0.7);
     this.camera.position.copy(cp);
-    this.camera.lookAt(this.pos.clone().addScaledVector(dir, -4).add(new THREE.Vector3(0, -0.4 + this.side * 0.3, 0)));
+    this.camera.lookAt(this.pos.clone().addScaledVector(dir, -4).add(new THREE.Vector3(0, -0.4 + this.side * 0.3 - this.side * C.airLook * Math.min(18, Math.max(0, above)), 0)));
     // Carve tilt
     const wantRoll = -s.turnInput * r * THREE.MathUtils.degToRad(7) * (1 - this.side) * (s.state === State.GROUNDED ? 1 : 0);
     this.roll += (wantRoll - this.roll) * (1 - Math.exp(-4 * dt));
     this.camera.rotateZ(this.roll);
 
     // Trauma shake: offset = noise · trauma²
-    const tr2 = this.trauma * this.trauma;
+    // Continuous speed shake on the snow (CAMERA.speedShake, 0 by default) on top of the trauma.
+    const ss = s.state === State.GROUNDED ? C.speedShake * smoothstep(C.speedShakeFrom, 1, r) * (0.7 + 0.3 * noise1(this.t * 0.7, 5.5)) : 0;
+    const tr2 = this.trauma * this.trauma + ss * ss;
     if (tr2 > 1e-4) {
       const f = this.t * C.shakeFreq;
       const nx = noise1(f, 1.3), ny = noise1(f, 7.1), nz = noise1(f, 3.7);
@@ -201,7 +209,9 @@ export class CameraController {
     }
 
     // FoV elasticity: base + velocityRatio · bonus; sharp snap back when crashing / braking hard.
-    let wantFov = C.baseFov + r * C.maxFovBonus;
+    // The lens opens in the top of the speed range (fovCurve > 1), kicks open entering the flow state.
+    this.flowKick = Math.max(this.flowHold || 0, (this.flowKick || 0) * Math.exp(-1.6 * dt));
+    let wantFov = C.baseFov + Math.pow(r, C.fovCurve) * C.maxFovBonus + this.flowKick * C.flowFov - (this.slow || 0) * 9;
     if (this.snapT > 0) wantFov = C.baseFov - 6;
     if (s.state === State.CRASH) wantFov = C.baseFov - 4;
     const rate = this.snapT > 0 || wantFov < this.fov ? C.fovSnapRate : C.fovRiseRate;
