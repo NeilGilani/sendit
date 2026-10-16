@@ -18,6 +18,8 @@ export function buildRavenspireProps(course, { terrain }) {
   group.add(buildHeli(course, terrain));
   group.add(buildRavens(course, terrain));
   group.add(buildIceFalls(course, terrain));
+  group.add(buildSmoke(course, terrain));
+  group.add(buildMast(course, M, terrain));
   group.traverse((o) => { if (o.isMesh && !o.material.transparent) { o.castShadow = true; o.receiveShadow = true; } });
   return group;
 }
@@ -620,5 +622,119 @@ function buildIceFalls(course, terrain) {
   }
   if (geos.length) g.add(new THREE.Mesh(mergeGeometries(geos), ice));
   if (cones.length) g.add(new THREE.Mesh(mergeGeometries(cones), iceTip));
+  return g;
+}
+
+// ------------------------------------------------------------------ chimney smoke + the station mast
+// The valley wind: smoke leans and the windsock points this way (x = down the fall line).
+const WIND = new THREE.Vector2(0.85, 0.35).normalize();
+
+/**
+ * Wood smoke from every chimney: soft camera-facing puffs that rise, grow, lean downwind and fade. It
+ * marks the refuge and the A-frames from far up the face (you see the plume long before the roof).
+ * One instanced draw for all chimneys; the puffs are visual only.
+ */
+function buildSmoke(course, terrain) {
+  const vents = course.structures.filter((s) => s.chim).map((s) => {
+    const [x, z] = s.world(s.chim.a, s.chim.b);
+    return new THREE.Vector3(x, s.chim.top + 0.3, z);
+  });
+  const PER = 26, LIFE = 11, n = vents.length * PER;
+  const geo = new THREE.InstancedBufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0], 3));
+  geo.setIndex([0, 1, 2, 0, 2, 3]);
+  const iPos = new THREE.InstancedBufferAttribute(new Float32Array(n * 4), 4).setUsage(THREE.DynamicDrawUsage);
+  const iData = new THREE.InstancedBufferAttribute(new Float32Array(n * 2), 2).setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute('iPos', iPos); geo.setAttribute('iData', iData);
+  geo.instanceCount = n;
+  const mat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false,
+    uniforms: { noiseTex: { value: terrain.terrainUniforms?.noiseTex.value ?? null }, uSunDir: { value: new THREE.Vector3(0.5, 0.7, 0.3).normalize() } },
+    vertexShader: /* glsl */`
+      attribute vec4 iPos; attribute vec2 iData;
+      varying vec2 vQ; varying float vA; varying float vSeed; varying float vLit;
+      void main() {
+        vQ = position.xy; vA = iData.x; vSeed = iData.y;
+        vec4 c = viewMatrix * vec4(iPos.xyz, 1.0);
+        float a = vSeed * 6.28;
+        c.xy += mat2(cos(a), -sin(a), sin(a), cos(a)) * position.xy * iPos.w;
+        vLit = 0.75 + 0.25 * vQ.y;
+        vA *= smoothstep(1.0, 4.0, -c.z);
+        gl_Position = projectionMatrix * c;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform sampler2D noiseTex;
+      varying vec2 vQ; varying float vA; varying float vSeed; varying float vLit;
+      void main() {
+        float r = length(vQ) * 2.0;
+        float n = texture2D(noiseTex, vQ * 0.6 + vSeed * 3.7).r;
+        float a = (1.0 - smoothstep(0.2, 1.0, r + (n - 0.5) * 0.7)) * vA;
+        if (a < 0.004) discard;
+        vec3 col = mix(vec3(0.32, 0.35, 0.41), vec3(0.76, 0.78, 0.83), vLit * (0.55 + 0.5 * n));
+        gl_FragColor = vec4(col, a);
+      }`,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = 'ChimneySmoke';
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 20;   // after the valley mist sheets (the puffs write no depth)
+  const hash = (i) => { const x = Math.sin(i * 127.1) * 43758.5453; return x - Math.floor(x); };
+  mesh.onBeforeRender = () => {
+    const t = performance.now() / 1000;
+    for (let v = 0; v < vents.length; v++) {
+      const o = vents[v];
+      for (let k = 0; k < PER; k++) {
+        const i = v * PER + k, sd = hash(i + 1);
+        const age = ((t + k * LIFE / PER + sd * 0.4) % LIFE) / LIFE;   // 0 → 1 over a puff's life
+        const rise = 26 * Math.sqrt(age) + 6 * age, lean = 30 * age * age + 3 * age;
+        const sway = Math.sin(t * 0.35 + age * 4 + v) * 2.5 * age;
+        iPos.setXYZW(i, o.x + WIND.x * lean - WIND.y * sway, o.y + rise, o.z + WIND.y * lean + WIND.x * sway, 1.2 + 17 * age);
+        iData.setXY(i, 0.75 * Math.min(1, age * 8) * (1 - age) ** 1.6, sd);
+      }
+    }
+    iPos.needsUpdate = true; iData.needsUpdate = true;
+  };
+  return mesh;
+}
+
+/**
+ * The old lift station's weather mast: a tall timber pole beside the station with a faded red-and-white
+ * windsock and a red beacon. It stands 24 m, so the top shows over the Station Cliff lip and tells you
+ * where the roof is before you can see it.
+ */
+function buildMast(course, M, terrain) {
+  const g = new THREE.Group();
+  g.name = 'StationMast';
+  if (!course.mast) return g;
+  const { x, z } = course.mast, y0 = terrain.baseHeight(x, z) - 0.5, H = course.mast.h + 0.5;
+  const pole = new THREE.CylinderGeometry(0.13, 0.22, H, 7);
+  pole.translate(0, H / 2, 0);
+  const bar = new THREE.BoxGeometry(1.6, 0.12, 0.12); bar.translate(0, H - 1.6, 0);
+  const cup = new THREE.BoxGeometry(0.1, 0.5, 0.1); cup.translate(0.75, H - 1.3, 0);   // anemometer stub
+  const wood = mergeGeometries([pole.toNonIndexed(), bar.toNonIndexed(), cup.toNonIndexed()]);
+  wood.translate(x, y0, z);
+  g.add(new THREE.Mesh(wood, M.woodDark));
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), toonMaterial({ name: 'beacon', color: 0x902018, frag: 'toonEmissive = vec3(0.9, 0.08, 0.04) * (0.4 + 0.6 * step(0.5, fract(uTime * 0.6)));' }));
+  lamp.position.set(x, y0 + H + 0.2, z);
+  g.add(lamp);
+  // Windsock: an open cone on a swivel, red and white bands faded by the sun.
+  const tex = canvasTex(64, 16, (c, w, h) => {
+    for (let i = 0; i < 5; i++) { c.fillStyle = i % 2 ? '#e8e2d8' : '#c8402e'; c.fillRect(i * w / 5, 0, w / 5 + 1, h); }
+    c.fillStyle = 'rgba(255,255,255,0.18)'; c.fillRect(0, 0, w, h * 0.4);
+  }, false);
+  const sockG = new THREE.CylinderGeometry(0.42, 0.16, 2.6, 10, 4, true);
+  sockG.rotateZ(-Math.PI / 2); sockG.translate(1.3 + 0.15, 0, 0);   // along +x from the swivel
+  { const uv = sockG.attributes.uv, p = sockG.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, (p.getX(i) - 0.15) / 2.6, uv.getX(i)); }
+  const sock = new THREE.Mesh(sockG, toonMaterial({ name: 'windsock', map: tex, side: THREE.DoubleSide }));
+  const swivel = new THREE.Group();
+  swivel.position.set(x, y0 + H - 0.9, z);
+  swivel.rotation.y = Math.atan2(-WIND.y, WIND.x);
+  swivel.add(sock);
+  g.add(swivel);
+  sock.onBeforeRender = () => {
+    const t = performance.now() / 1000;
+    sock.rotation.z = -0.12 + 0.06 * Math.sin(t * 1.3);            // droops a little in the lulls
+    sock.rotation.y = 0.12 * Math.sin(t * 0.7) + 0.05 * Math.sin(t * 3.1);
+  };
   return g;
 }

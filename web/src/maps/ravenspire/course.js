@@ -146,6 +146,13 @@ export class RavenspireCourse {
     this.towers = towers;
     this.obstacles = [];
     for (const t of towers) this.obstacles.push([t.x, t.z, 1.1, 'tower']);
+    // The station's weather mast (props.js): beside the uphill corner, tall enough to show over the lip.
+    const st = this.structures.find((k) => k.id === 'station');
+    if (st) {
+      const [x, z] = st.world(-st.hl + 3, -(st.hw + 3.5));
+      this.mast = { x, z, h: 24 };
+      this.obstacles.push([x, z, 0.4, 'tower']);
+    }
   }
 
   // ---------------------------------------------------------------- path (the hero line)
