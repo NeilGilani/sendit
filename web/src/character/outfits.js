@@ -16,7 +16,7 @@ export const GARMENTS = {
       cut: {
         hemFront: 0.68, hemBack: 0.64,            // mid-thigh, the back drops 4 cm
         jacketEase: { shoulder: 0.016, chest: 0.036, hem: 0.062 },   // how far the shell stands off the skin
-        sleeveEase: { upper: 0.02, elbow: 0.028, forearm: 0.022 },
+        sleeveEase: { upper: 0.012, elbow: 0.026, forearm: 0.022 },
         sleeveEnd: 0.69,                           // |x| of the cuff in the T-pose (wrist at 0.706)
         collarTop: 1.615,                          // zipped up under the jaw
         hood: 'down',                              // 'down' = thick roll behind the neck
@@ -58,7 +58,7 @@ export const GARMENTS = {
     'tuff-mitt': {
       name: 'Tuff Mitt',
       blurb: 'Leather mitts with long nylon gauntlets over the cuffs.',
-      cut: { mittEase: 0.014, gauntlet: [0.618, 0.034] },   // gauntlet start |x|, ease at its open end
+      cut: { mittEase: 0.012, mittScale: 0.86, gauntlet: [0.618, 0.032] },   // mitt size vs the hand, gauntlet start |x| + ease at its open end
     },
   },
 };

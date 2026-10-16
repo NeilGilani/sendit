@@ -54,7 +54,7 @@ export function buildOutfitGeometry(body, cut) {
       axisPoint: (t) => new THREE.Vector3(0, t, 0),
       filter: (x, y, z, b) => (b.startsWith('upperarm') ? Math.abs(x) < 0.2 : b.startsWith('neck') ? y < 1.56 : true),
       centre: (t, c) => new THREE.Vector3(0, t, c.z),
-      smoothA: 5, smoothT: 4, minEase: -0.012,   // the skin underneath is pulled in 4 cm: no muscles through the shell
+      smoothA: 8, smoothT: 5, minEase: -0.028,   // the skin underneath is pulled in 4 cm: no muscles through the shell
       ease: (t, th) => {
         const back = (1 - Math.cos(th)) / 2;            // 0 front … 1 back
         const side = Math.abs(Math.sin(th));
@@ -63,6 +63,12 @@ export function buildOutfitGeometry(body, cut) {
         return e + back * 0.012 + side * 0.006;
       },
       post: (rings, S) => {
+        // The superhero chest is far deeper than a real one: flatten the front of the upper body a little
+        // (the skin underneath is pulled in further than this).
+        for (const r of rings) {
+          const k = 0.05 * smooth(1.05, 1.25, r.t) * (1 - smooth(1.5, 1.58, r.t));
+          for (let q = 0; q < S; q++) r.r[q] *= 1 - k * Math.max(0, Math.cos((q / S) * TAU)) ** 2;
+        }
         // Fabric drops straight from the chest and shoulder blades: never nipped in at the waist.
         hang(rings, S, 1.32, 0.05);
         // Shoulder line: the shell slopes from the collar down to the armholes (no boxy epaulettes).
@@ -107,6 +113,8 @@ export function buildOutfitGeometry(body, cut) {
     pieces.push(sweep(rings, {
       id: PIECE.jacket, side: 0, ...frame('y'), lipEnd: true, skinBones: bones,
       skinMask: (b, x, y) => !b.startsWith('upperarm') || (y > 1.45 && Math.abs(x) > 0.13),
+      // …and only partly, at the outer edge: the chest panel stays flat when the arms reach forward.
+      weightLimit: (b, x, y) => (b.startsWith('upperarm') ? 0.55 * smooth(0.15, 0.23, Math.abs(x)) * smooth(1.43, 1.5, y) : undefined),
     }));
   }
 
@@ -115,7 +123,7 @@ export function buildOutfitGeometry(body, cut) {
     const segs = 28;
     const sd = s > 0 ? 'l' : 'r';
     const bones = B(new RegExp(`^(upperarm_${sd}|lowerarm_${sd}|clavicle_${sd})$`));
-    const t0 = 0.165, t1 = cut.sleeveEnd;
+    const t0 = 0.19, t1 = cut.sleeveEnd;
     const rings = bodyRings(body, {
       axis: 'x', side: s, t0, t1, rings: 34, segs, half: 0.022, bones,
       axisPoint: (t) => new THREE.Vector3(s * t, J['upperarm_' + sd].y, J['upperarm_' + sd].z),
@@ -131,6 +139,9 @@ export function buildOutfitGeometry(body, cut) {
         for (const r of rings) {
           const w = smooth(t1 - 0.06, t1, r.t);
           for (let k = 0; k < S; k++) r.r[k] = THREE.MathUtils.lerp(r.r[k], r.raw[k] + 0.014, w * 0.85);
+          // Slim sleeve head: it sits inside the jacket's shoulder and only widens past the armhole.
+          const head = THREE.MathUtils.lerp(0.74, 1, smooth(0.2, 0.33, r.t));
+          for (let k = 0; k < S; k++) r.r[k] *= head;
           // Near the armhole the top of the sleeve follows the sloped shoulder line of the body shell.
           if (r.t < 0.34) {
             const lim = 1.575 - (r.t - 0.08) * 0.42 - r.c.y - 0.02 * smooth(0.3, 0.2, r.t);
@@ -152,7 +163,13 @@ export function buildOutfitGeometry(body, cut) {
         r.r[k] += elbow + wrist + twist;
       }
     }
-    pieces.push(sweep(rings, { id: PIECE.sleeve, side: s, ...frame('x', s), lipEnd: true, skinBones: B(new RegExp(`^(upperarm_${sd}|lowerarm_${sd}|clavicle_${sd}|spine_03|hand_${sd})$`)) }));
+    // The armhole end stays with the shoulder girdle (clavicle) and blends into the arm, so the sleeve
+    // head never swings out through the chest or back when the arm reaches.
+    pieces.push(sweep(rings, {
+      id: PIECE.sleeve, side: s, ...frame('x', s), lipEnd: true,
+      skinBones: B(new RegExp(`^(upperarm_${sd}|lowerarm_${sd}|clavicle_${sd}|spine_03|hand_${sd})$`)),
+      anchor: { bone: body.bone('clavicle_' + sd), axis: 0, abs: true, y0: 0.2, y1: 0.28 },
+    }));
   }
 
   // ---------------------------------------------------------------- pant legs
@@ -309,12 +326,14 @@ export function buildOutfitGeometry(body, cut) {
       const segs = 24;
       const bones = B(new RegExp(`^(hand_${sd}|(index|middle|ring|pinky|thumb)_0[1-4](_leaf)?_${sd})$`));
       const rings = bodyRings(body, {
-        axis: 'x', side: s, t0: 0.695, t1: 0.928, rings: 18, segs, half: 0.02, bones,
+        axis: 'x', side: s, t0: 0.695, t1: 0.912, rings: 18, segs, half: 0.02, bones,
         axisPoint: (t) => new THREE.Vector3(s * t, 1.43, -0.05),
         smoothA: 2, smoothT: 2, minEase: 0.01,
         ease: () => cut.mittEase,
       });
-      for (const r of rings) for (let k = 0; k < segs; k++) r.r[k] += pnoise(k / segs * 4, r.t * 30, 4) * 0.0025;
+      // The superhero hands are oversized: the mitt is a little smaller than their outline (the hand
+      // underneath is collapsed in the body shader).
+      for (const r of rings) for (let k = 0; k < segs; k++) r.r[k] = r.r[k] * (cut.mittScale ?? 0.86) + pnoise(k / segs * 4, r.t * 30, 4) * 0.0025;
       pieces.push(sweep(rings, { id: PIECE.mitt, side: s, ...frame('x', s), capEnd: true, capLen: 0.75, rigid: hand }));
     }
     {

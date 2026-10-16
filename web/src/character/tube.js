@@ -248,7 +248,7 @@ export function sweep(rings, meta) {
       if (orient > 0) idx.push(a, b, c, c, b, d); else idx.push(a, c, b, c, d, b);
     }
   }
-  return { pos: P, nrm: N, g: G, lin: L, crease: C, idx, rows: nr, cols, skinBones: meta.skinBones, rigid: meta.rigid, anchor: meta.anchor, skinMask: meta.skinMask };
+  return { pos: P, nrm: N, g: G, lin: L, crease: C, idx, rows: nr, cols, skinBones: meta.skinBones, rigid: meta.rigid, anchor: meta.anchor, skinMask: meta.skinMask, weightLimit: meta.weightLimit };
 }
 
 // ------------------------------------------------------------------ skinning + merge
@@ -260,6 +260,22 @@ export function skinPiece(piece, body, smoothIters = 6) {
   if (piece.anchor && !used.includes(piece.anchor.bone)) used.push(piece.anchor.bone);
   const nb = used.length, local = new Map(used.map((j, q) => [j, q]));
   const W = new Float32Array(nv * nb);
+  // Optional per-bone limit (e.g. how much of the jacket's shoulder may follow the arm); the excess
+  // goes to the vertex's other bones.
+  const limit = () => {
+    if (!piece.weightLimit) return;
+    for (let i = 0; i < nv; i++) {
+      const x = piece.pos[i * 3], y = piece.pos[i * 3 + 1], z = piece.pos[i * 3 + 2];
+      let cut = 0, keep = 0;
+      const lims = used.map((j) => piece.weightLimit(body.names[j], x, y, z));
+      for (let q = 0; q < nb; q++) {
+        const lim = lims[q];
+        if (lim !== undefined && W[i * nb + q] > lim) { cut += W[i * nb + q] - lim; W[i * nb + q] = lim; }
+        else if (lim === undefined) keep += W[i * nb + q];
+      }
+      if (cut > 0 && keep > 0) for (let q = 0; q < nb; q++) if (lims[q] === undefined) W[i * nb + q] *= (keep + cut) / keep;
+    }
+  };
   if (piece.rigid !== undefined) {
     for (let i = 0; i < nv; i++) W[i * nb] = 1;
   } else {
@@ -271,12 +287,13 @@ export function skinPiece(piece, body, smoothIters = 6) {
       for (let q = 0; q < nb; q++) s += tmp[used[q]];
       if (s > 0) for (let q = 0; q < nb; q++) W[i * nb + q] = tmp[used[q]] / s;
     }
+    limit();
     // Anchor: below y0 the piece follows one bone only (e.g. a collar's base rides on the chest like
     // the jacket it is sewn into), blending to the transferred weights by y1.
     if (piece.anchor) {
-      const { bone, y0, y1 } = piece.anchor, ab = local.get(bone);
+      const { bone, y0, y1, axis = 1, abs = false } = piece.anchor, ab = local.get(bone);
       for (let i = 0; i < nv; i++) {
-        const y = piece.pos[i * 3 + 1];
+        const y = abs ? Math.abs(piece.pos[i * 3 + axis]) : piece.pos[i * 3 + axis];
         const a = 1 - Math.min(1, Math.max(0, (y - y0) / (y1 - y0)));
         if (a <= 0) continue;
         for (let q = 0; q < nb; q++) W[i * nb + q] *= 1 - a;
@@ -299,6 +316,7 @@ export function skinPiece(piece, body, smoothIters = 6) {
       // keep the duplicated seam column identical
       for (let i = 0; i < rows; i++) for (let q = 0; q < nb; q++) W[(i * cols + cols - 1) * nb + q] = W[(i * cols) * nb + q];
     }
+    limit();
   }
   const si = new Uint16Array(nv * 4), sw = new Float32Array(nv * 4);
   const top = [];

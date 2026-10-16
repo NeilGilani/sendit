@@ -290,6 +290,9 @@ export function bodyMaterial(src) {
     // rest of the covered skin in along its normal.
     float arm = color.a * color.r / tot * smoothstep(0.17, 0.25, abs(position.x)) * step(1.25, position.y);
     transformed.yz = mix(transformed.yz, vec2(1.45, -0.075), arm * 0.6);
+    // Hands live in the mitts: pull them toward the hand's axis too.
+    float hand = color.a * color.b / tot * smoothstep(0.66, 0.7, abs(position.x)) * step(1.25, position.y);
+    transformed.yz = mix(transformed.yz, vec2(1.43, -0.05), hand * 0.45);
     float cover = color.a * (color.r / tot * 1.8 * (1.0 - arm) + color.g / tot * 1.25 + step(1.2, position.y) * color.b / tot * 0.8);
     transformed -= objectNormal * uShrink * cover;
   }`,
