@@ -7,7 +7,7 @@
 //   --curve   print each lane's tightest radius and exit
 //   --line    follow the planned best line (planLine) instead of searching locally
 //   --fair    print each route's bottlenecks: where even the best line has < 0.3 m clearance
-//   --check   scrub speed when even the best line ahead is tight
+//   --check   speed control: brake for lane curves tighter than the grip allows, and when the best line ahead is tight
 //   --tuck    tuck whenever the line ahead is straight
 //   --splits  print the time between challenge gates (section splits)
 //   --ovr   apply the map's declared physics overrides (course.physics) on top of config.js
@@ -19,8 +19,7 @@ const { Player, State } = await import('../src/player.js');
 const { PHYSICS } = await import('../src/config.js');
 const { BlackspruceCourse } = await import('../src/maps/blackspruce/course.js');
 const { forestObstacles } = await import('../src/maps/blackspruce/forest.js');
-const { GATES, CLEARINGS } = await import('../src/maps/blackspruce/layout.js');
-const inClearing = (t, d) => CLEARINGS.some(([ct, cd, a, b]) => ((t - ct) / a) ** 2 + ((d - cd) / b) ** 2 < 1);
+const { GATES } = await import('../src/maps/blackspruce/layout.js');
 const GATE_T = GATES.map((g) => g[0]);
 const { Features } = await import('../src/features.js');
 const { game, Mode, on } = await import('../src/state.js');
@@ -33,6 +32,8 @@ const which = pos[0] || 'both', routeArg = pos[1] || 'main';
 const GAIN = Number(flag('gain', 6)), LINE = !!flag('line', false), FAIR = !!flag('fair', false), TRACE = Number(flag('trace', 0)) || 0, CHECK = !!flag('check', false), TUCK = !!flag('tuck', false), SPLITS = !!flag('splits', false), OVR = !!flag('ovr', false), BRAKE = Number(flag('brake', 0)) || 0;
 
 const course = new BlackspruceCourse();
+const CLEARINGS = course.clearings;
+const inClearing = (t, d) => CLEARINGS.some(([ct, cd, a, b]) => ((t - ct) / a) ** 2 + ((d - cd) / b) ** 2 < 1);
 const P = course.P, N = P.tileRes, SP = P.tileSize / (N - 1), HALF = P.tileSize / 2;
 const cache = new Map();
 const gridH = (i, j) => { const k = j * N + i; let v = cache.get(k); if (v === undefined) { v = course.height(-HALF + i * SP, -HALF + j * SP); cache.set(k, v); } return v; };
@@ -87,10 +88,10 @@ function laneFor(route, t) {
 /**
  * The best line through a route (independent of the bot's skill): dynamic programming over
  * t (1 m) × d (0.25 m) inside the route's lanes, maximising the smallest clearance between the
- * rider (0.35 m) and any hitbox, with the line's drift limited to SLOPE m per m (≈ 27°).
+ * rider (0.35 m) and any hitbox, with the line's drift limited to SLOPE m per m (≈ 37°, a hard traverse).
  * Returns { d: Float32Array per t, clear: Float32Array per t (clearance at the chosen d) }.
  */
-const SLOPE = 0.5, DB = 0.25, D0 = -70, ND = Math.round(140 / DB) + 1;
+const SLOPE = 0.75, DB = 0.25, D0 = -70, ND = Math.round(140 / DB) + 1;
 function planLine(route) {
   const T = P.finishT + 1, w = { x: 0, z: 0 };
   const val = new Float32Array(ND), nxt = new Float32Array(ND), from = new Int16Array(T * ND), clr = new Float32Array(T * ND);
@@ -126,6 +127,20 @@ function planLine(route) {
   const d = new Float32Array(T), clear = new Float32Array(T);
   for (let t = T - 1; t >= 0; t--) { d[t] = D0 + k * DB; clear[t] = clr[t * ND + k]; if (t > 0) k = from[t * ND + k]; }
   return { d, clear };
+}
+
+/** Tightest radius of a lane's centre line between t0 and t1 (6 m chords). */
+function laneRadius(L, t0, t1) {
+  const a = {}, b = {}, q = {};
+  let R = Infinity;
+  for (let t = t0; t < t1; t += 3) {
+    const la = course.laneAt(L, t - 6), lb = course.laneAt(L, t), lq = course.laneAt(L, t + 6);
+    if (!la || !lb || !lq) continue;
+    course.world(t - 6, la.d, a); course.world(t, lb.d, b); course.world(t + 6, lq.d, q);
+    const ax = b.x - a.x, az = b.z - a.z, bx = q.x - b.x, bz = q.z - b.z;
+    R = Math.min(R, 6 / Math.max(1e-6, Math.abs(Math.atan2(ax * bz - az * bx, ax * bx + az * bz))));
+  }
+  return R;
 }
 
 /** Steer toward a world point; tuck when the line ahead is straight (what a player does in a slot). */
@@ -190,8 +205,14 @@ function ride(type, route) {
       course.world(ta, l.d + off, tmp);
       steerTo(c, pl, tmp, bestClear);
       if (BRAKE && pl.speed > BRAKE) c.brake = Math.min(1, (pl.speed - BRAKE) / 3);
-      // Check speed when even the best line ahead is tight (what a player does).
-      if (CHECK && bestClear < 0.55 && pl.speed > 14) { c.brake = Math.min(1, (0.55 - bestClear) * 2.5); c.tuck = 0; }
+      // Speed control (what a skilled player does): brake for lane curves ahead tighter than the grip allows.
+      if (CHECK && pl.state === State.GROUNDED) {
+        const R = laneRadius(lane, tt + 4, tt + Math.max(20, pl.speed * 2.2));
+        const vmax = Math.sqrt(0.75 * (pl.equipment.type === 'snowboard' ? 1.45 : 1.8) * 9.81 * R);
+        if (pl.speed > vmax + 0.5) { c.brake = Math.min(1, (pl.speed - vmax) / 4); c.tuck = 0; }
+      }
+      // Check speed when even the best line ahead is tight.
+      if (CHECK && bestClear < 0.55 && pl.speed > 14 && !c.brake) { c.brake = Math.min(1, (0.55 - bestClear) * 2.5); c.tuck = 0; }
     };
     const was = p.state;
     if (TRACE) { trace.push(`${t.toFixed(2)} t=${tt.toFixed(1)} d=${course.dAt(p.position.x, tt).toFixed(2)} lane=${laneId} v=${p.speed.toFixed(1)} st=${p.state} steer=${(p._ctrl?.steer ?? 0).toFixed(2)} off=${off.toFixed(1)} near=${(scatter.nearest(p.position, 6)?.dist ?? 9).toFixed(2)}`); if (trace.length > 150) trace.shift(); }
@@ -224,14 +245,16 @@ console.log(`Blackspruce bot: ${course.forest.trees.length} trees, finishAt ${co
 function curvature() {
   const a = {}, b = {}, q = {};
   for (const L of course.lanes) {
-    let worst = [Infinity, 0];
+    let worst = [Infinity, 0], drift = [0, 0];
     for (let t = L.t0 + 7; t < L.t1 - 7; t++) {
       course.world(t - 6, course.laneAt(L, t - 6).d, a); course.world(t, course.laneAt(L, t).d, b); course.world(t + 6, course.laneAt(L, t + 6).d, q);
       const ax = b.x - a.x, az = b.z - a.z, bx = q.x - b.x, bz = q.z - b.z;
       const R = 6 / Math.max(1e-6, Math.abs(Math.atan2(ax * bz - az * bx, ax * bx + az * bz)));
       if (R < worst[0]) worst = [R, t];
+      const dr = Math.abs(course.laneAt(L, t + 1).d - course.laneAt(L, t - 1).d) / 2;
+      if (dr > drift[0] && !CLEARINGS.some(([ct, cd, ca, cb]) => ((t - ct) / ca) ** 2 + ((course.laneAt(L, t).d - cd) / cb) ** 2 < 1)) drift = [dr, t];
     }
-    console.log(`  ${L.id.padEnd(16)} ${L.kind.padEnd(5)} min radius ${worst[0].toFixed(0).padStart(3)} m at t=${worst[1]}${CLEARINGS.some(([ct, cd, ca, cb]) => ((worst[1] - ct) / ca) ** 2 < 1) ? ' (in a clearing)' : ''}`);
+    console.log(`  ${L.id.padEnd(16)} ${L.kind.padEnd(5)} min radius ${worst[0].toFixed(0).padStart(3)} m at t=${worst[1]}${CLEARINGS.some(([ct, cd, ca, cb]) => ((worst[1] - ct) / ca) ** 2 < 1) ? ' (in a clearing)' : ''}, steepest drift outside clearings ${drift[0].toFixed(2)} m/m at t=${drift[1]}`);
   }
 }
 if (flag('curve', false)) { curvature(); process.exit(0); }

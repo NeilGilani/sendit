@@ -69,6 +69,7 @@ export class BlackspruceCourse {
     this.key = 'blackspruce';
     this.buildTables();
     this.buildLanes();
+    this.clearings = CLEARINGS.map(([t, d, a, b]) => [t, this.resolveD(t, d), a, b]);
     this.buildPath();
     this.buildBumps();
     this.forest = planForest(this);
@@ -167,6 +168,14 @@ export class BlackspruceCourse {
     }
   }
 
+  /** A layout position across the run: metres, or [laneId, offset] relative to that lane's centre at t. */
+  resolveD(t, d) {
+    if (!Array.isArray(d)) return d;
+    const L = this.lanes.find((l) => l.id === d[0]);
+    if (!L) throw new Error(`blackspruce: unknown lane "${d[0]}"`);
+    return (this.laneAt(L, t) || this.laneAt(this.mainLane, t)).d + (d[1] || 0);
+  }
+
   /** Lane centre and half-width at t: { d, hw } or null outside the lane. */
   laneAt(lane, t) {
     if (t < lane.t0 || t > lane.t1) return null;
@@ -216,7 +225,8 @@ export class BlackspruceCourse {
       this.world(t, d, p);
       bumps.push({ kind: 'roller', x: p.x, z: p.z, t, d, hw, H, sig, reach: Math.max(hw + 8, sig * 3) });
     }
-    this.logs = LOGS.map(([t, d, ang, len, r]) => {
+    this.logs = LOGS.map(([t, dd, ang, len, r]) => {
+      const d = this.resolveD(t, dd);
       this.world(t, d, p);
       // Axis across the slope, turned by `ang`; n points downhill (−z).
       const ax = Math.cos(ang), az = Math.sin(ang);
@@ -387,7 +397,7 @@ export class BlackspruceCourse {
     this.features = { kickers: kick, jumps: { endAt: 0, freePillows: 0 } };
     this.challenge = {
       gates: GATES.map(([t, width]) => ({ at: this.pathLength(t), lateral: 0, width })),
-      flakes: FLAKES.map(([t, d, y]) => { const w = this.world(t, d); return { x: w.x, z: w.z, y }; }),
+      flakes: FLAKES.map(([t, d, y]) => { const w = this.world(t, this.resolveD(t, d)); return { x: w.x, z: w.z, y }; }),
       // Average m/s over the run (finishAt / time incl. penalties). Calibrated with the bot
       // (web/scripts/map2-bot.mjs) and test rides: see docs/map2.md.
       medalSpeeds: { gold: 16, silver: 14, bronze: 12 },
@@ -402,8 +412,8 @@ export class BlackspruceCourse {
     // Per-map physics overrides (merged over config.js PHYSICS by the per-map physics hook):
     // a steeper, faster run needs a higher speed reference so the soft cap doesn't eat the slope.
     this.physics = {
-      ski: { maxVelocity: 20 },
-      snowboard: { maxVelocity: 19.5 },
+      ski: { maxVelocity: 18 },
+      snowboard: { maxVelocity: 17.5 },
     };
   }
 

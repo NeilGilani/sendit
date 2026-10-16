@@ -63,6 +63,9 @@ export const BAND = {
   chutes: [[1.5, 3.4], [24, 6]],   // [d centre, half-width]: the Notch (main) and the Ramp (safe)
 };
 
+// Positions across the run (`d`) are metres from the centre line, or [laneId, offset] = relative to
+// a lane's centre at that t (so features stay on their line when a lane is re-shaped).
+
 // Clearings: [t, d, halfLength (along t), halfWidth (along d)] ellipses kept tree-free. They are
 // the rest beats; every one holds a challenge gate.
 export const CLEARINGS = [
@@ -70,15 +73,16 @@ export const CLEARINGS = [
   [452, 0, 44, 32],              // Kicker Meadow
   [505, 0, 34, 15],              //   … its landing
   [878, 0, 52, 40],              // Pillow Garden
+  [1228, ['main', 0], 24, 26],    // the Saddle (Deadfall → Gauntlet: every line merges, a breath)
   [1500, 0, 36, 32],             // Big Air clearing
   [1560, 0, 42, 15],             //   … its landing
   [1955, 0, 70, 46],             // finish
   // small breathers inside the long tree sections (glade pockets, no gate)
-  [300, -4, 16, 16],
-  [680, 2, 14, 14],
-  [1080, 0, 15, 15],
-  [1350, 2, 12, 12],
-  [1750, 0, 16, 18],
+  [300, ['main', 0], 16, 16],
+  [680, ['main', 0], 14, 14],
+  [1080, ['main', 0], 15, 15],
+  [1350, ['main', 0], 12, 12],
+  [1750, ['main', 0], 16, 18],
 ];
 
 // Sections: tree spacing (Poisson min distance, m), size range, crown slenderness and pivots.
@@ -108,27 +112,27 @@ export const SECTIONS = [
 //   safe — wide and slower: hw ≈ 5.5, longer wander, takes the chute instead of the cliff
 export const LANES = [
   {
-    id: 'main', kind: 'main', weave: [2.6, 84],
-    pts: [[-80, 0, 10], [60, 0, 10], [120, -3, 8], [180, 0, 5], [240, 7, 4.2], [300, 0, 4.4], [370, -7, 4.2], [430, -2, 6],
-      [470, 0, 10], [540, 0, 8], [582, 4, 4.2], [640, -3, 4], [700, 5, 4], [770, -2, 4.2], [800, 1.5, 4], [818, 1.5, 4],
-      [845, 0, 10], [920, 0, 9], [960, 6, 4.4], [1030, -5, 4.4], [1100, 5, 4.4], [1170, -5, 4.4], [1225, 0, 5],
-      [1270, 6, 4], [1330, -4, 3.8], [1400, 5, 3.8], [1450, -1, 4], [1478, 0, 8], [1530, 0, 10], [1600, 0, 6],
-      [1660, 8, 5.2], [1730, -7, 5.2], [1800, 7, 5.2], [1860, -3, 5.2], [1905, 0, 9], [2300, 0, 14]],
+    id: 'main', kind: 'main', weave: [1.4, 70],
+    pts: [[-80, 0, 10], [60, 0, 10], [120, -3, 8], [180, 0, 5], [232, 9, 4.2], [287, -8, 4.4], [342, 9, 4.2], [397, -6, 4.2], [432, -1, 6],
+      [470, 0, 10], [540, 0, 8], [592, 8, 4.2], [647, -8, 4], [702, 8, 4], [757, -7, 4.2], [800, 1.5, 4], [818, 1.5, 4],
+      [845, 0, 10], [920, 0, 9], [967, 9, 4.4], [1022, -9, 4.4], [1077, 9, 4.4], [1132, -9, 4.4], [1187, 8, 4.4], [1228, 0, 5],
+      [1272, 9, 4], [1327, -8, 3.8], [1382, 8, 3.8], [1437, -7, 4], [1478, 0, 8], [1530, 0, 10], [1600, 0, 6],
+      [1655, 11, 5.2], [1720, -10, 5.2], [1785, 10, 5.2], [1850, -8, 5.2], [1905, 0, 9], [2300, 0, 14]],
   },
   // Spruce Gate (side lanes branch off the main line ('m') and merge back into it)
-  { id: 'gate-slot', kind: 'slot', weave: [1.2, 90], pts: [[178, 'm', 4.5], [215, -12, 2.6], [250, -16, 2.4], [300, -17, 2.3], [380, -15, 2.4], [420, -9, 3], [436, 'm', 5]] },
-  { id: 'gate-safe', kind: 'safe', weave: [2.4, 96], pts: [[178, 'm', 5.5], [225, 20, 5.5], [310, 18, 5.5], [380, 28, 5.5], [420, 14, 6], [436, 'm', 7]] },
+  { id: 'gate-slot', kind: 'slot', weave: [1.2, 90], pts: [[178, 'm', 4.5], [218, -14, 2.6], [255, -20, 2.4], [300, -21, 2.3], [380, -20, 2.4], [418, -11, 3], [436, 'm', 5]] },
+  { id: 'gate-safe', kind: 'safe', weave: [2.4, 96], pts: [[178, 'm', 5.5], [228, 23, 5.5], [310, 22, 5.5], [380, 30, 5.5], [420, 15, 6], [436, 'm', 7]] },
   // The Needles: the slot runs straight at the cliff; the safe line wanders to the Ramp chute.
-  { id: 'needles-slot', kind: 'slot', weave: [1.0, 100], pts: [[540, 'm', 5], [580, -14, 2.4], [660, -17, 2.2], [740, -15, 2.2], [790, -12, 2.4], [815, -12, 3], [842, -8, 5]] },
-  { id: 'needles-safe', kind: 'safe', weave: [2.4, 96], pts: [[540, 'm', 5.5], [590, 20, 5.2], [660, 18, 5.2], [730, 30, 5.2], [790, 24, 6], [842, 22, 6.5]] },
+  { id: 'needles-slot', kind: 'slot', weave: [1.0, 100], pts: [[540, 'm', 5], [585, -16, 2.4], [660, -21, 2.2], [740, -20, 2.2], [790, -15, 2.4], [815, -14, 3], [842, -9, 5]] },
+  { id: 'needles-safe', kind: 'safe', weave: [2.4, 96], pts: [[540, 'm', 5.5], [592, 22, 5.2], [660, 21, 5.2], [730, 30, 5.2], [790, 24, 6], [842, 22, 6.5]] },
   // Deadfall: logs lie across both the main line and the high line; the low line goes around them.
-  { id: 'deadfall-slot', kind: 'slot', weave: [1.2, 100], pts: [[928, 'm', 5], [965, 16, 2.5], [1060, 20, 2.3], [1160, 17, 2.3], [1210, 9, 3], [1234, 'm', 5]] },
-  { id: 'deadfall-safe', kind: 'safe', weave: [2.4, 96], pts: [[926, 'm', 5.5], [970, -20, 5.3], [1050, -16, 5.2], [1130, -27, 5.2], [1200, -16, 5.5], [1234, 'm', 6]] },
+  { id: 'deadfall-slot', kind: 'slot', weave: [1.2, 100], pts: [[928, 'm', 5], [968, 18, 2.5], [1060, 22, 2.3], [1160, 21, 2.3], [1210, 12, 3], [1234, 'm', 5]] },
+  { id: 'deadfall-safe', kind: 'safe', weave: [2.4, 96], pts: [[926, 'm', 5.5], [982, -24, 5.3], [1050, -22, 5.2], [1130, -30, 5.2], [1200, -20, 5.5], [1234, 'm', 6]] },
   // The Gauntlet: tight chute line vs the zig.
-  { id: 'gauntlet-slot', kind: 'slot', weave: [0.8, 110], pts: [[1232, 'm', 4.5], [1265, -14, 2.3], [1340, -18, 2.1], [1420, -16, 2.1], [1450, -12.5, 3.0], [1474, -6, 4.4], [1492, 'm', 6]] },
-  { id: 'gauntlet-safe', kind: 'safe', weave: [2.2, 96], pts: [[1232, 'm', 5], [1275, 20, 4.8], [1340, 16, 4.8], [1400, 26, 4.8], [1455, 13, 5.5], [1482, 'm', 7]] },
+  { id: 'gauntlet-slot', kind: 'slot', weave: [0.8, 110], pts: [[1232, 'm', 4.5], [1268, -17, 2.3], [1340, -21, 2.1], [1420, -20, 2.1], [1450, -15, 3.0], [1474, -7, 4.4], [1492, 'm', 6]] },
+  { id: 'gauntlet-safe', kind: 'safe', weave: [2.2, 96], pts: [[1232, 'm', 5], [1276, 22, 4.8], [1340, 20, 4.8], [1400, 28, 4.8], [1450, 14, 5.5], [1484, 'm', 7]] },
   // Old Growth: a second flowing line on the left.
-  { id: 'oldgrowth-left', kind: 'safe', weave: [2.4, 90], pts: [[1598, 'm', 5.5], [1640, -18, 5], [1720, -27, 5], [1800, -20, 5], [1880, -12, 5.5], [1910, 'm', 7]] },
+  { id: 'oldgrowth-left', kind: 'safe', weave: [2.4, 90], pts: [[1598, 'm', 5.5], [1645, -22, 5], [1720, -30, 5], [1800, -25, 5], [1880, -16, 5.5], [1910, 'm', 7]] },
 ];
 
 // Pillows (smooth snow mounds over buried boulders / stumps): [t, d, radius m, height m].
@@ -153,12 +157,12 @@ export const ROLLERS = [
 // Fallen logs: [t, d, angle (rad from straight across the slope), length m, radius m]. Snow drifts
 // against the uphill side, so each log is a small natural kicker (ollie it or roll it).
 export const LOGS = [
-  [952, 6, 0.18, 10, 0.52], [994, -4, -0.22, 10.5, 0.56], [1040, 2, 0.12, 11, 0.55], [1088, 3, -0.15, 9.5, 0.5],
-  [1128, -6, 0.2, 10.5, 0.56], [1190, 2, -0.1, 10, 0.52],
+  [952, ['main', 1], 0.18, 10, 0.52], [994, ['main', -1], -0.22, 10.5, 0.56], [1040, ['main', 0.5], 0.12, 11, 0.55],
+  [1088, ['main', 1], -0.15, 9.5, 0.5], [1128, ['main', -1], 0.2, 10.5, 0.56], [1190, ['main', 0.5], -0.1, 10, 0.52],
   // on the high line
-  [985, 19, 0.1, 8, 0.46], [1072, 20, -0.12, 8.5, 0.48], [1140, 17, 0.14, 8, 0.46],
+  [985, ['deadfall-slot', 0], 0.1, 8, 0.46], [1072, ['deadfall-slot', 0], -0.12, 8.5, 0.48], [1140, ['deadfall-slot', 0], 0.14, 8, 0.46],
   // a few in the Old Growth
-  [1685, 5, 0.25, 9.5, 0.6], [1790, -6, -0.2, 10, 0.6],
+  [1688, ['main', 1], 0.25, 9.5, 0.6], [1795, ['main', -1], -0.2, 10, 0.6],
 ];
 
 // Kickers (features.js): at = t of the kicker's take-off (converted to path length), shaped ramps.
@@ -175,8 +179,9 @@ export const GATES = [[176, 16], [428, 20], [532, 16], [848, 24], [928, 22], [12
 // Golden snowflakes: [t, d, height above the snow]. Risk pays: most sit on the slots, over the
 // cliff and the kickers.
 export const FLAKES = [
-  [130, -16, 1.2], [300, -17, 1.2], [470, 0, 5.4], [700, -16, 1.2], [818, -12, 3.2], [880, 12, 3.4],
-  [1100, 20, 1.2], [1180, -27, 1.2], [1380, -17, 1.2], [1525, 0, 6.5], [1725, -27, 1.2], [1840, 7, 1.2],
+  [130, -16, 1.2], [300, ['gate-slot', 0], 1.2], [470, 0, 5.4], [700, ['needles-slot', 0], 1.2], [818, ['needles-slot', 0], 3.2],
+  [880, 12, 3.4], [1100, ['deadfall-slot', 0], 1.2], [1180, ['deadfall-safe', 0], 1.2], [1380, ['gauntlet-slot', 0], 1.2],
+  [1525, 0, 6.5], [1725, ['oldgrowth-left', 0], 1.2], [1840, ['main', 0], 1.2],
 ];
 
 // Stumps (snow-capped, they collide): scattered off the lines, a few at lane edges.

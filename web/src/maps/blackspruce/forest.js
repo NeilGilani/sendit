@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toonMaterial, mulberry32 } from '../../world.js';
-import { SECTIONS, CLEARINGS, BAND, STUMPS, KICKERS, ROLLERS, GATES, PILLOWS } from './layout.js';
+import { SECTIONS, BAND, STUMPS, KICKERS, ROLLERS, GATES, PILLOWS } from './layout.js';
 
 export const TREE_HIT = { base: 0.2, perWidth: 0.32 };   // hitbox radius = base + perWidth · crown width scale
 const ZONE = 150;                   // |d| metres covered by the designed forest (the generic one starts beyond)
@@ -19,9 +19,9 @@ const ZONE = 150;                   // |d| metres covered by the designed forest
 const smooth = (t) => { const x = t < 0 ? 0 : t > 1 ? 1 : t; return x * x * (3 - 2 * x); };
 function sectionAt(t) { return SECTIONS.find((s) => t >= s.t0 && t < s.t1) || SECTIONS[SECTIONS.length - 1]; }
 
-/** 1 inside a clearing ellipse (with a soft margin `m` metres), else 0. */
-function inClearing(t, d, m = 0) {
-  for (const [ct, cd, a, b] of CLEARINGS) {
+/** True inside one of the course's clearing ellipses (grown by a margin `m` metres). */
+function inClearingOf(clearings, t, d, m = 0) {
+  for (const [ct, cd, a, b] of clearings) {
     const q = ((t - ct) / (a + m)) ** 2 + ((d - cd) / (b + m)) ** 2;
     if (q < 1) return true;
   }
@@ -29,6 +29,7 @@ function inClearing(t, d, m = 0) {
 }
 
 export function planForest(course) {
+  const inClearing = (t, d, m) => inClearingOf(course.clearings, t, d, m);
   // One random stream per phase, so tuning one phase doesn't reshuffle the others.
   let rnd = mulberry32(31337);
   const trees = [], rocks = [], stumps = [], pivots = [];
@@ -116,7 +117,7 @@ export function planForest(course) {
       const l = course.laneAt(L, t);
       // Fair pivots: seen ≥ 2 s ahead, never right after a gate, a section start, or anything that
       // throws the rider into the air (rollers, logs, kickers, the band).
-      const ok = l.hw >= 3.7 && t > S.t0 + 30 && !inClearing(t, l.d, 22) && !logZone(t, l.d)
+      const ok = l.hw >= 3.7 && t > S.t0 + 30 && (L.kind === 'main' || (t > L.t0 + 45 && t < L.t1 - 30)) && !inClearing(t, l.d, 22) && !logZone(t, l.d)
         && !course.logs.some((g) => t > g.t - 14 && t < g.t + 26)
         && !ROLLERS.some((r) => t > r[0] - 10 && t < r[0] + 55)
         && !PILLOWS.some(([pt, pd, R]) => t > pt - 8 && t < pt + 45 && Math.abs(pd - l.d) < l.hw + R)
