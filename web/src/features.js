@@ -57,7 +57,6 @@ export class Features {
       return { p: path[0].clone(), dir: new THREE.Vector2(0, -1) };
     };
     this.at = at;
-
     // A course with `park: false` (e.g. a wild freeride face) gets no kickers, rollers, pillows,
     // banners or crowds; it can still add its own rideable surfaces (course.heightAt / blockAt).
     if (course.park === false) {
@@ -65,6 +64,7 @@ export class Features {
       T.features = this.terrainHooks();
       return;
     }
+
     const J = JUMPS;
     const rnd = mulberry32(2024);
     const rr = (a) => a[0] + (a[1] - a[0]) * rnd();
