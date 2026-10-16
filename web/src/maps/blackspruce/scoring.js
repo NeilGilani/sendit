@@ -3,6 +3,7 @@
 //   • Threaded — a close shave under THREAD metres from the hitbox is worth a bonus on top.
 //   • Tree slalom ×N — close shaves chained less than CHAIN seconds apart; the chain banks at
 //     every STEP shaves (bigger each time) and breaks on a crash or a gap.
+//   • First rides: a hint explains the fork signs (first three ride starts per session).
 //   • Branch dump — thread a spruce closer than DUMP metres and the snow sloughs off its branches
 //     on your side (mist, falling clumps, a few glints).
 // Only installed while this map is loaded (maps load once per page). Scores go through addScore,
@@ -44,7 +45,7 @@ function branchDump(x, z, player) {
 
 export function installScoring() {
   const S = TREE_SCORING;
-  let chain = 0, last = -Infinity;
+  let chain = 0, last = -Infinity, starts = 0;
   const offs = [
     on('nearMiss', ({ dist, kind, x, z }) => {
       if (game.mode !== Mode.RIDING) return;
@@ -58,6 +59,10 @@ export function installScoring() {
         if (chain === 10) emit('hint', 'Tree slalom ×10 — keep weaving');
         if (chain === 20) emit('hint', 'Untouchable in the trees!');
       }
+    }),
+    on('rideStarted', () => {
+      if (++starts > 3) return;
+      setTimeout(() => { if (game.mode === Mode.RIDING) emit('hint', 'Forks:  ◆◆ SLOT fast and tight  ·  ◆ FLOW  ·  ■ LONG WAY wide'); }, 2500);
     }),
     on('crashed', () => { chain = 0; }),
     on('respawned', () => { chain = 0; }),
