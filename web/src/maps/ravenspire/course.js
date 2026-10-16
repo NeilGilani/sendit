@@ -354,7 +354,7 @@ export class RavenspireCourse {
       // Rounded pillow: the top rises gently, rolls over and drops over the last ~40 % of the step.
       const s = fr < 0.6 ? fr / 0.6 - 0.12 * Math.sin(Math.PI * fr / 0.6) : 1 - smooth((fr - 0.6) / 0.4);
       // Lobes across the field: each step breaks into separate rounded pillows with soft gaps between.
-      const lobe = F.lobe ? 0.55 + 0.45 * Math.pow(Math.cos(Math.PI * (v + 3 * noise1(u / 7, F.seed + 5)) / F.lobe), 2) : 1;
+      const lobe = F.lobe ? 0.35 + 0.65 * Math.pow(Math.cos(Math.PI * (v + 3 * noise1(u / 7, F.seed + 5)) / F.lobe), 2) : 1;
       add += env * G * S * F.terrace * lobe * (s - 0.5);
     }
     const a = this.pillowHash.get(Math.floor(u / 16) * 4096 + Math.floor(v / 16));
