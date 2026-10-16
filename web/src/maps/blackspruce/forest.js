@@ -121,6 +121,7 @@ export function planForest(course) {
         && !course.logs.some((g) => t > g.t - 14 && t < g.t + 26)
         && !ROLLERS.some((r) => t > r[0] - 10 && t < r[0] + 55)
         && !PILLOWS.some(([pt, pd, R]) => t > pt - 8 && t < pt + 45 && Math.abs(pd - l.d) < l.hw + R)
+        && Math.abs(course.laneAt(L, t + 3).d - course.laneAt(L, t - 3).d) / 6 < 0.35   // not mid-traverse
         && !GATES.some((g) => Math.abs(g[0] - t) < 25)
         && !(t > BAND.t - 20 && t < BAND.t + 40)
         && !kickZones.some((z) => t > z.t0 - 20 && t < z.t1 + 10);
