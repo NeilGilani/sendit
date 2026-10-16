@@ -323,18 +323,38 @@ export function buildOutfitGeometry(body, cut) {
     const sd = s > 0 ? 'l' : 'r';
     const hand = body.bone('hand_' + sd);
     {
-      const segs = 24;
-      const bones = B(new RegExp(`^(hand_${sd}|(index|middle|ring|pinky|thumb)_0[1-4](_leaf)?_${sd})$`));
-      const rings = bodyRings(body, {
-        axis: 'x', side: s, t0: 0.695, t1: 0.912, rings: 18, segs, half: 0.02, bones,
-        axisPoint: (t) => new THREE.Vector3(s * t, 1.43, -0.05),
-        smoothA: 2, smoothT: 2, minEase: 0.01,
-        ease: () => cut.mittEase,
-      });
-      // The superhero hands are oversized: the mitt is a little smaller than their outline (the hand
-      // underneath is collapsed in the body shader).
-      for (const r of rings) for (let k = 0; k < segs; k++) r.r[k] = r.r[k] * (cut.mittScale ?? 0.86) + pnoise(k / segs * 4, r.t * 30, 4) * 0.0025;
+      // A closed fist (the rig's fingers are straight, but the mitt is rigid on the hand bone, so it can
+      // be shaped as a grip): a rounded box from the wrist over the knuckles, curled fingers at the end,
+      // and a thumb lobe wrapped forward. The pole grip runs through it.
+      const segs = 28, n = 2.6;
+      const x0 = 0.695, x1 = cut.mittLength ?? 0.835;
+      const rings = [];
+      for (let i = 0; i < 14; i++) {
+        const t = x0 + (x1 - x0) * (i / 13);
+        const w = smooth(x0, 0.75, t);                       // wrist → palm
+        const hy = THREE.MathUtils.lerp(0.042, 0.057, w) + 0.004 * bump(t, 0.81, 0.035);   // knuckle ridge
+        const hz = THREE.MathUtils.lerp(0.044, 0.062, w);
+        const r = new Float32Array(segs);
+        for (let k = 0; k < segs; k++) {
+          const th = (k / segs) * TAU, cy = Math.abs(Math.cos(th)), sz = Math.abs(Math.sin(th));
+          r[k] = 1 / Math.pow(Math.pow(cy / hy, n) + Math.pow(sz / hz, n), 1 / n) + pnoise(k / segs * 4, t * 40, 4) * 0.0018;
+        }
+        rings.push({ t, c: new THREE.Vector3(s * t, 1.432 - 0.006 * w, -0.058), r });
+      }
       pieces.push(sweep(rings, { id: PIECE.mitt, side: s, ...frame('x', s), capEnd: true, capLen: 0.75, rigid: hand }));
+      // Thumb lobe: from the base of the thumb, wrapped forward and down along the grip.
+      const a = new THREE.Vector3(s * 0.73, 1.418, -0.03), e = new THREE.Vector3(s * 0.785, 1.398, -0.004);
+      const T = e.clone().sub(a).normalize();
+      const e1 = new THREE.Vector3().crossVectors(T, new THREE.Vector3(0, 0, 1)).normalize();
+      const e2 = new THREE.Vector3().crossVectors(T, e1).normalize();
+      const thumb = [];
+      for (let i = 0; i < 7; i++) {
+        const f = i / 6;
+        thumb.push({ c: a.clone().lerp(e, f), r: new Float32Array(16).fill(THREE.MathUtils.lerp(0.024, 0.02, f)), e1, e2 });
+      }
+      const tp = sweepFrames(thumb, { id: PIECE.mitt, side: s, capEnd: true });
+      tp.rigid = hand;
+      pieces.push(tp);
     }
     {
       const segs = 24;

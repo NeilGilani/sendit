@@ -91,7 +91,7 @@ export function fabricMaterial() {
   const m = toonMaterial({
     name: 'riderFabric', rim: 0.25, uniforms: U,
     vertPars: 'attribute vec4 aG; attribute float aLin; attribute float aCrease; varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj; uniform float uHide;',
-    vertPre: 'vG = aG; vLin = aLin; vCrease = aCrease; vObj = position;\n  if (uHide > 0.5 && ((aG.x > 2.5 && aG.x < 5.5) || aG.x > 7.5)) transformed *= 0.0;',
+    vertPre: 'vG = aG; vLin = aLin; vCrease = aCrease; vObj = position;\n  if (uHide > 0.5 && ((aG.x > 2.5 && aG.x < 5.5) || aG.x > 7.5)) transformed *= 0.0;\n  if (uHide > 0.5 && (abs(aG.x - 1.0) < 0.5 || abs(aG.x - 7.0) < 0.5)) transformed.yz = mix(transformed.yz, vec2(1.45, -0.075), 0.25 * smoothstep(0.4, 0.6, abs(position.x)));',
     fragPars: `${COMMON}
 varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj;
 uniform vec3 uJacket, uPanel, uAccent, uGaiter, uPants, uCuff, uMitt, uGauntlet; uniform float uStyle; uniform vec3 uHemY;
@@ -227,7 +227,7 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
           seam += chLine(v - 0.8, 0.0022);
           seam += chLine(uc * 0.3 - 0.0, 0.0018) * step(0.8, v);
           fabRough = 0.5; fabSheen = 0.18; fabSpec = 0.6;
-          wr = 1.6;
+          wr = 0.35; wf = vec2(9.0, 30.0);        // supple leather: a few soft creases, no crumple
         } else if (id > 7.5) {
           // ---------------- hood worn up: yoke colour, a centre seam over the crown, accent lining
           c = uPanel;
@@ -259,7 +259,10 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
         float wfade = 1.0 - smoothstep(0.006, 0.03, fwidth(v));
         float cfade = 1.0 - smoothstep(0.002, 0.008, fwidth(v));
         fabH += (chPerlin(wp, wf.x) * 0.7 + chPerlin(vec2(u * wf.x * 3.0, v * wf.y * 2.7 + 3.1), wf.x * 3.0) * 0.3) * 0.0024 * wr * wfade;
-        fabH += chPerlin(vec2(u * 40.0, v * 38.0), 40.0) * 0.0005 * wr * cfade;
+        // Fine crumple: warped sines (no lattice, periodic around the piece).
+        float cu = u * 6.2831853;
+        float crum = sin(cu * 23.0 + 2.0 * sin(v * 190.0 + sin(cu * 7.0))) * sin(v * 230.0 + 2.2 * sin(cu * 17.0 + 1.3));
+        if (abs(id - 6.0) > 0.5) fabH += crum * 0.00016 * wr * cfade;   // (not on leather)
         // Fold occlusion: valleys between folds get less sky and sun; ridges catch a little more.
         fabAO = (1.0 - seam * 0.25) * clamp(1.0 + vCrease * 26.0, 0.66, 1.1);
         diffuseColor.rgb = c;
@@ -292,7 +295,8 @@ export function bodyMaterial(src) {
     transformed.yz = mix(transformed.yz, vec2(1.45, -0.075), arm * 0.6);
     // Hands live in the mitts: pull them toward the hand's axis too.
     float hand = color.a * color.b / tot * smoothstep(0.66, 0.7, abs(position.x)) * step(1.25, position.y);
-    transformed.yz = mix(transformed.yz, vec2(1.43, -0.05), hand * 0.45);
+    transformed.yz = mix(transformed.yz, vec2(1.43, -0.05), hand * 0.55);
+    transformed.x = mix(transformed.x, sign(transformed.x) * min(abs(transformed.x), 0.84), hand);   // fingers curl into the fist
     float cover = color.a * (color.r / tot * 1.8 * (1.0 - arm) + color.g / tot * 1.25 + step(1.2, position.y) * color.b / tot * 0.8);
     transformed -= objectNormal * uShrink * cover;
   }`,

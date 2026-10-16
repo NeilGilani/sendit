@@ -58,7 +58,7 @@ export const GARMENTS = {
     'tuff-mitt': {
       name: 'Tuff Mitt',
       blurb: 'Leather mitts with long nylon gauntlets over the cuffs.',
-      cut: { mittEase: 0.012, mittScale: 0.86, gauntlet: [0.618, 0.032] },   // mitt size vs the hand, gauntlet start |x| + ease at its open end
+      cut: { mittLength: 0.835, gauntlet: [0.618, 0.032] },   // fist end |x| (wrist 0.706), gauntlet start |x| + ease at its open end
     },
   },
 };
