@@ -123,6 +123,13 @@ export function mountFlowHud(player) {
     const kmh = (v) => `${Math.round(v * 3.6)} km/h <small>${Math.round(v * 2.237)} mph</small>`;
     const t = `${Math.floor(r.time / 60)}:${String(Math.floor(r.time % 60)).padStart(2, '0')}`;
     const bar = (k, v) => `<div class="row"><span>${k}</span><b>${v.toFixed(1)}</b></div><div class="bar"><i style="width:${v * 4}%"></i></div>`;
+    // Personal best per map (judged total), kept in localStorage.
+    const key = `sendit.freeride.${player.terrain?.course?.meta?.id ?? 'map'}`;
+    let best = null;
+    try { best = JSON.parse(localStorage.getItem(key)); } catch { /* private mode */ }
+    const isBest = !best || r.total > best.total;
+    if (isBest) try { localStorage.setItem(key, JSON.stringify({ total: r.total, score: r.score })); } catch { /* storage full */ }
+    const pb = isBest ? (best ? `<b style="color:#ffe14d">NEW BEST! <small>was ${best.total}</small></b>` : '<b style="color:#ffe14d">FIRST RUN LOGGED</b>') : `<b>${best.total}</b>`;
     const rating = r.total >= 85 ? 'LEGENDARY' : r.total >= 70 ? 'PRO LINE' : r.total >= 55 ? 'SOLID' : r.total >= 40 ? 'GETTING THERE' : 'KEEP SENDING';
     rs.innerHTML = `<h3>RUN COMPLETE</h3><div class="sub">FREERIDE · JUDGED LIKE THE FWT</div>
       <div class="row"><span>Time</span><b>${t}</b></div>
@@ -135,7 +142,8 @@ export function mountFlowHud(player) {
       ${r.featureList?.length ? `<div class="row"><span>Linked</span><b style="text-align:right;max-width:240px">${r.featureList.slice(0, 6).join(' · ')}</b></div>` : ''}
       ${r.goalList?.length ? `<div class="row"><span>Lines</span><b style="text-align:right;max-width:240px;color:#ffe14d">${r.goalList.join(' · ')}</b></div>` : ''}
       <div class="judge">${bar('Line', r.line)}${bar('Fluidity', r.fluidity)}${bar('Control', r.control)}${bar('Air &amp; style', r.style)}</div>
-      <div class="tot"><span>${rating}</span><b>${r.total}</b></div>`;
+      <div class="tot"><span>${rating}</span><b>${r.total}</b></div>
+      <div class="row"><span>Personal best</span>${pb}</div>`;
     rs.classList.add('on');
     rsT = performance.now() + 7000;
   });

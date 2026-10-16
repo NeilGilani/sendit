@@ -248,7 +248,8 @@ spin, W / S to flip; Shift grabs. On this map (trickStyle):
 - **Run summary** at the valley (zen runs): time, average / top speed, biggest drop, longest air, best line,
   score, the named features linked and the line goals completed, and a **judged score out of 100** like the
   Freeride World Tour — Line (biggest drop, real drops, different named features linked), Fluidity,
-  Control, Air & Style, 0–25 each.
+  Control, Air & Style, 0–25 each. The card keeps a **personal best** per map (judged total, localStorage `sendit.freeride.<map>`)
+  and flags a new one.
 
 Game feel at speed: wind roar (noise through a low-pass sweeping 300 Hz → 6 kHz with speed, silent below
 16 m/s), the lens opening in the top of the speed range, a continuous speed shake, closer camera with less
