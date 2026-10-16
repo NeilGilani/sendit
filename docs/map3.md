@@ -43,7 +43,7 @@ spines, pillows and cliff lips have a lit and a shaded side.
 | 1370…1600 | apron | 34° | the station, **Cable Drop** (8 m, u 1585, right under the old cable below the station's eave), the abandoned gondola line, **Lower Steps** |
 | 1560…1800 | **pillow stacks** (left) | 34° → 27° base | terraced pillows: rolling tops, ~4 m rounded drops every 9 m, staggered lobes (a second field low on the left, u 2030–2290) |
 | 1600…2100 | lower bowl | 27° → 19° | wind lips and rollers, the **Corvo Refuge** (rideable roof, stone chimney), larches |
-| 2100…2540 | runout | 10° → 5° | A-frame cabins, the **Valley Station**; **run complete at u = 2540** |
+| 2100…2540 | runout | 10° → 5° | A-frame cabins, the **Valley Station**; **run complete at u = 2540**, marked by a timber arch with a faded RAVENSPIRE · ZIEL · FINISH banner and a row of old marker poles across the valley (visual only) |
 | 400…2180 | **the Ravine** (right, v ≈ 340–480) | 41° → 25° | couloir entrance, up to 54 m deep, rock walls and quarter-pipe banks, frozen ledges (4–5 m) and **Frozen Falls** (u 1330: a 9 m ice-sheeted ledge with icicles), bends around the station's knoll |
 
 ### Best lines (bot numbers in §6)
@@ -91,7 +91,7 @@ web/src/maps/ravenspire/
   structures.js  Structure: roof surface (mono / gable / A-frame + snow load), walls (block test), drifts
   props.js       meshes: weathered buildings, boarded windows, signs, chimneys, bull wheels, the gondola,
                  the helicopter and ravens (animated in onBeforeRender), Frozen Falls' ice sheet and icicles,
-                 chimney smoke (one instanced draw), the station mast and windsock
+                 chimney smoke (one instanced draw), the station mast and windsock, the finish arch and poles
   tuning.js      RAVENSPIRE_PHYSICS (per-map physics) and RAVENSPIRE_CAMERA
   noise.js       value / fbm / ridged noise, mulberry32
 web/src/maps/builtin.js     one line: import './ravenspire/index.js';

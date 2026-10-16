@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toonMaterial } from '../../world.js';
-import { RAVINE, START_X } from './layout.js';
+import { RAVINE, START_X, FINISH_U } from './layout.js';
 import { snowUniforms, SNOW_COMMON_PARS, SNOW_BAND_GLSL } from '../../gfx/snow.js';
 import { on, emit } from '../../state.js';
 
@@ -20,6 +20,7 @@ export function buildRavenspireProps(course, { terrain }) {
   group.add(buildIceFalls(course, terrain));
   group.add(buildSmoke(course, terrain));
   group.add(buildMast(course, M, terrain));
+  group.add(buildFinish(M, terrain));
   group.traverse((o) => { if (o.isMesh && !o.material.transparent) { o.castShadow = true; o.receiveShadow = true; } });
   return group;
 }
@@ -738,5 +739,49 @@ function buildMast(course, M, terrain) {
     sock.rotation.z = -0.12 + 0.06 * Math.sin(t * 1.3);            // droops a little in the lulls
     sock.rotation.y = 0.12 * Math.sin(t * 0.7) + 0.05 * Math.sin(t * 3.1);
   };
+  return g;
+}
+
+// ------------------------------------------------------------------ the finish
+/**
+ * Where the run completes (u = FINISH_U, across the whole valley): a row of old marker poles with faded orange
+ * tops, and a timber arch with a sun-bleached ZIEL · FINISH banner where the main lines come down. Visual only.
+ */
+function buildFinish(M, terrain) {
+  const g = new THREE.Group();
+  g.name = 'FinishLine';
+  const x = START_X + FINISH_U, H = (z) => terrain.baseHeight(x, z);
+  const Z0 = -10, Z1 = 50;   // the arch
+  const poles = [], tips = [];
+  for (let z = -420; z <= 520; z += 14) {
+    if (z > Z0 - 4 && z < Z1 + 4) continue;
+    const y = H(z) - 0.2, h = 2.3;
+    const a = new THREE.CylinderGeometry(0.045, 0.06, h * 0.62, 5); a.translate(x, y + h * 0.31, z);
+    const b = new THREE.CylinderGeometry(0.04, 0.045, h * 0.38, 5); b.translate(x, y + h * 0.81, z);
+    poles.push(a.toNonIndexed()); tips.push(b.toNonIndexed());
+  }
+  g.add(new THREE.Mesh(mergeGeometries(poles), M.woodDark));
+  g.add(new THREE.Mesh(mergeGeometries(tips), toonMaterial({ name: 'markerTip', color: 0xd2642e })));
+  // The arch: two timber posts, a beam, and the banner hanging under it, facing the riders coming down.
+  const top = Math.max(H(Z0), H(Z1)) + 5.2;
+  const wood = [];
+  for (const z of [Z0, Z1]) { const b = new THREE.BoxGeometry(0.34, top - H(z) + 0.6, 0.34); b.translate(x, (top + H(z) - 0.6) / 2, z); wood.push(b.toNonIndexed()); }
+  const beam = new THREE.BoxGeometry(0.3, 0.3, Z1 - Z0 + 1.2); beam.translate(x, top + 0.1, (Z0 + Z1) / 2); wood.push(beam.toNonIndexed());
+  g.add(new THREE.Mesh(mergeGeometries(wood), M.woodDark));
+  const tex = canvasTex(1024, 96, (c, w, h) => {
+    const r = rand(77);
+    c.fillStyle = '#a8483a'; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 260; i++) { c.fillStyle = `rgba(240,225,200,${r() * 0.12})`; c.fillRect(r() * w, r() * h, 4 + r() * 60, 1 + r() * 3); }
+    c.fillStyle = '#efe4cf'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = 'bold 54px Georgia, serif';
+    c.fillText('RAVENSPIRE  ·  ZIEL  ·  FINISH', w / 2, h / 2 + 2);
+    for (let i = 0; i < 50; i++) { c.fillStyle = `rgba(168,72,58,${0.3 + r() * 0.5})`; c.beginPath(); c.ellipse(r() * w, r() * h, 2 + r() * 10, 1 + r() * 4, r() * 3, 0, 6.3); c.fill(); }
+  }, false);
+  const banner = new THREE.PlaneGeometry(Z1 - Z0 - 1, 2.4, 12, 1);
+  { const p = banner.attributes.position; for (let i = 0; i < p.count; i++) { const t = p.getX(i) / ((Z1 - Z0 - 1) / 2); p.setY(i, p.getY(i) - 0.5 * (1 - t * t)); } }   // sags a little
+  banner.rotateY(-Math.PI / 2);
+  banner.translate(x - 0.05, top - 1.35, (Z0 + Z1) / 2);
+  banner.computeVertexNormals();
+  g.add(new THREE.Mesh(banner, toonMaterial({ name: 'finishBanner', map: tex, side: THREE.DoubleSide })));
   return g;
 }
