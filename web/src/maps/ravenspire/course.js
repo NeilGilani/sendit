@@ -483,6 +483,55 @@ export class RavenspireCourse {
   /** Where the lobby plinth stands: on the summit shoulder, looking down the face. */
   lobbySpot() { return { x: START_X + 22, z: -18, heading: -Math.PI / 2 - 0.18 }; }
 
+  /**
+   * Golden snowflakes (activities.js), placed by hand across every line instead of along one path: just
+   * off the big lips (you pick them up as you send it), on the roofs, in the gorge, on a spine crest.
+   * Returns [{ x, y, z }] in world space.
+   */
+  flakeSpots() {
+    const H = (u, v) => this.height(START_X + u, v);
+    // The lip near u0 at v: where the snow falls away hardest; the flake hangs just out over the edge,
+    // on the path of a rider who pops off the lip.
+    const lip = (u0, v, span = 25) => {
+      let best = u0, drop = -1e9;
+      for (let u = u0 - span; u < u0 + span; u += 0.5) {
+        const d = H(u, v) - H(u + 1.5, v);
+        if (d > drop) { drop = d; best = u; }
+      }
+      // Walk back up the face to its top (the last point that is still bench, under ~40°).
+      let top = best;
+      while (top > best - 12 && H(top - 0.5, v) - H(top, v) > 0.42) top -= 0.5;
+      return { x: START_X + top + 3, y: H(top, v) + 0.4, z: v };
+    };
+    const on = (u, v, up = 1.2) => ({ x: START_X + u, y: H(u, v) + up, z: v });
+    const roof = (id) => {
+      const s = this.structures.find((k) => k.id === id);
+      const [x, z] = s.world(s.hl * 0.2, 0);
+      return { x, y: s.surface(x, z) + 1.2, z };
+    };
+    const rv = (u) => this.rvAt(this.rv.c, u);
+    // Crest of the spine nearest v at u (the highest point across ±15 m).
+    const crest = (u, v) => {
+      let bv = v;
+      for (let k = v - 15; k <= v + 15; k += 0.5) if (H(u, k) > H(u, bv)) bv = k;
+      return on(u, bv, 1.0);
+    };
+    return [
+      lip(548, -40),               // Band A, on the Stacks line
+      crest(330, -330),            // a spine crest on the Spine Wall
+      lip(905, 700, 30),           // the Hammer
+      lip(990, 40),                // the First Stack
+      on(1000, rv(1000)),          // deep in the Ravine
+      lip(1160, -40),              // the Throne's peak
+      lip(1330, rv(1330), 12),     // Frozen Falls
+      lip(1418, 280),              // Station Cliff
+      roof('station'),             // on the Old Lift Station's roof
+      on(1655, -360),              // the pillow stacks
+      lip(1835, -40, 10),          // a wind lip in the lower bowl
+      roof('refuge'),              // on the Corvo Refuge's roof
+    ];
+  }
+
   // ---------------------------------------------------------------- terrain arrays
   async generate(onProgress = () => {}) {
     const N = TILE.res, size = TILE.size, sp = size / (N - 1), half = size / 2;

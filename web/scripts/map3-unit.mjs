@@ -90,5 +90,15 @@ const near = (a, b, e = 1e-9) => Math.abs(a - b) <= e;
   PHYSICS.flow = null;
 }
 
+// ------------------------------------------------------------------ snowflakes placed by hand
+{
+  const { RavenspireCourse } = await import('../src/maps/ravenspire/course.js');
+  const c = new RavenspireCourse();
+  const spots = c.flakeSpots();
+  ok('12 flake spots, all finite', spots.length === 12 && spots.every((f) => [f.x, f.y, f.z].every(Number.isFinite)), spots.length);
+  const above = spots.map((f) => f.y - Math.max(c.height(f.x, f.z), c.heightAt(f.x, f.z) ?? -1e9));
+  ok('flakes float above the snow (0.3–45 m: lip flakes hang over the drop)', above.every((h) => h > 0.3 && h < 45), above.map((h) => h.toFixed(1)).join(' '));
+}
+
 console.log(fails ? `\n${fails} of ${n} FAILED` : `\nall ${n} passed`);
 process.exit(fails ? 1 : 0);

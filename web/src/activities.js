@@ -94,7 +94,21 @@ export class Activities {
     const mat = toonMaterial({ name: 'flake', color: 0xffcf4a, rim: 1.0, frag: 'toonEmissive = vec3(1.0, 0.72, 0.2) * 0.55;' });
     const halo = new THREE.SpriteMaterial({ map: glowTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
     this.flakes = [];
+    const spots = this.course.flakeSpots?.();   // a wild map may place its flakes by hand (opt-in)
     for (let i = 0; i < N; i++) {
+      if (spots && spots.length) {
+        const sp = spots[i % spots.length];
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(sp.x, sp.y, sp.z);
+        m.castShadow = true;
+        const glow = new THREE.Sprite(halo);
+        glow.scale.setScalar(2.4);
+        m.add(glow);
+        m.visible = !this.found.has(i);
+        this.group.add(m);
+        this.flakes.push({ i, m, base: sp.y, phase: rnd() * 6 });
+        continue;
+      }
       const s = ((i + 0.3 + rnd() * 0.4) / N) * this.course.finishAt * 0.96;
       const { p, dir } = f.at(s);
       const r = new THREE.Vector2(-dir.y, dir.x);

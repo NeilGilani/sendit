@@ -76,7 +76,7 @@ function lineSampler(L) {
 }
 
 export function ride(type, key, style, opts = {}) {
-  const L = LINES[key];
+  const L = opts.line || LINES[key];   // opts.line: an ad-hoc { name, pts } (e.g. aimed at a snowflake)
   const vAt = lineSampler(L);
   const T = makeTerrain();
   const events = [];
@@ -87,9 +87,12 @@ export function ride(type, key, style, opts = {}) {
   p.setEquipment(type);
   p.fadeThen = (fn) => fn();
   p.startRiding();
+  if (opts.start) p.place({ x: START_X + opts.start[0], z: opts.start[1] }, -Math.PI / 2);   // [u, v]
   game.score = 0;
   let t = 0, vSum = 0, n = 0, vMax = 0, crashes = 0, air = 0, airMax = 0, takeY = 0, drops = [], airSegs = [];
   let wasAir = false, takeU = 0, roofT = 0, wall = 0, vMaxAt = "", wasAirPrev = false;
+  const flakes = course.flakeSpots ? course.flakeSpots() : [], got = new Set();   // golden snowflakes picked up
+  const near = flakes.map(() => ({ d: 1e9, dy: 0 }));
   const DT = 1 / 60;
   const trace = [];
   while (t < 260) {
@@ -139,13 +142,18 @@ export function ride(type, key, style, opts = {}) {
       airSegs.push({ why: p.state === State.CRASH ? JSON.stringify(p.lastCrash) : '', u: Math.round(takeU), air: +p.lastLanding?.air?.toFixed(2) || 0, drop: +(takeY - p.position.y).toFixed(1), impact: +(p.lastLanding?.impact ?? 0).toFixed(1), result: p.state === State.CRASH ? 'CRASH' : p.lastLanding?.result, v: +prevVel.length().toFixed(1) });
     }
     wasAir = p.state === State.AIR;
+    for (let k = 0; k < flakes.length; k++) {
+      const f = flakes[k], dx = p.position.x - f.x, dz = p.position.z - f.z, dy = p.position.y + 0.9 - f.y;
+      if (dx * dx + dz * dz < 2.6 && Math.abs(dy) < 1.9 && p.state !== State.CRASH) got.add(k);
+      if (dx * dx + dz * dz < near[k].d ** 2) near[k] = { d: Math.hypot(dx, dz), dy };
+    }
     if (p.state === State.AIR) { air += DT; airMax = Math.max(airMax, p.airTime); }
     if (p.state === State.GROUNDED) {
       vSum += p.speed; n++; if (p.speed > vMax) { vMax = p.speed; vMaxAt = `u${Math.round(u)} air-before ${wasAirPrev ? "yes" : "no"}`; }
       if (course.heightAt(p.position.x, p.position.z) !== null) roofT += DT;
     }
     if (process.env.TRACE && Math.abs(t % 1) < DT) trace.push(`${t.toFixed(0)}s u=${u.toFixed(0)} v=${p.position.z.toFixed(0)} y=${p.position.y.toFixed(0)} spd=${p.speed.toFixed(1)} st=${p.state}`);
-    if (u > 2560 || crashes > 6) break;
+    if (u > (opts.endU ?? 2560) || crashes > 6) break;
   }
   emit('runComplete');
   const judged = p.flow?.lastRun;
@@ -156,7 +164,7 @@ export function ride(type, key, style, opts = {}) {
     line: key, type, style, time: +t.toFixed(1), finished: p.position.x - START_X > 2560,
     avg: +(vSum / Math.max(1, n)).toFixed(1), max: +vMax.toFixed(1), vMaxAt, crashes,
     stumbles: events.filter((e) => e.kind === 'stumble').length, stumbleWhy: events.filter((e) => e.kind === 'stumble').map((e) => e.r).join(','), airTotal: +air.toFixed(1), airMax: +airMax.toFixed(2),
-    roofSeconds: +roofT.toFixed(1), airs: big, trace, wall, score: game.score, flow: flowEv, judged,
+    roofSeconds: +roofT.toFixed(1), flakes: [...got].sort((a, b) => a - b), flakeNear: near, airs: big, trace, wall, score: game.score, flow: flowEv, judged,
   };
 }
 
@@ -166,7 +174,7 @@ if (process.argv[1] && process.argv[1].endsWith('map3-ride.mjs')) {
   console.log(`physics: ${process.env.DEFAULTS ? 'DEFAULTS (Valcrest)' : 'Ravenspire overrides'}  ski max ${PHYSICS.ski.maxVelocity}`);
   for (const k of keys) for (const ty of types) {
     const r = ride(ty, k, style, { flip: !!process.env.FLIP, spins: Number(process.env.SPINS || 2) });
-    console.log(`\n${LINES[k].name} · ${ty} · ${style}: ${r.finished ? 'finished' : 'DNF'} in ${r.time}s  avg ${r.avg} m/s (${(r.avg * 2.237).toFixed(0)} mph)  max ${r.max} (${(r.max * 2.237).toFixed(0)} mph)  crashes ${r.crashes}  stumbles ${r.stumbles}  air ${r.airTotal}s (max ${r.airMax}s)  roof ${r.roofSeconds}s`);
+    console.log(`\n${LINES[k].name} · ${ty} · ${style}: ${r.finished ? 'finished' : 'DNF'} in ${r.time}s  avg ${r.avg} m/s (${(r.avg * 2.237).toFixed(0)} mph)  max ${r.max} (${(r.max * 2.237).toFixed(0)} mph)  crashes ${r.crashes}  stumbles ${r.stumbles}  air ${r.airTotal}s (max ${r.airMax}s)  roof ${r.roofSeconds}s  flakes [${r.flakes}]`);
     if (r.stumbleWhy) console.log(`   stumbles: ${r.stumbleWhy}`);
     if (process.env.VMAX) console.log(`   max speed at ${r.vMaxAt}`);
     for (const a of r.airs) console.log(`   air @u${a.u}: ${a.air}s  drop ${a.drop} m  in ${a.v} m/s  impact ${a.impact} m/s  → ${a.result} ${a.why || ''}`);
