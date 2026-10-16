@@ -247,6 +247,15 @@ Blackspruce by section:
 - The min-of-60 metric reads ~2 ms below gfxperf's median frame time (Valcrest: 11.6 vs 13.9 ms).
 - On the gfxperf scale Blackspruce sits at roughly 14–16 ms in the dense sections, the target, about the same as Valcrest.
 
+**Standard metric** (`gfxperf.mjs`, quiet window, riding and carving down the Needles from t 560, the densest stretch), back-to-back pairs:
+
+| Run | Blackspruce Needles | Valcrest start |
+|-----|---------------------|----------------|
+| 1 | 16.4 ms | 14.6 ms |
+| 2 | 13.9 ms | 13.4 ms |
+
+This is within the 14–16 ms target. Valcrest's original baseline was 13.9 ms.
+
 What it took:
 - The designed forest thins with distance from the lanes, starting 6 m behind a lane edge: 12k → 4.8k designed trees. Those are the woods you can't see behind the lane-edge trees.
 - `perf = { treeNear: 0.44, treeMid: 0.35 }`: full-frond trees within ~18 m instead of ~41 m, and mid trees hand over to the opaque far shells at ~91 m instead of 260 m. Not noticeable at riding speed in screenshots or playtests.

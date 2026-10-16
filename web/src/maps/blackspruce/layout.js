@@ -78,11 +78,11 @@ export const CLEARINGS = [
   [1560, 0, 42, 15],             //   … its landing
   [1955, 0, 70, 46],             // finish
   // small breathers inside the long tree sections (glade pockets, no gate)
-  [300, ['main', 0], 16, 16],
-  [680, ['main', 0], 14, 14],
-  [1080, ['main', 0], 15, 15],
+  [300, ['main', 0], 15, 36],      // mid-section breathers across every line (the forest opens, then closes again)
+  [680, ['main', 0], 14, 36],
+  [1080, ['main', 0], 15, 36],
   [1350, ['main', 0], 12, 12],
-  [1750, ['main', 0], 16, 18],
+  [1750, ['main', 0], 16, 40],
 ];
 
 // Sections: tree spacing (Poisson min distance, m), size range, crown slenderness and pivots.
