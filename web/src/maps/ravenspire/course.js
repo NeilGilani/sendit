@@ -137,12 +137,13 @@ export class RavenspireCourse {
 
   // ---------------------------------------------------------------- the old footbridge
   /**
-   * An old suspension footbridge slung across the ravine just below the Ravine drop zone (props.js draws it):
-   * anchored where each wall tops out, ~40–55 m above the gorge floor, so you ride under it. Its anchor
+   * An old suspension footbridge slung across the ravine ~170 m below the Ravine drop zone (props.js draws it):
+   * anchored where each wall tops out, ~50–65 m above the gorge floor; you see it span the gorge ahead, then
+   * ride under it. Its anchor
    * posts collide (course.obstacles); the deck is out of reach.
    */
   buildBridge() {
-    const u = 1080, vc = this.rvAt(this.rv.c, u), x = START_X + u, floor = this.height(x, vc);
+    const u = 1220, vc = this.rvAt(this.rv.c, u), x = START_X + u, floor = this.height(x, vc);
     const anchor = (s) => {
       for (let d = 20; d < 120; d += 1) {
         const a = this.height(x, vc + s * d), b = this.height(x, vc + s * (d + 1.5));

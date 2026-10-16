@@ -44,7 +44,7 @@ spines, pillows and cliff lips have a lit and a shaded side.
 | 1560…1800 | **pillow stacks** (left) | 34° → 27° base | terraced pillows: rolling tops, ~4 m rounded drops every 9 m, staggered lobes (a second field low on the left, u 2030–2290) |
 | 1600…2100 | lower bowl | 27° → 19° | wind lips and rollers, the **Corvo Refuge** (rideable roof, stone chimney), larches |
 | 2100…2540 | runout | 10° → 5° | A-frame cabins, the **Valley Station**; **run complete at u = 2540**, marked by a timber arch with a faded RAVENSPIRE · ZIEL · FINISH banner and a row of old marker poles across the valley (visual only) |
-| 400…2180 | **the Ravine** (right, v ≈ 340–480) | 41° → 25° | couloir entrance, up to 54 m deep, rock walls and quarter-pipe banks, frozen ledges (4–5 m) and **Frozen Falls** (u 1330: a 9 m ice-sheeted ledge with icicles), an old suspension footbridge slung across the gorge 35–50 m overhead (u 1080), bends around the station's knoll |
+| 400…2180 | **the Ravine** (right, v ≈ 340–480) | 41° → 25° | couloir entrance, up to 54 m deep, rock walls and quarter-pipe banks, frozen ledges (4–5 m) and **Frozen Falls** (u 1330: a 9 m ice-sheeted ledge with icicles), an old suspension footbridge slung across the gorge 50–65 m overhead (u 1220, you see it span the gorge ahead from the Ravine drop zone), bends around the station's knoll |
 
 ### Best lines (bot numbers in §6)
 
@@ -71,7 +71,7 @@ spines, pillows and cliff lips have a lit and a shaded side.
 | Corvo Refuge | u 1880, v −175 | gable, 33° (ridge across the fall line) | the drift reaches 85 % up the uphill slab: over the ridge, down the slab, 7 m off the eave; stone chimney is solid, wood smoke leans downwind from it (you see the plume from far up the bowl) |
 | A-frames × 3 | u ≈ 2290, v 120–205 | 56° slabs | drifted on the uphill side; steep slab landings |
 | Valley Station ("Talstation") | u 2400, v 300 | gable, 26° | low roof at the bottom of the gondola |
-| old footbridge | across the ravine at u 1080 | | a 93 m suspension footbridge between the wall tops, 35–50 m above the gorge floor (you ride under it); the anchor posts collide, the deck is out of reach |
+| old footbridge | across the ravine at u 1220 | | a 79 m suspension footbridge between the wall tops, 50–65 m above the gorge floor (you ride under it); the anchor posts collide, the deck is out of reach |
 | abandoned gondola | station → valley station | | 6 rusty leaning towers (collision), sagging haul ropes, two forgotten cabins; the station's weather mast collides too |
 
 Walls are solid: a glancing touch slides along the wall (no snagging — a Steep complaint), a square hit

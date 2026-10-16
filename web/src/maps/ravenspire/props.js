@@ -791,7 +791,7 @@ function buildFinish(M, terrain) {
 /**
  * A rickety suspension footbridge across the gorge (course.bridge: anchors on each wall top): timber A-frame
  * towers, two sagging main cables, hangers every 3 m, a plank deck with a few planks missing and two hand
- * ropes. Seen from the ravine floor you ride under it ~35–50 m below. Merged into three draws.
+ * ropes. Seen from the ravine floor you ride under it ~50–65 m below. Merged into three draws.
  */
 function buildBridge(course, M) {
   const g = new THREE.Group();
