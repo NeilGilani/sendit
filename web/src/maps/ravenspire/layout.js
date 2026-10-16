@@ -59,8 +59,8 @@ export const SPINES = { u0: 110, u1: 800, v0: -0.92, v1: -0.46, spacing: 30, hei
 // turned into stacked steps `step` m apart with flat-ish tops and ~5 m drops (terrace = share of the
 // slope taken out of each top), wavy across the field so the pillows stagger.
 export const PILLOWS = [
-  { u0: 1560, u1: 1800, v0: -470, v1: -250, rows: 0, size: 0.6, seed: 11, step: 9, terrace: 0.75, lobe: 9 },
-  { u0: 2030, u1: 2290, v0: -560, v1: -360, rows: 0, size: 0.6, seed: 12, step: 8, terrace: 0.75, lobe: 8 },
+  { u0: 1560, u1: 1800, v0: -470, v1: -250, rows: 0, size: 0.6, seed: 11, step: 9, terrace: 0.6, top: 0.7, lobe: 9 },
+  { u0: 2030, u1: 2290, v0: -560, v1: -360, rows: 0, size: 0.6, seed: 12, step: 8, terrace: 0.6, top: 0.7, lobe: 8 },
 ];
 
 // The ravine: centre line v(u), floor half-width, depth, natural ledges in the floor.
