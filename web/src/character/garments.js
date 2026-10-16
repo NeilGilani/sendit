@@ -53,7 +53,7 @@ export function buildOutfitGeometry(body, cut) {
       axisPoint: (t) => new THREE.Vector3(0, t, 0),
       filter: (x, y, z, b) => (b.startsWith('upperarm') ? Math.abs(x) < 0.2 : b.startsWith('neck') ? y < 1.56 : true),
       centre: (t, c) => new THREE.Vector3(0, t, c.z),
-      smoothA: 3, smoothT: 3, minEase: 0.014,
+      smoothA: 5, smoothT: 4, minEase: -0.012,   // the skin underneath is pulled in 4 cm: no muscles through the shell
       ease: (t, th) => {
         const back = (1 - Math.cos(th)) / 2;            // 0 front … 1 back
         const side = Math.abs(Math.sin(th));

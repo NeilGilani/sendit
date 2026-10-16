@@ -236,28 +236,33 @@ export function sweep(rings, meta) {
 // ------------------------------------------------------------------ skinning + merge
 /** Copy skin weights from the body to each vertex of a piece, smooth them over the grid, keep 4. */
 export function skinPiece(piece, body, smoothIters = 6) {
-  const nv = piece.pos.length / 3, nb = body.nb;
+  const nv = piece.pos.length / 3;
+  // Work on a compact bone list: the bones this piece may use (plus its anchor).
+  const used = piece.rigid !== undefined ? [piece.rigid] : [...(piece.skinBones || new Set(body.names.map((_, j) => j)))];
+  if (piece.anchor && !used.includes(piece.anchor.bone)) used.push(piece.anchor.bone);
+  const nb = used.length, local = new Map(used.map((j, q) => [j, q]));
   const W = new Float32Array(nv * nb);
   if (piece.rigid !== undefined) {
-    for (let i = 0; i < nv; i++) W[i * nb + piece.rigid] = 1;
+    for (let i = 0; i < nv; i++) W[i * nb] = 1;
   } else {
-    const tmp = new Float32Array(nb);
+    const tmp = new Float32Array(body.nb);
     for (let i = 0; i < nv; i++) {
       tmp.fill(0);
       body.skinAt(piece.pos[i * 3], piece.pos[i * 3 + 1], piece.pos[i * 3 + 2], piece.skinBones, tmp, 8, piece.skinMask);
-      let s = 0; for (let j = 0; j < nb; j++) s += tmp[j];
-      if (s > 0) for (let j = 0; j < nb; j++) W[i * nb + j] = tmp[j] / s;
+      let s = 0;
+      for (let q = 0; q < nb; q++) s += tmp[used[q]];
+      if (s > 0) for (let q = 0; q < nb; q++) W[i * nb + q] = tmp[used[q]] / s;
     }
     // Anchor: below y0 the piece follows one bone only (e.g. a collar's base rides on the chest like
     // the jacket it is sewn into), blending to the transferred weights by y1.
     if (piece.anchor) {
-      const { bone, y0, y1 } = piece.anchor;
+      const { bone, y0, y1 } = piece.anchor, ab = local.get(bone);
       for (let i = 0; i < nv; i++) {
         const y = piece.pos[i * 3 + 1];
         const a = 1 - Math.min(1, Math.max(0, (y - y0) / (y1 - y0)));
         if (a <= 0) continue;
-        for (let j = 0; j < nb; j++) W[i * nb + j] *= 1 - a;
-        W[i * nb + bone] += a;
+        for (let q = 0; q < nb; q++) W[i * nb + q] *= 1 - a;
+        W[i * nb + ab] += a;
       }
     }
     // Diffuse weights over the grid so neighbouring vertices bend together (no torn folds).
@@ -266,20 +271,22 @@ export function skinPiece(piece, body, smoothIters = 6) {
     for (let it = 0; it < smoothIters; it++) {
       for (let i = 0; i < rows; i++) for (let k = 0; k < cols; k++) {
         const o = i * cols + k;
-        const nbh = [o, i > 0 ? o - cols : o, i < rows - 1 ? o + cols : o, i * cols + ((k - 1 + cols - 1) % (cols - 1)), i * cols + ((k + 1) % (cols - 1))];
-        for (let j = 0; j < nb; j++) {
-          tmpW[o * nb + j] = (W[nbh[0] * nb + j] * 2 + W[nbh[1] * nb + j] + W[nbh[2] * nb + j] + W[nbh[3] * nb + j] + W[nbh[4] * nb + j]) / 6;
+        const n1 = i > 0 ? o - cols : o, n2 = i < rows - 1 ? o + cols : o;
+        const n3 = i * cols + ((k - 1 + cols - 1) % (cols - 1)), n4 = i * cols + ((k + 1) % (cols - 1));
+        for (let q = 0; q < nb; q++) {
+          tmpW[o * nb + q] = (W[o * nb + q] * 2 + W[n1 * nb + q] + W[n2 * nb + q] + W[n3 * nb + q] + W[n4 * nb + q]) / 6;
         }
       }
       W.set(tmpW);
       // keep the duplicated seam column identical
-      for (let i = 0; i < rows; i++) for (let j = 0; j < nb; j++) W[(i * cols + cols - 1) * nb + j] = W[(i * cols) * nb + j];
+      for (let i = 0; i < rows; i++) for (let q = 0; q < nb; q++) W[(i * cols + cols - 1) * nb + q] = W[(i * cols) * nb + q];
     }
   }
   const si = new Uint16Array(nv * 4), sw = new Float32Array(nv * 4);
+  const top = [];
   for (let i = 0; i < nv; i++) {
-    const top = [];
-    for (let j = 0; j < nb; j++) { const w = W[i * nb + j]; if (w > 0.002) top.push([w, j]); }
+    top.length = 0;
+    for (let q = 0; q < nb; q++) { const w = W[i * nb + q]; if (w > 0.002) top.push([w, used[q]]); }
     top.sort((a, b) => b[0] - a[0]);
     const t4 = top.slice(0, 4);
     const s = t4.reduce((a, b) => a + b[0], 0) || 1;

@@ -35,8 +35,8 @@ export class BodyInfo {
       const m = bi.clone().invert().premultiply(bindInv);
       this.joint[this.names[j]] = new THREE.Vector3().setFromMatrixPosition(m);
     });
-    // Spatial hash for nearest-skin lookups.
-    this.cell = 0.05;
+    // Spatial hash for nearest-skin lookups (numeric cell keys).
+    this.cell = 0.09;
     this.grid = new Map();
     for (let i = 0; i < n; i++) {
       const k = this.key(this.pos[i * 3], this.pos[i * 3 + 1], this.pos[i * 3 + 2]);
@@ -46,7 +46,40 @@ export class BodyInfo {
     }
   }
 
-  key(x, y, z) { const c = this.cell; return `${Math.floor(x / c)},${Math.floor(y / c)},${Math.floor(z / c)}`; }
+  /** Vertex indices whose coordinate on an axis-aligned `axis` lies within c·axis ± half (all, if not aligned). */
+  slab(c, axis, half) {
+    const ax = Math.abs(axis.x) > 0.999 ? 0 : Math.abs(axis.y) > 0.999 ? 1 : Math.abs(axis.z) > 0.999 ? 2 : -1;
+    if (ax < 0) return null;
+    if (!this.sorted) this.sorted = [];
+    if (!this.sorted[ax]) {
+      const idx = Array.from({ length: this.n }, (_, i) => i).sort((a, b) => this.pos[a * 3 + ax] - this.pos[b * 3 + ax]);
+      this.sorted[ax] = { idx: Int32Array.from(idx), val: Float32Array.from(idx, (i) => this.pos[i * 3 + ax]) };
+    }
+    const { idx, val } = this.sorted[ax];
+    const t = ax === 0 ? c.x : ax === 1 ? c.y : c.z;
+    const lo = (x) => { let a = 0, b = val.length; while (a < b) { const m = (a + b) >> 1; if (val[m] < x) a = m + 1; else b = m; } return a; };
+    return idx.subarray(lo(t - half), lo(t + half + 1e-9));
+  }
+
+  /** Spatial hash of only the vertices whose dominant bone is in `boneSet` (cached per set). */
+  gridFor(boneSet) {
+    if (!boneSet) return this.grid;
+    const key = [...boneSet].sort((a, b) => a - b).join(',');
+    if (!this.grids) this.grids = new Map();
+    let g = this.grids.get(key);
+    if (!g) {
+      g = new Map();
+      for (const [k, list] of this.grid) {
+        const f = list.filter((i) => boneSet.has(this.dom[i]));
+        if (f.length) g.set(k, f);
+      }
+      this.grids.set(key, g);
+    }
+    return g;
+  }
+
+  cellKey(ix, iy, iz) { return ((ix + 512) * 1024 + (iy + 512)) * 1024 + (iz + 512); }
+  key(x, y, z) { const c = this.cell; return this.cellKey(Math.floor(x / c), Math.floor(y / c), Math.floor(z / c)); }
   bone(name) { return this.names.indexOf(name); }
   /** Set of bone indices from a name test (regexp or array of names). */
   bones(test) {
@@ -66,7 +99,10 @@ export class BodyInfo {
     for (let k = 0; k < segs; k++) { const a = (k / segs) * Math.PI * 2; cs[k] = Math.cos(a); sn[k] = Math.sin(a); }
     let count = 0;
     const p = this.pos;
-    for (let i = 0; i < this.n; i++) {
+    const list = this.slab(c, axis, half);
+    const N = list ? list.length : this.n;
+    for (let q = 0; q < N; q++) {
+      const i = list ? list[q] : q;
       if (boneSet && !boneSet.has(this.dom[i])) continue;
       const x = p[i * 3] - c.x, y = p[i * 3 + 1] - c.y, z = p[i * 3 + 2] - c.z;
       const t = x * axis.x + y * axis.y + z * axis.z;
@@ -83,7 +119,10 @@ export class BodyInfo {
   centre(c, axis, e1, e2, half, boneSet, filter) {
     let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity, count = 0;
     const p = this.pos;
-    for (let i = 0; i < this.n; i++) {
+    const list = this.slab(c, axis, half);
+    const N = list ? list.length : this.n;
+    for (let q = 0; q < N; q++) {
+      const i = list ? list[q] : q;
       if (boneSet && !boneSet.has(this.dom[i])) continue;
       const x = p[i * 3] - c.x, y = p[i * 3 + 1] - c.y, z = p[i * 3 + 2] - c.z;
       if (Math.abs(x * axis.x + y * axis.y + z * axis.z) > half) continue;
@@ -104,25 +143,28 @@ export class BodyInfo {
   skinAt(x, y, z, boneSet, out, k = 8, mask = null) {
     const c = this.cell;
     const cx = Math.floor(x / c), cy = Math.floor(y / c), cz = Math.floor(z / c);
-    const best = [];   // [d2, i] sorted, length ≤ k
+    const grid = this.gridFor(boneSet);
+    const bd = new Float64Array(k).fill(Infinity), bi = new Int32Array(k).fill(-1);   // k nearest, sorted
     for (let ring = 1; ring <= 6; ring++) {
       for (let dx = -ring; dx <= ring; dx++) for (let dy = -ring; dy <= ring; dy++) for (let dz = -ring; dz <= ring; dz++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) !== ring && ring > 1) continue;
-        const a = this.grid.get(`${cx + dx},${cy + dy},${cz + dz}`);
+        if (ring > 1 && Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) !== ring) continue;
+        const a = grid.get(this.cellKey(cx + dx, cy + dy, cz + dz));
         if (!a) continue;
         for (const i of a) {
-          if (boneSet && !boneSet.has(this.dom[i])) continue;
           if (mask && !mask(this.names[this.dom[i]], x, y, z)) continue;
           const ex = this.pos[i * 3] - x, ey = this.pos[i * 3 + 1] - y, ez = this.pos[i * 3 + 2] - z;
           const d2 = ex * ex + ey * ey + ez * ez;
-          if (best.length < k || d2 < best[best.length - 1][0]) {
-            best.push([d2, i]); best.sort((p, q) => p[0] - q[0]); if (best.length > k) best.pop();
-          }
+          if (d2 >= bd[k - 1]) continue;
+          let j = k - 1;
+          while (j > 0 && bd[j - 1] > d2) { bd[j] = bd[j - 1]; bi[j] = bi[j - 1]; j--; }
+          bd[j] = d2; bi[j] = i;
         }
       }
       // Done once the k-th nearest is closer than anything an outer ring could hold.
-      if (best.length >= k && Math.sqrt(best[best.length - 1][0]) < ring * c) break;
+      if (bi[k - 1] >= 0 && Math.sqrt(bd[k - 1]) < ring * c) break;
     }
+    const best = [];
+    for (let j = 0; j < k; j++) if (bi[j] >= 0) best.push([bd[j], bi[j]]);
     if (!best.length) return false;
     const d0 = Math.sqrt(best[0][0]);
     let tot = 0;
