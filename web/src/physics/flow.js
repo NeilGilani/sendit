@@ -49,6 +49,7 @@ export class Flow {
       on('resetTop', () => this.newRun()),
       on('runComplete', () => this.finishRun()),
       on('stumble', () => { if (this.run) this.run.stumbles++; }),
+      on('landingGrade', (e) => { if (this.run && e.grade !== 'sketchy') { if (e.feature) this.run.features.add(e.feature); if (e.roof) this.run.features.add(e.roof); } }),
     ];
   }
 
@@ -176,13 +177,14 @@ export class Flow {
   // ---------------------------------------------------------------- run summary (FWT-style judging)
   newRun() {
     this.run = { time: 0, ground: 0, speedSum: 0, topSpeed: 0, slow: 0, longestAir: 0, biggestDrop: 0, airs: 0, drops: 0,
-      tricks: 0, trickPts: 0, trickOnly: 0, stomps: 0, bestLine: 0, crashes: 0, stumbles: 0, score0: game.score };
+      tricks: 0, trickPts: 0, trickOnly: 0, stomps: 0, bestLine: 0, crashes: 0, stumbles: 0, score0: game.score, features: new Set() };
   }
 
   /**
    * Freeride World Tour judges one overall impression from Line, Fluidity, Control and Air & Style
    * (docs/map3-research.md). Here each is 0–25 from what the run measured:
-   *   Line      — big drops and how many real features (drops ≥ 10 m) the line linked
+   *   Line      — the biggest drop, how many real drops (≥ 10 m) and how many different named features
+   *               (course.featureAt: the Throne, the Ravine, a roof…) the line linked
    *   Fluidity  — average speed on the snow, minus time spent crawling (< 3 m/s)
    *   Control   — 25 minus crashes and stumbles; stomped landings earn back a little
    *   Air & Style — points from real tricks (spins, flips, grabs) and how many; plain airs count a little
@@ -192,12 +194,12 @@ export class Flow {
     if (!r || r.time < 5) return;
     const avg = r.speedSum / Math.max(1, r.ground);
     const clamp25 = (x) => Math.max(0, Math.min(25, x));
-    const line = clamp25(r.biggestDrop * 0.45 + r.drops * 2.2);
+    const line = clamp25(r.biggestDrop * 0.4 + r.drops * 1.6 + r.features.size * 1.5);   // + linking different named features
     const fluidity = clamp25(avg / 24 * 25 - (r.slow / Math.max(1, r.time)) * 40);
     const control = clamp25(25 - r.crashes * 7 - r.stumbles * 2.5 + r.stomps * 0.8);
     const style = clamp25(r.trickOnly / 120 + r.tricks * 1.2 + r.airs * 0.25);   // real tricks (spins, flips, grabs) count; plain airs a little
     const total = Math.round(line + fluidity + control + style);
-    const summary = { ...r, avg, line, fluidity, control, style, total, score: game.score - r.score0 };
+    const summary = { ...r, avg, line, fluidity, control, style, total, score: game.score - r.score0, featureList: [...r.features] };
     this.lastRun = summary;
     emit('runSummary', summary);
     this.newRun();

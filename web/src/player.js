@@ -451,8 +451,14 @@ export class Player {
       game.airTotal += this.airTime;
       addScore(label, points);
     }
-    if (flow && clean && drop >= 6) addScore(`${Math.round(drop)} m drop`, Math.round((drop * 12 + Math.max(0, drop - 15) * 10) * flow.scoreMul()));
-    if (flow && this.airTime > 0.35) emit('landingGrade', { grade, drop, impact, rawImpact, air: this.airTime, trick, perfect });
+    // Named features (course.featureAt / roofAt): drops carry the name of what you launched off, roof
+    // landings score on their own.
+    const C = this.terrain.course;
+    const feature = flow && C?.featureAt && this.takeoffPos ? C.featureAt(this.takeoffPos.x, this.takeoffPos.z) : null;
+    const roof = flow && clean && C?.roofAt ? C.roofAt(this.position.x, this.position.z) : null;
+    if (flow && clean && drop >= 6) addScore(`${feature ? `${feature} · ` : ''}${Math.round(drop)} m drop`, Math.round((drop * 12 + Math.max(0, drop - 15) * 10) * flow.scoreMul()));
+    if (roof && this.airTime > 0.5) addScore(`Roof landing · ${roof}`, Math.round(200 * flow.scoreMul()));
+    if (flow && this.airTime > 0.35) emit('landingGrade', { grade, drop, impact, rawImpact, air: this.airTime, trick, perfect, feature, roof });
     this.airTime = 0;
     this._maxAbove = 0;
   }

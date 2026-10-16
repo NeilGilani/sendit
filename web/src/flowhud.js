@@ -98,11 +98,11 @@ export function mountFlowHud(player) {
     bank.style.color = '#ff6bb0';
     restart(bank);
   });
-  on('landingGrade', ({ grade, drop, air }) => {
+  on('landingGrade', ({ grade, drop, air, feature, roof }) => {
     const [label, color] = GRADES[grade] || GRADES.clean;
-    $('.g').textContent = label;
+    $('.g').textContent = roof && grade !== 'sketchy' ? `${label} · ROOF` : label;
     $('.g').style.color = color;
-    $('.d').textContent = [drop >= 4 ? `${Math.round(drop)} M DROP` : null, `${air.toFixed(1)} S AIR`].filter(Boolean).join('  ·  ');
+    $('.d').textContent = [feature ? feature.toUpperCase() : null, drop >= 4 ? `${Math.round(drop)} M DROP` : null, `${air.toFixed(1)} S AIR`].filter(Boolean).join('  ·  ');
     restart(gr);
   });
   // End of run: the numbers and an FWT-style judged score (physics/flow.js finishRun).
@@ -121,6 +121,7 @@ export function mountFlowHud(player) {
       <div class="row"><span>Longest air</span><b>${r.longestAir.toFixed(1)} s</b></div>
       <div class="row"><span>Best line bonus</span><b>+${fmt(r.bestLine)}</b></div>
       <div class="row"><span>Score</span><b>${fmt(r.score)}</b></div>
+      ${r.featureList?.length ? `<div class="row"><span>Linked</span><b style="text-align:right;max-width:240px">${r.featureList.slice(0, 6).join(' · ')}</b></div>` : ''}
       <div class="judge">${bar('Line', r.line)}${bar('Fluidity', r.fluidity)}${bar('Control', r.control)}${bar('Air &amp; style', r.style)}</div>
       <div class="tot"><span>${rating}</span><b>${r.total}</b></div>`;
     rs.classList.add('on');

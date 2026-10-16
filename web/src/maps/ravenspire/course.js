@@ -376,6 +376,35 @@ export class RavenspireCourse {
     return null;
   }
 
+  // ---------------------------------------------------------------- named features (scoring, HUD)
+  /** Name of the feature a rider launched off at world (x, z), or null (player.js names drops with it). */
+  featureAt(x, z) {
+    const u = x - START_X, v = z;
+    for (const s of this.structures) if (s.surface(x, z) !== null) return s.name;
+    for (const B of BANDS) {
+      if (v < B.v0 - 20 || v > B.v1 + 20) continue;
+      const uc = B.uc + B.wob * (noise1(v / 45, B.seed + 50) * 2 - 1);
+      if (u > uc - 30 && u < uc + 6) return B.name;
+    }
+    if (u > RAVINE.u0 && u < RAVINE.u1 && this.rvAt(this.rv.d, u) > 8) {
+      const dv = Math.abs(v - this.rvAt(this.rv.c, u));
+      if (dv < this.rvAt(this.rv.f, u) + this.rvAt(this.rv.w, u)) return u < 760 ? 'The Couloir' : 'The Ravine';
+    }
+    const W = FACE.halfWidth(u);
+    if (u > SPINES.u0 && u < SPINES.u1 && v > SPINES.v0 * W - 10 && v < SPINES.v1 * W + 10) return 'Spine Wall';
+    for (const F of PILLOWS) if (F.terrace && u > F.u0 && u < F.u1 && v > F.v0 && v < F.v1) return 'Pillow Stacks';
+    for (const [hu, hv, L, , kind] of HITS) if (Math.abs(u - hu) < 20 && Math.abs(v - hv) < L) return kind === 'lip' ? 'Wind Lip' : 'Roller';
+    for (const B of BUTTRESSES) if (u > B.u0 && u < B.u1 && Math.abs(v - (B.v0 + (B.v1 - B.v0) * (u - B.u0) / (B.u1 - B.u0))) < B.w * 0.5) return B.name;
+    if (u < 70) return 'The Rollover';
+    return null;
+  }
+
+  /** Name of the building whose roof is at world (x, z), or null. */
+  roofAt(x, z) {
+    for (const s of this.structures) if (s.surface(x, z) !== null) return s.name;
+    return null;
+  }
+
   // ---------------------------------------------------------------- scatter hooks (trees)
   forestAt(x, z) {
     const u = x - START_X;
