@@ -29,6 +29,7 @@ export const FLOW_DEFAULTS = {
   scoreMul: 2,
   speedBoost: 0.1,           // +10 % soft-cap speed in flow state
   popBoost: 0.2, spinBoost: 0.15, landBoost: 0.25,
+  stompBoost: 1.5,           // m/s added along the line on a stomped landing
   boostAccel: 1.8,           // m/s² of thrust while tucking in flow state (the SSX boost, kept small)
 };
 

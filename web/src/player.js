@@ -467,6 +467,8 @@ export class Player {
     let grade = null;
     if (flow) {
       grade = !clean ? 'sketchy' : perfect && impact <= P.hardLanding * 0.55 ? 'stomped' : 'clean';
+      // Stomp it and ride out faster (SSX): a small push along the new line.
+      if (grade === 'stomped' && flow.C.stompBoost) { const sp = this.velocity.length(); if (sp > 1) this.velocity.multiplyScalar((sp + flow.C.stompBoost) / sp); this.speed = this.velocity.length(); }
       points = Math.round(points * flow.scoreMul());
     }
     this.lastLanding = { ...ev, impact, air: this.airTime, spins, flips: fl.flips, trick, drop, grade, rawImpact };

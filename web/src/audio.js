@@ -96,6 +96,8 @@ export class SoundScape {
     on('slowmo', ({ scale }) => { this.slow = scale; });   // apex slow motion: wind and snow drop in pitch
     on('heliDrop', () => this.heli());   // a map's heli-drop intro (maps/ravenspire/props.js)
     on('ravenCaw', (p) => this.caw(p));   // ravens around a map's summit
+    on('landingGrade', ({ grade }) => { if (grade === 'stomped') this.oneShot('boost', 0.35, 1.25); });   // the stomp boost
+    on('lineGoal', () => { this.oneShot('medal', 0.7, 1.05); this.chime(); });
     // A board's tail slap pops lower than a skier's hop.
     on('jumped', (d) => this.oneShot('jump_pop', 0.4 + d * 0.5, (this.skier.equipment?.type === 'snowboard' ? 0.78 : 0.95) + Math.random() * 0.15));
     on('nearMiss', () => this.oneShot('near_miss', 0.55, 0.95 + Math.random() * 0.2));

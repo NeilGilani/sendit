@@ -165,7 +165,7 @@ if (process.argv[1] && process.argv[1].endsWith('map3-ride.mjs')) {
   const keys = lineArg === 'all' ? Object.keys(LINES) : lineArg.split(',');
   console.log(`physics: ${process.env.DEFAULTS ? 'DEFAULTS (Valcrest)' : 'Ravenspire overrides'}  ski max ${PHYSICS.ski.maxVelocity}`);
   for (const k of keys) for (const ty of types) {
-    const r = ride(ty, k, style);
+    const r = ride(ty, k, style, { flip: !!process.env.FLIP, spins: Number(process.env.SPINS || 2) });
     console.log(`\n${LINES[k].name} · ${ty} · ${style}: ${r.finished ? 'finished' : 'DNF'} in ${r.time}s  avg ${r.avg} m/s (${(r.avg * 2.237).toFixed(0)} mph)  max ${r.max} (${(r.max * 2.237).toFixed(0)} mph)  crashes ${r.crashes}  stumbles ${r.stumbles}  air ${r.airTotal}s (max ${r.airMax}s)  roof ${r.roofSeconds}s`);
     if (r.stumbleWhy) console.log(`   stumbles: ${r.stumbleWhy}`);
     if (process.env.VMAX) console.log(`   max speed at ${r.vMaxAt}`);
