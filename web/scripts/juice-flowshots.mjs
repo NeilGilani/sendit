@@ -24,6 +24,8 @@ const stage = (steps) => page.evaluate(async (steps) => {
     await new Promise((r) => setTimeout(r, 120));
   }
 }, steps);
+if (process.env.SENDIT) await page.evaluate(() => { const f = window.__sendit.player.flow; if (f) { f.stateT = 12; f.meter = 1; } });   // SENDIT=1: force the flow state
+await page.keyboard.down('w');
 await stage([['score', 'FS 540 Indy', 420], ['score', 'Boardslide · 6.2 m', 180], ['nearMiss', { dist: 0.6 }], ['score', 'Close shave', 15]]);
 await page.waitForTimeout(400);
 await shot('1-chain');
