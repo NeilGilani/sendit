@@ -136,6 +136,32 @@ const CSS = /* css */`
 #juiceHud .tt small { display: block; font-size: 12px; color: rgba(250,248,243,.65); margin-top: 1px; }
 #juiceHud .tt .pb { height: 3px; border-radius: 2px; background: rgba(255,255,255,.15); margin-top: 5px; overflow: hidden; }
 #juiceHud .tt .pb i { display: block; height: 100%; background: var(--c1, #2ff5d6); }
+/* Challenge results (ui.js showResults): the medal slams in, rows cascade, new records glow */
+#results:not(.hidden) .medal { animation: jhMedal .75s cubic-bezier(.2,1.6,.4,1) .15s both; }
+#results:not(.hidden) .medal.gold { box-shadow: 0 6px 0 rgba(20,26,60,0.6), inset 0 -8px 0 rgba(0,0,0,0.15), 0 0 46px rgba(255,211,77,.85); }
+#results:not(.hidden) #resTitle { animation: jhPop2 .5s cubic-bezier(.2,1.6,.4,1) .3s both; }
+#results:not(.hidden) .res-rows > * { animation: jhRow .35s ease-out both; }
+#results:not(.hidden) .res-rows > :nth-child(1) { animation-delay: 0.50s; }
+#results:not(.hidden) .res-rows > :nth-child(2) { animation-delay: 0.50s; }
+#results:not(.hidden) .res-rows > :nth-child(3) { animation-delay: 0.59s; }
+#results:not(.hidden) .res-rows > :nth-child(4) { animation-delay: 0.59s; }
+#results:not(.hidden) .res-rows > :nth-child(5) { animation-delay: 0.68s; }
+#results:not(.hidden) .res-rows > :nth-child(6) { animation-delay: 0.68s; }
+#results:not(.hidden) .res-rows > :nth-child(7) { animation-delay: 0.77s; }
+#results:not(.hidden) .res-rows > :nth-child(8) { animation-delay: 0.77s; }
+#results:not(.hidden) .res-rows > :nth-child(9) { animation-delay: 0.86s; }
+#results:not(.hidden) .res-rows > :nth-child(10) { animation-delay: 0.86s; }
+#results:not(.hidden) .res-rows > :nth-child(11) { animation-delay: 0.95s; }
+#results:not(.hidden) .res-rows > :nth-child(12) { animation-delay: 0.95s; }
+#results:not(.hidden) .res-rows > :nth-child(13) { animation-delay: 1.04s; }
+#results:not(.hidden) .res-rows > :nth-child(14) { animation-delay: 1.04s; }
+#results:not(.hidden) .res-rows > :nth-child(15) { animation-delay: 1.13s; }
+#results:not(.hidden) .res-rows > :nth-child(16) { animation-delay: 1.13s; }
+#results:not(.hidden) .res-rows .v.new { animation: jhRow .35s ease-out both, jhNew .8s ease-in-out 1.4s infinite alternate; }
+@keyframes jhMedal { 0% { transform: scale(2.8) rotate(-35deg); opacity: 0; } 55% { opacity: 1; } 100% { transform: none; opacity: 1; } }
+@keyframes jhPop2 { 0% { transform: scale(.6); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@keyframes jhRow { 0% { opacity: 0; transform: translateY(8px); } 100% { opacity: 1; transform: none; } }
+@keyframes jhNew { from { text-shadow: 0 0 0 rgba(47,245,214,0); } to { text-shadow: 0 0 14px rgba(47,245,214,.9); } }
 /* the other HUDs' versions of these give way to ours */
 #flowHud .ch, #flowHud .gr, #flowHud .bank { display: none !important; }
 #chal #comboHud { display: none; }
@@ -211,6 +237,8 @@ export function mountJuiceHud({ player, combo, input, camera }) {
     banner(`${mult >= 4 ? 'MONSTER ' : ''}COMBO ×${trim(mult)}  +${fmt(bonus)}`, mult >= 4 ? '#ff9a3d' : '#ffe14d');
     if (mult >= 2.5) edge('rgba(255,200,60,.5)');
   });
+  // Finishing a Challenge: a flash and a gold edge for a medal (the results card animates in its CSS above).
+  on('runFinished', ({ medal }) => { if (medal) { flash(medal === 'gold' ? 0.32 : 0.2); edge(medal === 'gold' ? 'rgba(255,211,77,.6)' : 'rgba(47,245,214,.45)'); input?.rumble?.(0.6, 1, 300); } });
   // FEVER (juice/combo.js): a banner, a pulsing hot edge and a countdown on the combo panel.
   const fv = $('.cb .fv');
   on('juiceFever', ({ on: st }) => {

@@ -219,6 +219,7 @@ Bus events: `musicEnergy {level}` at 5 Hz, and `musicDrop {kind, strength}`.
 - **Close to a level.** When the ride ends within 30 % of the next level, the recap's last line becomes "ONLY N XP TO LEVEL L · ONE MORE RUN!".
 - **Pacing.** A first ride usually reaches level 3, about four rides reach level 5, and the curve slows after that.
 - **Pause screen.** It adds the level, the rank, XP to the next level, and the dailies still open.
+- **Challenge results card.** The medal slams in (a gold one glows), the title pops, rows cascade in and NEW! records pulse. Finishing with a medal flashes the screen and rumbles. Level-ups wait until the card closes.
 - **Challenge results.** An extra row reads "XP this ride +N · level L", with ▲ when the ride levelled up.
 - **First rides.** One hint 15 s into each of the first two rides explains that tricks, combos, close shaves and dailies earn XP.
 - **Ranks (`RANKS`).** Rookie from level 1, Shredder from 5, Ripper from 10, Pro from 20, Legend from 35, Mountain God from 60. Each rank has a colour, used for the badge, the celebration and the Progress tab.

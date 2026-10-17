@@ -80,6 +80,8 @@ export function mountProgressionUi({ juice }) {
   const play = () => {
     if (!queue.length) { playing = false; return; }
     playing = true;
+    // A results / settings card is up: wait until it closes (the card shows the level-up row itself).
+    if (document.querySelector('.screen.modal:not(.hidden)')) { setTimeout(play, 300); return; }
     // Let a trick announcement (or the air it comes from) finish first, up to 4 s.
     if (juice?.hud?.busy?.() && waited < 4000) { waited += 250; setTimeout(play, 250); return; }
     waited = 0;
