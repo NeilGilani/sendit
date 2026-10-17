@@ -11,6 +11,7 @@
 import { on, game, Mode } from '../state.js';
 import { PHYSICS as P } from '../config.js';
 import { trim } from './combo.js';
+import { reducedMotion } from './impact.js';
 
 export const JUICE_HUD = {
   minAirToAnnounce: 0.5,     // s — shorter airs don't get a grade unless they were a named trick
@@ -143,7 +144,7 @@ export function mountJuiceHud({ player, combo, input }) {
   const fmt = (n) => Math.round(n).toLocaleString('en-US');
   const riding = () => game.mode === Mode.RIDING;
 
-  const flash = (a = 0.22) => { fl.style.setProperty('--a', a); restart(fl); };
+  const flash = (a = 0.22) => { if (reducedMotion()) return; fl.style.setProperty('--a', a); restart(fl); };
   const edge = (c) => { eg.style.setProperty('--c', c); restart(eg); };
   const callout = (text, color = '#2ff5d6') => { if (!riding()) return; co.textContent = text; co.style.color = color; restart(co); };
   const banner = (text, color = '#ffe14d', lost = false) => {

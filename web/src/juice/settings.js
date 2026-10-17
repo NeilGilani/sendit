@@ -2,6 +2,7 @@
 // tab and the pause menu share): screen shake amount, hit-stop / slow motion, speed rush effect.
 // Stored with the other settings (state.js setSetting): juiceShake (0..1), juiceHitstop, juiceSpeedFx.
 import { settings, setSetting } from '../state.js';
+import { shakeAmount } from './impact.js';
 
 export function mountJuiceSettings() {
   const grid = typeof document !== 'undefined' && document.querySelector('#settings .grid');
@@ -15,7 +16,7 @@ export function mountJuiceSettings() {
   const fs = grid.querySelector('label[for=set-fullscreen]');
   grid.insertBefore(rows.content, fs || null);
   const shake = grid.querySelector('#set-juiceShake');
-  shake.value = settings.juiceShake ?? 1;
+  shake.value = shakeAmount();
   shake.addEventListener('input', () => setSetting('juiceShake', Number(shake.value)));
   for (const k of ['juiceHitstop', 'juiceSpeedFx']) {
     const el = grid.querySelector(`#set-${k}`);

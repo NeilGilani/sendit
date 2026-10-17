@@ -29,6 +29,14 @@ export const JUICE_IMPACT = {
   takeoffFov: 1.6,
 };
 
+/** Screen shake / punch scale: the setting, else 0.4 when the system asks for reduced motion. */
+export function shakeAmount() {
+  if (settings.juiceShake != null) return settings.juiceShake;
+  return reducedMotion() ? 0.4 : 1;
+}
+let _rm = null;
+export const reducedMotion = () => (_rm ??= typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+
 export class TimeWarp {
   constructor() { this.t = 0; this.cur = null; this.cool = 0; this.k = 1; this.lastFreeze = 0; }
 
@@ -55,7 +63,7 @@ export class TimeWarp {
 
 /** Wire impact feedback: warp (TimeWarp), cam (CameraController), input (rumble). */
 export function installImpact({ warp, cam, input, player }) {
-  const kick = (o) => { const s = settings.juiceShake ?? 1; if (s > 0) cam?.kick?.({ fov: (o.fov || 0) * s, dip: (o.dip || 0) * s, roll: (o.roll || 0) * s }); };
+  const kick = (o) => { const s = shakeAmount(); if (s > 0) cam?.kick?.({ fov: (o.fov || 0) * s, dip: (o.dip || 0) * s, roll: (o.roll || 0) * s }); };
   const I = JUICE_IMPACT;
   const offs = [
     on('landed', (e) => {

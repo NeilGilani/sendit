@@ -116,13 +116,17 @@ Tunables (`JUICE_HUD`):
 
 These are separate from the existing trauma shake, which is unchanged.
 
-**Rumble.** Added on top of main.js's own: a stomp (0.35/0.8, 120 ms), a huge landing (0.8/1, 260 ms), a combo bank (0.25/0.6, 140 ms) and a level-up (0.6/1, 420 ms).
+**Combo ticks.** Each multiplier step plays `combo_tick` a little higher (rate 0.85 + 0.07 × mult). It only ticks for moves under 60 points, because audio.js already ticks the bigger ones.
+
+**Rumble.** Added on top of main.js's own: a stomp (0.35/0.8, 120 ms), a huge landing (0.8/1, 260 ms), a combo bank (0.25/0.6, 140 ms), a level-up (0.6/1, 420 ms), a rail lock-in (0.15/0.45, 90 ms) and each rail kink (0.3/0.5, 70 ms).
 
 **Settings.** `juice/settings.js` adds three rows to the shared settings grid (`#settings .grid`), which the lobby's Settings tab and the pause menu both show:
 
 - **Screen shake & punch** (`settings.juiceShake`, 0 to 1, default 1) scales every punch and the existing trauma shake.
 - **Hit-stop & slow motion** (`settings.juiceHitstop`) turns the time warp off when unchecked.
 - **Speed rush effect** (`settings.juiceSpeedFx`) turns the post pass off when unchecked.
+
+With the system's *reduced motion* preference on and no shake setting saved, shake and punches default to 0.4 and the white landing flashes are off.
 
 ## 4. Speed rush (juice/speedfx.js)
 

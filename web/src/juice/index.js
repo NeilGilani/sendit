@@ -47,6 +47,18 @@ export function installJuice({ player, cam, sound, input, post, camera, fx }) {
     if (huge) speedfx.pulse('huge');
     else if (e.perfect && (e.trick || e.air > 1)) speedfx.pulse('stomp');
   });
+  // Combo ticks: each multiplier step plays the tick a little higher (THPS). audio.js already ticks
+  // scores of 60+ points, so only the small moves (close shaves, short rails) tick here.
+  let lastPts = 0, lastMult = 1;
+  on('score', ({ points }) => { lastPts = points; });
+  on('juiceCombo', (s) => {
+    const m = s?.mult ?? 1;
+    if (s && m > lastMult + 0.01 && lastPts < 60 && sound?.ctx) sound.oneShot?.('combo_tick', 0.3, 0.85 + Math.min(m, 6) * 0.07)?.catch?.(() => {});
+    lastMult = m;
+  });
+  // Rails: a light buzz on the lock-in and on each kink.
+  on('grindStart', () => input?.rumble?.(0.15, 0.45, 90));
+  on('grindKink', () => input?.rumble?.(0.3, 0.5, 70));
   if (typeof window !== 'undefined') window.__juice = juice;
   return juice;
 }
