@@ -56,7 +56,7 @@ engine's fixed valley-mist band (1,350–1,950 m), so only the base is a little 
 | `kazan` | Kazan Rim ★ | black | 45, 120 | 2.72 km / 1,140 m | the volcano-rim rollercoaster: a 22 m ridge spine with whoops every 40 m and three step-down gaps (6, 7 and 6 m) |
 | `makura` | Makura Pillows ★ | double-black | 640, −430 | 2.07 km / 780 m | two terraced pillow stacks, the 9 m Makura Cliff between them, Fox Ledge below |
 | `shirakaba` | Shirakaba Weave | black | 650, −100 | 2.18 km / 760 m | an S-weave (±42 m, 110 m wavelength) through the birch glade, small Birch Hit lips on its apexes, fir pockets with tree wells |
-| `kitsunebi` | Kitsunebi Gully | blue | 430, 520 | 2.30 km / 920 m | from the gondola top station into a 13 m-deep natural half-pipe lined with chōchin, with three step-downs in the floor (3, 4 and 3.5 m) |
+| `kitsunebi` | Kitsunebi Gully | blue | 430, 520 | 2.30 km / 920 m | from the gondola top station into a 13 m-deep natural half-pipe lined with chōchin, with three step-downs in the floor (3 m, 4 m and the 6 m Fox Fire Drop) |
 | `senbon` | Senbon Torii ★ | park | 1430, 40 | 1.07 km / 325 m | the village jump line: Ō-torii, the 33-gate tunnel, the Torii Exit kicker, up the drift onto the shrine roof, then roof to roof down Kiku, Tsuki and Yuki |
 
 ★ = `featured`. The lines connect: every trail crosses the village bench, and the drop zones (keys 1–9 or the
@@ -145,7 +145,7 @@ Ravenspire's base tuning was adapted for deep light powder and a gentler mountai
 ## 4. Scoring, goals, Challenge
 
 - **Line goals** (flow.js): Rim Rider (the three Kazan gaps), Pillow Talk, Pilgrimage (tunnel → shrine → Kiku),
-  Roof Hopper (Kiku → Tsuki → Yuki), Fox Fire (gully → Shrine Lip), Summit to Shrine.
+  Roof Hopper (Kiku → Tsuki → Yuki), Fox Fire (gully → Fox Fire Drop), Summit to Shrine.
 - **Senbon Torii bonus**: ride all 33 gates in one go (inside the posts, no crash) for 600 + 6 × average km/h
   points (~1,000 at 70 km/h).
 - **Whoop chain**: consecutive clean airs off the Kazan Rim score `Whoop ×n` (40 × n each).
@@ -182,7 +182,7 @@ Ravenspire's base tuning was adapted for deep light powder and a gentler mountai
 | kazan | 106 s, avg 87, max 122, air 19.8 s, Rim Rider, 0 crashes | 116 s, avg 80, max 120, air 17.1 s, Rim Rider, 0 crashes |
 | makura | 100 s, avg 77, max 99, air 35 s, Pillow Talk, 0 crashes | 102 s, avg 72, max 108, air 32 s, Pillow Talk, 0 crashes |
 | shirakaba | 104 s, avg 76, max 95, 0 crashes | 111 s, avg 71, max 88, 0 crashes |
-| kitsunebi | 110 s, avg 75, max 94, 0 crashes | 115 s, avg 72, max 87, 0 crashes |
+| kitsunebi | 95 s, avg 86, max 114, three ledge drops (1.8–2.1 s), Fox Fire, 0 crashes | 103 s, avg 79, max 106, air 5.9 s, 0 crashes |
 | senbon | 56 s, avg 73, max 108, air 15 s (max 3.3 s), torii 73 km/h +1,040, Roof Hopper, 0 crashes | 60 s, avg 68, max 99, torii 67 km/h, 0 crashes |
 
 - `map6-ride both all send --check` and `both all control --check` pass: all 24 rides finish with 0 crashes, and
@@ -196,16 +196,35 @@ Ravenspire's base tuning was adapted for deep light powder and a gentler mountai
 - The shared suite on the merged tree passes: unittest 52/52, physics-fuzz, physics-tricks, jumps-valcrest
   --check, map3-unit 32/32, map3-fuzz, map4-unit 15/15 and map2-bot --verify.
 
-### Performance
-See the appendix at the end (filled in from the measurements on the merged tree).
+### Performance (merged tree, dev server, other sessions sharing the GPU: quietest pass counts)
+`map3-perf.mjs http://localhost:5195 1600 900 1 60 <map>`, back to back:
+
+| spot (along the Okama path) | Kitsune GPU | Kitsune draws / tris | Valcrest GPU (same session) |
+|---|---|---|---|
+| 2 % (crater rim) | 12.0 ms | 481 / 2.79 M | 60.9 ms (a contention spike; 12–16 ms elsewhere) |
+| 20 % (bowl over the glade) | 22.8 ms | 407 / 2.92 M | 15.9 ms |
+| 38 % | 16.9 ms | 350 / 3.10 M | 14.3 ms |
+| 55 % (village) | 13.6 ms | 278 / 2.46 M | 15.0 ms |
+| 62 % | 14.4 ms | 264 / 2.05 M | 12.3 ms |
+| 80 % | 12.3 ms | 181 / 1.78 M | 15.9 ms |
+| **average** | **15.3 ms** | | 22.4 ms (≈ 14.7 ms without the spike) |
+
+- The first Kitsune pass (while the bots ran) read 36 ms with 55 ms spikes at three spots. Those are contention,
+  not the map, and the second pass is quiet.
+- The 20 % spot (looking down over the whole birch glade) is the heaviest view.
+- The props are about 30 draws: static meshes are merged per material, and the birches are 2 draws per 420 m
+  chunk.
+- `gfxpopin.mjs http://localhost:5195 kitsune-peak 1 25`: 0 tree pops, 0 shadow pops, 0 scatter-cell pops and 0
+  terrain LOD pops. 0 shader compiles and 0 texture uploads during the ride. One CPU frame over 50 ms (60 ms).
+  The birches have no LODs (always full), so they cannot pop.
 
 ## 7. Known issues and ideas
 - **Lantern glow is subtle on bright snow.** The additive glow sprites read in the village but not at long
   range. A real night variant (`preset: 'night'`) would make the lanterns sing; it needs a second atmosphere and
   a toggle.
 - The rider's body is dark under the dusk light (the character shading is shared, not the map's).
-- Kitsunebi Gully's step-downs give only short airs (0.45–1.4 s): the gully is the blue cruiser. A bigger
-  "Fox Fire" drop near the bottom would add a climax.
+- Kitsunebi Gully is fast (86 km/h on the floor). A rider who stays high on a wall rides past the step-downs
+  (they fade up the walls), so the drops are a reward for holding the floor line.
 - The tile edge still dips outward in a few spots on the far side ridges (130 of ~1,000 edge samples, up to
   22 m). They are not visible from the trails in the screenshots.
 - Birch crowns are twig cards: they flicker slightly at a distance at quality 0.
