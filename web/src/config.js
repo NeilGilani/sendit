@@ -235,6 +235,7 @@ export const ANIM = {
   carveCrouch: 0.2,           // extra crouch (0..1 scale) at full lean: lower, more athletic in hard carves (skis and board)
   headLevel: 0.45,            // share of the body's roll the head takes back out (eyes nearer level)
   headLook: 0.2,              // rad of head turn into the carve per rad of lean (looking along the path ahead)
+  skiSkidLook: 1.25,          // share of the skid angle the ski rider's head turns toward the path (down the slope in a hockey stop)
   polePlantTime: 0.38,        // s a pole touch lasts (triggered on edge changes)
   skiPressPitch: 0.14,        // rad the skis pitch up while pressing the tails / tips (butters, ollie load)
   skiPressShift: 0.09,        // m hips over the pressed end
@@ -254,6 +255,7 @@ export const ANIM = {
     heelSit: 0.1,             // m hips back/down on the heel edge
     toeDrive: 0.07,           // m knees/hips forward on the toe edge
     toeTall: 0.15,            // rad the hips (and 0.7 × the spine) unfold on a full toe-side carve: knees drive, torso stays tall
+    skidLook: 0.85,           // share of the skid angle the head (0.7) and shoulders (0.3) turn back toward the path (slide stops)
     pressShift: 0.11,         // m pelvis shift toward the pressed end (ollie / nollie / butter)
     pressPitch: 0.16,         // rad board flex / nose-lift while pressing
     popSnap: 0.38,            // rad the free end snaps up at an ollie / nollie, settling in ~0.3 s
