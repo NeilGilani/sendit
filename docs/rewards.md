@@ -11,11 +11,12 @@ shown before you open. Research behind the numbers: [rewards-research.md](reward
 Lobby → Cases tab      unopened cases, Open, progress to the next case, how to earn, collection %, best pull, contents and odds
 Lobby → Locker tab     everything you own per slot; click to wear it (lobby rider, rides, first person);
                        "Show missing" lists the rest as silhouettes with the case and the chance per case
-node web/scripts/unittest.mjs                      odds simulation, pity, progression pacing, migration, store
+node web/scripts/unittest.mjs                      item data, odds simulation, pity, reel, pacing, migration, tracker, store
 node web/scripts/cases-timing.mjs                  the opening at 60 fps: reel position, speed, ticks
 node web/scripts/rewards-table.mjs                 the case contents as markdown (the Items section below)
 GPU=1 node web/scripts/casesshot.mjs <url> <dir>   capture the opening (SEEK=1 RARITY=epic NEAR=1 EQUIP=1, see the file)
-GPU=1 node web/scripts/lobbytest.mjs <url>         end-to-end, section 8 covers cases
+GPU=1 node web/scripts/lobbytest.mjs <url>         end-to-end; sections 6b and 6c cover cases
+GPU=1 node web/scripts/rewards-looks.mjs <url> <dir>  screenshots of the lobby rider in reward looks
 ```
 
 ## Files
