@@ -8,7 +8,7 @@
 // frame and multiplies the physics clock by juice.timeScale(dt).
 import { ComboTracker } from './combo.js';
 import { mountJuiceHud, gradeOf, TIERS } from './hud.js';
-import { TimeWarp, installImpact } from './impact.js';
+import { TimeWarp, installImpact, shakeAmount } from './impact.js';
 import { installSpeedFx } from './speedfx.js';
 import { MusicEnergy } from './music.js';
 import { mountJuiceSettings } from './settings.js';
@@ -36,6 +36,9 @@ export function installJuice({ player, cam, sound, input, post, camera, fx, acti
     update(dt, time) {
       const riding = game.mode === Mode.RIDING;
       if (riding) combo.update(dt * warp.k);
+      // A hot chain opens the lens a little (+0.75° per ×1 above ×1, at most +3°, scaled by the shake setting).
+      const c = riding ? combo.state() : null;
+      if (cam) cam.juiceFov = c ? Math.min(3, (c.mult - 1) * 0.75) * shakeAmount() : 0;
       hud?.update(dt);
       music.update(dt);
       speedfx?.update(dt, time, player.speedRatio ?? 0, riding, !!player.flow?.inState);

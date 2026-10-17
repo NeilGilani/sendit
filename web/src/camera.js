@@ -243,7 +243,9 @@ export class CameraController {
     if (s.state === State.CRASH) wantFov = C.baseFov - 4;
     const rate = this.snapT > 0 || wantFov < this.fov ? C.fovSnapRate : C.fovRiseRate;
     this.fov += (wantFov - this.fov) * (1 - Math.exp(-rate * dt));
-    let fov = this.fov - this.side * 6 + (kk ? kk.fov[0] : 0);
+    // Juice: punches (kick) and the combo build-up (juiceFov, eased; set by juice/index.js).
+    this.juiceFovS = (this.juiceFovS || 0) + ((this.juiceFov || 0) - (this.juiceFovS || 0)) * (1 - Math.exp(-1.5 * dt));
+    let fov = this.fov - this.side * 6 + (kk ? kk.fov[0] : 0) + this.juiceFovS;
 
     if (this.intro < 1) {
       this.intro = Math.min(1, this.intro + dt / 2.8);

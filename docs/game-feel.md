@@ -119,6 +119,8 @@ Tunables (`JUICE_HUD`):
 | Combo bank | FOV +3° × mult/2. |
 | Popped take-off | FOV +1.6°. |
 
+**Combo build-up.** While a chain is live, the lens opens by +0.75° per ×1 above ×1, up to +3°. It is eased (rate 1.5/s), scaled by the shake setting, and set through `cam.juiceFov`.
+
 These are separate from the existing trauma shake, which is unchanged.
 
 **Combo ticks.** Each multiplier step plays `combo_tick` a little higher (rate 0.85 + 0.07 × mult). It only ticks for moves under 60 points, because audio.js already ticks the bigger ones.
