@@ -135,10 +135,11 @@ export function ride(type, key, style = 'send', opts = {}) {
         const ahead = Math.max(4, pl.speed * 0.35), du = 3;
         const slope = (vAt(u + ahead + du) - vAt(u + ahead - du)) / (2 * du);
         const err = vAt(u) + weave - pl.position.z;
-        want = Math.atan2(-1, -(slope + Math.tan(Math.max(-1, Math.min(1, Math.atan(2.5 * err / Math.max(6, pl.speed)))))));
+        want = Math.atan2(-1, -(slope + Math.tan(Math.max(-1, Math.min(1, Math.atan((opts.kct ?? (process.env.KCT ? Number(process.env.KCT) : type === 'snowboard' ? 1.0 : 1.5)) * err / Math.max(6, pl.speed)))))));
       }
       const d = Math.atan2(Math.sin(want - travel), Math.cos(want - travel));
-      if (pl.state === State.GROUNDED) c.steer = Math.max(-1, Math.min(1, -d * 2.2));
+      // Steering gain: a board answers the edge more slowly than skis, so a lower gain stops it over-correcting.
+      if (pl.state === State.GROUNDED) c.steer = Math.max(-1, Math.min(1, -d * (opts.gain ?? (type === 'snowboard' ? Number(process.env.BGAIN || 1.4) : 2.2))));
       if (style === 'send' || style === 'trick') c.tuck = Math.abs(d) < 0.2 ? 1 : 0;
       if (style === 'control' && pl.state === State.GROUNDED && pl.speed > (opts.target ?? 21)) c.brake = 0.7;
       if (pl.state === State.GROUNDED && style !== 'carve' && !c.brake) {

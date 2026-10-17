@@ -34,7 +34,7 @@ export class DragonbackCourse {
     this.life = { skiers: 0, lodge: false };
     // scatter.js overrides: a few boulders, a sparse larch / pine fringe low down only.
     this.spawn = { rockClusterChance: 0.03, rockScale: [0.7, 2.0], rockMinSlope: 22, treeStep: 10, treeMax: 6000 };
-    this.challenge = { medalSpeeds: { gold: 25, silver: 21, bronze: 17 } };
+    this.challenge = { medalSpeeds: { gold: 21.5, silver: 18.5, bronze: 15.5 } };   // m/s down the fall line (FINISH_U / time)
     this.physics = DRAGONBACK_PHYSICS;
     this.camera = DRAGONBACK_CAMERA;
     this.water = -1e5;
@@ -170,18 +170,9 @@ export class DragonbackCourse {
 
   // ---------------------------------------------------------------- path (the hero line)
   buildPath() {
-    // A natural top-to-bottom line for the HUD / challenge gates: down the Dragon's Spine, the Fork's
-    // right side, between the Organ Pipes and the Knife, the apron, the runout.
-    const S = (u) => this.ridgeById.spine.crestAt(u);
-    const knots = [[0, -30], [60, -70], [112, S(112)], [300, S(300)], [560, S(560)], [800, S(800)], [980, -30], [1150, -10], [1400, 40], [1650, 40], [1900, 0], [2150, 20], [FINISH_U + 160, 20]];
-    const pts = [];
-    for (let u = 0; u <= FINISH_U + 160; u += 8) {
-      let k = 0;
-      while (k < knots.length - 2 && knots[k + 1][0] < u) k++;
-      const [ua, va] = knots[k], [ub, vb] = knots[k + 1];
-      const t = smooth((u - ua) / (ub - ua));
-      pts.push(new THREE.Vector2(START_X + u, va + (vb - va) * t));
-    }
+    // The hero line is the Dragon's Spine line (RIDE_LINES.spine): down the crest and both gaps, the Fork's left
+    // branch, the Organ Pipes, the apron and the runout. The HUD, the challenge gates and the perf spots use it.
+    const pts = this.linePoints(RIDE_LINES.spine).filter(([u]) => u <= FINISH_U + 160).map(([u, v]) => new THREE.Vector2(START_X + u, v));
     this.path = pts;
     this.length = 0;
     for (let i = 1; i < pts.length; i++) this.length += pts[i].distanceTo(pts[i - 1]);
@@ -506,15 +497,19 @@ export class DragonbackCourse {
     ];
   }
 
-  /** Challenge gates: on the crests of the Dragon's Spine line (stay high), [{ at, lateral, width }]. */
+  /**
+   * Challenge gates along the hero line (the Dragon's Spine line): on the crest between its steps and gaps, the
+   * Fork, through the Organ Pipes and down the apron — stay high or pay +2 s a gate. [{ at, lateral, width }].
+   */
   placeGates() {
     const gates = [];
-    for (const u of [140, 260, 400, 540, 680, 840, 1000, 1240, 1480, 1760, 2000, 2200]) {
-      const i = this.path.findIndex((p) => p.x - START_X >= u);
-      if (i < 0) continue;
-      let at = 0;
-      for (let k = 1; k <= i; k++) at += this.path[k].distanceTo(this.path[k - 1]);
-      gates.push({ at, lateral: 0, width: 14 });
+    let at = 0;
+    // Mid-segment on the crest (never right after a gap: you can't steer a flight, so the landing scatters a
+    // few metres), the Fork, the Organ Pipes, the apron.
+    const marks = [200, 390, 480, 720, 900, 1060, 1210, 1360, 1540, 1750, 1980, 2200];
+    for (let i = 1, m = 0; i < this.path.length && m < marks.length; i++) {
+      at += this.path[i].distanceTo(this.path[i - 1]);
+      if (this.path[i].x - START_X >= marks[m]) { gates.push({ at, lateral: 0, width: marks[m] < 1150 ? 14 : 18 }); m++; }
     }
     return gates;
   }

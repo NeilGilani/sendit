@@ -19,7 +19,7 @@ export function hopRun(h, type, speed) {
   const u0 = sp.u0 + 2, dir = (sp.crestAt(sp.u0 + 12) - sp.crestAt(sp.u0 + 2)) / 10;
   const line = { name: h.name, pts: [[u0, `@${sp.id}`], [sp.u1, `@${sp.id}`], [h.land + 10, `@${to.id}`], [h.land + 80, `@${to.id}`]] };
   const r = ride(type, null, 'send', {
-    line, start: [u0, sp.crestAt(u0), Math.atan2(-1, -dir)], speed, endU: h.land + 70,
+    line, start: [u0, sp.crestAt(u0), Math.atan2(-1, -dir)], speed, endU: h.land + 70, gain: 2.2, kct: 2.5,   // a rider committed to the spur
     script: (c) => { c.jump = false; },
   });
   const air = r.airs.find((a) => !a.crash && a.feature === h.name && a.air > 0.5) || null;
