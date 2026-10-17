@@ -92,8 +92,12 @@ export class AudioEngine {
     this.musicLP = c.createBiquadFilter(); this.musicLP.type = 'lowpass'; this.musicLP.frequency.value = 20000; this.musicLP.Q.value = 0.7;
     this.musicLP.connect(this.music);
     this.duck = c.createGain(); this.duck.gain.value = M.music; this.duck.connect(this.musicLP);
-    const bus = (g) => { const n = c.createGain(); n.gain.value = g; n.connect(this.sfx); return n; };
-    this.snowBus = bus(M.snow); this.windBus = bus(M.wind); this.ambBus = bus(M.ambience); this.fxBus = bus(M.fx); this.uiBus = bus(M.ui);
+    // the rider's own sounds (snow, wind, one-shots) pass a distance stage: when the camera pulls far away
+    // (intro fly-ins, the heli drop, cinematic angles) they fall off and lose their top end
+    this.riderLP = c.createBiquadFilter(); this.riderLP.type = 'lowpass'; this.riderLP.frequency.value = 20000; this.riderLP.Q.value = 0.5;
+    this.riderGain = c.createGain(); this.riderLP.connect(this.riderGain); this.riderGain.connect(this.sfx);
+    const bus = (g, to = this.sfx) => { const n = c.createGain(); n.gain.value = g; n.connect(to); return n; };
+    this.snowBus = bus(M.snow, this.riderLP); this.windBus = bus(M.wind, this.riderLP); this.ambBus = bus(M.ambience); this.fxBus = bus(M.fx, this.riderLP); this.uiBus = bus(M.ui);
     // the place: a per-map reverb send (forest reflections, a faint long tail in open bowls, the park's structures)
     this.verb = c.createConvolver(); this.verb.normalize = true;
     this.verbOut = c.createGain(); this.verbOut.gain.value = 0;
@@ -220,6 +224,14 @@ export class AudioEngine {
       for (const k in snowParams) this.setP(this.sp, 's' + k, k, snowParams[k], when);
       for (const k in windParams) this.setP(this.wp, 'w' + k, k, windParams[k], when);
     } else this.legacy?.update(when, snowParams, windParams);
+    // ---- camera distance
+    const Dd = T.distance, cd = o.camDist ?? 0;
+    const dk = cd <= Dd.ref ? 1 : Math.pow(Dd.ref / cd, Dd.exp);
+    if (Math.abs(dk - (this.distK ?? 1)) > 0.01) {
+      this.distK = dk;
+      this.riderGain.gain.setTargetAtTime(dk, when, 0.15);
+      this.riderLP.frequency.setTargetAtTime(Math.min(20000, 20000 * Math.pow(dk, Dd.lpExp)), when, 0.15);
+    }
     // ---- transients from state changes
     if (!quiet) this.transients(r, when, edge, powder);
     // ---- grind

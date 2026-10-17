@@ -58,7 +58,7 @@ async function render(spec, sr, secs) {
     const t = i * dt;
     if (t >= secs) break;
     while (ei < evs.length && evs[ei].t <= t) { eng.event(evs[ei].name, evs[ei].d || {}, Math.max(t, evs[ei].t)); ei++; }
-    eng.frame(frames[i], t, dt, spec.opts || {});
+    eng.frame(frames[i], t, dt, { ...(spec.opts || {}), camDist: frames[i].camDist ?? 0 });   // frames may carry the camera's distance from the rider
     // spec.others: other skiers as functions of time → { x, y, z, speed, roll } (listener at the origin, facing −Z)
     if (spec.others) eng.others.update(t, spec.others.map((o) => { const s = othersAt(o, t); return { mesh: { visible: true, position: s }, speed: s.speed, roll: s.roll }; }), { x: 0, y: 0, z: 0 }, true);
   }

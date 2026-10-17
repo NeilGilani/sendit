@@ -245,7 +245,8 @@ export class SoundScape {
     const s = this.skier, c = this.ctx;
     const paused = game.mode === Mode.PAUSED, menu = game.mode === Mode.MENU;
     if (settings.view !== this.engine.view && (settings.view === 'fp') !== (this.engine.view === 'fp')) this.engine.setView(settings.view);
-    this.engine.frame(readRider(s, { menu }), c.currentTime, dt, { paused, menu, slow: this.slow ?? 1 });
+    const camDist = camera.position.distanceTo(s.renderPos ?? s.position);
+    this.engine.frame(readRider(s, { menu }), c.currentTime, dt, { paused, menu, slow: this.slow ?? 1, camDist });
     this.liftTowers(s, c.currentTime);
     if (!menu && !paused) this.treePasses(s, c.currentTime);
     this.engine.others.update(c.currentTime, window.__sendit?.life?.skiers, camera.position, !menu && !paused);   // other skiers swishing by

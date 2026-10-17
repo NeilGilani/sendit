@@ -154,6 +154,9 @@ Tune it with `maps[id].verb`, `verbTime`, `verbPre` and `verbDark`.
   on rails, −5 dB for 0.35 s on hard landings, and −6 dB under a music drop's riser then +2 dB. Attack 0.25 s,
   release 1.6 s.
 - **Music low-pass:** 1.2 kHz in big air after 0.4 s, 400 Hz on a bail, opening over ~0.5 s.
+- **Camera distance (`AUDIO.distance`):** the rider's own sounds (snow, wind, one-shots) are full within 8 m (the
+  chase cam sits 4.7–6.9 m back). Beyond that they fall off as (8/d)^0.9 and lose their highs (air absorption),
+  so intro fly-ins, the heli drop and far camera angles hear the rider from where the camera is.
 - **First person versus chase (`AUDIO.perspective`):** `settings.view === 'fp'` gives the full helmet wind
   (buffet, whistles, flap) and the full low end of the snow. The chase cam hears the snow from a little further
   away (×0.85, less low end), and the wind ×0.75 with little buffeting.

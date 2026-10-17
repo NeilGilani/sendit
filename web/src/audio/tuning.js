@@ -33,6 +33,9 @@ export const AUDIO = {
     dropDb: -6, dropTime: 0.33, pushDb: 2, pushTime: 0.6,        // a music drop: dip under the riser, then a +2 dB push
     attack: 0.25, release: 1.6,
   },
+  // Camera distance: the rider's sounds are full within `ref` m (the chase cam sits 4.7–6.9 m back), then fall
+  // off as (ref / d)^exp and lose their highs (air absorption) — intro fly-ins, the heli drop, far camera angles
+  distance: { ref: 8, exp: 0.9, lpExp: 0.8 },
   // First person (helmet cam) vs chase cam. fp: the rider's own ears inside the helmet.
   perspective: {
     fp: { snow: 1.0, snowLow: 1.0, wind: 1.15, buffet: 1.0, whistle: 1.0, flap: 1.0, fx: 1.0, breath: 1.0, face: 1.0 },
