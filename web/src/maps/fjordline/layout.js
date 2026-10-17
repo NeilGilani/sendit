@@ -158,7 +158,7 @@ export const BUILDINGS = [
   // Naust: the boathouse at the top of the beach (jump it: Naustgapet).
   { id: 'naust', name: 'Naustgapet', u: 2400, v: -110, L: 8, W: 7, roof: 'gable', pitch: 30, eave: 2.1, drift: 0.92, driftSlope: 0.04, ramp: 3, colour: 'tar', chimney: null, yaw: 0 },
   // Village houses off the line.
-  { id: 'hus4', name: 'Skolen', u: 2240, v: 40, L: 18, W: 10, roof: 'gable', pitch: 32, eave: 5.2, drift: 0, driftSlope: 0.05, colour: 'white', yaw: Math.PI / 2 },
+  { id: 'hus4', name: 'Skolen', u: 2240, v: 40, L: 18, W: 10, roof: 'gable', pitch: 32, eave: 5.2, drift: 0, driftSlope: 0.05, colour: 'red', yaw: Math.PI / 2 },
   { id: 'hus5', name: 'Bedehuset', u: 2300, v: -300, L: 14, W: 9, roof: 'gable', pitch: 40, eave: 4.6, drift: 0, driftSlope: 0.05, colour: 'white', yaw: Math.PI / 2 },
   { id: 'hus6', name: 'Gamle Smia', u: 2335, v: 110, L: 9, W: 7, roof: 'gable', pitch: 36, eave: 3.2, drift: 0, driftSlope: 0.05, colour: 'red', chimney: [0, 0.4] },
   { id: 'hus7', name: 'Fiskarheimen', u: 2195, v: 180, L: 11, W: 9, roof: 'gable', pitch: 34, eave: 4.0, drift: 0, driftSlope: 0.05, colour: 'ochre' },

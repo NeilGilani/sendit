@@ -505,6 +505,8 @@ export class FjordlineCourse {
 
   pisteAt(x, z) {
     const u = x - START_X;
+    // The village lanes, the beach and the harbour stay clear (scatter.js also plants sparse trees where forestAt is 0).
+    if (u > 2330 - 25 * noise1(z / 60, 9) && u > coastU(z) - 240) return 1;
     if (u > 1550 && this.lineDist(u, z) < 13 + 4 * (noise1(u / 41 + z / 57, 77) * 2 - 1)) return 1;
     for (const s of this.structures) if (Math.hypot(x - s.x, z - s.z) < s.R + 10) return 1;
     return 0;
