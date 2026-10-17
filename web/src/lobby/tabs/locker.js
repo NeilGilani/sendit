@@ -8,7 +8,20 @@ import { esc } from './common.js';
 import { cardHtml } from '../cases/opener.js';
 import { caseSfx } from '../cases/sfx.js';
 import { rarityOf } from '../../profile/rarity.js';
-import { ownKey, listItems } from '../../profile/catalog.js';
+import { ownKey, listItems, rewardSkins } from '../../profile/catalog.js';
+import { caseOdds, casePool } from '../../profile/rewards.js';
+import { SERIES } from '../../profile/items.js';
+
+/** Where an unowned skin drops and its chance per case: "First Chair Case · 1.75 % per case". */
+function dropInfo(variant, key) {
+  const series = variant.series === '*' ? Object.keys(SERIES) : [variant.series];
+  const s = series[0];
+  const pool = casePool(s)[variant.rarity];
+  const each = caseOdds(s)[variant.rarity] / Math.max(1, pool.length);
+  const where = variant.series === '*' ? 'every case' : SERIES[s].name;
+  const pct = each >= 1 ? each.toFixed(1) : each >= 0.1 ? each.toFixed(2) : each.toFixed(3);
+  return pool.some((e) => e.key === key) ? `Drops from ${where} · ${pct} % per case` : `Drops from ${where}`;
+}
 
 const SLOTS = [
   ['jacket', 'Jacket'], ['pants', 'Pants'], ['helmet', 'Helmet'], ['goggles', 'Goggles'], ['face', 'Face'], ['gloves', 'Gloves'],
@@ -28,6 +41,7 @@ registerLobbyTab({
   mount(el, ctx) {
     let slot = lastSlot;
     let focusKey = null;
+    let missingOn = false;     // show the skins you do not own yet as silhouettes
     const seenOnLeave = new Set();
     el.innerHTML = '<div class="lk-root"></div>';
     const root = el.firstChild;
@@ -40,8 +54,12 @@ registerLobbyTab({
       const cur = P.equipped(slot);
       const curKey = cur ? ownKey(cur.item.id, cur.variant.id) : null;
       const col = P.collection();
-      const sel = owned.find((o) => o.key === (focusKey || curKey)) || owned[0];
-      const r = sel ? rarityOf(sel.variant.rarity || (sel.variant.starter ? 'common' : 'common')) : null;
+      const ownedKeys = new Set(owned.map((o) => o.key));
+      const missingSkins = rewardSkins().filter(({ item, variant }) => item.slot === slot && !ownedKeys.has(ownKey(item.id, variant.id)))
+        .map(({ item, variant }) => ({ item, variant, key: ownKey(item.id, variant.id), missing: true }))
+        .sort((a, b) => rarityOf(b.variant.rarity).rank - rarityOf(a.variant.rarity).rank);
+      const sel = owned.find((o) => o.key === (focusKey || curKey)) || (missingOn && missingSkins.find((o) => o.key === focusKey)) || owned[0];
+      const r = sel ? rarityOf(sel.variant.rarity || 'common') : null;
       const missing = total(slot) - owned.length;
       root.innerHTML = `
         <h2 class="lp-title">Locker <span class="lp-pill" style="background:#ffe36a">${Math.round(col.pct * 100)} % collected</span></h2>
@@ -56,12 +74,16 @@ registerLobbyTab({
             ${isNew ? '<span class="lk-new">NEW</span>' : ''}${o.key === curKey ? `<span class="lk-eq">${ICONS.check}</span>` : o.entry?.n > 1 ? `<span class="lk-n">×${o.entry.n}</span>` : ''}
             ${cardHtml(o.key, rar).replace('class="cr-card', `class="cr-card${o.variant.starter ? ' starter' : ''}`)}
           </button>`;
-        }).join('')}</div>
+        }).join('')}${missingOn ? missingSkins.map((o) => `
+          <button type="button" role="option" class="lk-item missing" data-miss="${esc(o.key)}" aria-selected="false" title="${esc(`${o.item.name} | ${o.variant.name} (not owned)`)}">
+            ${cardHtml(o.variant.rarity === 'gold' ? null : o.key, o.variant.rarity).replace('class="cr-card', 'class="cr-card missing')}
+          </button>`).join('') : ''}</div>
         ${sel ? `<div class="lk-sel" style="--rc:${r.color}">
-          <span class="lk-grade">${esc(sel.variant.starter ? 'Starter' : r.name)}</span>
-          <b>${esc(sel.item.name)} | ${esc(sel.variant.name)}</b>
-          <p>${esc(sel.item.description || '')}</p></div>` : ''}
-        <p class="lk-locked">${missing > 0 ? `${missing} more ${esc(SLOTS.find((x) => x[0] === slot)[1].toLowerCase())} skin${missing === 1 ? '' : 's'} to find in cases. <a class="lk-go" data-go="cases">Open cases ›</a>` : 'You have them all.'}</p>
+          <span class="lk-grade">${esc(sel.variant.starter ? 'Starter' : r.name)}${sel.missing ? ' · not owned yet' : ''}</span>
+          <b>${esc(sel.variant.rarity === 'gold' && sel.missing ? '★ ??? ' : `${sel.item.name} | ${sel.variant.name}`)}</b>
+          <p>${esc(sel.missing ? dropInfo(sel.variant, sel.key) : sel.item.description || '')}</p></div>` : ''}
+        <p class="lk-locked">${missing > 0 ? `${missing} more ${esc(SLOTS.find((x) => x[0] === slot)[1].toLowerCase())} skin${missing === 1 ? '' : 's'} to find in cases.
+          <a class="lk-go" data-missing>${missingOn ? 'Hide missing' : 'Show missing'}</a> · <a class="lk-go" data-go="cases">Open cases ›</a>` : 'You have them all.'}</p>
         <p class="lp-hint"><span class="g-pad"><kbd>Y</kbd> next slot</span><span class="g-kb">Click a card to wear it</span></p>`;
       root.querySelectorAll('[data-slot]').forEach((b) => b.addEventListener('click', () => setSlot(b.dataset.slot)));
       root.querySelectorAll('[data-key]').forEach((b) => {
@@ -69,6 +91,8 @@ registerLobbyTab({
         b.addEventListener('focus', () => { if (focusKey !== b.dataset.key) { focusKey = b.dataset.key; } });
       });
       root.querySelector('[data-go]')?.addEventListener('click', () => ctx.select('cases'));
+      root.querySelector('[data-missing]')?.addEventListener('click', () => { missingOn = !missingOn; caseSfx.click(); render(); });
+      root.querySelectorAll('[data-miss]').forEach((b) => b.addEventListener('click', () => { focusKey = b.dataset.miss; render(); root.querySelector(`[data-miss="${CSS.escape(focusKey)}"]`)?.focus({ preventScroll: true }); }));
       if (P.newSkins(slot).length) seenOnLeave.add(slot);
     };
 

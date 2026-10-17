@@ -7,9 +7,9 @@ import { caseArt } from '../cases/caseArt.js';
 import { openCaseShow, cardHtml, openerActive } from '../cases/opener.js';
 import { lastGains } from '../cases/notify.js';
 import { caseSfx } from '../cases/sfx.js';
-import { RARITIES } from '../../profile/rarity.js';
+import { RARITIES, rarityOf } from '../../profile/rarity.js';
 import { SERIES, SERIES_ORDER } from '../../profile/items.js';
-import { CASE_XP, EARN, PITY, casePool, caseOdds, nextMilestone } from '../../profile/rewards.js';
+import { CASE_XP, EARN, PITY, casePool, caseOdds, nextMilestone, skin } from '../../profile/rewards.js';
 
 const ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M3 12h18M9 8V6a3 3 0 0 1 6 0v2M10 12v2h4v-2"/></svg>';
 const pct = (v) => (v >= 10 ? v.toFixed(0) : v >= 1 ? v.toFixed(1) : v.toFixed(2));
@@ -87,6 +87,8 @@ registerLobbyTab({
             return `<div class="cs-tier" style="--rc:${t.color}"><span>${esc(t.short)}</span><span class="cs-bar"><i style="--v:${c.total ? (c.owned / c.total).toFixed(3) : 0}"></i></span><b>${c.owned}/${c.total}</b></div>`;
           }).join('')}</div>
         </div>
+        ${r.best ? (() => { const b = skin(r.best.key); const g = rarityOf(r.best.rarity); return b ? `<h3 class="lp-h3">Best pull</h3>
+          <div class="cs-best" style="--rc:${g.color}">${cardHtml(r.best.key, r.best.rarity, { label: false })}<div><span>${esc(g.name)}</span><b>${esc(b.item.name)} | ${esc(b.variant.name)}</b><small>${r.opened} cases opened</small></div></div>` : ''; })() : ''}
         ${r.history.length ? `<h3 class="lp-h3">Recent pulls</h3><div class="cs-hist">${r.history.slice(-12).reverse().map((h) => cardHtml(h.key, h.rarity, { label: false })).join('')}</div>` : ''}
 
         <h3 class="lp-h3">Case contents and odds</h3>
