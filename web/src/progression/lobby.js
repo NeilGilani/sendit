@@ -3,7 +3,7 @@
 // added next to the chip's text; the lobby's own markup is not edited).
 import { registerLobbyTab } from '../lobby/tabs.js';
 import { on, game, Mode } from '../state.js';
-import { progression, PB_STATS } from './index.js';
+import { progression, PB_STATS, XP_SOURCES } from './index.js';
 import { fmtVal } from './ui.js';
 
 const ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2.5L5 13.5h6l-1 8 8-11h-6z"/></svg>';
@@ -53,6 +53,7 @@ const CSS = /* css */`
 .pg-today .ring::after { content: ''; width: 0.95em; height: 0.95em; border-radius: 50%; background: rgba(18,22,46,0.9); }
 .pg-today .row.done .ring::after { content: '✓'; display: grid; place-items: center; font-size: 0.7em; color: var(--lb-cyan); }
 .pg-today .row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pg-today .row.bonus { color: var(--lb-gold); border-color: rgba(255,211,77,0.45); }
 .pg-today .row em { font-style: normal; color: var(--lb-gold); font-weight: 900; font-size: 0.85em; }
 @media (max-height: 560px) { .pg-today { display: none; } }
 .pg-badge { flex: none; margin-left: 0.2em; font: 900 italic 0.72em/1 var(--font); color: var(--lb-navy); padding: 0.32em 0.55em; border-radius: 999px; background: var(--rc, var(--lb-cyan)); letter-spacing: 0.04em; }
@@ -155,7 +156,8 @@ function todayWidget() {
   }
   const list = progression.getChallenges();
   const left = list.filter((c) => !c.done).length;
-  el.innerHTML = `<b>${left ? 'TODAY' : 'ALL DAILIES DONE'}</b>${list.map((c) => `
+  const bonus = progression.dailyBonusLeft();
+  el.innerHTML = `<b>${left ? 'TODAY' : 'ALL DAILIES DONE'}</b>${bonus > 0 ? `<div class="row bonus"><i class="ring" style="--p:${(100 - (bonus / XP_SOURCES.dailyBonus) * 100).toFixed(0)}"></i><span>2× XP on your next ${n(bonus)} XP</span></div>` : ''}${list.map((c) => `
     <div class="row${c.done ? ' done' : ''}"><i class="ring" style="--p:${Math.min(100, (c.value / c.goal) * 100).toFixed(0)}"></i><span>${esc(c.title)}</span>${c.done ? '' : `<em>+${n(c.xp)}</em>`}</div>`).join('')}`;
   return true;
 }

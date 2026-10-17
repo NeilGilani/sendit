@@ -8,6 +8,7 @@
 //   progression.getChallenges()       → today's three dailies [{ id, slot, title, desc, goal, value, done, xp, unit? }]
 //   progression.rerollChallenge(slot) → the new challenge, or null (one free reroll per day)
 //   progression.rerollsLeft()         → number
+//   progression.dailyBonusLeft()      → bonus XP still to double today (the first XP_SOURCES.dailyBonus ridden XP count ×2)
 //   progression.getWeekly()           → this week's challenge { id, title, desc, goal, value, done, xp, unit? }
 //   progression.getAchievements()     → [{ id, title, desc, xp, icon, unlocked (ms or 0) }]
 //   progression.getPersonalBests(mapId) → { score, air, spin, kmh, combo }
@@ -47,6 +48,7 @@ export const progression = {
   getChallenges: () => C().challenges(),
   rerollChallenge: (slot) => C().reroll(slot),
   rerollsLeft: () => C().ensureDay().rerollsLeft,
+  dailyBonusLeft: () => C().ensureDay().bonusLeft,
   getWeekly: () => C().weekly(),
   getAchievements: () => C().achievements(),
   getPersonalBests: (mapId) => C().pbs(mapId),

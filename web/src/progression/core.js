@@ -16,6 +16,7 @@ export const XP_SOURCES = {
   rideMinM: 300,
   allDailies: 300,        // bonus for finishing all three dailies of a day
   newTrick: 40,           // first time a trick (or rail combo) lands clean
+  dailyBonus: 500,        // the first this-many XP earned while riding each day count double
 };
 
 export const RANKS = [
@@ -180,7 +181,7 @@ export function sanitizeState(raw) {
     day: raw.daily.day, rerolls: { ...(raw.daily.rerolls || {}) }, rerollsLeft: num(raw.daily.rerollsLeft, 1),
     list: Array.isArray(raw.daily.list) && raw.daily.list.length === 3 && raw.daily.list.every((c) => c && typeof c.id === 'string' && typeof c.stat === 'string' && c.goal > 0 && typeof c.title === 'string')
       ? raw.daily.list.map((c) => ({ ...c })) : dailiesFor(raw.daily.day),
-    progress: { ...(raw.daily.progress || {}) }, done: { ...(raw.daily.done || {}) }, swept: !!raw.daily.swept,
+    progress: { ...(raw.daily.progress || {}) }, done: { ...(raw.daily.done || {}) }, swept: !!raw.daily.swept, bonusLeft: num(raw.daily.bonusLeft, XP_SOURCES.dailyBonus),
   } : null;
   s.weekly = raw.weekly && typeof raw.weekly.week === 'string' ? { week: raw.weekly.week, progress: { ...(raw.weekly.progress || {}) }, done: !!raw.weekly.done } : null;
   return s;
@@ -218,13 +219,19 @@ export class Progression {
   progress() { const l = levelFor(this.state.xp); return { ...l, xp: this.state.xp, rank: rankFor(l.level) }; }
 
   addXP(amount, reason = '') {
-    const gained = Math.max(0, Math.round(amount));
+    let gained = Math.max(0, Math.round(amount));
     if (!gained) return 0;
+    // Daily bonus: XP earned while riding counts double until the day's bonus is used up.
+    let bonus = 0;
+    if (this.ride) {
+      const d = this.ensureDay();
+      if (d.bonusLeft > 0) { bonus = Math.min(gained, d.bonusLeft); d.bonusLeft -= bonus; gained += bonus; }
+    }
     const before = levelFor(this.state.xp).level;
     this.state.xp += gained;
     if (this.ride) this.ride.xp += gained;
     const p = levelFor(this.state.xp);
-    this.emit('xp', { gained, reason, xp: this.state.xp, ...p });
+    this.emit('xp', { gained, bonus, reason, xp: this.state.xp, ...p });
     for (let l = before + 1; l <= p.level; l++) {
       const rank = rankFor(l), rankUp = rankFor(l - 1).name !== rank.name;
       this.emit('levelUp', { level: l, prev: l - 1, rank, rankUp });
@@ -237,7 +244,7 @@ export class Progression {
   // ---------------------------------------------------------------- dailies
   ensureDay() {
     const day = dayKey(this.now());
-    if (this.state.daily?.day !== day) this.state.daily = { day, list: dailiesFor(day), rerolls: {}, rerollsLeft: 1, progress: {}, done: {}, swept: false };
+    if (this.state.daily?.day !== day) this.state.daily = { day, list: dailiesFor(day), rerolls: {}, rerollsLeft: 1, progress: {}, done: {}, swept: false, bonusLeft: XP_SOURCES.dailyBonus };
     return this.state.daily;
   }
 

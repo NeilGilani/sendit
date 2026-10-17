@@ -196,6 +196,8 @@ Bus events: `musicEnergy {level}` at 5 Hz, and `musicDrop {kind, strength}`.
 - **XP from goals:**
   - Each daily pays 150 to 450 XP, and a clean sweep of all three pays +300.
   - Achievements pay 100 to 800 XP.
+- **Daily 2× bonus.** The first 500 XP earned while riding each day count double (`XP_SOURCES.dailyBonus`). The TODAY strip shows it as "2× XP on your next N XP", and the in-ride XP label reads "LV n · 2× XP". It never expires during the day and is never taken away. API: `progression.dailyBonusLeft()`.
+- **Close to a level.** When the ride ends within 30 % of the next level, the recap's last line becomes "ONLY N XP TO LEVEL L · ONE MORE RUN!".
 - **Pacing.** A first ride usually reaches level 3, about four rides reach level 5, and the curve slows after that.
 - **Pause screen.** It adds the level, the rank, XP to the next level, and the dailies still open.
 - **Challenge results.** An extra row reads "XP this ride +N · level L", with ▲ when the ride levelled up.

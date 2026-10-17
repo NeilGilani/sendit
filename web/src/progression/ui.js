@@ -66,7 +66,7 @@ export function mountProgressionUi({ juice }) {
   const paint = () => {
     const p = progression.getProgress();
     fill.style.width = `${p.need ? (p.into / p.need) * 100 : 100}%`;
-    lab.textContent = `LV ${p.level}`;
+    lab.textContent = progression.dailyBonusLeft() > 0 ? `LV ${p.level} · 2× XP` : `LV ${p.level}`;
   };
   paint();
   on('progressXp', () => { paint(); showT = performance.now() + 2500; bar.classList.add('on'); lab.classList.add('on'); });
@@ -149,7 +149,7 @@ function mountRecap() {
       <div class="lv"><span>${lvUp ? `LEVEL UP · ${s.to.level}` : `LEVEL ${s.to.level}`}</span><span>${left} XP TO ${s.to.level + 1}</span></div>
       <div class="bar"><i></i></div>
       ${rows.map(([i, t]) => `<div class="row"><b>${i}</b><span>${t.replace(/[<>&]/g, '')}</span></div>`).join('')}
-      <div class="go">ONE MORE RUN? PRESS ENTER</div>`;
+      <div class="go">${s.to.need && s.to.need - s.to.into <= s.to.need * 0.3 ? `ONLY ${left} XP TO LEVEL ${s.to.level + 1} · ONE MORE RUN!` : 'ONE MORE RUN? PRESS ENTER'}</div>`;
     const bar = el.querySelector('.bar i'), xp = el.querySelector('.xp');
     bar.style.transition = 'none';
     bar.style.width = `${lvUp ? 0 : (s.from.into / Math.max(1, s.from.need)) * 100}%`;

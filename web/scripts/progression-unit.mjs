@@ -212,6 +212,25 @@ export async function run(test, assert) {
     assert.ok(JSON.parse(globalThis.localStorage.getItem(core.PROGRESSION_KEY)).xp > 0, 'persisted under its own key');
   });
 
+  await test('progression: daily 2x bonus doubles the first ridden XP of the day, then stops; not in the lobby', () => {
+    const { p, setNow } = make('2026-10-20T09:00:00');
+    const B = core.XP_SOURCES.dailyBonus;
+    p.addXP(100, 'lobby');
+    assert.equal(p.state.xp, 100, 'no bonus outside a ride');
+    p.startRide('valcrest-gully');
+    p.addXP(B - 100, 'ride');
+    assert.equal(p.state.xp, 100 + (B - 100) * 2);
+    p.addXP(200, 'ride');
+    assert.equal(p.state.xp, 100 + (B - 100) * 2 + 200 + 100, 'only the remaining 100 doubled');
+    p.addXP(50, 'ride');
+    assert.equal(p.ensureDay().bonusLeft, 0);
+    const x = p.state.xp;
+    p.addXP(50, 'ride');
+    assert.equal(p.state.xp, x + 50);
+    setNow('2026-10-21T09:00:00');
+    assert.equal(p.ensureDay().bonusLeft, B, 'fresh bonus tomorrow');
+  });
+
   // ---------------------------------------------------------------- juice: combo chain + time warp
   await test('juice combo: own chain grows per different move, banks a bonus, loses on crash', () => {
     const pl = { state: 1, flow: null };
