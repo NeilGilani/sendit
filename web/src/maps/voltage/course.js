@@ -204,23 +204,30 @@ export class VoltageCourse {
   /** Step-up: a steep kicker over a gap onto a raised deck (land near the top of the flight), roll off the back. */
   addStepUp(s) {
     const back = 30;
-    const mk = () => this.P(s.u - back, s.v, 0, s.hw);
+    const mk = () => this.P(s.u - back, s.v, 0, s.landHw);
     const B = this.kicker(mk, back, s.kickH, s.lipDeg, s.R);
     B.mark('lip');
     const lipY = B.y;
-    B.lineBy(-(B.y - B.baseAt(B.a)) + 0.05, -60);
-    B.snow(Math.max(0.5, s.gap - 2.5));
-    // The step: a 34° face up to the deck, the deck, then down the back at 30° to the snow.
-    B.width(s.landHw);
+    // A short table under the flight (a rider too slow lands on it and can still ride up the step — the old
+    // version left a ditch you could not get out of), then the step: a 30° face up to a deck above the lip,
+    // which falls away a little so you land on it just past the top of your flight, then down the back.
+    B.lineBy(-0.8, -58);
+    B.line(s.gap, -2);
     const deckY = lipY + s.rise;
-    B.lineBy(deckY - B.y, 34);
+    B.lineBy(deckY - B.y, 30);
     B.mark('deck');
-    B.arc(4, -14).line(s.deckLen, -14);   // the deck falls with the hill (a little flatter): you land near the top of the flight
+    B.arc(4, -10).line(s.deckLen, -10);
     B.arc(5, -36).toBase(16, 3);
     const f = B.build({ name: s.name, kind: 'stepup', lane: s.lane, rake: 1.1 });
-    f.jump = { ...s, lipA: f.marks.lip.a, lipY };
+    // Beside the kicker the table is reached by a 20° ride-up ramp (as on the tables).
+    const Ys = new Float32Array(f.Y.length), la = f.marks.lip.a, ty = f.yAt(la + 1);
+    for (let i = 0; i < Ys.length; i++) { const a = f.a0 + i * STEP; Ys[i] = a >= la + 0.5 ? f.Y[i] : Math.max(B.baseAt(a) - 0.2, ty - (la + 0.5 - a) * Math.tan(20 * DEG)); }
+    f.side = { Y: Ys, hwc: s.hw, blend: 1.4 };
+    // The window to land on the deck (the in-run gauge and the landing zones use it).
+    const deck = f.marks.deck;
+    f.jump = { ...s, lipA: la, lipY, knuckle: deck, table: deck.a - la, land: { vMin: s.vMin, vMax: s.vMax, sweet: { a: deck.a + 2.5, y: deck.y, v: s.vSweet } } };
     this.features.push(f);
-    const [lx, lz] = f.world(f.marks.lip.a);
+    const [lx, lz] = f.world(la);
     this.named.push({ name: s.name, kind: 'jump', x: lx, z: lz, r: s.hw + 3, back: 12, f });
   }
 

@@ -82,7 +82,7 @@ export const LANE_JUMPS = [
 
 // Step-up (land uphill on a raised deck) and step-down, hips (the landing turned off the take-off's line).
 export const STEPS = [
-  { name: 'Step-Up', lane: 'high', kind: 'stepup', u: 590, v: 186, lipDeg: 34, R: 10, kickH: 2.2, gap: 7, rise: 2.4, deckLen: 9, hw: 3, landHw: 6 },
+  { name: 'Step-Up', lane: 'high', kind: 'stepup', u: 590, v: 186, lipDeg: 30, R: 10, kickH: 2.2, gap: 4, rise: 1.0, deckLen: 10, hw: 3, landHw: 6, vMin: 10.5, vMax: 13.5, vSweet: 12 },
   { name: 'Step-Down', lane: 'current', kind: 'stepdown', u: 600, v: 125, lipDeg: 18, R: 10, kickH: 1.6, table: 6, vMax: 18, hw: 2.8, deckHw: 5, landHw: 7, drop: 0 },
 ];
 export const HIPS = [
@@ -134,9 +134,9 @@ export const GRID_JIBS = [
   { name: 'Grid Long Rail', u: 130, v: 248, kind: 'rail', segs: [[14, -13]], h0: 0.6, ramp: { gap: 0.9, drop: -0.05 }, difficulty: 1.2 },
   { name: 'Grid Wide Tube', u: 132, v: 258, kind: 'tube', half: 0.55, segs: [[9, -14]], h0: 0.6, ramp: 'flush' },
   { name: 'Grid Kink', u: 170, v: 240, kind: 'rail', segs: [[4.5, -6], [4, -24], [3, -6]], h0: 0.7, ramp: { gap: 1.0, drop: -0.05 }, difficulty: 1.3 },
-  { name: 'Grid S-Rail', u: 168, v: 254, kind: 'rail', shape: 'c', len: 11, turn: -32, h0: 0.65, ramp: { gap: 1.0, drop: -0.05 }, difficulty: 1.4 },
+  { name: 'Grid S-Rail', u: 174, v: 250, kind: 'rail', shape: 'c', len: 11, turn: -20, h0: 0.65, ramp: { gap: 1.0, drop: -0.05 }, difficulty: 1.4 },
   { name: 'Grid Rainbow Box', u: 205, v: 236, kind: 'box', half: 0.35, shape: 'rainbow', len: 9, hump: 0.6, h0: 0.4, ramp: 'flush', difficulty: 1.2 },
-  { name: 'Grid Down Box', u: 205, v: 248, kind: 'box', half: 0.3, segs: [[10, -20]], h0: 0.6, ramp: { gap: 1.0, drop: -0.05 } },
+  { name: 'Grid Down Box', u: 211, v: 247, kind: 'box', half: 0.3, segs: [[10, -20]], h0: 0.6, ramp: { gap: 1.0, drop: -0.05 } },
   { name: 'Grid Ledge', u: 207, v: 258, kind: 'ledge', half: 0.4, segs: [[9, -12]], h0: 0.5, ramp: 'flush' },
   { name: 'Grid Battleship', u: 240, v: 242, kind: 'box', half: 0.3, segs: [[3.5, 10], [3.5, -30]], h0: 0.3, ramp: 'flush', difficulty: 1.3 },
   { name: 'Grid Cannon', u: 242, v: 254, kind: 'tube', half: 0.4, segs: [[10, -14]], h0: 0.7, ramp: { gap: 1.2, drop: -0.05 }, difficulty: 1.15 },

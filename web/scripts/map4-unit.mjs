@@ -57,6 +57,7 @@ await test('features sit on the snow (never below it, never NaN) across the park
 await test('designed landings are soft: ≤ 4.6 m/s into the slope from the knuckle to the sweet spot (EFH ≤ 1.1 m), ≤ 7.5 (2.9 m: heavy, still clean) to the end', () => {
   const g = 9.81, k = PHYSICS.airDrag;
   for (const f of course.features.filter((q) => q.jump?.land)) {
+    const efh = f.kind !== 'stepup';   // the step-up's deck is not a constant-EFH landing: only the overall cap applies
     const J = f.jump, Ld = J.land, th = J.lipDeg * Math.PI / 180;
     let worst = 0, sweetWorst = 0, n = 0;
     for (let v = Ld.vMin + 0.4; v <= Ld.vMax - 0.1; v += 0.15) {
@@ -79,7 +80,7 @@ await test('designed landings are soft: ≤ 4.6 m/s into the slope from the knuc
       }
     }
     assert.ok(n >= (Ld.vMax - Ld.vMin > 1.5 ? 4 : 2), `${f.name}: flights tested`);
-    assert.ok(sweetWorst <= 4.6, `${f.name}: ${sweetWorst.toFixed(2)} m/s into the landing up to the sweet spot`);
+    if (efh) assert.ok(sweetWorst <= 4.6, `${f.name}: ${sweetWorst.toFixed(2)} m/s into the landing up to the sweet spot`);
     assert.ok(worst <= 7.5, `${f.name}: ${worst.toFixed(2)} m/s into the landing`);
   }
 });

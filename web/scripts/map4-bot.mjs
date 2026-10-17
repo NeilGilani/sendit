@@ -25,9 +25,9 @@ export const LINES = {
   slopeB: { start: [2, 0], feats: slope('Circuit Box', 'Surge Rainbow', 'Overload Handrail') },
   slopeC: { start: [2, 0], feats: slope('Circuit Down Rail', 'Surge Tube', 'Overload Gap Box') },
   spark: { start: [40, 70], feats: [jump('Spark 1'), jib('Spark Box'), jump('Spark 2'), jib('Spark Tube'), jump('Spark 3'), jib('Spark Down Box'), jump('Spark 4'), jib('Spark Butter Box'), { kind: 'qp', name: 'Spark QP' }] },
-  sparkLedge: { start: [150, 72], feats: [jib('Spark Ledge')] },
+  sparkLedge: { start: [150, 72], feats: [jib('Spark Ledge'), jump('Spark 3'), jib('Spark Down Box'), jump('Spark 4'), jib('Spark Butter Box')] },
   current: { start: [50, 125], feats: [jump('Current 1'), jib('Current Flat-Down'), jib('Current Kink'), jump('Current 2', 'spin360'), jib('Current Tube'), jump('Current 3'), { kind: 'jump', name: 'Step-Down' }] },
-  currentBox: { start: [110, 128], feats: [jib('Current Box')] },
+  currentBox: { start: [110, 128], feats: [jib('Current Box'), jump('Current 2'), jib('Current Tube'), jump('Current 3'), { kind: 'jump', name: 'Step-Down' }] },
   high: { start: [60, 186], feats: [jib('High DFD'), jib('High Rainbow'), jib('High Down Rail'), jib('High Kink'), jump('High Voltage 1', 'spin360'), jump('High Voltage 2', 'flip'), { kind: 'stepup', name: 'Step-Up' }, { kind: 'qp', name: 'Voltage QP' }] },
   gridL: { start: [40, 236], feats: ['Grid Box A', 'Grid Flat Box', 'Grid A-Frame', 'Grid Kink', 'Grid Rainbow Box', 'Grid Battleship', 'Grid Finale DFD'].map(jib) },
   gridM: { start: [40, 247], feats: ['Grid Rail A', 'Grid Down Rail', 'Grid Long Rail', 'Grid S-Rail', 'Grid Down Box', 'Grid Cannon'].map(jib) },
@@ -67,7 +67,17 @@ function ride(type, key, sty) {
   const way = [];
   for (const f of line.feats) for (const w of waypoints(f)) way.push({ ...w, f });
   const last = way[way.length - 1] || [p.position.x + 40, p.position.z];
-  way.push([Math.max(last[0] + 40, START_X + FINISH_U + 20), last[1], 'finish']);
+  // Ride out past the finish — around the quarterpipes at the bottom of the lanes, not into them (a QP across
+  // the lane is a dead end: you'd ride up it and back for ever).
+  let vOut = last[1];
+  for (const w of course.walls) {
+    const [, qz] = w.f.world(w.f.marks.coping.a);
+    if (Math.abs(vOut - qz) < w.hw + 5) vOut = qz + (vOut >= qz ? 1 : -1) * (w.hw + 7);
+  }
+  const qpLine = line.feats.some((f) => f.kind === 'qp');
+  if (Math.abs(vOut - last[1]) > 1 && !qpLine) way.push([START_X + 690, vOut, 'line']);
+  if (qpLine) { const lw = way[way.length - 1]; way.push([lw[0] - 6, vOut, 'line']); }
+  way.push([Math.max(last[0] + 40, START_X + FINISH_U + 20), vOut, 'finish']);
   // Dense path through the waypoints (pure pursuit): [x, z, waypoint index].
   const path = [];
   let px0 = p.position.x, pz0 = p.position.z;
@@ -84,9 +94,10 @@ function ride(type, key, sty) {
     on('takeoff', () => { const nm = course.featureAt(p.position.x, p.position.z); if (nm) ev.speeds[nm] = +p.speed.toFixed(1); }),
   ];
   const hist = [];
-  let key0 = 0, pipeSide = 1, pipeT = 0, airTrick = null, lastState = 1;
+  let key0 = 0, pipeSide = 1, pipeT = 0, airTrick = null, lastState = 1, stillT = 0;
   p.script = (c, pl) => {
     Object.assign(c, { steer: 0, brake: 0, up: 0, jump: false, tuck: 0 });
+    c._type = type; c._t = t;
     const g = pl.grind.g;
     // --- on a rail: balance, pop at the end (trick: a switch-up mid rail, spin out)
     if (g) {
@@ -143,22 +154,25 @@ function ride(type, key, sty) {
     const dRail = nextRail ? Math.hypot(nextRail[0] - pl.position.x, nextRail[1] - pl.position.z) : 1e9;
     const dJump = nextJump ? Math.hypot(nextJump[0] - pl.position.x, nextJump[1] - pl.position.z) : 1e9;
     if (pl.state === 1) {
-      if (dJump < dRail && nextJump && dJump < 90) {
+      if (dJump < dRail && nextJump && dJump < 160) {
         const F = nextJump[3], Ld = F.jump.land || { vMin: 10, vMax: 14 }, want = Ld.sweet?.v ?? (Ld.vMin + Ld.vMax) / 2;
         // Tucked if that still arrives at or under the sweet spot speed; else stand up; scrub if even that is too fast.
         const tk = pl.tuck; pl.tuck = 1; const vT = predictLipSpeed(pl, F); pl.tuck = 0; const vU = predictLipSpeed(pl, F); pl.tuck = tk;
         if (vT <= want + 0.3) c.tuck = 1;
-        else if (vU > want + 0.8 && dJump < 70 && dJump > 22) c.brake = type === 'ski' ? 0.28 : (Math.floor(t * 4) % 2 ? 0.6 : 0);
-      } else if (dRail < 45) {
-        const r = nextRail[3], hard = r.shape === 'rainbow' ? 9.5 : r.segs?.length ? 8.5 : 8.5;
-        // Speed check well before the rail (skis: a plough under 0.3; a board: short slide pulses), never on the approach.
-        if (pl.speed > hard + 1 && dRail > 16) c.brake = type === 'ski' ? 0.28 : (Math.floor(t * 4) % 2 ? 0.6 : 0);
+        else if (vU > want + 0.8 && dJump < 70 && dJump > 22 && pl.speed > Math.max(8, want)) check(c, vU - want);   // (never brake to a standstill)
+      } else if (dRail < 75) {
+        const r = nextRail[3], hard = r.shape === 'rainbow' ? 9.5 : 8.5;
+        // Speed check well before the rail, never on the last 14 m of the approach (it would turn the gear).
+        // (a board checks speed by skidding sideways: it needs longer to line up again afterwards)
+        if (pl.speed > hard + 0.6 && dRail > (type === 'ski' ? 14 : 24)) check(c, pl.speed - hard);
         else if (pl.speed < hard - 1.5) c.tuck = 1;
-      } else c.tuck = pl.speed < 15 ? 1 : 0;
+      } else if (pl.speed > 15) check(c, pl.speed - 13);
+      else c.tuck = pl.speed < 11 ? 1 : 0;
       // Pop at lips (kickers, gap-on ramps).
       // Pop at kicker lips (not at the gap-on ramps of rails: roll those, you come down onto the rail).
       const a = pl.lipAhead(0.3);
-      if (a !== null && a > 0.04 && !(dRail < 6 || (nextRail && wi >= way.indexOf(nextRail) - 1 && dRail < 10))) c.jump = true;
+      const railAhead = course.rails.some((r) => { const q = r.pts[0], dx = q[0] - pl.position.x, dz = q[2] - pl.position.z; return Math.hypot(dx, dz) < 9 && dx * pl.velocity.x + dz * pl.velocity.z > 0; });
+      if (a !== null && a > 0.04 && !railAhead) c.jump = true;
       // Trick set-up on the in-run (the wind-up / flip preload while loading).
       const fj = nextJump?.f;
       // The jump whose lip is right here (the waypoint may already point past it).
@@ -171,6 +185,10 @@ function ride(type, key, sty) {
       }
       if (trick) airTrick = trick;
     }
+    // Stopped across the slope (an over-done speed check on a board): let go of the stick so the gear settles
+    // back down the fall line, then push off.
+    stillT = pl.state === 1 && pl.speed < 1.5 ? stillT + 1 / 60 : 0;
+    if (stillT > 0.8) { c.steer = 0; c.brake = 0; c.up = 1; if (stillT > 3) stillT = 0; }
     if (pl.state === 2 && airTrick) {
       // Spins: keep the stick in until what's turned + what the open-arms spin still turns reaches the target,
       // then let go and spot. Flips: S through the throw window, then let go (the rider spots the landing).
@@ -187,6 +205,7 @@ function ride(type, key, sty) {
   const dbgR = process.env.DBG ? course.rails.find((q) => q.name === process.env.DBG) : null;
   while (t < 200) {
     p.step(DT); t += DT;
+    if (process.env.TR && Math.round(t * 60) % 60 === 0) console.log(`   tr t ${t.toFixed(0)} u${(p.position.x - START_X).toFixed(0)} v${p.position.z.toFixed(1)} st ${p.state} sp ${p.speed.toFixed(1)} hd ${p.heading.toFixed(2)} steer ${p._ctrl.steer.toFixed(2)} brake ${p._ctrl.brake} wi ${wi}`);
     if (dbgR) {
       const a0 = dbgR.pts[0], a1 = dbgR.pts[dbgR.pts.length - 1];
       const dx = a1[0] - a0[0], dz = a1[2] - a0[2], L2 = dx * dx + dz * dz;
@@ -200,6 +219,7 @@ function ride(type, key, sty) {
     if (key === 'pipe' && (pipeT > 40 || p.position.x - START_X > PIPE.u1 + 30)) break;
     if (p.position.x - START_X > FINISH_U + 15) break;
   }
+  if (t >= 200 && key !== 'pipe') ev.tricks.push(`TIMEOUT state ${p.state} v ${p.speed.toFixed(2)} at u${Math.round(p.position.x - START_X)},${Math.round(p.position.z)} heading ${p.heading.toFixed(2)} brake ${p._ctrl.brake} tuck ${p._ctrl.tuck}`);
   for (const o of offs) o();
   p.grind.dispose();
   const rails = line.feats.filter((f) => f.kind === 'jib').map((f) => f.name);
@@ -207,6 +227,18 @@ function ride(type, key, sty) {
   const j = course.judgeRun.judge();
   if (process.env.V) console.log('     judge:', j.sections.map((q) => `${q.name} ${q.score.toFixed(1)}`).join(', '), `variety ${j.variety.toFixed(1)} amplitude ${j.amplitude.toFixed(1)} flow ${j.flow.toFixed(1)} crashes ${j.crashes} avg ${j.avg.toFixed(1)}`);
   return { type, key, sty, t: +t.toFixed(1), crashes, stumbles, missed, ev, judged: j.total, u: Math.round(p.position.x - START_X) };
+}
+
+/**
+ * A speed check like a rider's: a plough (skis) or short skid (board) for a little too fast, hard hockey-stop /
+ * slide pulses for much too fast (each pulse a quarter second, so the gear comes back in line between them).
+ */
+function check(c, over) {
+  const pulse = Math.floor((c._t || 0) * 4) % 2 === 0;   // simulated time: deterministic
+  const type = c._type;
+  if (type === 'ski') { c.brake = over > 2 ? (pulse ? 0.8 : 0) : 0.28; return; }
+  // A board checks speed with a short skid: 0.15 s in every 0.6 s, so it never ends up stopped across the hill.
+  c.brake = Math.floor((c._t || 0) / 0.15) % 4 === 0 ? 0.7 : 0;
 }
 
 function steerTo(c, pl, x, z, k) {
@@ -222,7 +254,7 @@ let fail = 0;
 for (const key of keys) for (const type of types) {
   course.judgeRun.reset();
   const r = ride(type, key, style);
-  const bad = r.missed.length || (style === 'clean' && r.crashes);
+  const bad = r.missed.length || (style === 'clean' && r.crashes) || (r.key !== 'pipe' && r.u < FINISH_U);   // and it must reach the finish
   if (bad) fail++;
   console.log(`${bad ? 'FAIL' : 'ok  '} ${key.padEnd(10)} ${type.padEnd(9)} ${style} t ${r.t}s end u${r.u} crashes ${r.crashes} stumbles ${r.stumbles} rails ${r.ev.locks.size} banked ${r.ev.banks.length} lost ${r.ev.lost} bails ${r.ev.bails} clips ${r.ev.clips}${r.missed.length ? ' MISSED ' + r.missed.join(', ') : ''} judged ${r.judged}`);
   if (process.env.V) {
