@@ -16,6 +16,7 @@ export const TORII_BONUS = { base: 600, perKmh: 6 };      // points: base + per 
 export const WELL_DRAG = 2.4;                             // 1/s of speed lost at the heart of a well (fades to 0 at its rim)
 
 export function attachKitsune(course, pl) {
+  course._riderOffs?.();          // a new rider replaces the old one's listeners
   course.player = pl;
   const mine = () => course.player === pl;
   const run = { t: 0, dist: 0, samples: [], startU: 0, startV: 0, trail: course.activeTrail, done: false };
@@ -24,7 +25,7 @@ export function attachKitsune(course, pl) {
 
   const newRun = () => {
     run.t = 0; run.dist = 0; run.samples = []; run.done = false;
-    run.startU = pl.position.x - START_X; run.startV = pl.position.z;
+    run.startU = (pl.position?.x ?? START_X) - START_X; run.startV = pl.position?.z ?? 0;
     run.trail = course.activeTrail;
     tunnel.next = 0; tunnel.ok = true; whoops = 0;
   };
@@ -103,7 +104,8 @@ export function attachKitsune(course, pl) {
     on('runComplete', () => complete(null)),
     on('runFinished', (res) => complete(res)),
   ];
-  void offs; void FIR_WELL;
+  course._riderOffs = () => { for (const o of offs) o(); course._riderOffs = null; };
+  void FIR_WELL;
 
   function complete(res) {
     if (!mine() || run.done) return;

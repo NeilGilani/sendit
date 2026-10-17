@@ -86,9 +86,9 @@ function barkTexture() {
     g.fillStyle = '#ece9e1'; g.fillRect(0, 0, w, h);
     for (let i = 0; i < 160; i++) { g.fillStyle = `rgba(30,25,22,${0.35 + r() * 0.5})`; g.fillRect(r() * w, r() * h, 3 + r() * 12, 1 + r() * 2); }
     for (let i = 0; i < 18; i++) { g.fillStyle = `rgba(20,16,14,${0.6 + r() * 0.4})`; g.beginPath(); g.ellipse(r() * w, r() * h, 3 + r() * 6, 2 + r() * 5, 0, 0, 6.3); g.fill(); }
-    const gr = g.createLinearGradient(0, h, 0, h * 0.8);
-    gr.addColorStop(0, 'rgba(40,32,28,0.9)'); gr.addColorStop(1, 'rgba(40,32,28,0)');
-    g.fillStyle = gr; g.fillRect(0, h * 0.8, w, h * 0.2);
+    const gr = g.createLinearGradient(0, h, 0, h * 0.72);
+    gr.addColorStop(0, 'rgba(40,32,28,0.95)'); gr.addColorStop(1, 'rgba(40,32,28,0)');
+    g.fillStyle = gr; g.fillRect(0, h * 0.72, w, h * 0.28);
   });
 }
 /** Leafless birch twigs (alpha-tested card): a fan of fine purple-brown branches. */
@@ -96,16 +96,16 @@ function twigTexture() {
   return canvasTex(256, 256, (g, w, h) => {
     const r = rand(91);
     g.clearRect(0, 0, w, h);
-    g.strokeStyle = 'rgba(78,52,48,1)';
+    g.strokeStyle = 'rgba(128,112,116,1)';
     g.lineCap = 'round';
     const branch = (x, y, a, len, wdt, depth) => {
       if (depth > 6 || len < 4) return;
       const x2 = x + Math.cos(a) * len, y2 = y - Math.sin(a) * len;
       g.lineWidth = wdt; g.beginPath(); g.moveTo(x, y); g.lineTo(x2, y2); g.stroke();
-      const n = 2 + (r() < 0.4 ? 1 : 0);
-      for (let i = 0; i < n; i++) branch(x2, y2, a + (r() - 0.5) * 1.2, len * (0.62 + r() * 0.15), Math.max(1, wdt * 0.65), depth + 1);
+      const n = 2;
+      for (let i = 0; i < n; i++) branch(x2, y2, a + (i ? 0.45 : -0.45) + (r() - 0.5) * 0.5, len * (0.66 + r() * 0.12), Math.max(0.8, wdt * 0.6), depth + 1);
     };
-    for (let k = 0; k < 5; k++) branch(w / 2 + (r() - 0.5) * 30, h, Math.PI / 2 + (r() - 0.5) * 0.9, 60 + r() * 20, 5, 0);
+    for (let k = 0; k < 4; k++) branch(w / 2 + (r() - 0.5) * 40, h, Math.PI / 2 + (r() - 0.5) * 1.1, 52 + r() * 18, 3, 0);
   }, false);
 }
 
@@ -164,8 +164,9 @@ function place(geo, x, y, z, yaw = 0, sx = 1, sy = 1, sz = 1) {
   _q.setFromAxisAngle(_up, yaw); _p.set(x, y, z); _s.set(sx, sy, sz);
   return geo.clone().applyMatrix4(_m.compose(_p, _q, _s));
 }
+const ni = (g) => (g.index ? g.toNonIndexed() : g);
 function merged(list, mat, name) {
-  const m = new THREE.Mesh(mergeGeometries(list.map((g) => (g.index ? g.toNonIndexed() : g)).map(stripAttrs)), mat);
+  const m = new THREE.Mesh(mergeGeometries(list.map(ni).map(stripAttrs)), mat);
   m.name = name;
   return m;
 }
@@ -381,9 +382,12 @@ function buildTorii(course, M, terrain, glow) {
     const yaw = Math.atan2(gt.rz, gt.rx) * -1;   // local x → across the corridor (rx, rz)
     const y = add(gt.x, gt.z, yaw, gt.span, gt.height);
     if (i % 3 === 1) {
-      const lg = new THREE.SphereGeometry(0.3, 10, 8); lg.scale(1, 1.3, 1);
-      lan.push(place(lg, gt.x, y + gt.height * 0.62, gt.z));
-      glow.push([gt.x, y + gt.height * 0.62, gt.z, 3.2, 1]);
+      const lg = new THREE.SphereGeometry(0.24, 10, 8); lg.scale(1, 1.35, 1);
+      for (const sgn of [-1, 1]) {
+        const lx = gt.x + gt.rx * sgn * (gt.span / 2 + 0.45), lz = gt.z + gt.rz * sgn * (gt.span / 2 + 0.45);
+        lan.push(place(lg, lx, y + gt.height * 0.62, lz));
+        glow.push([lx, y + gt.height * 0.62, lz, 3.0, 1]);
+      }
     }
   });
   // The great gates (facing down the fall line: crossbeam across it), with a shimenawa rope.
@@ -528,7 +532,7 @@ function foxGeometry() {
   const snout = new THREE.ConeGeometry(0.11, 0.34, 8); snout.rotateX(-Math.PI / 2); parts.push(place(snout, 0, 1.8, -0.44));
   for (const s of [-1, 1]) { const ear = new THREE.ConeGeometry(0.08, 0.26, 6); parts.push(place(ear, s * 0.12, 2.12, -0.15)); }
   const tail = new THREE.SphereGeometry(0.2, 10, 8); tail.scale(1, 2.6, 1); tail.rotateX(0.35); parts.push(place(tail, 0.25, 1.45, 0.45));
-  return mergeGeometries(parts.map((p) => stripAttrs(p.index ? p.toNonIndexed() : p)));
+  return mergeGeometries(parts.map((p) => stripAttrs(ni(p))));
 }
 
 // ------------------------------------------------------------------ birches (instanced, chunked)
@@ -547,16 +551,16 @@ function birchGeometries() {
     l.translate(Math.sin(h * 5) * 0.25 * h, BIRCH.height * h, Math.sin(h * 3 + 1) * 0.18 * h);
     limbs.push(l);
   }
-  const wood = mergeGeometries([trunk, ...limbs].map((g) => stripAttrs(g.toNonIndexed())));
+  const wood = mergeGeometries([trunk, ...limbs].map((g) => stripAttrs(ni(g))));
   // Twig cards: three crossed quads around the crown.
   const cards = [];
   for (let k = 0; k < 3; k++) {
-    const q = new THREE.PlaneGeometry(7.5, 8.5);
-    q.translate(0, BIRCH.height * 0.66, 0);
+    const q = new THREE.PlaneGeometry(6.0, 6.5);
+    q.translate(0, BIRCH.height * 0.74, 0);
     q.rotateY(k * Math.PI / 3);
     cards.push(q);
   }
-  const twigs = mergeGeometries(cards.map((g) => stripAttrs(g.toNonIndexed())));
+  const twigs = mergeGeometries(cards.map((g) => stripAttrs(ni(g))));
   return { wood, twigs };
 }
 
@@ -600,7 +604,7 @@ function buildJuhyo(course, M, terrain) {
   const parts = [];
   const blob = (r, y, sx = 1, sy = 1) => { const b = new THREE.IcosahedronGeometry(r, 2); b.scale(sx, sy, sx); const p = b.attributes.position; for (let i = 0; i < p.count; i++) { const k = 1 + 0.12 * Math.sin(p.getX(i) * 5 + p.getY(i) * 3) * Math.cos(p.getZ(i) * 4); p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k); } b.translate(0, y, 0); return b; };
   parts.push(blob(1.5, 1.2, 1, 1.0), blob(1.25, 2.9, 0.95, 1.1), blob(0.95, 4.5, 0.9, 1.15), blob(0.6, 5.8, 0.85, 1.2), blob(0.5, 3.4, 1.6, 0.5));
-  const geo = mergeGeometries(parts.map((p) => stripAttrs(p.toNonIndexed())));
+  const geo = mergeGeometries(parts.map((p) => stripAttrs(ni(p))));
   geo.computeVertexNormals();
   const list = course.forest.juhyo;
   const mesh = new THREE.InstancedMesh(geo, M.snow, list.length);
@@ -659,7 +663,7 @@ function buildGondola(course, M, terrain, glow) {
   for (const l of lines) g.add(l);
   g.add(merged(steel, M.steel, 'towers'));
   // Cabins: red boxes with warm-lit windows, running up one cable and down the other.
-  const cabin = mergeGeometries([new THREE.BoxGeometry(2.2, 2.0, 2.0), place(new THREE.BoxGeometry(0.12, 1.6, 0.12), 0, 1.75, 0)].map((x) => stripAttrs(x.toNonIndexed())));
+  const cabin = mergeGeometries([new THREE.BoxGeometry(2.2, 2.0, 2.0), place(new THREE.BoxGeometry(0.12, 1.6, 0.12), 0, 1.75, 0)].map((x) => stripAttrs(ni(x))));
   cabin.translate(0, -2.5, 0);
   const glass = new THREE.BoxGeometry(2.25, 0.8, 2.05); glass.translate(0, -2.2, 0);
   const n = G.cabins;

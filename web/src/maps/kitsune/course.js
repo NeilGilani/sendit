@@ -195,7 +195,7 @@ export class KitsuneCourse {
     // Tōrō pairs: the approach to the Ō-torii, both sides of the main village path, the shrine forecourt and the finish.
     for (const u of [1450, 1475]) { add(u, 40 - 9, 'toro'); add(u, 40 + 9, 'toro'); }
     for (let u = 1560; u <= 1900; u += 34) { add(u, -100, 'toro'); add(u + 17, -20, 'toro'); }
-    for (const [u, v] of [[1790, 120], [1850, 110], [1900, 230], [1960, 230], [1850, 330], [1900, 395]]) add(u, v, 'toro');
+    for (const [u, v] of [[1800, 92], [1880, 96], [1950, 100], [1880, 4], [1950, 8], [1850, 330], [1900, 395]]) add(u, v, 'toro');
     for (let u = 2300; u <= 2420; u += 30) { add(u, 30, 'toro'); add(u, 95, 'toro'); }
     // Chōchin hung from every third tunnel gate (props.js reads course.gates).
     // Rope-line markers along the Kazan Rim crest edge (the boundary of the ridge), every 40 m, both sides.
@@ -267,7 +267,7 @@ export class KitsuneCourse {
       e = (TOP - CRATER.floor) + (rimH - (TOP - CRATER.floor)) * Math.pow(t, 2.6);
     }
     // Rounded Hokkaido ranges around (lower than the volcano so it dominates every view), bigger to the north.
-    const side = av - W - 260, beyond = u - 2900 - Math.max(0, -v) * 0.6;
+    const side = av - W - 260, beyond = u - 4300 - Math.max(0, -v) * 0.4 - Math.max(0, v) * 0.25;
     const rr = Math.hypot(x, z);
     const m = Math.max(side, beyond * 0.7, (rr - 4200) * 0.8);
     if (m > -200 && r > 900) {
@@ -362,7 +362,11 @@ export class KitsuneCourse {
       carve = t >= 1 ? 0 : (D - 0.6) * (0.5 + 0.5 * Math.cos(Math.PI * t));   // smooth transition, steepest mid-wall
     }
     const lip = 0.9 * (D / 13) * Math.exp(-(((dv - wf - ww + 1) / 2.6) ** 2));   // the lee lip you pop off
-    return e - carve + lip;
+    // Step-downs in the floor (and the lower walls, fading up them): a bench above each, then a drop.
+    let ledge = 0;
+    for (const [lu, h] of G.ledges) if (u > lu - h * BENCH_PER_M - 2 && u < lu + 6) ledge += cliff(u, lu, h, h * BENCH_PER_M);
+    if (ledge > 0) ledge *= 1 - sstep(wf, wf + ww * 0.7, dv);
+    return e - carve + lip + ledge;
   }
 
   bands(u, v) {

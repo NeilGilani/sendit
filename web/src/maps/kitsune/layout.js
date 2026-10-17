@@ -48,7 +48,7 @@ export const KAZAN = {
   height: (u) => 22 * sstep(25, 140, u) * (1 - sstep(1250, 1500, u)) * (0.85 + 0.15 * Math.sin(u / 190)),
   top: 9,                  // half-width of the rounded crest
   flank: 34,               // m from the crest edge to the foot of the ridge
-  whoop: { wave: 46, amp: 1.6, from: 140, to: 1280 },
+  whoop: { wave: 40, amp: 2.3, from: 140, to: 1280 },
   gaps: [[520, 6], [860, 7], [1150, 6]],   // [u, drop m]
 };
 
@@ -60,6 +60,7 @@ export const GULLY = {
   floor: (u) => 6 + 3 * sstep(430, 700, u),
   depth: (u) => 13 * sstep(430, 560, u) * (1 - sstep(1420, 1560, u)),
   wall: 15,
+  ledges: [[760, 3], [1040, 4], [1290, 3.5]],   // [u, drop m]: step-downs in the gully floor (the fox-fire drops)
 };
 
 // Cliff bands. uc = lip position (u), [v0, v1] lateral extent, h = height (m), var = ± variation,
@@ -85,8 +86,7 @@ export const HITS = [
   [230, -110, 26, 2.4, 'lip', 'Okama Wind Lip'],
   [360, 40, 30, 2.6, 'lip', 'Okama Wind Lip'],
   [470, -190, 22, 2.2, 'lip', 'Okama Wind Lip'],
-  [780, -40, 60, 2.0, 'roller'],
-  [1180, -60, 70, 2.0, 'roller'],
+  [560, 100, 50, 1.8, 'roller'],
   [1440, -40, 30, 2.8, 'lip', 'Shrine Lip'],
   [1600, -70, 18, 2.4, 'lip', 'Lantern Kicker'],
   [1660, -30, 14, 1.8, 'lip', 'Lantern Kicker'],
@@ -103,9 +103,9 @@ export const HITS = [
 // climbs toward the ridge (≥ 1 rides straight onto the roof). Rideable through features.heightAt.
 export const BUILDINGS = [
   { id: 'haiden', name: 'Kitsune Shrine', u: 1765, v: 40, L: 18, W: 24, roof: 'sori', pitch: 30, eave: 4.2, drift: 1.05, colour: 'shrine' },
-  { id: 'kiku', name: 'Ryokan Kiku', u: 1880, v: 150, L: 16, W: 20, roof: 'sori', pitch: 27, eave: 4.6, drift: 1.0, colour: 'ryokan' },
-  { id: 'tsuki', name: 'Ryokan Tsuki', u: 1935, v: 168, L: 14, W: 18, roof: 'sori', pitch: 27, eave: 4.0, drift: 0.9, colour: 'ryokan' },
-  { id: 'yuki', name: 'Ryokan Yuki', u: 1988, v: 158, L: 14, W: 18, roof: 'sori', pitch: 27, eave: 4.0, drift: 0.9, colour: 'ryokan' },
+  { id: 'kiku', name: 'Ryokan Kiku', u: 1852, v: 46, L: 16, W: 20, roof: 'sori', pitch: 27, eave: 4.6, drift: 1.0, colour: 'ryokan' },
+  { id: 'tsuki', name: 'Ryokan Tsuki', u: 1918, v: 50, L: 14, W: 18, roof: 'sori', pitch: 27, eave: 4.0, drift: 0.9, colour: 'ryokan' },
+  { id: 'yuki', name: 'Ryokan Yuki', u: 1984, v: 56, L: 14, W: 18, roof: 'sori', pitch: 27, eave: 4.0, drift: 0.9, colour: 'ryokan' },
   { id: 'tea', name: 'Tea House', u: 1640, v: -150, L: 10, W: 12, roof: 'sori', pitch: 28, eave: 3.4, drift: 1.0, colour: 'ryokan' },
   { id: 'topstation', name: 'Gondola Top Station', u: 395, v: 575, L: 16, W: 14, roof: 'sori', pitch: 24, eave: 5.0, drift: 1.0, colour: 'station' },
   { id: 'basestation', name: 'Gondola Base Station', u: 2470, v: 520, L: 20, W: 16, roof: 'sori', pitch: 24, eave: 5.5, drift: 0.6, colour: 'station' },
@@ -148,14 +148,14 @@ export const DROP_ZONES = [
 
 // The canonical lines, as (u, v) waypoints ('gully' = the gully's centre line, 'weave' = the glade weave):
 // the trails follow them, the bots ride them, and the forest keeps them clear.
-export const WEAVE = { u0: 700, u1: 1460, v: -55, amp: 62, wave: 105 };
+export const WEAVE = { u0: 700, u1: 1460, v: -55, amp: 42, wave: 110 };
 export const RIDE_LINES = {
   okama: { name: 'Okama Bowl', pts: [[0, 0], [150, -20], [400, -55], [620, 20], [800, -40], [1100, -20], [1400, -70], [1550, -80], [1700, -60], [1900, -40], [2150, -10], [2500, 20]] },
   kazan: { name: 'Kazan Rim', pts: [[0, 0], [40, 110], 'crest', [1480, 228], [1600, 250], [1750, 270], [2000, 300], [2250, 260], [2500, 240]] },
   makura: { name: 'Makura Pillows', pts: [[0, 0], [200, -130], [500, -300], [640, -430], [960, -440], [1030, -420], [1320, -400], [1450, -300], [1600, -210], [1800, -190], [2100, -120], [2500, -60]] },
   shirakaba: { name: 'Shirakaba Weave', pts: [[0, 0], [300, -60], [560, -90], [650, -100], 'weave', [1520, -30], [1700, -60], [2000, -60], [2500, -20]] },
   kitsunebi: { name: 'Kitsunebi Gully', pts: [[405, 545], [440, 500], 'gully', [1640, 400], [1800, 415], [2000, 420], [2250, 400], [2500, 380]] },
-  senbon: { name: 'Senbon Torii', pts: [[1430, 40], [1545, 40], 'tunnel', [1740, 40], [1790, 46], [1840, 115], [1880, 150], [1935, 168], [1988, 158], [2100, 120], [2300, 90], [2500, 80]] },
+  senbon: { name: 'Senbon Torii', pts: [[1430, 40], [1545, 40], 'tunnel', [1740, 40], [1800, 43], [1852, 46], [1918, 50], [1984, 56], [2100, 60], [2300, 64], [2500, 70]] },
 };
 
 // The trails (the mountains-and-trails contract: lobby list, spawn, finish).
@@ -170,7 +170,7 @@ export const TRAILS = [
     description: 'A tight weave through the white birch glade. Firs sit in deep tree wells; brush the trunks for close shaves.' },
   { id: 'kitsunebi', name: 'Kitsunebi Gully', difficulty: 'blue', start: [430, 520], finishV: 380,
     description: 'From the gondola top station into a natural half-pipe lit by fox-fire lanterns. Hit the walls, carve the transitions, then out past the onsen.' },
-  { id: 'senbon', name: 'Senbon Torii', difficulty: 'park', start: [1430, 40], finishV: 80,
+  { id: 'senbon', name: 'Senbon Torii', difficulty: 'park', start: [1430, 40], finishV: 70,
     description: 'The shrine village jump line: through the Ō-torii and a tunnel of 33 vermilion gates, up the drift onto the shrine roof, then roof to roof down the ryokan row.' },
 ];
 

@@ -70,7 +70,7 @@ export function planForest(course) {
     const u = 650 + rnd() * 860, v = -340 + rnd() * 540;
     const g = glade(u, v);
     if (g < 0.25 || rnd() > g) continue;
-    if (!free(u, v, 5.5)) continue;
+    if (!free(u, v, 7)) continue;
     const R = 5.5 + 5 * (1 - g) + rnd() * 1.5;
     if (near(u, v, R)) continue;
     put(u, v, R * 0.8);
