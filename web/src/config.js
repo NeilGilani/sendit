@@ -256,6 +256,7 @@ export const ANIM = {
     toeDrive: 0.07,           // m knees/hips forward on the toe edge
     toeTall: 0.15,            // rad the hips (and 0.7 × the spine) unfold on a full toe-side carve: knees drive, torso stays tall
     skidLook: 0.85,           // share of the skid angle the head (0.7) and shoulders (0.3) turn back toward the path (slide stops)
+    headTilt: 0.1,            // rad head pitch toward the toes that levels the head turned down the nose (riding straight)
     pressShift: 0.11,         // m pelvis shift toward the pressed end (ollie / nollie / butter)
     pressPitch: 0.16,         // rad board flex / nose-lift while pressing
     popSnap: 0.38,            // rad the free end snaps up at an ollie / nollie, settling in ~0.3 s

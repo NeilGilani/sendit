@@ -632,7 +632,8 @@ export class Rider {
     // hips, so for the body that is a toe / heel tilt and the head levels it with a pitch (+ X = toward the
     // toes; toeSide = which side of travel the toes are on).
     const toeSide = nx * (p.look >= 0 ? 1 : -1);
-    const level = -(p.worldRoll ?? p.lean) * toeSide * ANIM.headLevel * (1 - p.air) * ns;
+    // (+ BA.headTilt: the head turned down the nose sat a few degrees toward the heels riding straight.)
+    const level = (-(p.worldRoll ?? p.lean) * toeSide * ANIM.headLevel * (1 - p.air) + BA.headTilt) * ns;
     this.trunk(off, hipYaw + nx * 0.3 * sk, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist + gT * 0.2 + skidLook * 0.3, wob - p.lean * 0.15, headYaw + skidLook * 0.7, -(hipPitch + bend) * 0.6 + level);
     // Legs: feet in the bindings across the board, knees toward the toe edge and a little duck.
     const w = st.width / 2;
