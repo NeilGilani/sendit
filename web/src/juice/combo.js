@@ -30,7 +30,8 @@ export class ComboTracker {
     this.idle = 0;
     this.best = 0;           // best banked bonus this ride
     this.offs = [
-      on('activity', ({ type }) => { this.source = this.pl.flow ? 'flow' : type === 'challenge' ? 'challenge' : 'own'; this.clear(); }),
+      // A Challenge run is scored on the activity's style combo, so it wins over the flow line chain.
+      on('activity', ({ type }) => { this.source = type === 'challenge' ? 'challenge' : this.pl.flow ? 'flow' : 'own'; this.clear(); }),
       on('rideStarted', () => { this.clear(); this.best = 0; }),
       on('respawned', () => this.clear()),
       on('score', (e) => this.onScore(e)),
@@ -41,7 +42,12 @@ export class ComboTracker {
       on('flowLost', ({ pts }) => { if (this.source === 'flow') this.lost(pts, this.mirror?.mult ?? 1); }),
       // challenge
       on('combo', (s) => { if (this.source === 'challenge') this.setMirror({ ...s, items: this.mirror?.items || [] }); }),
-      on('comboBanked', ({ banked, mult }) => { if (this.source === 'challenge') this.banked(banked, mult, this.mirror?.pts ?? 0); }),
+      on('comboBanked', ({ banked, mult }) => {
+        if (this.source !== 'challenge') return;
+        const pts = this.mirror?.pts ?? 0;
+        if (mult < this.C.minBankMult) { this.mirror = null; emit('juiceCombo', null); return; }   // a lone move is not a combo
+        this.banked(Math.max(0, banked - pts), mult, pts);   // activities banks pts × mult: the bonus is the extra
+      }),
       on('comboLost', () => { if (this.source === 'challenge') this.lost(this.mirror?.pts ?? 0, this.mirror?.mult ?? 1); }),
     ];
   }
@@ -57,9 +63,17 @@ export class ComboTracker {
     return { ...s, left: this.left(), source: this.source };
   }
 
+  /** True while the source's own rules keep the chain from timing out (own: air + rails; flow: air; challenge: never). */
+  live() {
+    const st = this.pl.state;
+    if (this.source === 'own') return st === AIR || st === GRIND;
+    if (this.source === 'flow') return st === AIR;
+    return false;
+  }
+
   left() {
     const pl = this.pl;
-    if (pl.state === AIR || pl.state === GRIND) return 1;
+    if (this.live()) return 1;
     if (this.source === 'flow' && pl.flow) return Math.max(0, 1 - pl.flow.idle / pl.flow.C.chainWindow);
     if (this.source === 'challenge') return this.mirror ? Math.max(0, 1 - this.idle / CHALLENGE_WINDOW) : 0;
     return Math.max(0, 1 - this.idle / this.C.window);
@@ -96,9 +110,7 @@ export class ComboTracker {
 
   /** Per frame (real seconds). Banks the own chain once it has been idle on the snow for the window. */
   update(dt) {
-    const pl = this.pl;
-    const live = pl.state === AIR || pl.state === GRIND;
-    if (!live) this.idle += dt;
+    if (!this.live()) this.idle += dt;
     if (this.source === 'own' && this.chain && this.idle >= this.C.window) this.bank();
     if (this.source === 'challenge' && this.mirror && this.idle > CHALLENGE_WINDOW + 0.3) this.mirror = null;   // the activity banks on its own clock
   }

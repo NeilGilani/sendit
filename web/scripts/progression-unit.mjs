@@ -308,6 +308,41 @@ export async function run(test, assert) {
     game.mode = mode0;
   });
 
+  await test('review fixes: a swap only changes its own slot; challenge banks pay the bonus; rails do not hold a flow chain', () => {
+    // Swap: every day of a month, swapping slot 0 leaves slots 1 and 2 (and their done state) alone.
+    for (let d = 1; d <= 28; d++) {
+      const { p } = make(`2026-11-${String(d).padStart(2, '0')}T10:00:00`);
+      const before = p.challenges();
+      p.ensureDay().done[before[2].id] = true;
+      const c = p.reroll(0);
+      const after = p.challenges();
+      assert.notEqual(c.id, before[0].id);
+      assert.deepEqual(after.slice(1).map((x) => x.id), before.slice(1).map((x) => x.id), `day ${d}`);
+      assert.equal(after[2].done, true);
+      assert.equal(new Set(after.map((x) => x.cat)).size, 3, 'still three categories');
+    }
+    // Challenge mirror: a lone move is not a combo; a real one banks only the multiplied extra.
+    const pl = { state: 1, flow: { idle: 0, C: { chainWindow: 3 } } };
+    const cb = new ComboTracker(pl);
+    const banks = [];
+    const off = on('juiceComboBanked', (e) => banks.push(e));
+    emit('activity', { type: 'challenge' });
+    assert.equal(cb.source, 'challenge', 'challenge wins over the flow chain');
+    emit('combo', { mult: 1, pts: 20, n: 1 });
+    emit('comboBanked', { banked: 20, mult: 1, total: 20 });
+    assert.equal(banks.length, 0);
+    emit('combo', { mult: 2, pts: 300, n: 3 });
+    emit('comboBanked', { banked: 600, mult: 2, total: 620 });
+    assert.equal(banks[0].bonus, 300);
+    emit('activity', { type: 'zen' });
+    assert.equal(cb.source, 'flow');
+    pl.state = 5;   // GRIND: flow.js keeps idling on rails, so the HUD must not show a full bar
+    assert.equal(cb.live(), false);
+    pl.state = 2;
+    assert.equal(cb.live(), true);
+    off(); cb.dispose();
+  });
+
   await test('juice time warp: hit-stop freezes, eases back to real time, respects cooldown', () => {
     const w = new TimeWarp();
     assert.equal(w.scale(0.016), 1);

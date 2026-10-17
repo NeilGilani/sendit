@@ -31,14 +31,14 @@ There is one live chain, and the HUD shows it at the top centre, whichever syste
 | Where | Source | Rules |
 |---|---|---|
 | Flow maps (Ravenspire, Voltage Park) | physics/flow.js line chain | flow.js rules: ×0.25 per different move up to ×5, 3.2 to 3.6 s window. The flow HUD's own chain, grade and bank banner are hidden; ours replaces them. |
-| Challenge mode | activities.js style combo | activities.js rules, with a 2.6 s window. |
+| Challenge mode (on every map, flow maps included, since the run is scored on it) | activities.js style combo | activities.js rules, with a 2.6 s window. A lone move is not a combo; a bank pays `banked − pts`. |
 | Everywhere else (Valcrest, Blackspruce in Zen) | juice/combo.js | See below. |
 
 Rules for the juice/combo.js chain:
 
 - Every scored move adds its points to the chain: tricks, rails, close shaves, drops and the Blackspruce tree slalom. Distance markers (`250 m`) are not moves.
 - The multiplier grows by `step` for each *different* move. A repeat counts `repeatCredit`; the move key strips Perfect, Sketchy, numbers and lengths.
-- Air and rails keep the chain alive. After `window` seconds on the snow the chain banks: `addScore("Combo ×m", pts × (m − 1))`.
+- Air and rails keep the chain alive. (For the flow source only air does, as in flow.js. The Challenge combo keeps its own clock.) After `window` seconds on the snow the chain banks: `addScore("Combo ×m", pts × (m − 1))`.
 - A crash loses the chain, and a "COMBO LOST −pts" banner shakes on screen.
 - While the chain rides on an air or a rail at ×1.5 or more, the panel turns pink and shows **LAND IT**.
 
@@ -147,7 +147,7 @@ This is one `EffectPass`, inserted before SMAA through `composer.addPass(pass, i
 
 - **Rush.** Driven by speed ratio from 0.82 to 1.0, up to 0.45. The SEND IT state adds +0.12. Blur length is 0.018 and fringe 0.0028 (UV at the edge), kept subtle.
 - **Pulses.** `huge` 1, `stomp` 0.75, `bank` 0.55, `flow` 0.8; they decay at 2.4/s.
-- **Cost.** The pass is disabled whenever its intensity is about 0.
+- **Cost.** The pass is disabled whenever its intensity is about 0. It runs for 20 frames during loading so its shader compiles behind the loading screen.
 - **Quality.** Low = off, medium = 4 blur taps, high = 8 (`JUICE_SPEEDFX.taps`).
 - **Measured cost.** `node web/scripts/juice-perf.mjs <url> 1` runs alternating forced-on and off windows, back to back. At medium, 1600×900, on a shared GPU (00:30 PDT, other sessions running), the median frame was 8.5 ms with the pass on and 8.7 ms off. No difference showed above the noise.
 
@@ -198,7 +198,9 @@ Bus events: `musicEnergy {level}` at 5 Hz, and `musicDrop {kind, strength}`.
 
 ### Daily challenges
 
-Three challenges are chosen per local day from `CHALLENGE_POOL`, each from a different category. The choice is seeded by the date, so it stays the same all day and changes at midnight. There is one free **Swap** per day for an unfinished challenge. Progress resets at midnight; nothing earned is ever taken away.
+Three challenges are chosen per local day from `CHALLENGE_POOL`, each from a different category. The choice is seeded by the date, so it stays the same all day and changes at midnight. The day's list is stored in `state.daily.list`.
+
+There is one free **Swap** per day for an unfinished challenge. A swap replaces only that slot (`swapDaily()`), with a category none of the three currently show. Progress resets at midnight; nothing earned is ever taken away.
 
 | Category | Examples |
 |---|---|

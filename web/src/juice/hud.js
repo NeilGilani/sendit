@@ -231,6 +231,7 @@ export function mountJuiceHud({ player, combo, input, camera }) {
 
   on('landed', (e) => {
     if (e.result === 'crash') return;
+    if (!e.clean && e.air < JUICE_HUD.minAirToAnnounce) { callout('WOBBLE!', '#ff6bb0'); return; }   // too short to grade
     const named = !!e.trick;
     if (e.air < JUICE_HUD.minAirToAnnounce && !(named && e.air > 0.35)) return;
     const grade = gradeOf(e);

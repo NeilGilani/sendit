@@ -24,11 +24,10 @@ export const JUICE_MUSIC = {
 export class MusicEnergy {
   constructor({ sound, player, combo }) {
     Object.assign(this, { sound, player, combo });
-    this.level = 0; this.burst = 0; this.flowReal = false; this.lifted = false; this.liftT = 0;
+    this.level = 0; this.burst = 0; this.lifted = false; this.liftT = 0;
     this.emitT = 0; this.stingT = 0;
     const C = JUICE_MUSIC;
     this.offs = [
-      on('flowState', ({ on: st }) => { this.flowReal = !!st; }),
       on('landed', (e) => {
         if (!e.clean || e.result === 'crash') return;
         const huge = /720|900|1080|1260|1440|flip|cork|misty|rodeo|wildcat|tamedog/i.test(e.trick || '') || e.air >= 2;
@@ -44,6 +43,9 @@ export class MusicEnergy {
   }
 
   dispose() { for (const o of this.offs) o(); this.release(); }
+
+  /** The real SEND IT state (polled: a ride restart clears it without a flowState event). */
+  get flowReal() { return !!this.player?.flow?.inState; }
 
   drop(kind, strength) {
     this.burst = Math.min(1, this.burst + 0.5 * strength + 0.2);

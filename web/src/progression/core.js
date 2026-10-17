@@ -64,6 +64,18 @@ export const CHALLENGE_POOL = [
   { cat: 'medal', make: (r) => { const g = pick(r, ['bronze', 'silver', 'gold']); return { stat: `medal-${g}`, goal: 1, title: `Earn a ${g} medal`, desc: 'Any Challenge run', xp: { bronze: 180, silver: 280, gold: 420 }[g] }; } },
 ];
 
+/**
+ * A swapped daily for `slot` (its `n`-th swap), from a category none of the other slots show.
+ * Only that slot changes; the day's state keeps the list (Progression.state.daily.list).
+ */
+export function swapDaily(day, slot, n, excludeCats) {
+  const r = rng(`${day}#${slot}#swap${n}`);
+  const pool = CHALLENGE_POOL.filter((t) => !excludeCats.includes(t.cat));
+  const t = pool[Math.floor(r() * pool.length)];
+  const c = t.make(r);
+  return { id: `${day}:${slot}:${n}`, slot, cat: t.cat, scope: 'day', ...c, xp: Math.round(c.xp) };
+}
+
 /** The three dailies for a day key (YYYY-MM-DD), from different categories, stable for the day. */
 export function dailiesFor(day, rerolls = {}) {
   const out = [], used = new Set();
@@ -146,7 +158,7 @@ export function defaultState() {
   return {
     version: PROGRESSION_VERSION, xp: 0,
     life: { rides: 0, tricks: 0, flips: 0, stomps: 0, near: 0, meters: 0, air: 0, grindM: 0, maxSpin: 0, bestMult: 0, topKmh: 0, golds: 0, dailySweeps: 0, maps: {}, trickBook: {} },
-    daily: null,           // { day, rerolls: {slot: n}, rerollsLeft, progress: {stat: n}, done: {id: true}, swept }
+    daily: null,           // { day, list: [3 challenges], rerolls: {slot: n}, rerollsLeft, progress: {stat: n}, done: {id: true}, swept }
     weekly: null,          // { week, progress: {stat: n}, done }
     achievements: {},      // id → unlock time (ms)
     pb: {},                // mapId → { stat: value }
@@ -166,6 +178,8 @@ export function sanitizeState(raw) {
   s.pb = raw.pb && typeof raw.pb === 'object' ? JSON.parse(JSON.stringify(raw.pb)) : {};
   s.daily = raw.daily && typeof raw.daily.day === 'string' ? {
     day: raw.daily.day, rerolls: { ...(raw.daily.rerolls || {}) }, rerollsLeft: num(raw.daily.rerollsLeft, 1),
+    list: Array.isArray(raw.daily.list) && raw.daily.list.length === 3 && raw.daily.list.every((c) => c && typeof c.id === 'string' && typeof c.stat === 'string' && c.goal > 0 && typeof c.title === 'string')
+      ? raw.daily.list.map((c) => ({ ...c })) : dailiesFor(raw.daily.day),
     progress: { ...(raw.daily.progress || {}) }, done: { ...(raw.daily.done || {}) }, swept: !!raw.daily.swept,
   } : null;
   s.weekly = raw.weekly && typeof raw.weekly.week === 'string' ? { week: raw.weekly.week, progress: { ...(raw.weekly.progress || {}) }, done: !!raw.weekly.done } : null;
@@ -191,7 +205,13 @@ export class Progression {
     this.ensureDay();
   }
 
-  save() { this.storage?.set(PROGRESSION_KEY, this.state); }
+  save() { clearTimeout(this._saveT); this._saveT = null; this.storage?.set(PROGRESSION_KEY, this.state); }
+
+  /** During a ride, batch the writes (score events come several times a second). */
+  saveSoon() {
+    if (!this.ride) return this.save();
+    if (!this._saveT) this._saveT = setTimeout(() => this.save(), 4000);
+  }
 
   // ---------------------------------------------------------------- levels
   get level() { return levelFor(this.state.xp).level; }
@@ -210,14 +230,14 @@ export class Progression {
       this.emit('levelUp', { level: l, prev: l - 1, rank, rankUp });
     }
     if (p.level > before) this.checkAchievements();
-    this.save();
+    this.saveSoon();
     return gained;
   }
 
   // ---------------------------------------------------------------- dailies
   ensureDay() {
     const day = dayKey(this.now());
-    if (this.state.daily?.day !== day) this.state.daily = { day, rerolls: {}, rerollsLeft: 1, progress: {}, done: {}, swept: false };
+    if (this.state.daily?.day !== day) this.state.daily = { day, list: dailiesFor(day), rerolls: {}, rerollsLeft: 1, progress: {}, done: {}, swept: false };
     return this.state.daily;
   }
 
@@ -236,7 +256,7 @@ export class Progression {
 
   challenges() {
     const d = this.ensureDay();
-    return dailiesFor(d.day, d.rerolls).map((c) => {
+    return d.list.map((c) => {
       const v = c.scope === 'ride' ? Math.max(d.progress[`best:${c.stat}`] || 0, this.ride?.[c.stat] || 0) : d.progress[c.stat] || 0;
       return { ...c, value: Math.min(c.goal, v), done: !!d.done[c.id] };
     });
@@ -249,6 +269,8 @@ export class Progression {
     if (!c || c.done || d.rerollsLeft <= 0) return null;
     d.rerollsLeft--;
     d.rerolls[slot] = (d.rerolls[slot] || 0) + 1;
+    // Only this slot changes, to a category the other two (and this one) are not showing.
+    d.list[slot] = swapDaily(d.day, slot, d.rerolls[slot], d.list.map((x) => x.cat));
     this.save();
     return this.challenges().find((x) => x.slot === slot);
   }

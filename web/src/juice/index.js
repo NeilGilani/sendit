@@ -28,13 +28,17 @@ export function installJuice({ player, cam, sound, input, post, camera, fx, acti
   const juice = {
     combo, warp, hud, speedfx, music, splits,
     /** Physics time scale for this frame (hit-stop / micro slow-mo); 1 = real time. */
-    timeScale(dt) { return game.mode === Mode.RIDING ? warp.scale(dt) : 1; },
+    timeScale(dt) {
+      if (game.mode === Mode.RIDING) return warp.scale(dt);
+      warp.cur = null; warp.k = 1;   // leaving the ride (lift, pause, lobby) drops any warp in progress
+      return 1;
+    },
     update(dt, time) {
       const riding = game.mode === Mode.RIDING;
       if (riding) combo.update(dt * warp.k);
       hud?.update(dt);
       music.update(dt);
-      speedfx?.update(dt, time, player.speedRatio ?? 0, riding);
+      speedfx?.update(dt, time, player.speedRatio ?? 0, riding, !!player.flow?.inState);
     },
     toast: (o) => hud?.toast(o),
   };
@@ -53,7 +57,8 @@ export function installJuice({ player, cam, sound, input, post, camera, fx, acti
   // scores of 60+ points, so only the small moves (close shaves, short rails) tick here.
   let lastPts = 0, lastMult = 1;
   on('score', ({ points }) => { lastPts = points; });
-  on('juiceCombo', (s) => {
+  on('juiceCombo', (s) => queueMicrotask(() => comboTick(s)));   // after every 'score' listener (lastPts is this move's)
+  const comboTick = (s) => {
     const m = s?.mult ?? 1;
     if (s && m > lastMult + 0.01 && lastPts < 60 && sound?.ctx) sound.oneShot?.('combo_tick', 0.3, 0.85 + Math.min(m, 6) * 0.07)?.catch?.(() => {});
     // A new tier word (NICE, SICK, INSANE…): a bright high tick and a short buzz.
@@ -63,7 +68,7 @@ export function installJuice({ player, cam, sound, input, post, camera, fx, acti
       if (sound?.ctx) sound.oneShot?.('combo_tick', 0.42, 1.3 + tier * 0.08)?.catch?.(() => {});
     }
     lastMult = m;
-  });
+  };
   // Rails: a light buzz on the lock-in and on each kink.
   on('grindStart', () => input?.rumble?.(0.15, 0.45, 90));
   on('grindKink', () => input?.rumble?.(0.3, 0.5, 70));

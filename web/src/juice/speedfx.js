@@ -95,11 +95,12 @@ export function installSpeedFx({ post, camera }) {
     on('juiceComboBanked', ({ mult }) => { if (mult >= 2.5) pulse('bank'); }),
     on('flowState', ({ on: st }) => { if (st) pulse('flow'); }),
   ];
-  let flowHold = false;
-  offs.push(on('flowState', ({ on: st }) => { flowHold = !!st; }));
+  // Compile the pass's shader during the loading screen (a no-op at rush 0), not on the first big moment.
+  let warm = 20;
   return {
     pass, pulse, setQuality, dispose: () => offs.forEach((o) => o()),
-    update(dt, time, speedRatio, riding) {
+    update(dt, time, speedRatio, riding, flowHold = false) {
+      if (warm > 0) { warm--; U('rush').value = 0; U('lines').value = 0; pass.enabled = true; return; }
       boost *= Math.exp(-S.pulseDecay * dt);
       const want = riding && settings.juiceSpeedFx !== false && taps > 0
         ? Math.max(THREE.MathUtils.smoothstep(speedRatio, S.speedFrom, S.speedFull) * S.speedAmount + (flowHold ? 0.12 : 0), boost)

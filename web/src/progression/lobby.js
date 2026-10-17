@@ -2,7 +2,7 @@
 // bests) through the tab registry, and a level badge + XP bar on the profile chip (a small widget
 // added next to the chip's text; the lobby's own markup is not edited).
 import { registerLobbyTab } from '../lobby/tabs.js';
-import { on } from '../state.js';
+import { on, game, Mode } from '../state.js';
 import { progression, PB_STATS } from './index.js';
 import { fmtVal } from './ui.js';
 
@@ -177,7 +177,8 @@ function chipWidget() {
   return true;
 }
 if (typeof document !== 'undefined') {
-  for (const ev of ['mode', 'progressXp', 'profile', 'lobbyTabs', 'challengeDone']) on(ev, () => { chipWidget(); todayWidget(); });
+  // Only while the lobby is up (score events during a ride would re-render hidden widgets).
+  for (const ev of ['mode', 'progressXp', 'profile', 'lobbyTabs', 'challengeDone']) on(ev, () => { if (game.mode === Mode.MENU) { chipWidget(); todayWidget(); } });
   const tryMount = () => { if (!chipWidget() || !todayWidget()) setTimeout(tryMount, 500); };
   tryMount();
 }
