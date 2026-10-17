@@ -232,6 +232,7 @@ export class AudioEngine {
       this.riderGain.gain.setTargetAtTime(dk, when, 0.15);
       this.riderLP.frequency.setTargetAtTime(Math.min(20000, 20000 * Math.pow(dk, Dd.lpExp)), when, 0.15);
     }
+    this.dbg = { snowParams, windParams };   // for the ?audiodebug overlay
     // ---- transients from state changes
     if (!quiet) this.transients(r, when, edge, powder);
     // ---- grind
@@ -252,8 +253,8 @@ export class AudioEngine {
     if (r.st === ST.GRIND) duck = Math.min(duck, D.grindDb);
     if (this.landDuckT > 0) { this.landDuckT -= dt; duck = Math.min(duck, D.landDb); }
     // a music drop (musicDrop): dip under the riser, then a short push when it lands
-    if (this.dropT > 0) { this.dropT -= dt; duck = Math.min(duck, D.dropDb); if (this.dropT <= 0) this.pushT = D.pushTime; }
-    else if (this.pushT > 0) { this.pushT -= dt; if (duck === 0) duck = D.pushDb; }
+    if (this.dropT > 0) { this.dropT -= dt; duck = Math.min(duck, D.dropDb); if (this.dropT <= 0) this.musicPushT = D.pushTime; }
+    else if (this.musicPushT > 0) { this.musicPushT -= dt; if (duck === 0) duck = D.pushDb; }
     if (Math.abs(duck - this.duckDb) > 0.1) {
       this.duck.gain.setTargetAtTime(T.mix.music * dbToGain(duck), when, duck < this.duckDb ? D.attack : D.release);
       this.duckDb = duck;
@@ -309,8 +310,8 @@ export class AudioEngine {
       this.count('bump');
     }
     // pushing on the flat: a stroke every ~0.65 s while W is held below push speed
-    if (r.push) { if ((this.pushT = (this.pushT ?? 0) - (when - (this.lastWhen ?? when))) <= 0) { this.pushT = F.push.period * (0.9 + Math.random() * 0.2); this.fx.push(when, r.board); this.count('push'); } }
-    else this.pushT = 0.12;   // the first stroke comes a beat after W goes down
+    if (r.push) { if ((this.strokeT = (this.strokeT ?? 0) - (when - (this.lastWhen ?? when))) <= 0) { this.strokeT = F.push.period * (0.9 + Math.random() * 0.2); this.fx.push(when, r.board); this.count('push'); } }
+    else this.strokeT = 0.12;   // the first stroke comes a beat after W goes down
     this.lastWhen = when;
     // slash: the edge bites hard and fast while sliding a little → an exaggerated fan of spray (Steep does this)
     const SL = F.slash;

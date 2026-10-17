@@ -183,6 +183,7 @@ if (has('music-energy-drop')) { const r = R['music-energy-drop']; expect(r.centr
 if (has('camera-pulls-away')) expect(lvl('camera-pulls-away', 5, 6) < lvl('camera-pulls-away', 0.5, 1.8) * 0.4, 'the rider fades when the camera pulls far away');
 if (has('push-off')) expect((R['push-off'].events.push || 0) >= 5, 'pushing off on the flat makes strokes');
 if (has('bumps')) expect((R['bumps'].events.bump || 0) >= 4, 'bumps and rollers thump through the legs');
+if (has('groomed-carve-ski')) expect(R['groomed-carve-ski'].duckDb === 0, 'the music is untouched while cruising (no stray duck or push)');
 if (has('park-crowd')) expect(lvl('park-crowd', 3.2, 5) > lvl('park-crowd', 0.5, 2.5) * 1.5, 'a clean park landing gets a cheer');
 await browser.close();
 if (errors.length) { console.log('page errors:', errors.slice(0, 5)); fails++; }

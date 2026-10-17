@@ -81,7 +81,7 @@ async function render(spec, sr, secs) {
     pk.push(p);
   }
   const sp = spectrum(L, R, sr, Math.floor((spec.specFrom || 0) * sr), spec.specTo ? Math.floor(spec.specTo * sr) : L.length);
-  const out = { peak, nan, rms, pk, rmsAll: Math.sqrt(sum / (2 * L.length)), centroid: sp.centroid, bands: sp.bands, events: eng.stats.events, paramNaN: eng.stats.nan || 0, workletError: eng.stats.workletError || 0, worklet: eng.worklet };
+  const out = { peak, nan, rms, pk, rmsAll: Math.sqrt(sum / (2 * L.length)), centroid: sp.centroid, bands: sp.bands, events: eng.stats.events, paramNaN: eng.stats.nan || 0, duckDb: eng.duckDb, workletError: eng.stats.workletError || 0, worklet: eng.worklet };
   if (spec.wav) out.wav = toWavBase64(L, R, sr);
   return out;
 }

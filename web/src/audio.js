@@ -84,7 +84,33 @@ export class SoundScape {
     E('gate'); E('liftBoarded'); E('liftArrived');
     on('rideStarted', ({ equipment }) => this.engine.event('rideStarted', { board: equipment === 'snowboard' ? 1 : 0 }, c.currentTime));
     on('crashed', () => this.oneShot('crash', 0.3, 1, this.engine.fxBus));
+    if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('audiodebug')) this.mountDebug();
     this.ready = true;
+  }
+
+  /** ?audiodebug: a small live read-out of what the engine is being fed (for tuning by ear). */
+  mountDebug() {
+    const el = document.createElement('pre');
+    el.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99999;margin:0;padding:6px 8px;font:11px/1.35 ui-monospace,monospace;color:#cfe;background:rgba(0,10,20,.72);border-radius:6px;pointer-events:none;white-space:pre';
+    document.body.appendChild(el);
+    this.debugEl = el; this.debugT = 0;
+  }
+
+  drawDebug(dt) {
+    if (!this.debugEl || (this.debugT -= dt) > 0) return;
+    this.debugT = 0.2;
+    const e = this.engine, s = e.dbg?.snowParams, w = e.dbg?.windParams;
+    if (!s) return;
+    const f = (x) => (Number.isFinite(x) ? x.toFixed(2) : String(x));
+    const ev = Object.entries(e.stats.events).slice(-8).map(([k, v]) => `${k} ${v}`).join(' · ');
+    this.debugEl.textContent = [
+      `audio · ${e.mapId} · ${e.view} · ${e.worklet ? 'worklet' : 'loops'}${e.stats.workletError ? ' · DSP ERROR' : ''}`,
+      `snow  v ${f(s.speed)} m/s  edge ${f(s.edge)}  load ${f(s.load)}  skid ${f(s.skid)}  stop ${f(s.stop)}  board ${s.board}`,
+      `      groomed ${f(s.groomed)}  powder ${f(s.powder)}  ice ${f(s.ice)}  park ${f(s.park)}  sink ${f(s.sink)}  chatter ${f(s.chatter)}`,
+      `wind  v ${f(w.v)}  air ${f(w.air)}  spin ${f(w.spin)}  tuck ${f(w.tuck)}  ambient ${f(w.ambient)}`,
+      `mix   music duck ${f(e.duckDb)} dB  lp ${Math.round(e.musicLpF ?? 20000)} Hz  camera ×${f(e.distK ?? 1)}  energy ${e.energy === undefined ? '–' : f(e.energy)}`,
+      `events ${ev}`,
+    ].join('\n');
   }
 
   /** −1 (obstacle on the rider's left) … 1 (right), from the travel direction. */
@@ -255,6 +281,7 @@ export class SoundScape {
     const camDist = camera.position.distanceTo(s.renderPos ?? s.position);
     this.engine.frame(readRider(s, { menu }), c.currentTime, dt, { paused, menu, slow: this.slow ?? 1, camDist });
     this.liftTowers(s, c.currentTime);
+    this.drawDebug(dt);
     if (!menu && !paused) this.treePasses(s, c.currentTime);
     this.engine.others.update(c.currentTime, window.__sendit?.life?.skiers, camera.position, !menu && !paused);   // other skiers swishing by
 
