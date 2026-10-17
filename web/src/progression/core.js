@@ -180,7 +180,7 @@ export function sanitizeState(raw) {
   s.daily = raw.daily && typeof raw.daily.day === 'string' ? {
     day: raw.daily.day, rerolls: { ...(raw.daily.rerolls || {}) }, rerollsLeft: num(raw.daily.rerollsLeft, 1),
     list: Array.isArray(raw.daily.list) && raw.daily.list.length === 3 && raw.daily.list.every((c) => c && typeof c.id === 'string' && typeof c.stat === 'string' && c.goal > 0 && typeof c.title === 'string')
-      ? raw.daily.list.map((c) => ({ ...c })) : dailiesFor(raw.daily.day),
+      ? raw.daily.list.map((c) => ({ ...c })) : dailiesFor(raw.daily.day, raw.daily.rerolls || {}),
     progress: { ...(raw.daily.progress || {}) }, done: { ...(raw.daily.done || {}) }, swept: !!raw.daily.swept, bonusLeft: num(raw.daily.bonusLeft, XP_SOURCES.dailyBonus),
   } : null;
   s.weekly = raw.weekly && typeof raw.weekly.week === 'string' ? { week: raw.weekly.week, progress: { ...(raw.weekly.progress || {}) }, done: !!raw.weekly.done } : null;

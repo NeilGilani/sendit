@@ -350,6 +350,11 @@ export async function run(test, assert) {
     emit('combo', { mult: 1, pts: 20, n: 1 });
     emit('comboBanked', { banked: 20, mult: 1, total: 20 });
     assert.equal(banks.length, 0);
+    emit('combo', { mult: 1.25, pts: 100, n: 2 });
+    emit('comboBanked', { banked: 125, mult: 1.25, total: 145 });
+    assert.equal(banks.length, 1, 'a two-move challenge combo (step 0.25) still banks');
+    assert.equal(banks[0].bonus, 25);
+    banks.length = 0;
     emit('combo', { mult: 2, pts: 300, n: 3 });
     emit('comboBanked', { banked: 600, mult: 2, total: 620 });
     assert.equal(banks[0].bonus, 300);

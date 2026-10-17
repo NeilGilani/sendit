@@ -45,7 +45,7 @@ export class ComboTracker {
       on('comboBanked', ({ banked, mult }) => {
         if (this.source !== 'challenge') return;
         const pts = this.mirror?.pts ?? 0;
-        if (mult < this.C.minBankMult) { this.mirror = null; emit('juiceCombo', null); return; }   // a lone move is not a combo
+        if ((this.mirror?.n ?? 0) < 2 || mult <= 1) { this.mirror = null; emit('juiceCombo', null); return; }   // a lone move is not a combo
         this.banked(Math.max(0, banked - pts), mult, pts);   // activities banks pts × mult: the bonus is the extra
       }),
       on('comboLost', () => { if (this.source === 'challenge') this.lost(this.mirror?.pts ?? 0, this.mirror?.mult ?? 1); }),

@@ -73,9 +73,12 @@ export function trackProgression({ player, getMapId }) {
   const end = () => { if (!open) return null; open = false; return P.endRide(); };
   on('rideStarted', start);
   // First rides: one line on how XP works (the trick tips and drop-zone hints come earlier).
+  let hintT = 0;
+  on('rideEnded', () => clearTimeout(hintT));
   on('rideStarted', () => {
+    clearTimeout(hintT);
     if (P.state.life.rides >= 2) return;
-    setTimeout(() => { if (open && game.mode === Mode.RIDING) emit('hint', "Tricks, combos, close shaves and dailies all earn XP · level up in the lobby's Progress tab"); }, 15000);
+    hintT = setTimeout(() => { if (open && game.mode === Mode.RIDING) emit('hint', "Tricks, combos, close shaves and dailies all earn XP · level up in the lobby's Progress tab"); }, 15000);
   });
   on('rideEnded', () => { const s = end(); if (s) emit('progressRideSummary', s); });
   on('score', ({ points }) => { if (open) P.recordScore(points); });
@@ -92,6 +95,7 @@ export function trackProgression({ player, getMapId }) {
   on('juiceComboBanked', ({ mult, bonus }) => { if (open) P.recordCombo(mult, bonus); });
   on('runFinished', ({ medal }) => P.recordMedal(medal));
   globalThis.addEventListener?.('pagehide', () => { if (open) end(); P.save(); });
+  globalThis.document?.addEventListener?.('visibilitychange', () => { if (document.visibilityState === 'hidden') P.save(); });   // flush batched in-ride writes
   return function update(dt) {
     if (!open || game.mode !== Mode.RIDING) return;
     const d = game.distance || 0;
