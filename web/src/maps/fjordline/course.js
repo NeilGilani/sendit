@@ -299,7 +299,11 @@ export class FjordlineCourse {
     if (low > 0) e += low * (fbm(u / 260 + 4, v / 120, 2) - 0.5) * 14;
     // Big buttresses and bowls across the whole mountain (seen from the fjord it must not read as a plane).
     const wide = sstep(60, 300, u) * (1 - sstep(1900, 2200, u)) * land;
-    if (wide > 0) e += wide * (fbm(u / 700 + 1.3, v / 230 + 8.1, 3) - 0.5) * 80 * (1 - 0.8 * Math.exp(-((this.lineDistFast(u, v) / 50) ** 2)));
+    if (wide > 0) {
+      // Twice as strong far from the lines (≥ 200 m): ribs and bowls you see from the fjord, the lines ride as before.
+      const ld = this.lineDistFast(u, v);
+      e += wide * (fbm(u / 700 + 1.3, v / 230 + 8.1, 3) - 0.5) * (80 + 90 * sstep(90, 200, ld)) * (1 - 0.8 * Math.exp(-((ld / 50) ** 2)));
+    }
     if (u > 130 && u < 1750) e += this.outcrops(u, v);
     for (const B of BUTTRESSES) e += buttress(u, v, B);
     e += this.spines(u, v);

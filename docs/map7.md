@@ -141,7 +141,7 @@ No shared file is touched. Everything goes through existing opt-in course hooks:
 - The **far shore** rises out of the water ~6.4 km out, with the big peak across the fjord.
 
 `natural(x, z)` adds the detail: powder lumps, drainages (1D ridged ribs across the face), big lateral relief
-(eased off within 50 m of the lines), rock outcrops (kept 45 m off the lines), buttresses, spines, cliff bands,
+(eased off within 50 m of the lines, twice as strong 200 m from them), rock outcrops (kept 45 m off the lines), buttresses, spines, cliff bands,
 hits (rollers, lips, kickers), shoulder rollers, and the **couloir** (a floor that keeps the face, quarter-pipe
 walls 34 m high in an 85 m wide rock mass, a choke and the chokestone bench). `height()` = natural + the ramps.
 
@@ -231,8 +231,8 @@ never a duplicate.
 | Skaret | snowboard | 119 s | 23.5 m/s (53 mph) | 36.0 | 0 | 0 | 23.5 s (2.8 s) | Skarvtind Classic, Wave Rider |
 | Kvalneset | ski | 95 s | 24.7 m/s (55 mph) | 31.2 | 0 | 0 | 9.4 s (2.5 s) | Stairway to the Sea |
 | Kvalneset | snowboard | 108 s | 21.8 m/s (49 mph) | 28.7 | 0 | 0 | 9.5 s (2.6 s) | Stairway to the Sea |
-| Sølvryggene | ski | 123 s | 23.2 m/s (52 mph) | 34.8 | 1 | 0 | 28.8 s (3.5 s) | Silver Lining, Wave Rider |
-| Sølvryggene | snowboard | 118 s | 22.7 m/s (51 mph) | 33.9 | 0 | 1 | 27.6 s (3.5 s) | Silver Lining, Wave Rider |
+| Sølvryggene | ski | 114 s | 23.5 m/s (53 mph) | 35.7 | 0 | 2 | 27.3 s (3.6 s) | Silver Lining, Wave Rider |
+| Sølvryggene | snowboard | 119 s | 22.6 m/s (51 mph) | 32.5 | 0 | 1 | 26.5 s (3.4 s) | Silver Lining, Wave Rider |
 | Fjordløypa | ski | 140 s | 19.6 m/s (44 mph) | 33.3 | 0 | 0 | 14.8 s (1.7 s) | Rollercoaster |
 | Fjordløypa | snowboard | 148 s | 18.9 m/s (42 mph) | 31.9 | 0 | 0 | 13.3 s (1.6 s) | Rollercoaster |
 | Brygga | ski | 55 s | 17.4 m/s (39 mph) | 27.3 | 0 | 0 | 13.8 s (2.8 s) | Rorbu Hopper, Naustgapet |
@@ -241,7 +241,7 @@ never a duplicate.
 | Sjøsiden | snowboard | 47 s | 13.9 m/s (31 mph) | 21.2 | 0 | 0 | 0 | – |
 
 All 12 reach the sea (`--check` PASS: every ride finishes with ≤ 1 crash and exactly one `runCompleted` with the
-right `trailId`); the one crash is a spine crest on Sølvryggene at full tuck. Judged scores 88–96 on the
+right `trailId`), **0 crashes**, 4 stumbles (spine crests and the chokestone at full tuck). Judged scores 88–96 on the
 double-blacks and the black; the biggest drops are 17–22 m (Hammaren's peak, Neskanten, the nest). Max speed is the
 instant after a big drop; sustained speeds on the face are 25–31 m/s (56–70 mph).
 
@@ -257,11 +257,11 @@ skis run.
 `map7-unit.mjs`: 69/69 (registry contract, trail numbers vs the lines, spawns on snow facing downhill, finishes at
 the water's edge, atmosphere shape, choke width and couloir angle, the coast wet / dry, the headland steps and
 bands, roofs and decks, walls, the pier splash and dry respawn, runCompleted once with the contract fields).
-`map7-fuzz.mjs 40 40`: 96k frames, no NaN, never below the snow / a roof / a deck, never stuck, 6 splashes all
+`map7-fuzz.mjs 40 40`: 96k frames, no NaN, never below the snow / a roof / a deck, never stuck, 5–6 splashes all
 respawned on dry land (every fifth run is launched at the water from the beach).
 
 Shared suite on the integrated branch: unittest 52/52, physics-fuzz, physics-tricks, jumps-valcrest --check,
-map2-bot --verify, map3-unit 32/32, map3-fuzz, map4-unit 15/15 all pass.
+map2-bot --verify, map3-unit 32/32, map3-fuzz, map4-unit 15/15 all pass; GPU lobbytest (GPU=1, :5196): all checks passed.
 
 ### Performance
 
