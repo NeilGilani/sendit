@@ -35,7 +35,7 @@ export class PowderFX {
     for (let i = 0; i < 46; i++) {
       _o.set(lip.x + this.rnd(-1.2, 1.2), lip.y + this.rnd(0, 0.4), lip.z + this.rnd(-1, 0.6));
       const v = this.dir(0.4).multiplyScalar(this.rnd(0.3, 1.4)).addScaledVector(v0, this.rnd(0.15, 0.4));
-      P.emit(t + this.rnd(0, 0.15), _o, v, this.rnd(2.2, 4.0), this.rnd(0.25, 0.5), this.rnd(1.2, 2.4), 0);
+      P.emit(t + this.rnd(0, 0.15), _o, v, this.rnd(2.2, 4.0), this.rnd(0.18, 0.35), this.rnd(0.7, 1.6), 0);
     }
     for (let i = 0; i < 30; i++) {
       _o.set(lip.x + this.rnd(-0.6, 0.6), lip.y + 0.2, lip.z);
@@ -50,11 +50,11 @@ export class PowderFX {
     const fwd = vh.clone().normalize();
     const speed = vh.length();
     // Big rolling mist: radial burst + carried downhill with the rider.
-    for (let i = 0; i < 190; i++) {
+    for (let i = 0; i < 260; i++) {
       const o = new THREE.Vector3(p.x + this.rnd(-0.8, 0.8), p.y + this.rnd(0, 0.5), p.z + this.rnd(-0.8, 0.8));
       const v = this.dir(0.55).multiplyScalar(this.rnd(1.5, 6.5)).addScaledVector(fwd, speed * this.rnd(0.25, 0.75));
       v.y += this.rnd(1.0, 4.5);
-      P.emit(t + this.rnd(0, 0.12), o, v, this.rnd(3.2, 6.0), this.rnd(0.35, 0.7), this.rnd(2.2, 4.6), 0);
+      P.emit(t + this.rnd(0, 0.12), o, v, this.rnd(3.2, 6.0), this.rnd(0.25, 0.5), this.rnd(1.3, 3.2), 0);
     }
     // Clumps thrown high (they read as the "explosion" in slow motion).
     for (let i = 0; i < 240; i++) {

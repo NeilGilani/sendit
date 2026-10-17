@@ -56,7 +56,7 @@ void main() {
   if (vKind < 0.5) {
     // Mist puff: cauliflower edge from noise, denser core.
     float n = texture2D(noiseTex, vUv * 0.22 + vSeed * 3.7 + vT * 0.05).r * 0.65 + texture2D(noiseTex, vUv * 0.5 + vSeed * 1.3).g * 0.35;
-    a = smoothstep(1.0, 0.2, r + (n - 0.5) * 0.7) * 0.3 * (0.6 + 0.8 * n);
+    a = smoothstep(1.0, 0.15, r + (n - 0.5) * 1.1) * 0.26 * smoothstep(0.25, 0.75, n + 0.15);
     // Backlit mist glows, but a cloud of it must not pile up into a white disc: soft forward lobe.
     col = uSkyAmb * 0.9 + uSunCol * (0.3 + min(hg * 3.2, 0.9));
   } else if (vKind < 1.5) {

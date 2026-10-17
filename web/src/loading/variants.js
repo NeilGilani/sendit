@@ -54,9 +54,9 @@ export const TIMES = {
   aurora: {
     name: 'Northern lights', weight: 1,
     sunElev: 26, sunAz: [-70, 70],           // the "sun" is the moon here
-    sun: [0.34, 0.42, 0.62], sky: [0.07, 0.11, 0.2], ground: [0.12, 0.16, 0.24],
+    sun: [0.3, 0.38, 0.58], sky: [0.05, 0.08, 0.16], ground: [0.08, 0.11, 0.18],
     zenith: [0.004, 0.008, 0.03], horizon: [0.05, 0.09, 0.15], awayHorizon: [0.03, 0.06, 0.11], low: [0.03, 0.05, 0.08],
-    sunDisk: 8, glow: [0.12, 0.16, 0.24], haze: [0.04, 0.08, 0.13], hazeDensity: 0.8, exposure: 2.6, moon: true,
+    sunDisk: 8, glow: [0.12, 0.16, 0.24], haze: [0.04, 0.08, 0.13], hazeDensity: 0.8, exposure: 1.45, moon: true,
     cloud: { cover: 0.1, lit: [0.2, 0.25, 0.35], shade: [0.04, 0.06, 0.1], height: 2600 }, stars: 1, aurora: 1, snowfall: 0.25,
   },
 };

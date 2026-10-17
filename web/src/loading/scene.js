@@ -267,8 +267,10 @@ export class LoadingScene {
     const pool = tricksFor(v.gear);
     let trick = v.trick || r.pick(pool);
     if (!v.trick && trick === this.lastTrick) trick = r.pick(pool);
-    let cam = v.cam || r.weighted(CAMERAS, 'w');
-    if (!v.cam && cam === this.lastCam) cam = r.weighted(CAMERAS, 'w');
+    // Night skies are the show: those loads favour the moves that look up or across (sky in frame).
+    const cams = v.time.aurora ? { dolly: CAMERAS.dolly, low: CAMERAS.low, follow: CAMERAS.follow, orbit: { w: 0.5 } } : CAMERAS;
+    let cam = v.cam || r.weighted(cams, 'w');
+    if (!v.cam && cam === this.lastCam) cam = r.weighted(cams, 'w');
     this.lastTrick = trick; this.lastCam = cam;
     const shot = this.shot = new Shot({ H: this.height.H, line: this.height.line, trick, gear: v.gear, r });
     this.move = planMove(cam, shot, this.sunDir, r, this.height.H);

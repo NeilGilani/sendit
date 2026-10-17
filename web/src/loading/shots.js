@@ -29,9 +29,9 @@ export function planMove(kind, shot, sun, r, H) {
     case 'dolly': {
       // Side drone at mid-arc height, out over the void beside the arete, tracking down the line a
       // little slower than the rider: the range and sky behind, the rider crossing the frame.
-      const d = r.range(15, 21), h = r.range(-1.5, 2.5);
-      const z0 = r.range(6, 11), z1 = M.z - r.range(2, 8);
-      m.pos = (s, com) => V(side * d, M.y + h + (1 - s) * 3, z0 + (z1 - z0) * ease(s));
+      const d = r.range(14, 19), h = r.range(-1.5, 2);
+      const z0 = r.range(-1, 3), z1 = M.z - r.range(4, 9);
+      m.pos = (s, com) => V(side * d, A.y + h - s * 5, z0 + (z1 - z0) * ease(s));
       m.fov = r.range(36, 44);
       m.look = (s, com) => com.clone().lerp(M, 0.12);
       break;

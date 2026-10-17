@@ -127,19 +127,17 @@ export function makeHeight(v) {
     const w = 1 - smooth(160, 520, rr);
     let reg = regional(x, z) - R0;
     if (w <= 0) return reg;
-    // Local: the spine in-run, the rock band and the landing apron, with rock buttresses either side.
+    // Local: the spine in-run, the rock band and the landing apron.
     const ax = Math.abs(x);
-    let y = profile(z);
-    if (z > 0) {
-      // Narrow spine: convex across, steep couloir walls past ~12 m.
-      const sp = 3 * Math.log1p(Math.exp((ax - 13) / 3));
-      y += -0.012 * x * x * smooth(0, 6, z) - 0.65 * sp * smooth(-2, 8, z);
-    } else {
-      // The rock band spans the width; the apron below opens out.
-      const u = -z;
-      y += -0.004 * x * x * (1 - smooth(10, 60, u)) + 0.0035 * x * x * smooth(15, 120, u);
-      y -= 6 * smooth(22, 60, ax) * smooth(0, 10, u);
-    }
+    // The rock band is ~70 m wide: past it the flank just keeps falling (no step cut into the sides).
+    let y = z >= 0 ? profile(z) : profile(z) + line.cliff * smooth(22, 46, ax) * smooth(0, line.cliffLen, -z);
+    // Cross-section, continuous through the lip: a knife-edged spine above it (narrow rideable crest,
+    // steep rocky flanks), a broad shoulder below the band (the apron), both falling away to the sides.
+    const spN = 2 * Math.log1p(Math.exp((ax - 6) / 2));
+    const spW = 3 * Math.log1p(Math.exp((ax - 22) / 3));
+    const kN = smooth(-8, 4, z);
+    y += -0.02 * x * x * (1 - smooth(4, 9, ax)) * smooth(0, 6, z);
+    y -= 0.85 * spN * kN + 0.75 * spW * (1 - kN);
     // Detail: smooth on the line, rougher off it (rock buttresses, drifts).
     const off = smooth(4, 26, ax) + smooth(30, 90, z) + smooth(80, 200, -z);
     // Rolls and pillows everywhere but the lip (a 35° apron that is a perfect plane reads as CG).
@@ -336,8 +334,10 @@ const TERRAIN_FRAG = /* glsl */`
   float n0 = texture2D(noiseTex, vW.xz * 0.0041 + 0.13).r;
   float n1 = texture2D(noiseTex, vW.xz * 0.031 + 0.71).g;
   // Snow holds up to ~50° (less where the wind scours ridges); rock bands show through above.
-  float hold = 0.33 + (n0 - 0.5) * 0.2 + (n1 - 0.5) * 0.08;
-  float rock = smoothstep(hold, hold + 0.09, slope);
+  // Near: snow sticks to anything under ~55° (big, soft-edged rock bands above that, never spots).
+  float nb = texture2D(noiseTex, vW.xz * 0.0017 + 0.31).g;
+  float hold = 0.36 + (nb - 0.5) * 0.14 + (n0 - 0.5) * 0.06;
+  float rock = smoothstep(hold, hold + 0.12, slope);
 #ifdef FAR
   // Big faces shed snow from ~35°: dark rock walls, snow in the couloirs and on the shoulders.
   float holdF = 0.2 + (n0 - 0.5) * 0.16 + (texture2D(noiseTex, vW.xz * 0.0011 + 0.5).g - 0.5) * 0.12;
