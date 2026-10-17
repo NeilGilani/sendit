@@ -71,6 +71,7 @@ export class PowderFX {
 
   /** Continuous: call every frame while the edge is biting. */
   slash(t, dt, p, fwd, n, side, speed) {
+    const P = this.p;
     this.acc += dt * 520;
     const lat = new THREE.Vector3().crossVectors(fwd, n).normalize().multiplyScalar(-side);   // to the outside of the turn
     while (this.acc > 1) {

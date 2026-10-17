@@ -290,6 +290,12 @@ export class LoadingScene {
     this.post('shot', { info: { trick: T.name, camera: CAMERAS[cam].name, place: v.place, time: TIMES[v.tod].name, gear: v.gear, seed: v.seed } });
   }
 
+  /** After a frame error: drop the current shot and start a new one (or keep establishing). */
+  recover() {
+    this.cutting = 0;
+    if (this.riderReady) this.nextShot();
+  }
+
   // ------------------------------------------------------------------ frame
   frame(dt, setupOnly = false) {
     dt = Math.min(dt, 1 / 20);

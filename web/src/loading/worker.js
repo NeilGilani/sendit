@@ -3,6 +3,7 @@
 // booting the game). Messages in: init {canvas, width, height, dpr, opts}, resize, visible, outro.
 // Messages out: frame (first frame shown), shot {info}, stats, log, error.
 const T0 = performance.now();
+let errors = 0;
 let scene = null, running = false, last = 0, due = 0, visible = true, sentFrame = false;
 const post = (type, payload = {}) => self.postMessage({ type, ...payload });
 
@@ -23,9 +24,11 @@ function loop(now) {
   try {
     scene.frame(dt);
   } catch (e) {
-    running = false;
-    post('error', { message: `frame: ${e.message}` });
-    return;
+    // One bad frame (e.g. a shot that trips over something): log it and cut to a fresh shot; only a
+    // repeat offender gives up (the page then keeps the painted screen).
+    post('log', { message: `frame error: ${e.message}` });
+    if (++errors > 3) { running = false; post('error', { message: `frame: ${e.message}` }); return; }
+    try { scene.recover(); } catch { /* next frame will tell */ }
   }
   if (!sentFrame) { sentFrame = true; post('frame'); }
 }

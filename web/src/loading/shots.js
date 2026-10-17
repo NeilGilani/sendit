@@ -50,7 +50,7 @@ export function planMove(kind, shot, sun, r, H) {
     case 'low': {
       // Cliff-base up-shot: low beside the foot of the rock band, looking up as the rider flies over
       // against the sky, then panning down to the touchdown.
-      const x = side * r.range(6, 9), z = -shot.line.cliffLen - r.range(2, 5);
+      const x = side * r.range(9, 13), z = -shot.line.cliffLen - r.range(6, 10);
       m.a = V(x, H(x, z) + 1.2, z);
       m.b = V(x + side * 1.5, H(x + side * 1.5, z - 2.5) + 1.4, z - 2.5);
       m.fov = r.range(46, 54);

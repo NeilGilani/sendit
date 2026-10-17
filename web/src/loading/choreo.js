@@ -68,7 +68,7 @@ export class Shot {
     const turns = T.spin / Math.PI;
     this.landSwitch = Math.round(turns) % 2 === 1;
     this.tStart = -1.9;                                    // in-run start (real s before the pop)
-    this.tEnd = this.Ta + 2.7;                             // ride-out end
+    this.tEnd = this.Ta + 2.2;                             // ride-out end (touchdown, the slash, out)
     this.state = { grounded: true, landed: false, slashing: false };
     // Ride-out path (computed once): starts at the touchdown, follows the fall line, slashes.
     this.out = this.planRideOut();

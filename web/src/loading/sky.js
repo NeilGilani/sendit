@@ -87,7 +87,7 @@ void main() {
     vec2 cp = dir.xz / (dir.y + 0.08) * 0.11 + vec2(uSkyTime * 0.0012, 0.0);
     float n = fbm(cp * 0.6);
     float cov = smoothstep(1.0 - uCloudCover - 0.12, 1.0 - uCloudCover + 0.25, n + 0.12);
-    float wisp = smoothstep(0.55, 0.85, fbm(cp * vec2(0.25, 1.6) + 3.1)) * 0.35;   // cirrus streaks
+    float wisp = smoothstep(0.55, 0.85, fbm(cp * vec2(0.25, 1.6) + 3.1)) * 0.35 * (1.0 - smoothstep(0.35, 0.8, dir.y));   // cirrus streaks (low; overhead they would read as beams)
     float dens = clamp(cov + wisp * (1.0 - cov), 0.0, 1.0) * smoothstep(0.0, 0.12, dir.y);
     float edge = pow(max(mu, 0.0), 6.0);
     float thick = smoothstep(0.2, 1.0, cov);

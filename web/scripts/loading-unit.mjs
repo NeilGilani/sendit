@@ -8,10 +8,13 @@ import { pickVariant, rng, tricksFor, TRICKS, CAMERAS } from '../src/loading/var
 import { Shot } from '../src/loading/choreo.js';
 import { planMove } from '../src/loading/shots.js';
 import { Player } from '../src/player.js';
+import { PowderFX } from '../src/loading/powderfx.js';
 
 let failed = 0, checks = 0;
 const ok = (c, msg) => { checks++; if (!c) { failed++; console.log(`FAIL  ${msg}`); } };
-const fx = { spray() {}, takeoff() {}, landing() {}, slash() {} };
+// The real powder events into a counting stub pool (catches errors in powderfx.js too).
+let emitted = 0;
+const fx = new PowderFX({ emit() { emitted++; } }, rng(1));
 const flat = { getHeight: () => 0, getNormal: (_x, _z, _r, o = new THREE.Vector3()) => o.set(0, 1, 0), getSpawn: () => ({ position: new THREE.Vector3(), heading: 0 }) };
 const noInput = { strength: () => 0, justPressed: () => false, key: () => false };
 const UP = new THREE.Vector3(0, 1, 0), NOSE = new THREE.Vector3(0, 0, -1);
@@ -46,6 +49,10 @@ for (let seed = 1; seed <= 24; seed++) {
       let under = 0;
       for (let t = -1.5; t < sh.Ta - 0.05; t += 0.05) { sh.pose(pl, t, 0.016, fx, 0); under = Math.max(under, h.H(pl.renderPos.x, pl.renderPos.z) - pl.renderPos.y); }
       ok(under < 0.35, `${tag}: rider stays on / above the snow (max ${under.toFixed(2)} m under)`);
+      // The whole shot plays (ride-out + slash fire their powder without throwing).
+      const e0 = emitted;
+      for (let t = sh.tStart; t < sh.tEnd; t += 1 / 60) sh.pose(pl, t, 1 / 60, fx, t);
+      ok(emitted - e0 > 400, `${tag}: powder fired over the shot (${emitted - e0} particles)`);
       // Speed ramp: continuous, slow in the air, real speed before and after.
       ok(Math.abs(sh.rate(-1.5) - 1) < 1e-3 && sh.rate(sh.Ta * 0.5) < 0.4 && Math.abs(sh.rate(sh.Ta + 2) - 1) < 1e-3, `${tag}: speed ramp`);
       for (const cam of Object.keys(CAMERAS)) {
