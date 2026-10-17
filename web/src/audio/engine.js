@@ -302,6 +302,8 @@ export class AudioEngine {
     if (r.st === ST.AIR && r.grab > 0.5 && !this.grabbing) { this.grabbing = true; this.fx.grab(when, false, r.board); this.count('grab'); }
     if (this.grabbing && (r.grab < 0.25 || r.st !== ST.AIR)) { this.grabbing = false; if (r.st === ST.AIR) this.fx.grab(when, true); }
     if (prev && prev.st !== ST.CRASH && r.st === ST.CRASH) this.crashT = this.T.duck.crashHold;
+    // dropping into a tuck: the jacket bunches up (a short nylon rustle)
+    if (grounded && r.tuck > 0.6 && (prev?.tuck ?? 0) <= 0.6 && r.speed > 6 && when - (this.lastTuck ?? -9) > 1.5) { this.lastTuck = when; this.fx.grab(when, true); this.count('tuck'); }
     // bumps and rollers: the legs absorbing a sudden compression
     const B = F.bump, dc = r.comp - (prev?.comp ?? 0);
     if (grounded && r.comp > B.from && dc > B.rise && when - (this.lastBump ?? -9) > B.minGap) {
