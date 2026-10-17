@@ -211,10 +211,12 @@ machine.
 ### Overnight checks (all seven maps)
 
 - Pop-in (`gfxpopin.mjs`, q1, 8 s fly-through each on Valcrest, Blackspruce, Ravenspire, Voltage Park,
-  Dragonback, Kitsune Peak and Fjordline): 0 tree / shadow / scatter / terrain pops on every map. Mid-ride
-  shader compiles were 0 everywhere except Dragonback, which still links one `liftMetal` program the first
-  time a lift comes close (~100-200 ms, once; that material is built in `lifts.js`). The warm-up now also
-  compiles proxies of meshes hidden at load (`compileHidden` in `gfx/prewarm.js`).
+  Dragonback, Kitsune Peak and Fjordline): 0 tree / shadow / scatter / terrain pops and 0 mid-ride shader
+  compiles on every map. Dragonback used to link one `liftMetal` program (its lift cables, out of view at
+  load) mid-ride. Root cause: `renderer.compile()` builds the canvas variant of each program, while the game
+  draws into the post stack's render target, which has another output colour space and so other program
+  keys. Only real frames warm the real programs. The warm frames now draw every mesh unculled, and meshes
+  hidden at load are drawn as proxies through the post stack (`warmHidden` in `gfx/prewarm.js`).
 - Tests: unittest 52/52, map3-unit 32/32, map4-unit 15/15, map2-bot `--verify`, map3-fuzz and the GPU
   lobbytest all pass. q0 / q2 boot with no console errors. Fjordline's props print harmless three warnings
   (`toNonIndexed()` on already non-indexed geometry).
