@@ -220,10 +220,15 @@ export const ANIM = {
   flailSpeed: 14,             // arm flail oscillation speed
   // Lean = atan(lateral force / g) in the equipment frame (carves, stops), capped for readability;
   // the gear itself rolls to the physics edge angle, the difference is angulation (hips / knees).
-  maxLean: 0.8,               // rad body inclination cap
+  maxLean: 0.9,               // rad body inclination cap (52°: high-g carves at speed read aggressive)
   maxGearEdge: 1.05,          // rad visual edge angle cap
   angulation: 0.75,           // share of (edge − lean) the ski rider takes up in the spine (upright upper body)
-  angulationReverse: 0.25,    // … share kept when the edge is below the lean (cross-slopes, a turn being let go): no banking further in
+  angulationReverse: 0,       // … share kept when the edge is below the lean or already on the other side (cross-slopes, letting go, edge changes)
+  crossover: 0.2,             // rad the upper body leads into the new turn while the lean still points into the old one (skis)
+  skiCounter: 0.1,            // counter-rotation: hips / shoulders face the outside of a carve by this × the lean (skis)
+  skiStanceCarve: 0.035,      // m each ski moves out at full lean (wider stance in deep carves)
+  headLevel: 0.45,            // share of the body's roll the head takes back out (eyes nearer level)
+  headLook: 0.2,              // rad of head turn into the carve per rad of lean (looking along the path ahead)
   polePlantTime: 0.38,        // s a pole touch lasts (triggered on edge changes)
   skiPressPitch: 0.14,        // rad the skis pitch up while pressing the tails / tips (butters, ollie load)
   skiPressShift: 0.09,        // m hips over the pressed end
@@ -238,7 +243,7 @@ export const ANIM = {
     crouchHinge: 0.19,        // rad of hip fold per unit crouch (the spine bends 0.8 × this): a crouch mostly bends the knees
     shoulderOpen: 0.42,       // rad shoulders open toward the nose
     hipOpen: 0.16,            // rad hips open toward the nose
-    headTurn: 1.3,            // rad total head yaw toward the direction of travel
+    headTurn: 1.5,            // rad total head yaw toward the direction of travel (down the nose, over the front shoulder)
     turnLead: 0.35,           // rad upper-body rotation leading into the turn
     heelSit: 0.1,             // m hips back/down on the heel edge
     toeDrive: 0.07,           // m knees/hips forward on the toe edge
