@@ -208,6 +208,25 @@ LOD0 (no doubled rasterisation). This night's GPU numbers were unreliable: three
 30–50 % of the GPU, and timer queries got lost. Re-check with `map2-perf.mjs` / `gfxperf.mjs` on a quiet
 machine.
 
+### Overnight checks (all seven maps)
+
+- Pop-in (`gfxpopin.mjs`, q1, 8 s fly-through each on Valcrest, Blackspruce, Ravenspire, Voltage Park,
+  Dragonback, Kitsune Peak and Fjordline): 0 tree / shadow / scatter / terrain pops on every map. Mid-ride
+  shader compiles were 0 everywhere except Dragonback, which still links one `liftMetal` program the first
+  time a lift comes close (~100-200 ms, once; that material is built in `lifts.js`). The warm-up now also
+  compiles proxies of meshes hidden at load (`compileHidden` in `gfx/prewarm.js`).
+- Tests: unittest 52/52, map3-unit 32/32, map4-unit 15/15, map2-bot `--verify`, map3-fuzz and the GPU
+  lobbytest all pass. q0 / q2 boot with no console errors. Fjordline's props print harmless three warnings
+  (`toNonIndexed()` on already non-indexed geometry).
+- Load times were 85-117 s tonight with the CPU at 100 % and three other sessions on the GPU, for this
+  build. They were 5-9 s on a quiet machine earlier (see "Load time" above). Re-measure when quiet.
+- Spray: carve-spray intensity now keeps growing with speed up to ~24 m/s (was capped at 16 m/s), with
+  bigger grains at speed, so a 70 mph carve on Ravenspire throws more than a few flecks.
+- Atmosphere hook: the sky tint is twilight-correct. The sun-side horizon takes `skyHorizon`, the opposite
+  side blends toward `skyZenith`, and the glow band hugs the horizon. Kitsune Peak's shade went from
+  muddy maroon to blue-violet. Its own exposure / ambient are still dark; the suggested values were
+  passed to the coordinator.
+
 ## Next levers, if a weaker GPU needs more
 
 - **Shadow map**: casters inside a 1200 m-deep ortho box. Pulling the far plane in would cull up-sun terrain
