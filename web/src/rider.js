@@ -211,7 +211,8 @@ export class Rider {
     const board = this.isBoard;
 
     // --- layer drivers
-    let crouchT = 0.45 + ratio * 0.15 + pl.tuck * 0.45 + pl.squat * 0.55 + pl.brake * 0.15;
+    // Deep carves sink the hips (athletic stance: more knee flex the harder the turn, ANIM.carveCrouch).
+    let crouchT = 0.45 + ratio * 0.15 + pl.tuck * 0.45 + pl.squat * 0.55 + pl.brake * 0.15 + (ground ? Math.abs(p.lean) / ANIM.maxLean * ANIM.carveCrouch : 0);
     // In the air the crouch follows the physical tuck (player.flipTuck: the faster the flip, the tighter
     // the ball); a flip turning open is a layout: body stretched long (less crouch).
     const flipTuckPhys = Math.max(0, pl.flipTuck ?? Math.min(1, Math.abs(pl.flipRate || 0) / 3.5));   // < 0 = stretched layout
