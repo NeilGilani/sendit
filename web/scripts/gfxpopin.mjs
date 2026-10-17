@@ -7,7 +7,7 @@
 //   shadows  — a tree within the shadow box starts / stops casting a shadow in one frame.
 //   scatter  — a boulder / fence / ice cell switches visibility or geometry while an instance in it
 //              is closer than its fade-out distance (whole-cell pops).
-//   terrain  — a terrain chunk swaps LOD geometry without geomorphing.
+//   terrain  — a terrain chunk (playable tile or 10 m mid ring) swaps LOD geometry without geomorphing.
 //   compiles — shader programs linked during the ride (stalls), textures uploaded during the ride.
 //   spikes   — main-thread frames (rAF callbacks) longer than 50 ms.
 // Also reports load time (navigation → first riding frame).
@@ -101,7 +101,7 @@ for (const map of mapsArg.split(',')) for (const q of qs.split(',').map(Number))
     const pops = { trees: [0, 0, 0], shadows: 0, scatter: 0, terrain: 0, minTreePop: Infinity };
     const cellState = new Map();
     for (const im of sc.cells) cellState.set(im, [im.visible, im.geometry]);
-    const chunkGeo = new Map(T.chunks.map((m) => [m, m.geometry]));
+    const chunkGeo = new Map([...T.chunks, ...(T.midChunks || [])].map((m) => [m, m.geometry]));
     const prog0 = R.info.programs.length, tex0 = R.info.memory.textures;
     const progNames0 = new Set(R.info.programs.map((p) => p.cacheKey));
     // Debug: remember which object each shadow-depth material was used for.
@@ -156,7 +156,7 @@ for (const map of mapsArg.split(',')) for (const q of qs.split(',').map(Number))
             cellState.set(im, [im.visible, im.geometry]);
           }
         }
-        for (const m of T.chunks) {
+        for (const m of [...T.chunks, ...(T.midChunks || [])]) {
           if (chunkGeo.get(m) !== m.geometry) { if (!T.geomorph) pops.terrain++; chunkGeo.set(m, m.geometry); }
         }
         if (el < secs) requestAnimationFrame(tick); else done();

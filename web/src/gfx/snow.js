@@ -479,7 +479,7 @@ export const SNOW_FRAG_GLSL = /* glsl */`
         }
         lo = 0.5 * (lo + hi);
       }
-      tp = xz + perDepth * lo;
+      tp = xz + perDepth * lo * (1.0 - smoothstep(32.0, 45.0, dist));   // fades out, never switches off
     }
     #endif
     // Stencils grow with the pixel footprint: the track map has no mips, so distant grooves would

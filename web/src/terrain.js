@@ -38,6 +38,8 @@ export class Terrain {
     // chunk swaps to the coarser grid it already looks exactly like it.
     this.morph = { uMorphEnd: { value: new THREE.Vector4() }, uMorphLen: { value: new THREE.Vector4() }, uMorphEye: { value: new THREE.Vector3() } };
     this.geomorph = true;
+    // Same for the 10 m mid ring (its own LOD distances; the backdrop / ranges carry aMorph = 0).
+    this.midMorph = { uMorphEnd: { value: new THREE.Vector4(1e9, 1e9, 1e9, 1e9) }, uMorphLen: { value: new THREE.Vector4(1, 1, 1, 1) }, uMorphEye: this.morph.uMorphEye };
     this.vel = new THREE.Vector2();
     this._lastCam = null;
     this.features = null;     // optional { heightAt(x, z) -> number | null }
@@ -310,8 +312,9 @@ export class Terrain {
 
   makeFarMaterial() {
     const m = toonMaterial({
-      name: 'terrainFarSnow', uniforms: this.farUniforms,
+      name: 'terrainFarSnow', uniforms: { ...this.farUniforms, ...this.midMorph },
       fragPars: SNOW_COMMON_PARS + 'vec3 tN;', frag: FAR_SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
+      vertPars: TERRAIN_MORPH_PARS, vertPre: TERRAIN_MORPH_GLSL,
     });
     const prev = m.onBeforeCompile;
     m.onBeforeCompile = (shader, r) => {
@@ -417,12 +420,22 @@ export class Terrain {
     const pos = new Float32Array(w * w * 3), nor = new Float32Array(w * w * 3);
     const H = (i, j) => m.h[Math.min(m.n - 1, Math.max(0, j)) * m.n + Math.min(m.n - 1, Math.max(0, i))];
     const th = this.half;
+    const morph = new Float32Array(w * w * 2);
     let k = 0;
     for (let j = -1; j <= n + 1; j++) for (let i = -1; i <= n + 1; i++) {
       const ci = Math.min(Math.max(i, 0), n), cj = Math.min(Math.max(j, 0), n);
       const gi = Math.min(cx * C + ci * step, m.n - 1), gj = Math.min(cz * C + cj * step, m.n - 1);
       const x = -m.half + gi * m.sp, z = -m.half + gj * m.sp;
       let y = H(gi, gj);
+      // Geomorph target: the next-coarser grid's surface here (lod 2 is the coarsest).
+      let yc = y;
+      if (lod < 2) {
+        const oi = ci & 1, oj = cj & 1;
+        if (oi && !oj) yc = (H(gi - step, gj) + H(gi + step, gj)) / 2;
+        else if (!oi && oj) yc = (H(gi, gj - step) + H(gi, gj + step)) / 2;
+        else if (oi && oj) yc = (H(gi + step, gj - step) + H(gi - step, gj + step)) / 2;
+      }
+      morph[(k / 3) * 2] = yc - y; morph[(k / 3) * 2 + 1] = lod;
       // Sink under the playable tile (its own skirts close the seam).
       const inside = 1 - smooth(th - 60, th - 4, Math.max(Math.abs(x), Math.abs(z)));
       y -= inside * 40;
@@ -436,6 +449,7 @@ export class Terrain {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    g.setAttribute('aMorph', new THREE.BufferAttribute(morph, 2));
     g.setIndex(this.midIndices[lod]);
     g.computeBoundingSphere();
     this.midCache.set(key, g);
@@ -528,6 +542,7 @@ export class Terrain {
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setIndex(new THREE.BufferAttribute(idx, 1));
     g.computeVertexNormals();
+    g.setAttribute('aMorph', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));   // no geomorph
     const mesh = new THREE.Mesh(g, this.farMaterial);
     mesh.receiveShadow = false;
     mesh.name = 'FarTerrain';
@@ -590,6 +605,7 @@ export class Terrain {
     g.setIndex(new THREE.BufferAttribute(idx, 1));
     g.computeVertexNormals();
     g.computeBoundingSphere();
+    g.setAttribute('aMorph', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));   // no geomorph
     const mesh = new THREE.Mesh(g, this.farMaterial);
     mesh.name = 'DistantRanges';
     mesh.frustumCulled = false;
@@ -607,6 +623,10 @@ export class Terrain {
     const ends = this.lodDistances.map((d) => d - slack);
     this.morph.uMorphEnd.value.fromArray(ends);
     this.morph.uMorphLen.value.fromArray(ends.map((e) => Math.max(10, e * PERF.terrainMorph)));
+    const midSlack = MIDTERRAIN.chunkCells * (this.mid?.sp ?? 10) * 0.5 * 0.42 + 5;
+    const mEnds = this.midLodDistances.map((d) => d - midSlack);
+    this.midMorph.uMorphEnd.value.set(mEnds[0], mEnds[1], 1e9, 1e9);
+    this.midMorph.uMorphLen.value.set(mEnds[0] * PERF.terrainMorph, mEnds[1] * PERF.terrainMorph, 1, 1);
     if (this.material) {
       const { terrain, far } = this.qualityDefines(q);
       this.material.defines = terrain;
