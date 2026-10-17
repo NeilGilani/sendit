@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SENDIT — loading screen preview</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <!-- Dev preview of the loading screen alone (no game boot): borrows the markup and inline CSS from
+       index.html, then runs src/loading/index.js. Same URL flags (?loadseed, ?loadtrick, ?loadcam, ?loadtod,
+       ?loadgear, ?loadmtn). ?finish=<s> plays the hand-off after s seconds. Not part of the build. -->
+  <script type="module">
+    const html = await (await fetch('/index.html')).text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    for (const s of doc.head.querySelectorAll('style')) document.head.appendChild(s);
+    document.body.prepend(doc.getElementById('loading'));
+    const { loadingScreen } = await import('/src/loading/index.js');
+    const q = new URLSearchParams(location.search);
+    let p = 0;
+    const tick = setInterval(() => { p = Math.min(0.97, p + 0.02); loadingScreen.progress(p, 'Previewing the loading screen…'); }, 400);
+    if (q.has('finish')) setTimeout(() => { clearInterval(tick); loadingScreen.finish(); }, Number(q.get('finish')) * 1000);
+  </script>
+</body>
+</html>
