@@ -134,7 +134,7 @@ export const AUDIO = {
     gate: { gain: 0.45 },
     drop: { riser: 0.3, hit: 0.5 },     // music drops (game-feel's musicDrop): the riser and the 'boost' hit
     bindings: { gain: 0.35 },           // stepping into bindings / strapping in at the start; the chair bump               // a slalom pole whacked aside: hollow plastic clack + flex
-    lift: { gain: 0.16, creak: 0.12, tower: 0.45 },   // rope hum, chair creak, grip over the sheaves
+    lift: { gain: 0.14, creak: 0.12, tower: 1.1 },   // rope hum, chair creak; a tower pass sits ~8–10 dB over the rope bed (CC0 tower recording)
     // breathing: exertion fills with speed / turn load / stops, drains at rest; heard when slowing down after
     breath: { gain: 0.3, fill: 0.09, drain: 0.035, from: 0.35, slowBelow: 3.5 },
   },

@@ -172,7 +172,7 @@ if (has('wind-sweep')) {
 if (has('bigmountain-70mph-fp', 'bigmountain-70mph-chase')) expect(lvl('bigmountain-70mph-fp', 8) > lvl('bigmountain-70mph-chase', 8), 'first person is windier than the chase cam');
 if (has('jump-spin-grab-ski')) expect(Math.max(...R['jump-spin-grab-ski'].pk.slice(41, 46)) > Math.max(...R['jump-spin-grab-ski'].pk.slice(30, 38)) * 1.2, 'the landing stands out of the air');
 if (has('forest-ambience', 'idle-alpine')) expect(lvl('forest-ambience') > lvl('idle-alpine') * 0.8, 'the forest has its own bed');
-if (has('lift-ride')) expect(Math.max(...R['lift-ride'].pk.slice(20, 30)) > Math.max(...R['lift-ride'].pk.slice(40, 60)) * 1.5, 'a lift tower rattles over the rope hum');
+if (has('lift-ride')) expect(lvl('lift-ride', 2, 3.5) > lvl('lift-ride', 4, 6.8) * 1.4, 'a lift tower rattles over the rope hum');   // rms: a random chair creak can't fake it
 if (has('breath-after-run')) expect((R['breath-after-run'].events.breath || 0) >= 3 && !R['groomed-carve-ski']?.events.breath, 'the rider catches their breath after a hard run');
 if (has('powder-faceshot-fp')) expect((R['powder-faceshot-fp'].events.faceShot || 0) >= 2, 'deep powder turns throw face shots');
 if (has('park-pa')) expect((R['park-pa'].events.pa || 0) >= 2, 'the park PA speaks up');
