@@ -121,7 +121,8 @@ export const AUDIO = {
     hardBrake: { gain: 0.5 },
     grind: { gain: 0.5, sample: 0.55, scrape: 0.5, clank: 0.5 },
     faceShot: { gain: 0.4, powder: 0.55, sink: 0.08, minSpeed: 7, minGap: 1.2 },   // powder thrown into the face at a turn
-    gate: { gain: 0.45 },               // a slalom pole whacked aside: hollow plastic clack + flex
+    gate: { gain: 0.45 },
+    bindings: { gain: 0.35 },           // stepping into bindings / strapping in at the start; the chair bump               // a slalom pole whacked aside: hollow plastic clack + flex
     lift: { gain: 0.16, creak: 0.12, tower: 0.45 },   // rope hum, chair creak, grip over the sheaves
     // breathing: exertion fills with speed / turn load / stops, drains at rest; heard when slowing down after
     breath: { gain: 0.3, fill: 0.09, drain: 0.035, from: 0.35, slowBelow: 3.5 },

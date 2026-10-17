@@ -81,7 +81,8 @@ export class SoundScape {
     E('takeoff'); E('landed'); E('crashed'); E('hardBrake'); E('parkLanding');
     E('grindStart'); E('grindKink'); E('grindHop'); E('grindEnd'); E('grindClip');
     E('nearMiss', (d) => ({ ...d, pan: this.sideOf(d.x, d.z) }));
-    E('gate');
+    E('gate'); E('liftBoarded'); E('liftArrived');
+    on('rideStarted', ({ equipment }) => this.engine.event('rideStarted', { board: equipment === 'snowboard' ? 1 : 0 }, c.currentTime));
     on('crashed', () => this.oneShot('crash', 0.3, 1, this.engine.fxBus));
     this.ready = true;
   }

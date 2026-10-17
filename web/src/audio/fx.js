@@ -123,6 +123,33 @@ export class FX {
     this.thump(when + 0.01, { f: 140, f2: 80, gain: G * 0.3, decay: 0.08, pan });
   }
 
+  /** Stepping in: two boot-into-binding clacks (skis) or the two ratchet straps cinched (board). */
+  bindings(when, board = 0) {
+    const G = this.T.bindings.gain;
+    if (!board) {
+      for (const [dt, pan] of [[0, -0.3], [rnd(0.55, 0.8), 0.3]]) {
+        this.modal(when + dt, [[rnd(1400, 1700), 1, 0.06], [rnd(3100, 3600), 0.5, 0.04]], G * 0.5, pan);
+        this.noise(when + dt, { f: 2500, q: 0.9, gain: G * 0.6, decay: 0.02, pan });
+        this.thump(when + dt + 0.005, { f: 130, f2: 70, gain: G * 0.7, decay: 0.07, pan });
+      }
+      return;
+    }
+    let t = when;
+    for (const pan of [-0.25, 0.25]) {
+      const n = 5 + Math.floor(Math.random() * 4);
+      for (let i = 0; i < n; i++) { this.noise(t, { f: rnd(3200, 4800), q: 2, gain: G * 0.45, decay: 0.012, pan }); t += rnd(0.06, 0.1); }
+      t += rnd(0.35, 0.6);
+    }
+  }
+
+  /** The chair scooping you up (or the drop at the top): a padded bump and a creak of the hanger. */
+  chairBump(when, k = 1) {
+    const G = this.T.bindings.gain * k;
+    this.thump(when, { f: 95, f2: 55, gain: G * 0.8, decay: 0.12 });
+    this.noise(when, { buf: 'pink', type: 'lowpass', f: 600, q: 0.7, gain: G * 0.5, attack: 0.005, decay: 0.15 });
+    this.creak(when + 0.08, G * 0.25, rnd(-0.3, 0.3));
+  }
+
   /** Take-off: the tail / skis unloading (a woody tock) and the snow they flick off. */
   takeoff(when, k = 1, board = 0, powder = 0, speed = 10) {
     // leaving the snow: the air rushes in — a swell rising in pitch over ~0.3 s, bigger the faster you go

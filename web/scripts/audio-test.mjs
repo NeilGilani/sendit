@@ -100,7 +100,8 @@ add('extreme-inputs', { seconds: 4, frames: frames(4, (t) => ({ speed: 80 * (t %
 add('extreme-full-volume', { seconds: 4, volumes: { master: 1, sfx: 1, music: 1 }, view: 'fp', map: 'ravenspire', musicTone: true,
   frames: frames(4, (t) => ({ speed: 45, edge: 1.2, load: 3, skid: 1.4, stop: 1, rock: 1, groomed: 0, st: t % 1 < 0.6 ? 1 : 2, air: 1, spin: 20, board: 1 })),
   events: [0.3, 0.9, 1.5, 2.1, 2.7, 3.3].map((t, i) => ({ t, name: i % 2 ? 'crashed' : 'landed', d: { impact: 25 } })) });
-add('lift-ride', { seconds: 10, frames: frames(10, () => ({ st: 4, speed: 0 })), events: [{ t: 2, name: 'liftTower' }, { t: 7, name: 'liftTower' }] });
+add('lift-ride', { seconds: 10, frames: frames(10, () => ({ st: 4, speed: 0 })), events: [{ t: 0.2, name: 'liftBoarded' }, { t: 2, name: 'liftTower' }, { t: 7, name: 'liftTower' }, { t: 9.5, name: 'liftArrived' }] });
+add('ride-start', { seconds: 4, solo: 'fxBus', frames: frames(4, () => ({ speed: 0 })), events: [{ t: 0.1, name: 'rideStarted', d: { board: 0 } }, { t: 2, name: 'rideStarted', d: { board: 1 } }] });
 add('breath-after-run', { seconds: 26, view: 'fp',
   frames: frames(26, (t) => (t < 16 ? { speed: 16, ...carve(t, 2.4, 1.0, 16), load: 1.9 } : { speed: Math.max(0, 16 - (t - 16) * 8), stop: t < 18 ? 1 : 0, skid: t < 18 ? 1.3 : 0 })) });
 add('powder-faceshot-fp', { seconds: 8, view: 'fp', frames: frames(8, (t) => ({ groomed: 0, powder: 1, deep: 1, sink: 0.22, speed: 11, ...carve(t, 2.2, 0.7, 11) })) });

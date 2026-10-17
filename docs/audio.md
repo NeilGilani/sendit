@@ -106,6 +106,8 @@ mountain drops in pitch with time.
 | Crowd cheer | Park map: `parkLanding` (clean) or a perfect / stomped `landed`; the PA announcer reacts ~1.4 s later |
 | Face shot | Deep powder (sunk in) at a turn above 7 m/s: a soft whump and a fizz of flakes over the goggles. Full in first person, ×0.4 in the chase cam. |
 | Gate clack (skis) | `gate` (pass): a hollow plastic pole knocked aside, as two short modes and a flex thud. The old `gate` cue still plays on the UI bus. |
+| Bindings | `rideStarted`: two boot-into-binding clacks (skis) or two ratchet straps (board) |
+| Chair bump | `liftBoarded` / `liftArrived`: a padded thump and a hanger creak |
 | Lift tower | Each tower the chair passes (`player._lift.supports`): 6–9 roller thunks, louder mid-train, with a low metal ring |
 | Breathing | Exertion fills with speed, turn load and stops, and drains at rest. When the rider slows below 3.5 m/s after a hard run: exhales and inhales (formant-filtered noise) that slow and fade. Huffs on crashes and very hard landings. Full in first person, ×0.35 in the chase cam. |
 
