@@ -127,6 +127,7 @@ export const AUDIO = {
     treePass: { gain: 0.3, radius: 6, minSpeed: 6, minGap: 0.15 },   // any tree / rock passing within 6 m: a softer whoosh
     hardBrake: { gain: 0.5 },
     patter: { gain: 0.3 },
+    roof: { gain: 0.6 },                // landing on a roof: hollow timber boom, creak, snow off the eaves
     bump: { gain: 0.45, from: 0.25, rise: 0.12, full: 1.2, minGap: 0.25 },   // compression (m/s into the snow) rising fast: a whump
     push: { gain: 0.35, period: 0.65 },  // pushing on the flat: double-pole strokes (skis) / back-foot kicks (board)              // sprayed snow falling back after a slash / hockey stop
     grind: { gain: 0.5, sample: 0.55, scrape: 0.5, clank: 0.5 },

@@ -138,6 +138,15 @@ export class FX {
     for (let i = 0; i < 6; i++) this.noise(when + Math.random() * 0.1, { f: rnd(900, 3000) * (1 - 0.5 * powder), q: 1.3, gain: G * rnd(0.15, 0.35), decay: rnd(0.006, 0.015) });
   }
 
+  /** Landing on a roof: the hollow wooden structure booms under the snow, the timbers creak, snow slides off. */
+  roof(when, impact = 6) {
+    const G = this.T.roof.gain * clamp(impact / 8, 0.4, 1.3);
+    this.modal(when, [[rnd(78, 92), 1, 0.55], [rnd(130, 150), 0.7, 0.4], [rnd(215, 245), 0.45, 0.3], [rnd(350, 390), 0.25, 0.2]], G * 0.6);
+    this.noise(when, { buf: 'brown', type: 'lowpass', f: 300, q: 0.8, gain: G * 0.7, attack: 0.004, decay: 0.25 });
+    this.creak(when + rnd(0.15, 0.3), G * 0.2, rnd(-0.3, 0.3));
+    this.noise(when + 0.3, { buf: 'pink', f: 1600, f2: 900, q: 0.5, gain: G * 0.25, attack: 0.2, hold: 0.3, decay: 0.8 });   // snow sliding off the eaves
+  }
+
   /** Face shot: deep powder flying up over the goggles and jacket — a soft whump and a fizz of flakes. */
   faceShot(when, k = 1) {
     const G = this.T.faceShot.gain * k;

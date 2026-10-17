@@ -78,7 +78,7 @@ export class SoundScape {
     on('jumped', (d) => this.oneShot('jump_pop', 0.18 + d * 0.25, (this.skier.equipment?.type === 'snowboard' ? 0.78 : 0.95) + Math.random() * 0.15, this.engine.fxBus));
     // ---- the rider's sounds (engine one-shots)
     const E = (name, fn) => on(name, (d) => { if (game.mode !== Mode.MENU) this.engine.event(name, fn ? fn(d) : d, c.currentTime); });
-    E('takeoff'); E('landed'); E('crashed'); E('hardBrake'); E('parkLanding');
+    E('takeoff'); E('landed'); E('crashed'); E('hardBrake'); E('parkLanding'); E('landingGrade');
     E('grindStart'); E('grindKink'); E('grindHop'); E('grindEnd'); E('grindClip');
     E('nearMiss', (d) => ({ ...d, pan: this.sideOf(d.x, d.z) }));
     E('gate'); E('liftBoarded'); E('liftArrived');

@@ -336,6 +336,7 @@ export class AudioEngine {
         if (d.perfect || d.grade === 'stomped') this.amb.cheer(when + 0.25, 1);
         break;
       }
+      case 'landingGrade': if (d.roof) { this.fx.roof(when, d.rawImpact ?? d.impact ?? 6); this.count('roof'); } break;
       case 'parkLanding': if (d.clean) this.amb.cheer(when + 0.2, clamp((d.dist ?? 15) / 20, 0.6, 1.3)); break;
       case 'crashed': this.fx.crash(when, 1, powder, board); this.crashT = this.T.duck.crashHold; this.breath.jolt(0.35); this.breath.huff(when + 0.03, this.T.fx.breath.gain * this.T.perspective[this.view].breath); break;
       case 'musicEnergy': this.setMusicEnergy(d.level ?? 0); break;   // (SoundScape calls these directly; the test drives them as events)
