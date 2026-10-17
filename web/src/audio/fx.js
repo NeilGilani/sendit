@@ -176,8 +176,14 @@ export class FX {
   }
 
   /** A tumbling crash: several impacts decaying over ~1.3 s, each with snow and cloth. */
-  crash(when, severity = 1, powder = 0) {
+  crash(when, severity = 1, powder = 0, board = 0) {
     const G = this.T.crash.gain * clamp(severity, 0.4, 1.3);
+    // a 'yard sale': skis and poles clattering loose (plastic / aluminium clacks), or the board slapping the snow
+    for (let i = 0, n = board ? 2 : 3 + Math.floor(Math.random() * 3); i < n; i++) {
+      const t = when + 0.1 + Math.random() * 0.9;
+      if (board) this.noise(t, { f: rnd(700, 1100), q: 0.9, gain: G * 0.45 * (1 - 0.6 * powder), decay: 0.05 });
+      else this.modal(t, [[rnd(900, 1300), 1, 0.06], [rnd(2400, 3100), 0.6, 0.04], [rnd(4200, 5200), 0.3, 0.03]], G * 0.22 * (1 - 0.7 * powder), rnd(-0.6, 0.6));
+    }
     let t = when, k = 1;
     const hits = 4 + Math.floor(Math.random() * 3);
     for (let i = 0; i < hits; i++) {

@@ -276,7 +276,7 @@ export class AudioEngine {
         break;
       }
       case 'parkLanding': if (d.clean) this.amb.cheer(when + 0.2, clamp((d.dist ?? 15) / 20, 0.6, 1.3)); break;
-      case 'crashed': this.fx.crash(when, 1, powder); this.crashT = this.T.duck.crashHold; this.breath.jolt(0.35); this.breath.huff(when + 0.03, this.T.fx.breath.gain * this.T.perspective[this.view].breath); break;
+      case 'crashed': this.fx.crash(when, 1, powder, board); this.crashT = this.T.duck.crashHold; this.breath.jolt(0.35); this.breath.huff(when + 0.03, this.T.fx.breath.gain * this.T.perspective[this.view].breath); break;
       case 'liftTower': this.lift.tower(when, d.k ?? 1); break;
       case 'gate': if (d.pass && !board) this.fx.gateClack(when, d.side ?? 0); break;
       case 'nearMiss': this.fx.nearMiss(when, { pan: d.pan ?? 0, speed: r?.speed ?? 12, dist: d.dist, kind: d.kind }); break;

@@ -41,6 +41,13 @@ export class OtherRiders {
       if (!k) { if (v.on) { v.g.gain.setTargetAtTime(0, when, 0.15); v.on = false; } continue; }
       const p = k.mesh.position, edge = clamp(Math.abs(k.roll || 0) / 0.35, 0, 1);
       setPos(v.pan, p, when, v.fresh);
+      // Doppler: the panner only places the sound, so shift the noise by the radial speed (c = 343 m/s)
+      const d = Math.hypot(p.x - at.x, p.y - at.y, p.z - at.z);
+      if (!v.fresh && v.t !== undefined && when > v.t) {
+        const vr = clamp((d - v.d) / (when - v.t), -60, 60);
+        v.src.playbackRate.setTargetAtTime(343 / (343 + vr), when, 0.05);
+      }
+      v.d = d; v.t = when;
       v.fresh = false;
       const lvl = T.gain * Math.pow(clamp(k.speed / 12, 0, 1.5), 1.15) * (0.45 + 0.55 * edge);
       v.g.gain.setTargetAtTime(lvl, when, v.on ? 0.08 : 0.3);
