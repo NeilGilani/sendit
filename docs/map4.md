@@ -255,6 +255,23 @@ far LOD and the tree scatter are untouched by the park.
   kicker's transition would dip into the snow, so a steep hill under it can't bury the transition (a buried
   transition is a kink that throws 7 m/s away).
 
+### Contracts with the rest of the game (all inside maps/voltage)
+
+- **Trails** (the mountain / trails contract):
+  - `registerMap({ trails })` lists nine trails: slopestyle (park), Spark (green), Current (blue), High Voltage
+    (black), the Grid (park), the Stairway (black), Hip Row (blue), the Conduit (black) and the Tower
+    (double-black).
+  - Each has `{ id, name, difficulty, description, length, vertical }`. Length and vertical are measured by
+    `course.trailInfo()`, and map4-unit checks they still match `TRAIL_SIZE` in index.js after a layout change.
+  - `course.trailSpawn(id) → { x, z, heading }`: a drop zone, or the top of the lane. The data is `TRAILS` in
+    layout.js.
+- **`runCompleted`** `{ mapId, trailId, distance, time, score, judged? }` goes out on the state.js bus when a run
+  reaches the finish (zen `runComplete` or Challenge `runFinished`) — park.js.
+  - The trail is the one most of the run's features (takeoffs and grinds) were on, else the trail it started on.
+  - The clock and distance start at the top, at a drop zone or at the spawn.
+- **Atmosphere:** `course.atmosphere` isn't set yet. The park is ready for a night-lit look (neon, floodlight heads,
+  emissive banners) once the graphics hook's shape is fixed.
+
 ### Hooks into shared files (all opt-in; the other maps behave exactly as before)
 
 | file | change | effect |

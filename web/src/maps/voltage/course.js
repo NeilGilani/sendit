@@ -12,7 +12,7 @@ import { fbm, ridged, vnoise, smooth, sstep, mulberry32 } from './noise.js';
 import { ProfileBuilder, ProfileFeature, PipeFeature, SpineFeature, FeatureIndex, STEP } from './shapes.js';
 import {
   TILE, START_X, TOP, FINISH_U, PARK_HALF, PROFILE, BEHIND, JIBS, JUMPS, LANES, LANE_JUMPS, STEPS, HIPS, QUARTERPIPES,
-  ROLLERS, LANE_JIBS, GRID_JIBS, PIPE, BIG_AIR, DROP_ZONES, LINE_GOALS, GAPS, SPINES, START_RAMPS,
+  ROLLERS, LANE_JIBS, GRID_JIBS, PIPE, BIG_AIR, DROP_ZONES, LINE_GOALS, GAPS, SPINES, START_RAMPS, TRAILS,
 } from './layout.js';
 import { VOLTAGE_PHYSICS, VOLTAGE_CAMERA } from './tuning.js';
 import { attachPark } from './park.js';
@@ -606,6 +606,34 @@ export class VoltageCourse {
       if (i === 5) return { name, x: this.pipe.world(4, 0)[0], z: this.pipe.world(4, 0)[1], heading: -Math.PI / 2 + 0.25 };
       return { name, x: START_X + u, z: v, heading: -Math.PI / 2 + hd * DEG };
     });
+  }
+
+  // ---------------------------------------------------------------- trails (mountain / trails contract)
+  /** Where trail `id` starts: { x, z, heading } (a drop zone or the top of its lane); null for an unknown id. */
+  trailSpawn(id) {
+    const t = TRAILS.find((q) => q.id === id);
+    if (!t) return null;
+    this.activeTrail = t.id;
+    if (typeof t.start === 'number') { const z = this.dropZones[t.start]; return { x: z.x, z: z.z, heading: z.heading }; }
+    return { x: START_X + t.start[0], z: t.start[1], heading: -Math.PI / 2 };
+  }
+
+  /** The trails with their measured length (start → finish line, m) and vertical (m). */
+  trailInfo() {
+    return TRAILS.map(({ id, name, difficulty, description }) => {
+      const s = this.trailSpawn(id), u0 = s.x - START_X;
+      const end = id === 'superpipe' ? PIPE.u1 : id === 'big-air' ? this.bigAir.marks.landingEnd.a + this.bigAir.x - START_X : FINISH_U;
+      const top = id === 'big-air' || id === 'slopestyle' ? this.heightAt(s.x, s.z, this.base(s.x, s.z)) ?? this.profileAt(u0) : this.profileAt(u0);
+      this.activeTrail = null;
+      return { id, name, difficulty, description, length: Math.round(end - u0), vertical: Math.round(top - this.profileAt(end)) };
+    });
+  }
+
+  /** The trail a finished run belongs to: the lane most of its features were on (else the one it started on). */
+  trailFor(lanes) {
+    let best = null, n = 0;
+    for (const t of TRAILS) { const k = t.lanes.reduce((s, l) => s + (lanes[l] || 0), 0); if (k > n) { n = k; best = t.id; } }
+    return best ?? this.activeTrail ?? 'slopestyle';
   }
 
   /** Golden snowflakes: over the big lips, on rails, high in the pipe, on the step-up deck and the tower. */

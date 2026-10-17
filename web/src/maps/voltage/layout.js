@@ -211,6 +211,22 @@ export const DROP_ZONES = [
   ['The Stairway · Step Line', 372, 245, 0],
 ];
 
+// ------------------------------------------------------------------ trails (the mountain / trails contract)
+// registerMap({ trails }) + course.trailSpawn(id) → { x, z, heading }. A trail starts at `start` ([u, v], or a
+// drop zone index) and is ridden to the finish; `lanes` are the feature lanes that count toward it when a run is
+// classified at the finish (runCompleted). Length and vertical are measured from the course (course.js trailInfo).
+export const TRAILS = [
+  { id: 'slopestyle', name: 'Slopestyle Course', difficulty: 'park', start: 0, lanes: ['slope'], description: 'Start ramp, three rail sections, Lightning, Thunder, Voltage, Megawatt and the road gap: the judged run.' },
+  { id: 'spark', name: 'Spark Lane', difficulty: 'green', start: [30, 70], lanes: ['spark'], description: 'The flow lane: small tables, boxes, a stacked double, rollers, a side hit and a quarterpipe.' },
+  { id: 'current', name: 'Current Lane', difficulty: 'blue', start: [30, 125], lanes: ['current'], description: 'Rails on the benches, then the Triple Stack, a step-down and the transfer hip into High Voltage.' },
+  { id: 'high-voltage', name: 'High Voltage', difficulty: 'black', start: [30, 186], lanes: ['high'], description: 'Pro rails, two big tables, the Canal gap, a step-up and the 5 m quarterpipe.' },
+  { id: 'grid', name: 'The Grid', difficulty: 'park', start: [40, 247], lanes: ['grid'], description: 'A jib garden: 16 boxes, tubes and rails in rows.' },
+  { id: 'stairway', name: 'The Stairway', difficulty: 'black', start: 8, lanes: ['stair'], description: 'Step-down, step-up, step-down, then over the Stairway Spine.' },
+  { id: 'hip-row', name: 'Hip Row', difficulty: 'blue', start: [460, -236], lanes: ['hips'], description: 'Four hips down the left side of the park.' },
+  { id: 'superpipe', name: 'The Conduit', difficulty: 'black', start: 5, lanes: ['pipe'], description: 'A 22 ft superpipe, 240 m long.' },
+  { id: 'big-air', name: 'The Tower', difficulty: 'double-black', start: 4, lanes: ['bigair'], description: 'A 33 m scaffold big air: 93 km/h on the in-run, 3 s in the air.' },
+];
+
 // Line goals (physics/flow.js, course.lineGoals): named features in order, in one clean run.
 export const LINE_GOALS = [
   ['Rail Triple', 1500, 'Section 1', 'Section 2', 'Section 3'],

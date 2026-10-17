@@ -223,6 +223,32 @@ await test('the judge: a clean full slopestyle run scores in the 80s–90s, a cr
   assert.ok(Array.isArray(good.rows) && good.rows.length >= 7);
 });
 
+await test('trails contract: registerMap trails match the course; trailSpawn lands on the park; runCompleted at the finish', async () => {
+  const m = registry.getMap('voltage-park');
+  const info = course.trailInfo();
+  assert.equal(m.trails.length, info.length);
+  for (const t of m.trails) {
+    assert.ok(['green', 'blue', 'black', 'double-black', 'park'].includes(t.difficulty), t.id);
+    const i = info.find((q) => q.id === t.id);
+    assert.ok(i && i.length === t.length && i.vertical === t.vertical, `${t.id}: ${JSON.stringify(i)} vs ${t.length} / ${t.vertical} (update TRAIL_SIZE in index.js)`);
+    const s = course.trailSpawn(t.id);
+    assert.ok(s && T.isInside(s.x, s.z, 50) && Number.isFinite(s.heading), t.id);
+  }
+  assert.equal(course.trailSpawn('nope'), null);
+  // A rider who finishes after riding Current's features completes the Current trail.
+  const { emit, on } = await import('../src/state.js');
+  const p = L.makePlayer(T, 'ski', 'park');
+  const sp = course.trailSpawn('current');
+  p.place({ x: sp.x, z: sp.z }, sp.heading);
+  emit('dropZone', {});
+  p.parkRun.lanes = { current: 3, slope: 1 };
+  let got = null; const off = on('runCompleted', (e) => { got = e; });
+  emit('runComplete');
+  off();
+  assert.ok(got && got.mapId === 'voltage-park' && got.trailId === 'current' && Number.isFinite(got.distance) && Number.isFinite(got.time) && Number.isFinite(got.score), JSON.stringify(got));
+  p.grind.dispose();
+});
+
 await test('drop zones and snowflakes are on the park', () => {
   assert.equal(course.dropZones.length, 9);
   for (const d of course.dropZones) { assert.ok(T.isInside(d.x, d.z, 50)); assert.ok(Number.isFinite(T.getHeight(d.x, d.z))); }
