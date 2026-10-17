@@ -29,7 +29,7 @@ const localStore = {
   set(k, v) { try { globalThis.localStorage?.setItem(k, JSON.stringify(v)); } catch { /* private mode / quota */ } },
 };
 
-const BUS = { weeklyDone: 'weeklyDone', newTrick: 'newTrick', xp: 'progressXp', levelUp: 'juiceLevelUp', achievement: 'achievement', challengeDone: 'challengeDone', dailySweep: 'dailySweep', challengeProgress: 'challengeProgress', personalBest: 'personalBest' };
+const BUS = { cleanRun: 'cleanRun', weeklyDone: 'weeklyDone', newTrick: 'newTrick', xp: 'progressXp', levelUp: 'juiceLevelUp', achievement: 'achievement', challengeDone: 'challengeDone', dailySweep: 'dailySweep', challengeProgress: 'challengeProgress', personalBest: 'personalBest' };
 const listeners = new Map();   // core event → Set(fn)
 function fire(name, detail) {
   for (const fn of listeners.get(name) || []) { try { fn(detail); } catch (e) { console.error('[progression] listener', e); } }
@@ -94,7 +94,11 @@ export function trackProgression({ player, getMapId }) {
   on('nearMiss', () => { if (open) P.recordNearMiss(); });
   on('juiceWipeout', ({ tumble, speed }) => { if (!open) return; const xp = P.recordWipeout(tumble, speed); if (xp) emit('progressWipeout', { tumble, xp }); });
   on('juiceComboBanked', ({ mult, bonus }) => { if (open) P.recordCombo(mult, bonus); });
-  on('runFinished', ({ medal }) => P.recordMedal(medal));
+  on('runFinished', ({ medal }) => { P.recordMedal(medal); P.finishRun(); });
+  on('runComplete', () => P.finishRun());   // Zen: the finish line
+  on('resetTop', () => P.startRun());
+  on('activity', () => P.startRun());       // a Challenge (re)start
+  on('crashed', () => P.crashInRun());
   globalThis.addEventListener?.('pagehide', () => { if (open) end(); P.save(); });
   globalThis.document?.addEventListener?.('visibilitychange', () => { if (document.visibilityState === 'hidden') P.save(); });   // flush batched in-ride writes
   return function update(dt) {

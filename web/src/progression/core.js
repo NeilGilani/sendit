@@ -75,6 +75,7 @@ export const CHALLENGE_POOL = [
   { cat: 'score', make: (r) => { const g = pick(r, [3000, 6000, 10000]); return { stat: 'rideScore', goal: g, title: `Score ${fmt(g)} in one ride`, desc: 'Style points, one ride', xp: 160 + g / 40, scope: 'ride' }; } },
   { cat: 'tricks', make: (r) => { const g = pick(r, [10, 20, 30]); return { stat: 'tricks', goal: g, title: `Land ${g} tricks`, desc: 'Spins, flips, grabs and rails', xp: 120 + g * 6 }; } },
   { cat: 'grind', make: (r) => { const g = pick(r, [40, 80, 150]); return { stat: 'grindM', goal: g, title: `Grind ${g} m of rails`, desc: 'Voltage Park has the rails', xp: 160 + g, unit: 'm' }; } },
+  { cat: 'clean', make: (r) => { const g = pick(r, [1, 2, 3]); return { stat: 'cleanRuns', goal: g, title: g === 1 ? 'Finish a run without crashing' : `Finish ${g} runs without crashing`, desc: 'Top to bottom, any map, no wipeouts', xp: 200 + g * 90 }; } },
   { cat: 'medal', make: (r) => { const g = pick(r, ['bronze', 'silver', 'gold']); return { stat: `medal-${g}`, goal: 1, title: `Earn a ${g} medal`, desc: 'Any Challenge run', xp: { bronze: 180, silver: 280, gold: 420 }[g] }; } },
 ];
 
@@ -156,6 +157,8 @@ export const ACHIEVEMENTS = [
   { id: 'gold', title: 'Golden', desc: 'Earn a gold medal', xp: 350, icon: '🥇', test: (s) => s.life.golds >= 1 },
   { id: 'book-10', title: 'Bag of Tricks', desc: 'Land 10 different tricks', xp: 250, icon: '📖', test: (s) => Object.keys(s.life.trickBook || {}).length >= 10 },
   { id: 'book-30', title: 'Trick Encyclopedia', desc: 'Land 30 different tricks', xp: 600, icon: '📚', test: (s) => Object.keys(s.life.trickBook || {}).length >= 30 },
+  { id: 'clean-run', title: 'Clean Sheet', desc: 'Finish a run top to bottom without crashing', xp: 250, icon: '✓', test: (s) => s.life.cleanRuns >= 1 },
+  { id: 'clean-10', title: 'Untouchable', desc: 'Finish 10 runs without crashing', xp: 600, icon: '◎', test: (s) => s.life.cleanRuns >= 10 },
   { id: 'meat-10', title: 'Hall of Meat', desc: 'Wipe out 10 times', xp: 150, icon: '✚', test: (s) => s.life.wipeouts >= 10 },
   { id: 'yard-sale', title: 'Yard Sale', desc: 'Tumble 15 m in one wipeout', xp: 200, icon: '☄', test: (s) => s.life.maxTumble >= 15 },
   { id: 'level-10', title: 'Double Digits', desc: 'Reach level 10', xp: 0, icon: '⬆', test: (s, p) => p.level >= 10 },
@@ -173,7 +176,7 @@ export const PB_STATS = {
 export function defaultState() {
   return {
     version: PROGRESSION_VERSION, xp: 0,
-    life: { rides: 0, tricks: 0, flips: 0, stomps: 0, near: 0, meters: 0, air: 0, grindM: 0, maxSpin: 0, bestMult: 0, topKmh: 0, golds: 0, dailySweeps: 0, wipeouts: 0, maxTumble: 0, maps: {}, trickBook: {} },
+    life: { rides: 0, tricks: 0, flips: 0, stomps: 0, near: 0, meters: 0, air: 0, grindM: 0, maxSpin: 0, bestMult: 0, topKmh: 0, golds: 0, dailySweeps: 0, wipeouts: 0, maxTumble: 0, runs: 0, cleanRuns: 0, maps: {}, trickBook: {} },
     daily: null,           // { day, list: [3 challenges], rerolls: {slot: n}, rerollsLeft, progress: {stat: n}, done: {id: true}, swept }
     weekly: null,          // { week, progress: {stat: n}, done }
     achievements: {},      // id → unlock time (ms)
@@ -413,6 +416,20 @@ export class Progression {
   }
 
   trickBook() { return Object.entries(this.state.life.trickBook).map(([name, n]) => ({ name, n })); }
+
+  /** A run starts (a ride, a reset to the top) / is finished: clean runs count when no crash happened in between. */
+  startRun() { if (this.ride) this.ride.runCrashes = 0; }
+  crashInRun() { if (this.ride) this.ride.runCrashes = (this.ride.runCrashes || 0) + 1; }
+  finishRun() {
+    if (!this.ride) return false;
+    const L = this.state.life;
+    L.runs++;
+    const clean = !this.ride.runCrashes;
+    if (clean) { L.cleanRuns++; this.bump('cleanRuns'); this.emit('cleanRun', { runs: L.cleanRuns }); }
+    this.ride.runCrashes = 0;
+    this.checkAchievements();
+    return clean;
+  }
 
   /** A wipeout: XP for the tumble (m) and the speed (m/s) it happened at. Returns the XP paid. */
   recordWipeout(tumble = 0, speed = 0) {

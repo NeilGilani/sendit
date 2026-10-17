@@ -248,6 +248,7 @@ There is one free **Swap** per day for an unfinished challenge. A swap replaces 
 | Score | Score 3,000, 6,000 or 10,000 in one ride |
 | Tricks | Land 10, 20 or 30 tricks |
 | Rails | Grind 40, 80 or 150 m |
+| Clean runs | Finish 1, 2 or 3 runs without crashing |
 | Medals | Earn a bronze, silver or gold medal |
 
 ### Weekly challenge
@@ -267,7 +268,7 @@ The Progress tab shows it under the dailies. API: `progression.getWeekly()`. Eve
 
 ### Achievements
 
-There are 26 (`ACHIEVEMENTS`), including:
+There are 28 (`ACHIEVEMENTS`), including:
 
 - First ride, first trick, 360, 540, 720 and 1080, and a flip.
 - 1 and 50 stomps, 100 close shaves.
@@ -276,6 +277,10 @@ There are 26 (`ACHIEVEMENTS`), including:
 - All four maps, a clean sweep of the dailies, a gold medal, and level 10.
 
 Each one unlocks once, with a toast and XP.
+
+### Clean runs (mastery)
+
+A run is a ride start, a reset to the top or a Challenge (re)start, through to the finish line (Zen `runComplete`, Challenge `runFinished`). A run with no crash counts as clean: a "CLEAN RUN · NO CRASHES" call-out shows, there is a daily type for it, and **Clean Sheet** (1) and **Untouchable** (10) are achievements. Event: `cleanRun {runs}`.
 
 ### Wipeouts (Hall of Meat lite)
 

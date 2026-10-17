@@ -106,6 +106,7 @@ export function mountProgressionUi({ juice }) {
   mountRecap();
   const toast = (o) => juice?.toast(o);
   on('achievement', () => sfx('token', 0.6, 1.08));
+  on('cleanRun', () => juice?.hud?.callout('CLEAN RUN · NO CRASHES', '#2ff5d6'));
   on('challengeDone', () => sfx('medal', 0.55, 1.25));
   on('personalBest', () => { if (game.mode === Mode.RIDING) sfx('combo_bank', 0.45, 1.3); });
   on('achievement', (a) => toast({ kind: 'Achievement unlocked', title: a.title, sub: `${a.desc}${a.xp ? ` · +${a.xp} XP` : ''}`, icon: a.icon || '★', c1: '#ffe14d', c2: '#ff9a3d', hold: 4.2 }));

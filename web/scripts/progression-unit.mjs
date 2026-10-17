@@ -247,6 +247,20 @@ export async function run(test, assert) {
     assert.equal(p.recordWipeout(5, 5), 0, 'nothing outside a ride');
   });
 
+  await test('progression: clean runs count only without a crash since the run started', () => {
+    const { p, of } = make('2026-10-23T09:00:00');
+    p.startRide('valcrest-gully');
+    p.startRun();
+    p.crashInRun();
+    assert.equal(p.finishRun(), false);
+    p.startRun();
+    assert.equal(p.finishRun(), true);
+    assert.equal(p.state.life.cleanRuns, 1);
+    assert.equal(p.state.life.runs, 2);
+    assert.ok(of('achievement').some((a) => a.id === 'clean-run'));
+    assert.equal(of('cleanRun').length, 1);
+  });
+
   // ---------------------------------------------------------------- juice: combo chain + time warp
   await test('juice combo: own chain grows per different move, banks a bonus, loses on crash', () => {
     const pl = { state: 1, flow: null };
