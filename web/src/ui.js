@@ -5,10 +5,10 @@
 // The lobby (lobby/Lobby.js) is the "lobby" screen; UI only shows/hides it and routes input to it.
 import { game, Mode, on, settings, setSetting } from './state.js';
 import { State } from './player.js';
+import { progression } from './progression/index.js';   // level + dailies on the pause screen
 import { HUD } from './config.js';
 import { moveFocus, focusFirst, handleArrowKey, nudgeRange } from './lobby/nav.js';
 import { fmtTime } from './activities.js';
-import { progression } from './progression/index.js';
 
 const $ = (id) => document.getElementById(id);
 const BASES = ['loading', 'lobby', 'pause'];
