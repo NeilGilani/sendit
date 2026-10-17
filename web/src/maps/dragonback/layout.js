@@ -66,7 +66,7 @@ export const RIDGES = [
     knots: [[86, -96, 28, 52], [300, -84, 38, 58], [500, -70, 42, 62], [700, -58, 38, 60], [880, -50, 31, 56], [970, -47, 24, 50]],
     steps: [[170, 6], [430, 7]], gaps: [[560, 16, 6, 5, 'The Little Gap', 0.6], [750, 24, 16, 8, "The Spine's Gap"]] },
   { id: 'scale', name: 'The Scales', top: 3, p: 1.6, rise: 60, end: 'prow', seed: 9,
-    knots: [[300, -40, 8, 22], [390, -36, 12, 24], [520, -30, 16, 26], [600, -26, 14, 24]] },
+    knots: [[300, -40, 8, 28], [390, -36, 12, 34], [520, -30, 16, 34], [600, -26, 14, 30]] },
   { id: 'twinL', name: 'Left Twin', top: 3, p: 1.6, rise: 50, end: 'prow', seed: 4,
     knots: [[140, 36, 16, 26], [300, 42, 24, 28], [460, 46, 22, 28], [560, 48, 12, 26], [680, 52, 12, 24]] },
   { id: 'twinR', name: 'Right Twin', top: 3, p: 1.6, rise: 50, end: 'prow', seed: 5,
@@ -201,13 +201,13 @@ export const LINE_GOALS = [
 // Trails (the lobby's mountain browser, docs/maps.md): one per signature line. [id, name, difficulty, line key,
 // start, description]. start: null = the normal spawn (the first trail must be the default start), '@ridge:u' =
 // on that ridge's crest at u, pointing down it, or [u, v]. Every trail finishes at the valley (FINISH_U).
-// length / vertical are measured start → finish along the line (scripts/map5-trails.mjs).
+// length / vertical (index.js) are the shared measure: fall-line metres start → finish (scripts/trails-check.mjs).
 export const TRAILS = [
   ['ride-the-dragon', 'Ride the Dragon', 'double-black', 'spine', null, "The Dragon's Spine top to bottom: two steps, the Little Gap, the Spine's Gap, the Fork, the Organ Pipes.", true],
   ['twin-hop', 'Twin Hop', 'black', 'twins', '@twinL:150', 'Hop the Twins and back, then the Staircase: seven ridge-to-ridge airs.', true],
   ['scale-jump', 'Scale Jump', 'black', 'scales', '@spine:200', 'Off the Spine onto the Scales, the Tail, Wyrm Leap onto the Knife.'],
   ['bladerunner', 'Bladerunner', 'double-black', 'blade', '@blade:110', 'The Blade’s knife edge, Blade Leap onto the Shard, the Organ Pipes.'],
-  ['the-blade', 'The Blade', 'double-black', 'bladecrest', '@blade:110', 'The whole knife edge, through the Blade’s Notch.'],
+  ['the-blade', 'The Blade', 'double-black', 'bladecrest', '@blade:140', 'The whole knife edge, through the Blade’s Notch.'],
   ['dragons-tooth', "The Dragon's Tooth", 'double-black', 'keel', '@keel:110', 'The broad Keel, Keel Leap, the Sentinel’s notch, then the East Wall’s 38 m prow.', true],
   ['wishbone', 'West Fin & Wishbone', 'black', 'wishbone', '@westfin:110', 'West Fin’s prow onto the pillows, the Hollow, the Wishbone, West Buttress.'],
   ['the-staircase', 'The Staircase', 'black', 'twins', '@stair1:790', 'Four ridges en échelon, hop to hop to hop.'],

@@ -252,20 +252,21 @@ drops, stomp boost, the judged FWT-style run summary and the personal best (docs
 
   | trail | difficulty | start | length | vertical |
   |---|---|---|---|---|
-  | `ride-the-dragon` Ride the Dragon ★ | ◆◆ | the Shoulder (spawn) | 2910 m | 1580 m |
-  | `twin-hop` Twin Hop ★ | ◆ | Left Twin u 150 | 2760 m | 1500 m |
-  | `scale-jump` Scale Jump | ◆ | the Spine u 200 | 2720 m | 1490 m |
-  | `bladerunner` Bladerunner | ◆◆ | the Blade u 110 | 2760 m | 1540 m |
-  | `the-blade` The Blade | ◆◆ | the Blade u 110 | 2740 m | 1540 m |
-  | `dragons-tooth` The Dragon's Tooth ★ | ◆◆ | the Keel u 110 | 2950 m | 1540 m |
-  | `wishbone` West Fin & Wishbone | ◆ | West Fin u 110 | 2820 m | 1540 m |
-  | `the-staircase` The Staircase | ◆ | Stair 1 u 790 | 1890 m | 980 m |
-  | `the-knife` The Knife | ◆◆ | the Knife u 1250 | 1280 m | 610 m |
-  | `organ-pipes` The Organ Pipes | ◆ | u 1130 | 1420 m | 710 m |
-  | `the-gullies` The Gullies | ■ blue | u 130 | 2690 m | 1520 m |
-  | `the-slot` The Slot | ■ blue | u 100 | 2760 m | 1550 m |
+  | `ride-the-dragon` Ride the Dragon ★ | ◆◆ | the Shoulder (spawn) | 2280 m | 1555 m |
+  | `twin-hop` Twin Hop ★ | ◆ | Left Twin u 150 | 2140 m | 1480 m |
+  | `scale-jump` Scale Jump | ◆ | the Spine u 200 | 2090 m | 1470 m |
+  | `bladerunner` Bladerunner | ◆◆ | the Blade u 110 | 2180 m | 1520 m |
+  | `the-blade` The Blade | ◆◆ | the Blade u 140 | 2150 m | 1515 m |
+  | `dragons-tooth` The Dragon's Tooth ★ | ◆◆ | the Keel u 110 | 2180 m | 1515 m |
+  | `wishbone` West Fin & Wishbone | ◆ | West Fin u 110 | 2180 m | 1525 m |
+  | `the-staircase` The Staircase | ◆ | Stair 1 u 790 | 1500 m | 960 m |
+  | `the-knife` The Knife | ◆◆ | the Knife u 1250 | 1040 m | 585 m |
+  | `organ-pipes` The Organ Pipes | ◆ | u 1130 | 1160 m | 685 m |
+  | `the-gullies` The Gullies | ■ blue | u 130 | 2160 m | 1495 m |
+  | `the-slot` The Slot | ■ blue | u 100 | 2190 m | 1525 m |
 
-  Lengths are along the line in 3-D, start to finish.
+  Lengths and verticals are the shared measure (`trails-check.mjs`): fall-line metres and drop, start to finish
+  line. `map5-trails.mjs` also prints the 3-D length along the line, 1.3–2.95 km.
 - **Light** (`course.atmosphere`, the per-map atmosphere hook, docs/graphics.md): **first light**.
   - A low morning sun (20°) from the east-south-east (bearing 120), down the run. The face falls east; a western
     sun left the whole face in the summit ridge's shadow.
