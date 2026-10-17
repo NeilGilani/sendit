@@ -4,11 +4,12 @@
 // All tunables live in config.js.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { PostStack } from './gfx/post.js';
+import { PostStack, POST } from './gfx/post.js';
+const POST_EXPOSURE = POST.exposure;
 import { PERF } from './gfx/perf.js';
 import { prewarm, warmQualityVariants } from './gfx/prewarm.js';
 import { rockTextureReady } from './gfx/snow.js';
-import { patchShaderChunks, globals, makeNoiseTexture } from './world.js';
+import { patchShaderChunks, globals, makeNoiseTexture, applyMapAtmosphere } from './world.js';
 import { HUD } from './config.js';
 import { ATMOSPHERE, col, createSnowfall } from './scene.js';
 import { Terrain } from './terrain.js';
@@ -77,6 +78,13 @@ async function boot() {
   ui.loading(0.02, 'Fetching the mountain…');
   currentMap = await loadMap(resolveMapSelection(params, profileStore.profile));
   course = currentMap.course;
+  // Per-map sky / sun / haze / exposure (course.atmosphere, docs/graphics.md); defaults otherwise.
+  // ?atmo={"sunElevation":8,...} (JSON) previews / overrides fields while building a map's look.
+  let atmo = course.atmosphere;
+  try { if (params.has('atmo')) atmo = { ...atmo, ...JSON.parse(params.get('atmo')) }; } catch (e) { console.warn('[gfx] bad ?atmo JSON', e); }
+  POST.exposure = applyMapAtmosphere(atmo, { defaultExposure: POST_EXPOSURE }).exposure;
+  scene.fog.color.set(ATMOSPHERE.aerialColor);
+  scene.fog.density = ATMOSPHERE.aerialDensity;
   await terrain.generate(course, (p) => ui.loading(p * 0.45, course.meta ? `Shaping ${course.name}…` : 'Carving the gully…'));
   globals.uWater.value = course.water ?? -1e5;
   if (params.has('at')) {

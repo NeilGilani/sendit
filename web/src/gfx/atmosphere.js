@@ -104,17 +104,24 @@ function msApprox(r, el) {
 const LUT_W = 128, LUT_H = 96;
 const elevOf = (v) => { const e = v * 2 - 1; return Math.sign(e) * e * e * Math.PI / 2; };
 
-/** Bake once: sky LUT + derived lighting colours (all scaled by ATMOSPHERE.skyScale). */
-function bake() {
+/**
+ * Bake: sky LUT + derived lighting colours (all scaled by ATMOSPHERE.skyScale).
+ * `opts` (per-map atmosphere, see applyAtmosphere()): skyZenith / skyHorizon as linear radiance
+ * targets ([r, g, b] in the LUT units before skyScale), ambientScale, sunIntensity.
+ */
+function bake(opts = {}) {
   const t0 = performance.now();
   const sun = sunDir();
   const S = A.skyScale;
   const data = new Uint16Array(LUT_W * LUT_H * 4);
+  const raw = new Float32Array(LUT_W * LUT_H * 3);
   const toH = THREE.DataUtils.toHalfFloat;
   let irr = [0, 0, 0], wsum = 0;
   const hor = { away: [0, 0, 0], toward: [0, 0, 0], side: [0, 0, 0] };
+  const rowMean = [];
   for (let j = 0; j < LUT_H; j++) {
     const el = elevOf((j + 0.5) / LUT_H);
+    const m = [0, 0, 0];
     for (let i = 0; i < LUT_W; i++) {
       const az = ((i + 0.5) / LUT_W - 0.5) * Math.PI * 2;
       const d = [Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)];
@@ -125,12 +132,40 @@ function bake() {
         const e = 0.03;
         r = msApprox(skyRadiance([Math.cos(e) * Math.cos(az), Math.sin(e), Math.cos(e) * Math.sin(az)], sun), e).map((v) => v * 1.12);
       } else r = msApprox(r, el);
-      const o = (j * LUT_W + i) * 4;
-      for (let c = 0; c < 3; c++) data[o + c] = toH(r[c] * S);
+      const o = (j * LUT_W + i) * 3;
+      for (let c = 0; c < 3; c++) { raw[o + c] = r[c]; m[c] += r[c] / LUT_W; }
+    }
+    rowMean.push(m);
+  }
+  // Per-map sky colours: each elevation row is re-coloured toward the target (horizon .. zenith) while
+  // keeping its azimuthal structure (the warm glow toward the sun).
+  const tinted = !!(opts.skyZenith || opts.skyHorizon);
+  if (tinted) {
+    const Z = opts.skyZenith ?? rowMean[LUT_H - 1], Hc = opts.skyHorizon ?? rowMean[Math.floor(LUT_H / 2)];
+    for (let j = 0; j < LUT_H; j++) {
+      const el = elevOf((j + 0.5) / LUT_H);
+      const t = Math.pow(Math.max(0, Math.sin(el)), 0.5);
+      const k = [0, 1, 2].map((c) => (Hc[c] + (Z[c] - Hc[c]) * t) / Math.max(1e-6, rowMean[j][c]));
+      for (let i = 0; i < LUT_W; i++) { const o = (j * LUT_W + i) * 3; for (let c = 0; c < 3; c++) raw[o + c] *= k[c]; }
+    }
+  }
+  const lutAt = (az, el) => {
+    const u = (((az / (Math.PI * 2) + 0.5) % 1) + 1) % 1;
+    const i = Math.min(LUT_W - 1, Math.max(0, Math.floor(u * LUT_W)));
+    const v = Math.sign(el) * Math.sqrt(Math.abs(el) / (Math.PI / 2)) * 0.5 + 0.5;
+    const j = Math.min(LUT_H - 1, Math.max(0, Math.floor(v * LUT_H)));
+    const o = (j * LUT_W + i) * 3;
+    return [raw[o], raw[o + 1], raw[o + 2]];
+  };
+  for (let j = 0; j < LUT_H; j++) {
+    const el = elevOf((j + 0.5) / LUT_H);
+    for (let i = 0; i < LUT_W; i++) {
+      const o3 = (j * LUT_W + i) * 3, o = (j * LUT_W + i) * 4;
+      for (let c = 0; c < 3; c++) data[o + c] = toH(raw[o3 + c] * S);
       data[o + 3] = toH(1);
       if (el > 0) {
         const w = Math.sin(el) * Math.cos(el) * (elevOf((j + 1) / LUT_H) - elevOf(j / LUT_H));   // cos-weighted solid angle
-        for (let c = 0; c < 3; c++) irr[c] += r[c] * S * w;
+        for (let c = 0; c < 3; c++) irr[c] += raw[o3 + c] * S * w;
         wsum += w;
       }
     }
@@ -145,19 +180,21 @@ function bake() {
   const horizon = (azOff) => {
     const sa = Math.atan2(sun[2], sun[0]) + azOff;
     const e = 0.07;
+    if (tinted) return lutAt(sa, e).map((v) => v * S);   // follows the re-coloured sky
     const d = [Math.cos(sa) * Math.cos(e), Math.sin(e), Math.sin(sa) * Math.cos(e)];
     return msApprox(skyRadiance(d, sun), e).map((v) => v * S);
   };
   hor.toward = horizon(0.35);      // a little off the sun so the disk's Mie peak does not dominate
   hor.side = horizon(Math.PI / 2);
   hor.away = horizon(Math.PI);
-  let sunT = sunTransmitted(sun).map((v) => v * S / Math.PI);   // irradiance / π (Lambert units)
+  let sunT = sunTransmitted(sun).map((v, c) => v * S / Math.PI * (opts.sunIntensity ?? 1) * (opts.sunTint ? opts.sunTint[c] : 1));   // irradiance / pi (Lambert units)
   const sL = 0.2126 * sunT[0] + 0.7152 * sunT[1] + 0.0722 * sunT[2];
-  sunT = sunT.map((v) => v + (sL - v) * LIGHTING.sunWhiten);      // high-altitude sun is close to white
+  if (!opts.sunTint) sunT = sunT.map((v) => v + (sL - v) * LIGHTING.sunWhiten);      // high-altitude sun is close to white
   const sinE = Math.sin(THREE.MathUtils.degToRad(LIGHTING.sunElevation));
   const ground = [0, 1, 2].map((c) => A.groundAlbedo[c] * (sunT[c] * sinE + irr[c] * LIGHTING.skyBoost));
   // Shade is lit by the sky AND by the sunlit slopes around it (terrain bounce neutralises the blue).
-  irr = irr.map((v, c) => v * LIGHTING.skyBoost + ground[c] * LIGHTING.terrainBounce);
+  irr = irr.map((v, c) => (v * LIGHTING.skyBoost + ground[c] * LIGHTING.terrainBounce) * (opts.ambientScale ?? 1));
+  for (let c = 0; c < 3; c++) ground[c] *= opts.ambientScale ?? 1;
   const zen = skyRadiance([0, 1, 0], sun).map((v) => v * S);
   const out = { tex, sun: sunT, sky: irr, ground, hor, zenith: zen, ms: performance.now() - t0 };
   console.log('[gfx] atmosphere', JSON.stringify(out, (k, v) => (typeof v === 'number' ? +v.toFixed(3) : (k === 'tex' ? undefined : v))));
@@ -165,6 +202,58 @@ function bake() {
 }
 
 export const ATMO = bake();
+
+const DEFAULTS = { sunElevation: LIGHTING.sunElevation, sunBearing: LIGHTING.sunBearing, aerialColor: A.aerialColor, aerialDensity: A.aerialDensity };
+/** sRGB hex / css string / [r, g, b] (0..1, sRGB) -> linear [r, g, b]. */
+function linColor(c) {
+  if (c == null) return null;
+  const col = Array.isArray(c) ? new THREE.Color().setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace) : new THREE.Color(c);
+  return [col.r, col.g, col.b];
+}
+
+/**
+ * Per-map atmosphere (course.atmosphere, any subset; docs/graphics.md). Resets to the defaults, applies
+ * the map's values and re-bakes the sky / light colours in place (ATMO keeps its identity). Must run
+ * before any material compiles: world.js applyMapAtmosphere() wraps it (shared uniforms, fog chunk) and
+ * main.js calls that right after the map loads.
+ *   sunElevation, sunBearing  degrees (the ?sun= URL debug override still wins)
+ *   skyZenith, skyHorizon     sky colours as they should look on screen (sRGB hex or [r, g, b] 0..1)
+ *   fogColor                  tint on the aerial-perspective / haze colour (sRGB hex or [r, g, b])
+ *   fogDensity                multiplier on the haze extinction (1 = default)
+ *   exposure                  camera exposure (default POST.exposure)
+ *   ambientScale              multiplier on sky + bounce light (how bright shade is)
+ *   sunIntensity              (extra) multiplier on the sun (e.g. 0.1 for moonlight)
+ *   sunTint                   (extra) colour of the sun light (sRGB), replaces the physical sun colour
+ *   preset                    (extra) 'golden' | 'dusk' | 'night': start from ATMOSPHERE_PRESETS
+ * Returns { exposure } for the post stack.
+ */
+export const ATMOSPHERE_PRESETS = {
+  // Low warm sun, long shadows, amber haze.
+  golden: { sunElevation: 13, sunBearing: 195, skyZenith: '#4a78c0', skyHorizon: '#f6d2a6', fogColor: '#ffdcb4', fogDensity: 1.2, exposure: 0.66, ambientScale: 0.85, sunTint: '#ffd09a' },
+  // Sun almost down: violet-blue sky, peach horizon, dim warm light, deep blue shade.
+  dusk: { sunElevation: 7, sunBearing: 205, skyZenith: '#30447e', skyHorizon: '#eaa27e', fogColor: '#efc1ad', fogDensity: 1.3, exposure: 0.9, ambientScale: 0.95, sunIntensity: 0.55, sunTint: '#ffa070' },
+  night: { sunElevation: 28, sunBearing: 140, skyZenith: '#070b18', skyHorizon: '#1b2740', fogColor: '#7f93c8', fogDensity: 0.8, exposure: 2.2, ambientScale: 4.0, sunIntensity: 0.11, sunTint: '#a9c4ff' },
+};
+
+export function applyAtmosphere(atm = {}, { defaultExposure = 0.62 } = {}) {
+  atm = atm || {};
+  if (atm.preset && ATMOSPHERE_PRESETS[atm.preset]) atm = { ...ATMOSPHERE_PRESETS[atm.preset], ...atm };
+  LIGHTING.sunElevation = atm.sunElevation ?? DEFAULTS.sunElevation;
+  LIGHTING.sunBearing = atm.sunBearing ?? DEFAULTS.sunBearing;
+  if (typeof location !== 'undefined') {
+    const q = new URLSearchParams(location.search).get('sun');
+    if (q) { const [b, e] = q.split(',').map(Number); if (Number.isFinite(b)) LIGHTING.sunBearing = b; if (Number.isFinite(e)) LIGHTING.sunElevation = e; }
+  }
+  A.aerialColor = atm.fogColor != null ? '#' + new THREE.Color().setRGB(...linColor(atm.fogColor)).getHexString() : DEFAULTS.aerialColor;
+  A.aerialDensity = atm.fogDensity ?? DEFAULTS.aerialDensity;
+  // Screen colours -> linear radiance in the LUT units (display ~ exposure x skyScale x radiance).
+  const exposure = atm.exposure ?? defaultExposure;
+  const toRad = (c) => { const l = linColor(c); return l && l.map((v) => v / Math.max(1e-4, exposure * A.skyScale)); };
+  const old = ATMO.tex;
+  Object.assign(ATMO, bake({ skyZenith: toRad(atm.skyZenith), skyHorizon: toRad(atm.skyHorizon), ambientScale: atm.ambientScale, sunIntensity: atm.sunIntensity, sunTint: linColor(atm.sunTint) }));
+  if (old !== ATMO.tex) old.dispose();
+  return { exposure };
+}
 export const SKY_LUT_W = LUT_W;
 const c3 = (a, k = 1) => new THREE.Color(a[0] * k, a[1] * k, a[2] * k);
 export const sunColor = () => c3(ATMO.sun, LIGHTING.sunBoost);
