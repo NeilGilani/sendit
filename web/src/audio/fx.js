@@ -124,7 +124,10 @@ export class FX {
   }
 
   /** Take-off: the tail / skis unloading (a woody tock) and the snow they flick off. */
-  takeoff(when, k = 1, board = 0, powder = 0) {
+  takeoff(when, k = 1, board = 0, powder = 0, speed = 10) {
+    // leaving the snow: the air rushes in — a swell rising in pitch over ~0.3 s, bigger the faster you go
+    const W = this.T.takeoff.swell * Math.min(1.4, Math.max(0.2, (speed - 4) / 14));
+    if (W > 0) this.noise(when + 0.02, { buf: 'pink', f: 380, f2: 1300, q: 0.7, gain: W, attack: 0.28, decay: 0.55 });
     const G = this.T.takeoff.gain * clamp(k, 0.3, 1.4);
     this.thump(when, { f: board ? 170 : 230, f2: board ? 70 : 110, gain: G * 0.5, decay: 0.07 });
     this.noise(when, { f: board ? 1200 : 1900, q: 1.4, gain: G * 0.35, decay: 0.03 });   // tail / tip tick

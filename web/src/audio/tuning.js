@@ -105,7 +105,7 @@ export const AUDIO = {
     poleplant: { gain: 0.32, minSpeed: 3, maxSpeed: 22, chance: 0.85, minGap: 0.55 },
     edgeChange: { gain: 0.35, minSpeed: 4, minGap: 0.35 },
     slash: { gain: 0.55, minSpeed: 6, edge: 0.6, skid: 0.12, minGap: 0.6 },
-    takeoff: { gain: 0.45 },
+    takeoff: { gain: 0.45, swell: 0.35 },   // swell: the air rushing in as the snow falls away
     landing: { gain: 1.1, crack: 0.9, thump: 0.6, crunch: 0.45, debris: 22, spray: 0.6, slap: 0.6 },   // shaped on CC0 snow impacts
     grab: { gain: 0.28 },
     crash: { gain: 0.8 },

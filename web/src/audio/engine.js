@@ -243,7 +243,7 @@ export class AudioEngine {
     const r = this.last?.r, powder = this.last?.powder ?? 0, board = r?.board ?? 0;
     this.count(name);
     switch (name) {
-      case 'takeoff': this.fx.takeoff(when, 1, board, powder); break;
+      case 'takeoff': this.fx.takeoff(when, 1, board, powder, r?.speed ?? 10); break;
       case 'jumped': if (d.late) this.fx.takeoff(when, 0.6, board, powder); break;
       case 'landed': {
         const imp = d.rawImpact ?? d.impact ?? 3;
