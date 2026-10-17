@@ -233,7 +233,7 @@ class SnowProcessor extends AudioWorkletProcessor {
 class WindProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [P('v'), P('air'), P('buffet', 1), P('whistle', 1), P('rush', 1), P('spin'), P('tuck'), P('ambient'), P('ambF', 380),
-      P('gusty', 1), P('rate', 1), P('gain', 1)];
+      P('gusty', 1), P('rate', 1), P('gain', 1), P('flap', 1)];
   }
 
   constructor(opts) {
@@ -244,7 +244,7 @@ class WindProcessor extends AudioWorkletProcessor {
     this.p = {};
     this.rng = new Rng(777);
     this.ch = [0, 1].map((c) => ({ rng: new Rng(99991 + c * 31337), pink: new Pink(), brown: 0, rush: new SVF(), bump: new SVF(), hp: new SVF(), hi: new SVF(), w1: new SVF(), w2: new SVF(), amb: new SVF(), ambH: new SVF() }));
-    this.buf = new SVF(); this.flut = new SVF(); this.bBrown = 0;
+    this.buf = new SVF(); this.flut = new SVF(); this.bBrown = 0; this.flapF = new SVF(); this.flapPh = 0; this.flapA = 1; this.flapPk = new Pink(); this.flapRng = new Rng(4242);
     this.g1 = 0; this.g2 = 0; this.g3 = 0; this.sqPh = 0; this.sqA = 0; this.sqT = 0; this.lock1 = 0; this.lock2 = 0; this.lockT1 = 0; this.lockT2 = 0; this.lt1 = 0; this.lt2 = 0;
     this.ph = 0;
     this.prev = null;
@@ -274,10 +274,12 @@ class WindProcessor extends AudioWorkletProcessor {
     const air = clamp(p.air, 0, 1);
     let lvl = T.floor + Math.pow(vEff / T.vMax, T.exp);
     lvl = Math.min(1.4, lvl * lerp(1, T.air.boost, air) * (1 + T.gust.depth * 0.3 * this.g1 * gusty));
+    const tuck = clamp(p.tuck, 0, 1);
     const spinAbs = Math.abs(p.spin), spinAmt = Math.min(1, spinAbs / T.spin.full) * T.spin.gain * air;
     const g = {
-      buffet: T.buffet.gain * Math.pow(lvl, 1.2) * p.buffet * (1 - 0.3 * clamp(p.tuck, 0, 1)),
-      rush: T.rush.gain * lvl * p.rush * (1 + spinAmt * 0.4),
+      buffet: T.buffet.gain * Math.pow(lvl, 1.2) * p.buffet * (1 - 0.3 * tuck),
+      rush: T.rush.gain * lvl * p.rush * (1 + spinAmt * 0.4) * (1 - T.tuck.rush * tuck),
+      flap: T.flap.gain * sstep(T.flap.from, T.flap.full, vEff) * lvl * p.flap * (1 - T.tuck.flap * tuck) * (1 - 0.6 * air),
       hi: T.rush.hiGain * Math.pow(lvl, 1.3) * p.rush,
       wh1: T.whistle.gain * sstep(T.whistle.from, T.whistle.from + 6, vEff) * p.whistle * this.lock1,
       wh2: T.whistle.gain * sstep(T.whistle.from + 3, T.whistle.from + 10, vEff) * p.whistle * this.lock2 * 0.8,
@@ -288,7 +290,9 @@ class WindProcessor extends AudioWorkletProcessor {
     g.ambHi = T.ambient.hiss * g.amb * clamp(0.3 + 0.5 * this.g2 * gusty, 0, 1.5);
     const a = this.prev || g;
     this.prev = g;
-    const fr = clamp(T.rush.f0 + T.rush.fPerV * vEff * lerp(1, T.air.rushUp, air), 150, 4000) * r;
+    const fr = clamp(T.rush.f0 + T.rush.fPerV * vEff * lerp(1, T.air.rushUp, air) * (1 - T.tuck.lp * tuck), 150, 4000) * r;
+    const flapInc = (T.flap.f0 + T.flap.fPerV * vEff) * r / fs;
+    this.flapF.set(T.flap.f * r, T.flap.q, fs);
     const fh = clamp(T.rush.hiF0 * Math.pow(Math.max(vEff, 1) / 10, T.rush.hiExp), 400, 9000) * r;
     const f1 = clamp((T.whistle.st * vEff) / T.whistle.d1, 200, 6000) * r, f2 = clamp((T.whistle.st * vEff) / T.whistle.d2, 150, 5000) * r;
     for (const c of this.ch) {
@@ -303,7 +307,12 @@ class WindProcessor extends AudioWorkletProcessor {
       const t = i / n, it = 1 - t;
       const buffet = a.buffet * it + g.buffet * t, rush = a.rush * it + g.rush * t, hi = a.hi * it + g.hi * t;
       const wh1 = a.wh1 * it + g.wh1 * t, wh2 = a.wh2 * it + g.wh2 * t, amb = a.amb * it + g.amb * t, ambHi = a.ambHi * it + g.ambHi * t;
-      const spin = a.spin * it + g.spin * t, outG = a.out * it + g.out * t;
+      const spin = a.spin * it + g.spin * t, outG = a.out * it + g.out * t, flap = a.flap * it + g.flap * t;
+      // jacket flapping: irregular pulses at 8–25 Hz through a 200–600 Hz band
+      this.flapPh += flapInc * (0.85 + 0.3 * this.flapA);
+      if (this.flapPh >= 1) { this.flapPh -= 1; this.flapA = this.flapRng.u(); }
+      const fp = 0.5 + 0.5 * Math.sin(TAU * this.flapPh);
+      const flapS = flap > 1e-5 ? this.flapF.bp(this.flapPk.next(this.flapRng.bi())) * flap * fp * fp * fp * (0.4 + this.flapA) * 4 : 0;
       this.ph += phInc; if (this.ph >= 1) this.ph -= 1;
       const cs = Math.cos(TAU * this.ph), sw = Math.sin(TAU * this.ph * 2);
       // buffet: shared low rumble, fluttering
@@ -319,7 +328,7 @@ class WindProcessor extends AudioWorkletProcessor {
         // per-ear spin modulation: one ear faces the airflow, then the other
         const ear = 1 + T.spin.depth * spin * (ci === 0 ? cs : -cs);
         if ((i & 15) === 0) c.rush.set(fr * (1 + T.spin.sweep * spin * sw), T.rush.q, fs);
-        let s = bfs;
+        let s = bfs + flapS * (ci === 0 ? 1.1 : 0.9);
         const pre = c.hp.hp(pk);
         s += (c.rush.lp(pre) + c.bump.bp(pre) * T.rush.bump) * rush * 1.6 * ear * (ci === 0 ? earL : earR) * squall;
         s += c.hi.bp(w) * hi * ear * (ci === 0 ? earL : earR);

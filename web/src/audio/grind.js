@@ -18,8 +18,8 @@ export class Grind {
     lfoSrc.connect(lfoF); lfoF.connect(lfoG); lfoG.connect(this.rough.gain);
     this.src.connect(this.rough);
     this.bands = MODES.rail.map((f, i) => {
-      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 18 + i * 6;
-      const g = c.createGain(); g.gain.value = [1.0, 0.7, 0.45, 0.3][i] * 2.5;
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 60 + i * 10;   // steel rings: narrow modes
+      const g = c.createGain(); g.gain.value = [1.0, 0.7, 0.45, 0.3][i] * 5;
       this.rough.connect(bp); bp.connect(g); g.connect(this.out);
       return bp;
     });
@@ -35,11 +35,13 @@ export class Grind {
     this.kind = 'rail'; this.on = false;
   }
 
-  setKind(kind, when) {
+  /** jitter: retune the modes ±3 % so every rail rings a little differently. */
+  setKind(kind, when, jitter = false) {
     const k = MODES[kind] ? kind : 'rail';
-    if (k === this.kind) return;
+    if (k === this.kind && !jitter) return;
     this.kind = k;
-    MODES[k].forEach((f, i) => this.bands[i].frequency.setValueAtTime(f, when));
+    this.tune = jitter ? 0.97 + Math.random() * 0.06 : this.tune || 1;
+    MODES[k].forEach((f, i) => this.bands[i].frequency.setValueAtTime(f * this.tune, when));
     this.dullG.gain.setValueAtTime(k === 'box' ? this.T.scrape * 1.2 : 0, when);
     this.hissG.gain.setValueAtTime(this.T.scrape * (k === 'box' ? 0.15 : 0.5), when);
   }
@@ -58,7 +60,7 @@ export class Grind {
 
   /** Lock-on: the gear lands on the metal. */
   clank(when, kind = 'rail', k = 1) {
-    const T = this.T, m = MODES[MODES[kind] ? kind : 'rail'];
+    const T = this.T, m = MODES[MODES[kind] ? kind : 'rail'].map((f) => f * (this.tune || 1));
     if (kind === 'box') {
       this.fx.thump(when, { f: 150, f2: 70, gain: T.clank * 0.9 * k, decay: 0.12 });
       this.fx.noise(when, { f: 700, q: 1, gain: T.clank * 0.6 * k, decay: 0.08 });

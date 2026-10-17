@@ -11,12 +11,14 @@ export const AUDIO = {
     fx: 0.85,             // one-shots: landings, whooshes, pole plants, crashes, grinds
     ui: 0.8,              // game / UI cues (gates, medals, tokens, combo)
     music: 0.85,
-    limiterThresholdDb: -3,   // brick-wall-ish limiter on the master (DynamicsCompressor)
-    limiterKneeDb: 2,
+    glueThresholdDb: -12, glueKneeDb: 8, glueRatio: 1.6, glueAttack: 0.01, glueRelease: 0.2,   // SFX bus glue (gentle: Chrome adds make-up gain, which would lift the quiet bits)
+    limiterThresholdDb: -2,   // limiter on the master (DynamicsCompressor, ratio 20, no look-ahead)…
+    limiterKneeDb: 0,
     limiterRatio: 20,
     limiterAttack: 0.002,
-    limiterRelease: 0.18,
-    preLimiter: 0.9,      // master trim into the limiter
+    limiterRelease: 0.12,
+    clipKnee: 0.72, clipCeil: 0.86,   // …then a tanh soft clipper (linear to 0.72, ceiling 0.86 so the 4× oversampling ripple stays under −1 dBFS) catches its overshoot
+    preLimiter: 0.8,      // master trim into the limiter (headroom)
   },
   // Music ducking: big moments pull the music down so the mountain carries them (dB, attack / release s).
   duck: {
@@ -24,12 +26,14 @@ export const AUDIO = {
     crashDb: -9, crashHold: 1.6,
     speedDb: -4, speedFrom: 18, speedFull: 30,   // wind at big-mountain speed
     grindDb: -3,
+    landDb: -5,                 // short duck on hard landings (impact > 4 m/s), 0.35 s
+    airLp: 1200, airLpAfter: 0.4, crashLp: 400, lpRelease: 0.5,   // music low-pass in big air / on a bail
     attack: 0.25, release: 1.6,
   },
   // First person (helmet cam) vs chase cam. fp: the rider's own ears inside the helmet.
   perspective: {
-    fp: { snow: 1.0, snowLow: 1.0, wind: 1.15, buffet: 1.0, whistle: 1.0, fx: 1.0 },
-    chase: { snow: 0.85, snowLow: 0.6, wind: 0.75, buffet: 0.3, whistle: 0.35, fx: 0.9 },
+    fp: { snow: 1.0, snowLow: 1.0, wind: 1.15, buffet: 1.0, whistle: 1.0, flap: 1.0, fx: 1.0 },
+    chase: { snow: 0.85, snowLow: 0.6, wind: 0.75, buffet: 0.3, whistle: 0.35, flap: 0.6, fx: 0.9 },
   },
 
   // ---------------------------------------------------------------- snow engine (worklet 'sendit-snow')
@@ -82,6 +86,10 @@ export const AUDIO = {
     air: { boost: 1.25, rushUp: 1.15 },
     // spins and flips: ears rotate through the airflow → a whoosh per half turn
     spin: { gain: 0.6, depth: 0.75, sweep: 0.45, full: 9 },
+    // jacket / pants flapping in the airflow (from ~12 m/s): AM 8–25 Hz rising with speed, 200–600 Hz band
+    flap: { gain: 0.3, from: 11, full: 24, f0: 8, fPerV: 0.55, f: 380, q: 0.9 },
+    // tucked: the body shields the head (lee of a windscreen measures 8–9 dB): rush −6 dB, darker
+    tuck: { rush: 0.5, lp: 0.4, flap: 0.5 },
     // map ambience wind (independent of the rider): distant, over ridges
     ambient: { gain: 0.35, f: 650, q: 0.5, hiss: 0.4, hissF: 1800 },   // alpine gust reference: flat to 2 kHz
     out: 0.85,
@@ -91,6 +99,7 @@ export const AUDIO = {
   fx: {
     poleplant: { gain: 0.32, minSpeed: 3, maxSpeed: 22, chance: 0.85, minGap: 0.55 },
     edgeChange: { gain: 0.35, minSpeed: 4, minGap: 0.35 },
+    slash: { gain: 0.55, minSpeed: 6, edge: 0.6, skid: 0.12, minGap: 0.6 },
     takeoff: { gain: 0.45 },
     landing: { gain: 0.9, thump: 0.8, spray: 0.7, slap: 0.6 },
     grab: { gain: 0.28 },

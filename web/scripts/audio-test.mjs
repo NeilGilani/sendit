@@ -96,6 +96,9 @@ add('park-crowd', { seconds: 10, map: 'voltage-park', frames: frames(10, () => (
 add('slowmo-air', { seconds: 5, opts: { slow: 0.35 }, frames: frames(5, (t) => (t < 1 ? { speed: 14 } : { st: 2, speed: 14, air: t - 1, spin: 4 })) });
 add('extreme-inputs', { seconds: 4, frames: frames(4, (t) => ({ speed: 80 * (t % 1), edge: 3, load: 9, skid: 9, stop: 1, groomed: 1, powder: 1, rock: 1, sink: 2, spin: 60, flip: 60, st: t % 1 < 0.5 ? 1 : 2, air: 3, board: t > 2 ? 1 : 0 })),
   events: [{ t: 0.5, name: 'landed', d: { impact: 40 } }, { t: 1, name: 'crashed' }, { t: 1.1, name: 'crashed' }, { t: 1.2, name: 'landed', d: { impact: 30 } }] });
+add('extreme-full-volume', { seconds: 4, volumes: { master: 1, sfx: 1, music: 1 }, view: 'fp', map: 'ravenspire', musicTone: true,
+  frames: frames(4, (t) => ({ speed: 45, edge: 1.2, load: 3, skid: 1.4, stop: 1, rock: 1, groomed: 0, st: t % 1 < 0.6 ? 1 : 2, air: 1, spin: 20, board: 1 })),
+  events: [0.3, 0.9, 1.5, 2.1, 2.7, 3.3].map((t, i) => ({ t, name: i % 2 ? 'crashed' : 'landed', d: { impact: 25 } })) });
 if (traceDir) for (const type of ['ski', 'snowboard']) {
   const f = join(traceDir, `trace-${type}.json`);
   if (!existsSync(f)) continue;
@@ -126,7 +129,7 @@ for (const s of S) {
   if (!r.worklet) fail(`${s.name}: worklet did not load`);
   if (r.nan) fail(`${s.name}: ${r.nan} non-finite samples`);
   if (r.paramNaN) fail(`${s.name}: ${r.paramNaN} non-finite parameters`);
-  if (r.peak >= 0.999) fail(`${s.name}: clipping (peak ${r.peak.toFixed(3)})`);
+  if (r.peak > 0.9) fail(`${s.name}: peak above −1 dBFS (${r.peak.toFixed(3)})`);
 }
 // ---------------------------------------------------------------- relative checks (sound design sanity)
 const lvl = (n, a = 0, b = 1e9) => { const r = R[n]; if (!r) return null; const w = r.rms.slice(Math.floor(a / 0.1), Math.floor(b / 0.1)); return Math.sqrt(w.reduce((s, x) => s + x * x, 0) / Math.max(1, w.length)); };

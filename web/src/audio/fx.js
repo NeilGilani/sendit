@@ -100,6 +100,13 @@ export class FX {
     this.noise(when, { buf: 'pink', f, f2: f * 1.7, q: 0.9, gain: G, attack: 0.03, decay: 0.12 });
   }
 
+  /** Slash: the edge bites in hard while the tail slides — a fan of snow thrown out of the turn. */
+  slash(when, k = 1, board = 0, powder = 0, side = 1) {
+    const G = this.T.slash.gain * clamp(k, 0.3, 1.5), f = (board ? 1700 : 2400) * (1 - 0.45 * powder);
+    this.noise(when, { buf: 'pink', f: f * 1.3, f2: f * 0.45, q: 0.7, gain: G, attack: 0.04, hold: 0.06, decay: 0.35 + 0.25 * powder, pan: -0.25 * side });
+    for (let i = 0; i < 5; i++) this.noise(when + 0.03 + i * rnd(0.03, 0.07), { f: rnd(2500, 5000) * (1 - 0.4 * powder), q: 1.2, gain: G * 0.25, decay: 0.04, pan: -0.3 * side });
+  }
+
   /** Take-off: the tail / skis unloading (a woody tock) and the snow they flick off. */
   takeoff(when, k = 1, board = 0, powder = 0) {
     const G = this.T.takeoff.gain * clamp(k, 0.3, 1.4);
@@ -160,7 +167,11 @@ export class FX {
   nearMiss(when, o = {}) {
     const G = this.T.nearMiss.gain * clamp((o.speed ?? 12) / 14, 0.4, 1.4) * clamp(2.2 / Math.max(0.6, o.dist ?? 2), 0.5, 1.4);
     const pan = clamp(o.pan ?? 0, -0.9, 0.9), tree = o.kind !== 'rock';
-    this.noise(when, { buf: 'pink', f: 2600, f2: 650, q: 1.1, gain: G, attack: 0.16, decay: 0.32, pan });
+    const g = this.noise(when, { buf: 'pink', f: 2600, f2: 650, q: 1.1, gain: G, attack: 0.16, decay: 0.32, pan });
+    // comb: a 4 → 9 → 4 ms swept delay mixed in (the 'jet' flange of air rushing past an object)
+    const c = this.ctx, d = c.createDelay(0.02), dg = c.createGain();
+    d.delayTime.setValueAtTime(0.004, when); d.delayTime.linearRampToValueAtTime(0.009, when + 0.2); d.delayTime.linearRampToValueAtTime(0.004, when + 0.55);
+    dg.gain.value = 0.5; g.connect(d); d.connect(dg); dg.connect(this.dest(pan));
     this.noise(when + 0.1, { buf: 'brown', type: 'lowpass', f: 420, q: 0.6, gain: G * 0.8, attack: 0.08, decay: 0.25, pan: pan * 0.6 });
     if (tree) for (let i = 0; i < 4; i++) this.noise(when + 0.08 + i * rnd(0.03, 0.06), { f: rnd(4000, 6500), q: 1.2, gain: G * 0.25, decay: 0.05, pan });
   }

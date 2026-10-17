@@ -17,6 +17,17 @@ import { Ambience } from './ambience.js';
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const dbToGain = (db) => Math.pow(10, db / 20);
+/** tanh soft clip: linear below `knee`, saturating toward `ceil` (−1 dBFS) above it. Inputs beyond ±1 are
+ *  held at the curve's ends by the WaveShaper, so the ceiling holds whatever arrives. */
+function softClipCurve(knee = 0.75, ceil = 0.89) {
+  const n = 4096, c = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1, a = Math.abs(x);
+    c[i] = a <= knee ? x : Math.sign(x) * (knee + (ceil - knee) * Math.tanh((a - knee) / (ceil - knee)));
+  }
+  return c;
+}
+
 const WORKLET_URL = new URL('./worklet.js', import.meta.url);
 
 export class AudioEngine {
@@ -45,15 +56,25 @@ export class AudioEngine {
     this.limiter = c.createDynamicsCompressor();
     this.limiter.threshold.value = M.limiterThresholdDb; this.limiter.knee.value = M.limiterKneeDb;
     this.limiter.ratio.value = M.limiterRatio; this.limiter.attack.value = M.limiterAttack; this.limiter.release.value = M.limiterRelease;
-    this.limiter.connect(c.destination);
+    // the compressor has no look-ahead and can overshoot: a tanh soft clipper (4× oversampled) catches it
+    this.clip = c.createWaveShaper(); this.clip.curve = softClipCurve(M.clipKnee, M.clipCeil); this.clip.oversample = '4x';
+    this.limiter.connect(this.clip); this.clip.connect(c.destination);
     this.master = c.createGain(); this.master.gain.value = M.preLimiter; this.master.connect(this.limiter);
-    this.sfx = c.createGain(); this.sfx.connect(this.master);
+    // glue: gentle bus compression so snow, wind and impacts sit together
+    this.glue = c.createDynamicsCompressor();
+    this.glue.threshold.value = M.glueThresholdDb; this.glue.knee.value = M.glueKneeDb; this.glue.ratio.value = M.glueRatio;
+    this.glue.attack.value = M.glueAttack; this.glue.release.value = M.glueRelease;
+    this.glue.connect(this.master);
+    this.sfx = c.createGain(); this.sfx.connect(this.glue);
     this.music = c.createGain(); this.music.connect(this.master);
-    this.duck = c.createGain(); this.duck.gain.value = M.music; this.duck.connect(this.music);
+    // music: duck gain → low-pass (big air / bails muffle it) → music volume
+    this.musicLP = c.createBiquadFilter(); this.musicLP.type = 'lowpass'; this.musicLP.frequency.value = 20000; this.musicLP.Q.value = 0.7;
+    this.musicLP.connect(this.music);
+    this.duck = c.createGain(); this.duck.gain.value = M.music; this.duck.connect(this.musicLP);
     const bus = (g) => { const n = c.createGain(); n.gain.value = g; n.connect(this.sfx); return n; };
     this.snowBus = bus(M.snow); this.windBus = bus(M.wind); this.ambBus = bus(M.ambience); this.fxBus = bus(M.fx); this.uiBus = bus(M.ui);
     // analysers for the headless test / debug overlay
-    this.analyser = c.createAnalyser(); this.analyser.fftSize = 2048; this.limiter.connect(this.analyser);
+    this.analyser = c.createAnalyser(); this.analyser.fftSize = 2048; this.clip.connect(this.analyser);
 
     this.fx = new FX(c, this.fxBus, this.T.fx);
     try {
@@ -111,7 +132,7 @@ export class AudioEngine {
     // ---- wind (relative airspeed ≈ rider speed; the crash tumble keeps some)
     const spin = air ? Math.abs(r.spin) + Math.abs(r.flip) : 0;
     const windParams = {
-      v: quiet ? 0 : r.speed, air, buffet: persp.buffet, whistle: persp.whistle, rush: 1, spin, tuck: r.tuck,
+      v: quiet ? 0 : r.speed, air, buffet: persp.buffet, whistle: persp.whistle, flap: persp.flap, rush: 1, spin, tuck: r.tuck,
       ambient: (o.menu ? 0.6 : 1) * map.wind, ambF: map.windF, gusty: map.gustiness, rate, gain: persp.wind * (o.paused ? 0.5 : 1),
     };
     if (this.worklet) {
@@ -132,9 +153,18 @@ export class AudioEngine {
     if (this.crashT > 0) duck = Math.min(duck, D.crashDb);
     duck = Math.min(duck, D.speedDb * sstep(D.speedFrom, D.speedFull, r.speed));
     if (r.st === ST.GRIND) duck = Math.min(duck, D.grindDb);
+    if (this.landDuckT > 0) { this.landDuckT -= dt; duck = Math.min(duck, D.landDb); }
     if (Math.abs(duck - this.duckDb) > 0.1) {
       this.duck.gain.setTargetAtTime(T.mix.music * dbToGain(duck), when, duck < this.duckDb ? D.attack : D.release);
       this.duckDb = duck;
+    }
+    // music low-pass: muffled in big air, dark on a bail, opens on landing
+    let lp = 20000;
+    if (r.st === ST.AIR && r.air > D.airLpAfter) lp = D.airLp;
+    if (this.crashT > 0) lp = D.crashLp;
+    if (lp !== this.musicLpF) {
+      this.musicLP.frequency.setTargetAtTime(lp, when, lp < (this.musicLpF ?? 20000) ? (this.crashT > 0 ? 0.04 : 0.12) : D.lpRelease);
+      this.musicLpF = lp;
     }
     this.last = { r, edge, powder };
   }
@@ -162,6 +192,13 @@ export class AudioEngine {
     if (r.st === ST.AIR && r.grab > 0.5 && !this.grabbing) { this.grabbing = true; this.fx.grab(when); this.count('grab'); }
     if (this.grabbing && (r.grab < 0.25 || r.st !== ST.AIR)) { this.grabbing = false; if (r.st === ST.AIR) this.fx.grab(when, true); }
     if (prev && prev.st !== ST.CRASH && r.st === ST.CRASH) this.crashT = this.T.duck.crashHold;
+    // slash: the edge bites hard and fast while sliding a little → an exaggerated fan of spray (Steep does this)
+    const SL = F.slash;
+    if (grounded && prev && r.speed > SL.minSpeed && edge > SL.edge && this.last.edge < SL.edge - 0.02 && r.skid > SL.skid && when - (this.lastSlash ?? -9) > SL.minGap) {
+      this.lastSlash = when;
+      this.fx.slash(when, clamp(r.speed / 14, 0.5, 1.3) * (0.6 + r.skid), r.board, powder, r.edgeSign);
+      this.count('slash');
+    }
   }
 
   /** Bus events (state.js) → one-shots. d: the event payload (+ pan / speed added by the caller). */
@@ -173,6 +210,7 @@ export class AudioEngine {
       case 'jumped': if (d.late) this.fx.takeoff(when, 0.6, board, powder); break;
       case 'landed': {
         const imp = d.rawImpact ?? d.impact ?? 3;
+        if (imp > 4) this.landDuckT = 0.35;
         this.fx.landing(when, imp, { powder, board });
         if (d.perfect || d.grade === 'stomped') this.amb.cheer(when + 0.25, 1);
         break;
@@ -181,7 +219,7 @@ export class AudioEngine {
       case 'crashed': this.fx.crash(when, 1, powder); this.crashT = this.T.duck.crashHold; break;
       case 'nearMiss': this.fx.nearMiss(when, { pan: d.pan ?? 0, speed: r?.speed ?? 12, dist: d.dist, kind: d.kind }); break;
       case 'hardBrake': this.fx.hardBrake(when, typeof d === 'number' ? d : d.speed ?? 12, board, powder); break;
-      case 'grindStart': this.grind.setKind(d.kind, when); this.grind.clank(when, d.kind, 1); break;
+      case 'grindStart': this.grind.setKind(d.kind, when, true); this.grind.clank(when, d.kind, 1); break;
       case 'grindKink': this.grind.tick(when, clamp((d.kink ?? 10) / 20, 0.3, 1)); break;
       case 'grindHop': this.grind.popOff(when); break;
       case 'grindEnd': if (d.reason !== 'bail') this.grind.popOff(when); break;
