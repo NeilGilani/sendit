@@ -41,7 +41,7 @@ const CSS = /* css */`
 .pg-pb { display: grid; grid-template-columns: 1fr auto; gap: 0.3em 1em; font-size: 0.9em; }
 .pg-pb span { color: var(--lb-dim); }
 .pg-pb b { font-weight: 800; text-align: right; }
-.pg-today { position: absolute; right: var(--lb-pad); bottom: calc(var(--lb-pad) + 5.6em); z-index: 2; display: flex; flex-direction: column; align-items: flex-end; gap: 0.3em; pointer-events: auto; cursor: pointer; }
+#lobby > .pg-today { position: absolute; right: var(--lb-pad); bottom: calc(var(--lb-pad) + 5.6em); z-index: 2; display: flex; flex-direction: column; align-items: flex-end; gap: 0.3em; pointer-events: auto; cursor: pointer; }
 .pg-today > b { font: 900 italic 0.72em/1 var(--font); letter-spacing: 0.3em; color: rgba(255,255,255,0.85); text-shadow: 0 1px 6px rgba(10,14,40,0.6); }
 .pg-today .row { display: flex; align-items: center; gap: 0.5em; padding: 0.3em 0.75em 0.3em 0.35em; border-radius: 999px; background: var(--lb-glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--lb-line); font-size: 0.8em; font-weight: 700; max-width: 21em; }
 .pg-today .row.done { color: var(--lb-dim); text-decoration: line-through; text-decoration-color: rgba(47,245,214,0.7); }
