@@ -73,7 +73,7 @@ uniform float uStars; uniform float uAurora; uniform float uMoon; uniform float 
 uniform sampler2D noiseTex;
 varying vec3 vDir;
 float h12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
-float fbm(vec2 p) { float a = 0.0, w = 0.5; for (int i = 0; i < 5; i++) { a += w * texture2D(noiseTex, p).r; p = p * 2.03 + 0.17; w *= 0.5; } return a; }
+float fbm(vec2 p) { float a = 0.0, w = 0.5; for (int i = 0; i < 4; i++) { a += w * texture2D(noiseTex, p).r; p = p * 2.03 + 0.17; w *= 0.5; } return a; }
 void main() {
   vec3 dir = normalize(vDir);
   vec3 col = skyColor(dir);
@@ -87,7 +87,7 @@ void main() {
     vec2 cp = dir.xz / (dir.y + 0.08) * 0.11 + vec2(uSkyTime * 0.0012, 0.0);
     float n = fbm(cp * 0.6);
     float cov = smoothstep(1.0 - uCloudCover - 0.12, 1.0 - uCloudCover + 0.25, n + 0.12);
-    float wisp = smoothstep(0.55, 0.85, fbm(cp * vec2(0.25, 1.6) + 3.1)) * 0.35 * (1.0 - smoothstep(0.35, 0.8, dir.y));   // cirrus streaks (low; overhead they would read as beams)
+    float wisp = cov > 0.95 ? 0.0 : smoothstep(0.55, 0.85, fbm(cp * vec2(0.25, 1.6) + 3.1)) * 0.35 * (1.0 - smoothstep(0.35, 0.8, dir.y));   // cirrus streaks (low; overhead they would read as beams)
     float dens = clamp(cov + wisp * (1.0 - cov), 0.0, 1.0) * smoothstep(0.0, 0.12, dir.y);
     float edge = pow(max(mu, 0.0), 6.0);
     float thick = smoothstep(0.2, 1.0, cov);

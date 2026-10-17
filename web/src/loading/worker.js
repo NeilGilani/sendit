@@ -15,8 +15,11 @@ function loop(now) {
   if (!visible) { last = now; return; }
   // ~60 fps cap: a 120 Hz display would otherwise double the GPU load while the game boots. A due-time
   // budget (not a fixed gate) keeps 75 / 90 / 144 Hz displays near 60 too.
+  // While the game compiles and warms its shaders (the last stretch of the boot) the GPU is the
+  // bottleneck for both: drop to 30 fps there (slow motion hides it) and give the game the time.
+  const period = scene && scene.stageP >= 0.88 && scene.stageP < 1 ? 1000 / 30 : 1000 / 60;
   if (last && now < due - 4) return;
-  due = Math.max(due + 1000 / 60, now);
+  due = Math.max(due + period, now);
   const dt = last ? (now - last) / 1000 : 1 / 60;
   if (last) scene.adapt(now - last);
   last = now;

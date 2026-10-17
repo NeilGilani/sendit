@@ -15,7 +15,9 @@ const browser = await chromium.launch({
 const rows = [];
 for (let i = 0; i < runs * configs.length; i++) {
   const extra = configs[i % configs.length];
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  // VIEW=WxH@dpr (default 1280x720@1), e.g. VIEW=1440x960@2 for a high-DPI laptop screen.
+  const [vw, vh, dpr] = (process.env.VIEW || '1280x720@1').split(/[x@]/).map(Number);
+  const ctx = await browser.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr || 1 });
   const page = await ctx.newPage();
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });

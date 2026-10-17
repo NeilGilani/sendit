@@ -20,7 +20,7 @@ fs.mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
 let bad = 0;
 for (const q of variants) {
-  const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
+  const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: Number(process.env.DPR || 1) });   // DPR=2 for high-DPI captures
   const page = await ctx.newPage();
   const errors = [], logs = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); else if (m.text().includes('[loading]')) logs.push(m.text()); });

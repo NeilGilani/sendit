@@ -52,7 +52,7 @@ export function makeHeight(v) {
     let a = 0, w = 1, amp = 0.5, s = 0;
     for (let i = 0; i < oct; i++) {
       let n = 1 - Math.abs(n2(x, y));
-      n = i < 2 ? n * n * n : n * n;           // knife-edged crests on the big ridges
+      n = i < 1 ? Math.pow(n, 2.5) : n * n;     // sharp crests on the big ridges (not needle cones)
       n *= w;
       w = Math.min(1, n * 2.2);
       a += n * amp; s += amp;
@@ -347,23 +347,39 @@ const TERRAIN_FRAG = /* glsl */`
   float rock = smoothstep(hold, hold + 0.24, slope);
 #ifdef FAR
   // Big faces shed snow from ~35°: dark rock walls, snow in the couloirs and on the shoulders.
-  float holdF = 0.2 + (n0 - 0.5) * 0.16 + (texture2D(noiseTex, vW.xz * 0.0011 + 0.5).g - 0.5) * 0.12;
-  rock = smoothstep(holdF, holdF + 0.08, slope);
+  // Low-frequency hold line and a wide band: a narrow threshold on detailed noise mottles into speckle.
+  float holdF = 0.2 + (texture2D(noiseTex, vW.xz * 0.0011 + 0.5).g - 0.5) * 0.2 + (texture2D(noiseTex, vW.xz * 0.0004 + 0.1).r - 0.5) * 0.1;
+  rock = smoothstep(holdF - 0.04, holdF + 0.16, slope);
   // Conifers below the treeline on the gentler valley sides: near-black green, speckled.
   float tree = (1.0 - smoothstep(uTreeLine - 120.0, uTreeLine + 120.0, vW.y + (n0 - 0.5) * 260.0)) * (1.0 - smoothstep(0.32, 0.5, slope));
   tree *= smoothstep(0.3, 0.55, texture2D(noiseTex, vW.xz * 0.0023).g + 0.25);
 #endif
   vec3 rc = vec3(0.3), Nr = N, Nh = N; float band = 0.0;
   if (rock > 0.01) {
+#ifdef FAR
+    // Far faces (most of the frame in wide shots): the game's rock albedo + strata ledges, no Voronoi
+    // block lighting (it costs a lot of fill rate at high DPI and can't be seen past a few hundred metres).
+    vec2 ru = vec2(vW.x * 0.7 + vW.z * 0.7, vW.y);
+    // A smooth tone (the game's rockAlbedo streak / bed lookups alias into crosses at this range).
+    float rt = texture2D(noiseTex, ru * vec2(0.0021, 0.0034)).r * 0.6 + texture2D(noiseTex, ru * 0.009 + 0.37).g * 0.4;
+    rc = mix(uRockA, uRockB, smoothstep(0.25, 0.8, rt)) * (0.88 + 0.24 * n1);
+    // (no ledge lines here: at this scale they alias into speckle)
+#else
     rockShade(vW, N, tFP, rc, Nr, Nh, band);
+#endif
     // Snow on ledges and on block tops that tilt up.
+#ifdef FAR
+    float ledge = band * 0.6;
+#else
     float ledge = smoothstep(0.55, 0.8, Nh.y) * smoothstep(0.35, 0.7, n1) + band * 0.6;
+#endif
     rock *= 1.0 - clamp(ledge, 0.0, 0.85);
   }
   // Snow relief: soft drifts + wind ripples from the noise gradients (fades with distance).
   // Differences over ~4 texels: 1-texel steps pick up the bilinear grid of the noise (a brick pattern).
   float e = 0.016;
-  // Wind-carved: long drifts and sastrugi stretched along the wind, not round blotches.
+  // Wind-carved: long drifts and sastrugi stretched along the wind, not round blotches. Faded out by
+  // ~1 m/px: differences of a far mip level show the texture's bilinear grid as crosses.
   vec2 q = vec2(dot(vW.xz, uWindDir), dot(vW.xz, vec2(-uWindDir.y, uWindDir.x))) * vec2(0.008, 0.03);
   float h0 = texture2D(noiseTex, q).r, hx = texture2D(noiseTex, q + vec2(e, 0.0)).r, hy = texture2D(noiseTex, q + vec2(0.0, e)).r;
   vec2 qf = vW.xz * 0.09 + 0.37;
@@ -371,11 +387,12 @@ const TERRAIN_FRAG = /* glsl */`
   vec2 q2 = vec2(dot(vW.xz, uWindDir), dot(vW.xz, vec2(-uWindDir.y, uWindDir.x))) * vec2(0.9, 0.25);
   float r0 = texture2D(noiseTex, q2).b, rx = texture2D(noiseTex, q2 + vec2(e, 0.0)).b;
   float fade = 1.0 - smoothstep(0.08, 1.2, tFP);
-  vec3 Ns = normalize(N + (vec3(uWindDir.x, 0.0, uWindDir.y) * (hx - h0) + vec3(-uWindDir.y, 0.0, uWindDir.x) * (hy - h0)) * (-3.4) * (1.0 - smoothstep(2.0, 12.0, tFP)) + vec3(fx - f0, 0.0, fy - f0) * (-0.35) * fade + vec3(uWindDir.x, 0.0, uWindDir.y) * (rx - r0) * (-30.0) * (1.0 - smoothstep(0.02, 0.18, tFP)) * 0.03);
+  vec3 Ns = normalize(N + (vec3(uWindDir.x, 0.0, uWindDir.y) * (hx - h0) + vec3(-uWindDir.y, 0.0, uWindDir.x) * (hy - h0)) * (-3.4) * (1.0 - smoothstep(0.25, 1.2, tFP)) + vec3(fx - f0, 0.0, fy - f0) * (-0.35) * fade + vec3(uWindDir.x, 0.0, uWindDir.y) * (rx - r0) * (-30.0) * (1.0 - smoothstep(0.02, 0.18, tFP)) * 0.03);
 #ifdef FAR
   if (tree > 0.01) {
-    float sp = texture2D(noiseTex, vW.xz * 0.05).r;
-    rc = mix(rc, uForestCol * (0.55 + 0.6 * sp), tree);
+    // Forest as a dark mass with soft clumps (a fine speckle reads as crosses at high DPI).
+    float sp = texture2D(noiseTex, vW.xz * 0.009).r * 0.7 + texture2D(noiseTex, vW.xz * 0.031 + 0.4).g * 0.3;
+    rc = mix(rc, uForestCol * (0.5 + 0.5 * sp), tree);
     rock = max(rock, tree * 0.92);
   }
 #endif
@@ -403,7 +420,7 @@ export function terrainMaterial(uniforms, atmo, { far = false } = {}) {
     frag: TERRAIN_FRAG,
     band: SNOW_BAND_GLSL + ROCK_FILL_GLSL,
   });
-  m.defines = far ? { FAR: 1, ROCK_LITE: 1, ROCK_FAR: 1 } : { SNOW_SPARKLE: 1, DEBUGVIEW: (typeof self !== 'undefined' && self.__loadDebugView) || 0 };   // ?loaddebug=view1|2|3: rock mask / normals / baked visibility   // near: the game's full rock (joints, columns, photo grain)
+  m.defines = far ? { FAR: 1, ROCK_LITE: 1, ROCK_FAR: 1, DEBUGVIEW: (typeof self !== 'undefined' && self.__loadDebugView) || 0 } : { SNOW_SPARKLE: 1, ROCK_LITE: 1, DEBUGVIEW: (typeof self !== 'undefined' && self.__loadDebugView) || 0 };   // ?loaddebug=view1|2|3: rock mask / normals / baked visibility
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (shader, r) => {
     prev(shader, r);
@@ -418,6 +435,10 @@ gl_FragColor.rgb = vec3(tRock, 0.2, 1.0 - tRock) * 3.0;
 gl_FragColor.rgb = (normalize(vWN) * 0.5 + 0.5) * 3.0;
 #elif defined(DEBUGVIEW) && DEBUGVIEW == 3
 gl_FragColor.rgb = vec3(vVisT, 0.0) * 3.0;
+#elif defined(DEBUGVIEW) && DEBUGVIEW == 4
+gl_FragColor.rgb = diffuseColor.rgb * 2.0;
+#elif defined(DEBUGVIEW) && DEBUGVIEW == 5
+gl_FragColor.rgb = (tN * 0.5 + 0.5) * 2.0;
 #endif
 `);
   };

@@ -23,7 +23,9 @@ import { PowderFX } from './powderfx.js';
 import { Shot } from './choreo.js';
 import { planMove, CameraRig } from './shots.js';
 
-const PIXEL_BUDGET = 2560 * 1440;          // max rendered pixels (CSS px × ratio²) before MSAA
+// Max rendered pixels (CSS px × ratio²). A 1440×960 @2× laptop would ask for 5.5 MP; at that size the
+// scene was fill-rate bound (~30 fps, +4 s of boot). ~2.1 MP + SMAA stays crisp on a 13'' panel.
+const PIXEL_BUDGET = 1920 * 1100;
 const lum = (c) => 0.2126 * c.x + 0.7152 * c.y + 0.0722 * c.z;
 
 export class LoadingScene {
@@ -416,12 +418,13 @@ export class LoadingScene {
     if (frameMs > 25) P.over25++;
     if (frameMs > 50) P.over50++;
     this.ft.push(frameMs);
-    if (this.ft.length < 30) return;
+    if (this.ft.length < 20) return;
     const s = [...this.ft].sort((a, b) => a - b);
     const med = s[Math.floor(s.length * 0.5)], p90 = s[Math.floor(s.length * 0.9)];
     this.ft.length = 0;
     let next = this.scale;
-    if (med > 19 || p90 > 30) next = Math.max(0.5, this.scale * 0.88);
+    const mean = s.reduce((a, b) => a + b, 0) / s.length;
+    if (med > 19 || p90 > 30 || mean > 22) next = Math.max(0.5, this.scale * 0.85);
     else if (med < 17.8 && this.scale < 1) next = Math.min(1, this.scale * 1.06);   // at vsync: creep back up
     if (Math.abs(next - this.scale) > 0.01) { this.scale = next; this.resize(this.size); }
     this.post('stats', { stats: { medMs: +med.toFixed(1), scale: +this.scale.toFixed(2), ratio: +this.ratio.toFixed(2), frames: this.frames, build: this.stats.build, compile: this.stats.compile, fps: +(1000 * P.n / P.sum).toFixed(1), over25: P.over25, over50: P.over50, maxMs: Math.round(P.max), px: `${Math.round(this.size.width * this.ratio)}x${Math.round(this.size.height * this.ratio)}` } });
