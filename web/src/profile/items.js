@@ -41,6 +41,12 @@ export const CLOTHING_ITEMS = [
         colors: { base: '#f1f1ee', panel: '#141414', accent: '#ff3d6e', gaiter: '#141414', style: 0, pat: 'checker', patA: '#141414', patScale: 1 } },
       { id: 'glacier', name: 'Glacier', rarity: 'rare', series: 'first-chair',
         colors: { base: '#dff3ff', panel: '#7fb8e6', accent: '#1b4f8a', gaiter: '#7fb8e6', style: 0, pat: 'digital', patA: '#a9cfee', patB: '#5d8fbf', finish: 'gloss' } },
+      { id: 'expedition', name: 'Expedition Red', rarity: 'common', series: 'backcountry',
+        colors: { base: '#b3261e', panel: '#1b1e23', accent: '#f2efe6', gaiter: '#1b1e23', style: 0 } },
+      { id: 'topo', name: 'Topo Map', rarity: 'rare', series: 'backcountry',
+        colors: { base: '#c9b48a', panel: '#5a4a32', accent: '#ff5b14', gaiter: '#5a4a32', style: 0, pat: 'topo', patScale: 1 } },
+      { id: 'beacon', name: 'Beacon', rarity: 'epic', series: 'backcountry',
+        colors: { base: '#ff6a00', panel: '#1b1e23', accent: '#f2efe6', gaiter: '#1b1e23', style: 1, finish: 'reflective' } },
     ],
   },
   {
@@ -62,6 +68,12 @@ export const CLOTHING_ITEMS = [
         colors: { base: '#ff8a1a', panel: '#141414', accent: '#fff3d6', gaiter: '#141414', style: 0, pat: 'tiger', patA: '#141414' } },
       { id: 'molten', name: 'Molten', rarity: 'legendary', series: 'first-chair',
         colors: { base: '#1a0f0c', panel: '#2a1510', accent: '#ffb13d', gaiter: '#1a0f0c', style: 0, pat: 'flames', patA: '#ff4a12', patB: '#ffd23a', finish: 'neon' } },
+      { id: 'glacier-blue', name: 'Glacier Blue', rarity: 'uncommon', series: 'backcountry',
+        colors: { base: '#2f7be0', panel: '#123766', accent: '#f2efe6', gaiter: '#123766', style: 0 } },
+      { id: 'whiteout', name: 'Whiteout', rarity: 'rare', series: 'backcountry',
+        colors: { base: '#f2f4f6', panel: '#c9d2d9', accent: '#2f7be0', gaiter: '#c9d2d9', style: 0, pat: 'digital', patA: '#d9e0e6', patB: '#aeb9c3' } },
+      { id: 'northern-lights', name: 'Northern Lights', rarity: 'legendary', series: 'backcountry',
+        colors: { base: '#0f2a2a', panel: '#103a3a', accent: '#5dffb0', gaiter: '#0f2a2a', style: 0, pat: 'fade', patA: '#5dffb0', patB: '#3b2a9a', finish: 'iridescent' } },
     ],
   },
   {
@@ -74,6 +86,8 @@ export const CLOTHING_ITEMS = [
         colors: { base: '#16c2b0', panel: '#7a3cff', accent: '#ff3fa4', gaiter: '#7a3cff', style: 1, pat: 'zigzag', patA: '#ff3fa4', patB: '#7a3cff', onePiece: true } },
       { id: 'hyperwave', name: 'Hyperwave', rarity: 'legendary', series: 'night-park',
         colors: { base: '#1b1240', panel: '#2a1a6a', accent: '#2bf0ff', gaiter: '#1b1240', style: 1, pat: 'zigzag', patA: '#ff2fd2', patB: '#2bf0ff', finish: 'neon', onePiece: true } },
+      { id: 'alpine-78', name: "Alpine '78", rarity: 'epic', series: 'backcountry',
+        colors: { base: '#f2efe6', panel: '#b3261e', accent: '#1f2a44', gaiter: '#b3261e', style: 1, pat: 'band', patA: '#b3261e', patB: '#1f2a44', onePiece: true } },
     ],
   },
   {
@@ -91,6 +105,8 @@ export const CLOTHING_ITEMS = [
         colors: { base: '#e9eef2', cuff: '#9aa8b4', pat: 'digital', patA: '#9aa8b4', patB: '#5d6c7a' } },
       { id: 'heritage', name: 'Heritage', rarity: 'epic', series: 'first-chair',
         colors: { base: '#efe6d2', cuff: '#c8392b', pat: 'band', patA: '#c8392b', patB: '#f2a03a' } },
+      { id: 'charcoal', name: 'Charcoal', rarity: 'common', series: 'backcountry', colors: { base: '#2b2c2f', cuff: '#1a1b1d' } },
+      { id: 'avalanche', name: 'Avalanche', rarity: 'uncommon', series: 'backcountry', colors: { base: '#ff6a00', cuff: '#1b1e23' } },
     ],
   },
   {
@@ -101,6 +117,9 @@ export const CLOTHING_ITEMS = [
       { id: 'olive', name: 'Olive', rarity: 'common', series: 'night-park', colors: { base: '#5a5f3a', cuff: '#3a3d25' } },
       { id: 'camo', name: 'Urban Camo', rarity: 'uncommon', series: 'night-park',
         colors: { base: '#8e9399', cuff: '#3a3d42', pat: 'camo', patA: '#3a3d42', patB: '#c9ccd0' } },
+      { id: 'khaki', name: 'Khaki', rarity: 'common', series: 'backcountry', colors: { base: '#a8956a', cuff: '#6e5f40' } },
+      { id: 'desert', name: 'Desert Camo', rarity: 'rare', series: 'backcountry',
+        colors: { base: '#d2b98c', cuff: '#6e5f40', pat: 'camo', patA: '#8a6a40', patB: '#efe0c0' } },
       { id: 'tiedye', name: 'Tie-Dye', rarity: 'rare', series: 'night-park',
         colors: { base: '#ff6ad5', cuff: '#3b1a75', pat: 'tiedye', patA: '#2bd1ff', patB: '#fff36a' } },
       { id: 'splatter', name: 'Paintball', rarity: 'epic', series: 'night-park',
@@ -134,6 +153,11 @@ export const CLOTHING_ITEMS = [
       { id: 'navy', name: 'Matte Navy', rarity: 'common', series: 'first-chair', colors: { base: '#1f2a44', liner: '#111522', accent: '#e8d9a8' } },
       { id: 'checker', name: 'Finish Line', rarity: 'rare', series: 'night-park',
         colors: { base: '#f1f1ee', liner: '#141414', accent: '#141414', finish: 'gloss', decal: 'checker', decalCol: '#141414' } },
+      { id: 'beacon', name: 'Beacon Orange', rarity: 'common', series: 'backcountry', colors: { base: '#ff6a00', liner: '#1a1a1a', accent: '#f2efe6', finish: 'gloss' } },
+      { id: 'summit-stars', name: 'Summit Stars', rarity: 'uncommon', series: 'backcountry',
+        colors: { base: '#1f2a44', liner: '#111522', accent: '#f2efe6', decal: 'stars', decalCol: '#f2efe6' } },
+      { id: 'bronze', name: 'Bronze', rarity: 'epic', series: 'backcountry', colors: { base: '#a0642e', liner: '#1a1008', accent: '#f2d2a8', finish: 'metallic' } },
+      { id: 'copper-chrome', name: 'Copper Chrome', rarity: 'legendary', series: 'backcountry', colors: { base: '#d27a46', liner: '#1a1008', accent: '#ffe2c8', finish: 'chrome' } },
     ],
   },
   {
@@ -160,6 +184,12 @@ export const CLOTHING_ITEMS = [
         colors: { lens: '#ff2fd2', lensBase: '#1a0f5a', strap: '#141414', strapLogo: '#2bf0ff', frame: '#2bf0ff', iri: 0.8 } },
       { id: 'black-gold', name: 'Black Gold', rarity: 'legendary', series: 'first-chair',
         colors: { lens: '#ffcf4a', lensBase: '#3a2400', strap: '#111111', strapLogo: '#ffcf4a', frame: '#c9962e', iri: 0.6 } },
+      { id: 'persimmon', name: 'Persimmon', rarity: 'common', series: 'backcountry',
+        colors: { lens: '#ff8a3d', lensBase: '#7a2a10', strap: '#3a3129', strapLogo: '#ff8a3d' } },
+      { id: 'ice-blue', name: 'Ice Blue', rarity: 'uncommon', series: 'backcountry',
+        colors: { lens: '#7fd6ff', lensBase: '#123766', strap: '#f2efe6', strapLogo: '#2f7be0', frame: '#f2efe6' } },
+      { id: 'amber-iridium', name: 'Amber Iridium', rarity: 'rare', series: 'backcountry',
+        colors: { lens: '#ffb13d', lensBase: '#5a2a10', strap: '#1d1d1b', strapLogo: '#ffb13d', frame: '#3a3129', iri: 0.5 } },
     ],
   },
   {
@@ -174,6 +204,8 @@ export const CLOTHING_ITEMS = [
       { id: 'heather', name: 'Heather', rarity: 'common', series: 'first-chair', colors: { base: '#7d7f82', pat: 'none' } },
       { id: 'stars', name: 'Night Sky', rarity: 'rare', series: 'night-park', colors: { base: '#141a40', pat: 'stars', patA: '#ffe36a' } },
       { id: 'glow-skull', name: 'Glow Skull', rarity: 'legendary', series: 'night-park', colors: { base: '#0c0c10', pat: 'skull', patA: '#7dff3a' } },
+      { id: 'topo-olive', name: 'Topo Olive', rarity: 'common', series: 'backcountry', colors: { base: '#4d5a36', pat: 'topo' } },
+      { id: 'blaze', name: 'Blaze', rarity: 'uncommon', series: 'backcountry', colors: { base: '#ff6a00', pat: 'none' } },
     ],
   },
   {
@@ -182,6 +214,8 @@ export const CLOTHING_ITEMS = [
       { id: 'charcoal', name: 'Charcoal', rarity: 'common', series: 'night-park', colors: { base: '#2b2c2f', pat: 'none' } },
       { id: 'tiger', name: 'Tiger', rarity: 'rare', series: 'night-park', colors: { base: '#ff8a1a', pat: 'tiger', patA: '#141414' } },
       { id: 'arctic', name: 'Whiteout', rarity: 'uncommon', series: 'first-chair', colors: { base: '#e9eef2', pat: 'digital', patA: '#9aa8b4', patB: '#5d6c7a' } },
+      { id: 'stars', name: 'Bivouac', rarity: 'rare', series: 'backcountry', colors: { base: '#1f2a44', pat: 'stars', patA: '#f2efe6' } },
+      { id: 'skull', name: 'Yeti Skull', rarity: 'epic', series: 'backcountry', colors: { base: '#f2f4f6', pat: 'skull', patA: '#1f2a44' } },
       { id: 'flames', name: 'Inferno', rarity: 'epic', series: 'night-park', colors: { base: '#141416', pat: 'flames', patA: '#ff5b14', patB: '#ffd23a' } },
     ],
   },
@@ -196,6 +230,8 @@ export const CLOTHING_ITEMS = [
       { id: 'woodland', name: 'Woodland', rarity: 'rare', series: 'first-chair', colors: { base: '#4d5a36', cuff: '#2b2a1f', pat: 'camo', patA: '#2b2a1f', patB: '#8a7650' } },
       { id: 'black', name: 'Black Leather', rarity: 'common', series: 'first-chair', colors: { base: '#1e1e1e', cuff: '#111112' } },
       { id: 'gold-lame', name: 'Gold Lamé', rarity: 'legendary', series: 'first-chair', colors: { base: '#c9962e', cuff: '#3a2a10', finish: 'metallic' } },
+      { id: 'brown', name: 'Saddle', rarity: 'common', series: 'backcountry', colors: { base: '#7a4a28', cuff: '#2a1d14' } },
+      { id: 'expedition', name: 'Expedition', rarity: 'uncommon', series: 'backcountry', colors: { base: '#b3261e', cuff: '#1b1e23' } },
     ],
   },
   {
@@ -205,6 +241,7 @@ export const CLOTHING_ITEMS = [
       { id: 'hi-vis', name: 'Hi-Vis', rarity: 'uncommon', series: 'night-park', colors: { base: '#d9ff2e', cuff: '#1b1b1d' } },
       { id: 'white', name: 'White', rarity: 'common', series: 'night-park', colors: { base: '#eeeeea', cuff: '#c9c9c4' } },
       { id: 'checker', name: 'Checker', rarity: 'rare', series: 'night-park', colors: { base: '#f1f1ee', cuff: '#141414', pat: 'checker', patA: '#141414' } },
+      { id: 'wool', name: 'Wool Grey', rarity: 'common', series: 'backcountry', colors: { base: '#8e8f8c', cuff: '#5a5b58' } },
       { id: 'neon', name: 'Glowstick', rarity: 'epic', series: 'night-park', colors: { base: '#1b1240', cuff: '#2bf0ff', finish: 'neon', pat: 'stripes', patA: '#ff2fd2' } },
     ],
   },
@@ -269,5 +306,6 @@ export const GOLD_ITEMS = [
 export const SERIES = {
   'first-chair': { name: 'First Chair Case', blurb: 'Classic outerwear: heritage colourways, camo and chrome.', color: '#3a7bd5', accent: '#ffd23f' },
   'night-park': { name: 'Night Park Case', blurb: 'Neon, reflective and 90s park kit under the lights.', color: '#c43cff', accent: '#2bf0ff' },
+  backcountry: { name: 'Backcountry Case', blurb: 'Expedition colours, topo maps, beacon orange and copper.', color: '#d2691e', accent: '#f2efe6' },
 };
-export const SERIES_ORDER = ['first-chair', 'night-park'];
+export const SERIES_ORDER = ['first-chair', 'night-park', 'backcountry'];

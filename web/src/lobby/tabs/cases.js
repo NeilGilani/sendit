@@ -96,7 +96,7 @@ registerLobbyTab({
         ${r.history.length ? `<h3 class="lp-h3">Recent pulls</h3><div class="cs-hist">${r.history.slice(-12).reverse().map((h) => cardHtml(h.key, h.rarity, { label: false })).join('')}</div>` : ''}
 
         <h3 class="lp-h3">Case contents and odds</h3>
-        <div class="cs-queue">${SERIES_ORDER.map((s) => `<button type="button" class="cs-q${showSeries === s ? ' on' : ''}" style="--sc:${SERIES[s].color}" data-show="${s}" aria-expanded="${showSeries === s}">${esc(SERIES[s].name)}</button>`).join('')}</div>
+        <div class="cs-queue">${SERIES_ORDER.map((s) => `<button type="button" class="cs-q${showSeries === s ? ' on' : ''}" style="--sc:${SERIES[s].color}" data-show="${s}" aria-expanded="${showSeries === s}">${esc(SERIES[s].name)} <small>${col.bySeries[s].owned}/${col.bySeries[s].total}</small></button>`).join('')}</div>
         ${showSeries ? contents(showSeries, P.profile) : ''}
         <p class="lp-hint">Bad-luck protection: if ${PITY - 1} cases in a row give nothing Covert or better, the next one is Covert (${Math.max(0, PITY - 1 - r.sinceRed)} to go).</p>
         <p class="lp-hint"><span class="g-pad"><kbd>Y</kbd> open a case</span><span class="g-kb">Odds are fixed and shown before you open. Cases are only earned by riding.</span></p>`;
