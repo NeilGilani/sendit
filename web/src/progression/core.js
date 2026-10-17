@@ -15,6 +15,7 @@ export const XP_SOURCES = {
   ride: 40,               // a ride of at least rideMinM metres
   rideMinM: 300,
   allDailies: 300,        // bonus for finishing all three dailies of a day
+  newTrick: 40,           // first time a trick (or rail combo) lands clean
 };
 
 export const RANKS = [
@@ -104,6 +105,8 @@ export const ACHIEVEMENTS = [
   { id: 'all-maps', title: 'Explorer', desc: 'Ride Valcrest, Blackspruce, Ravenspire and Voltage Park', xp: 400, icon: '⌖', test: (s) => Object.keys(MAPS).every((m) => s.life.maps?.[m]) },
   { id: 'dailies-3', title: 'Daily Grind', desc: 'Finish all three dailies in a day', xp: 250, icon: '✓', test: (s) => s.life.dailySweeps >= 1 },
   { id: 'gold', title: 'Golden', desc: 'Earn a gold medal', xp: 350, icon: '🥇', test: (s) => s.life.golds >= 1 },
+  { id: 'book-10', title: 'Bag of Tricks', desc: 'Land 10 different tricks', xp: 250, icon: '📖', test: (s) => Object.keys(s.life.trickBook || {}).length >= 10 },
+  { id: 'book-30', title: 'Trick Encyclopedia', desc: 'Land 30 different tricks', xp: 600, icon: '📚', test: (s) => Object.keys(s.life.trickBook || {}).length >= 30 },
   { id: 'level-10', title: 'Double Digits', desc: 'Reach level 10', xp: 0, icon: '⬆', test: (s, p) => p.level >= 10 },
 ];
 
@@ -119,7 +122,7 @@ export const PB_STATS = {
 export function defaultState() {
   return {
     version: PROGRESSION_VERSION, xp: 0,
-    life: { rides: 0, tricks: 0, flips: 0, stomps: 0, near: 0, meters: 0, air: 0, grindM: 0, maxSpin: 0, bestMult: 0, topKmh: 0, golds: 0, dailySweeps: 0, maps: {} },
+    life: { rides: 0, tricks: 0, flips: 0, stomps: 0, near: 0, meters: 0, air: 0, grindM: 0, maxSpin: 0, bestMult: 0, topKmh: 0, golds: 0, dailySweeps: 0, maps: {}, trickBook: {} },
     daily: null,           // { day, rerolls: {slot: n}, rerollsLeft, progress: {stat: n}, done: {id: true}, swept }
     achievements: {},      // id → unlock time (ms)
     pb: {},                // mapId → { stat: value }
@@ -132,8 +135,9 @@ export function sanitizeState(raw) {
   const num = (v, f = 0) => (Number.isFinite(v) && v >= 0 ? v : f);
   const s = { ...d, xp: num(raw.xp) };
   s.life = { ...d.life };
-  for (const k of Object.keys(d.life)) if (k !== 'maps') s.life[k] = num(raw.life?.[k]);
+  for (const k of Object.keys(d.life)) if (k !== 'maps' && k !== 'trickBook') s.life[k] = num(raw.life?.[k]);
   s.life.maps = raw.life?.maps && typeof raw.life.maps === 'object' ? { ...raw.life.maps } : {};
+  s.life.trickBook = raw.life?.trickBook && typeof raw.life.trickBook === 'object' && !Array.isArray(raw.life.trickBook) ? { ...raw.life.trickBook } : {};
   s.achievements = raw.achievements && typeof raw.achievements === 'object' ? { ...raw.achievements } : {};
   s.pb = raw.pb && typeof raw.pb === 'object' ? JSON.parse(JSON.stringify(raw.pb)) : {};
   s.daily = raw.daily && typeof raw.daily.day === 'string' ? {
@@ -288,7 +292,7 @@ export class Progression {
     if (!this.ride || !e.clean) return;
     const L = this.state.life;
     if (e.air > 0) { this.ride.air += e.air; L.air += e.air; this.bump('air', e.air); this.pbCheck('air', round1(e.air)); }
-    if (e.trick) { L.tricks++; this.bump('tricks'); }
+    if (e.trick) { L.tricks++; this.bump('tricks'); this.recordTrickName(e.trick); }
     if (e.flips > 0) { L.flips += e.flips; this.bump('flips', e.flips); }
     if (e.spin > 0) {
       L.maxSpin = Math.max(L.maxSpin, e.spin);
@@ -298,6 +302,23 @@ export class Progression {
     if (e.grade === 'stomped' || e.grade === 'perfect') { L.stomps++; this.bump('stomps'); }
     this.checkAchievements();
   }
+
+  /** Trick book: the first clean landing of a trick name pays XP_SOURCES.newTrick and emits newTrick. */
+  recordTrickName(name) {
+    const key = trickKey(name);
+    if (!key) return false;
+    const book = this.state.life.trickBook;
+    const first = !book[key];
+    book[key] = (book[key] || 0) + 1;
+    if (first) {
+      this.emit('newTrick', { name: key, count: Object.keys(book).length, xp: XP_SOURCES.newTrick });
+      this.addXP(XP_SOURCES.newTrick, `New trick: ${key}`);
+      this.checkAchievements();
+    }
+    return first;
+  }
+
+  trickBook() { return Object.entries(this.state.life.trickBook).map(([name, n]) => ({ name, n })); }
 
   recordNearMiss() {
     if (!this.ride) return;
@@ -376,6 +397,10 @@ export class Progression {
 }
 
 // ---------------------------------------------------------------- helpers
+/** "Perfect Left 540 Mute" → "Left 540 Mute"; rail labels lose the length / extras ("Boardslide to 50-50"). */
+export function trickKey(label) {
+  return String(label || '').replace(/^(Perfect|Sketchy|Locked-in)\s+/i, '').replace(/\s*·.*$/, '').replace(/\s+/g, ' ').trim();
+}
 function rng(seed) {
   let h = 2166136261;
   for (const ch of String(seed)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);

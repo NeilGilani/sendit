@@ -197,7 +197,7 @@ Three challenges are chosen per local day from `CHALLENGE_POOL`, each from a dif
 
 ### Achievements
 
-There are 22 (`ACHIEVEMENTS`), including:
+There are 24 (`ACHIEVEMENTS`), including:
 
 - First ride, first trick, 360, 540, 720 and 1080, and a flip.
 - 1 and 50 stomps, 100 close shaves.
@@ -206,6 +206,15 @@ There are 22 (`ACHIEVEMENTS`), including:
 - All four maps, a clean sweep of the dailies, a gold medal, and level 10.
 
 Each one unlocks once, with a toast and XP.
+
+### Trick book
+
+The first clean landing of each trick name pays +40 XP (`XP_SOURCES.newTrick`) and puts a **NEW TRICK +40 XP** ribbon over that trick's announcement. Rail combos count too.
+
+- Names are normalised by `trickKey()`, which strips Perfect, Sketchy and Locked-in and drops anything after a `·` (rail length, extras). So "Perfect Left 540 Mute" equals "Left 540 Mute".
+- "Left 540" and "Right 540" are different tricks, which rewards variety (the THPS idea).
+- The Progress tab lists the most-landed entries and the count.
+- Achievements: **Bag of Tricks** (10 different) and **Trick Encyclopedia** (30).
 
 ### Personal bests
 
@@ -222,6 +231,7 @@ progression.rerollChallenge(slot)   // → the new challenge, or null (one free 
 progression.rerollsLeft()           // → number
 progression.getAchievements()       // → [{ id, title, desc, xp, icon, unlocked (ms or 0) }]
 progression.getPersonalBests(mapId) // → { score?, air?, spin?, kmh?, combo? }
+progression.getTrickBook()          // → [{ name, n }] every trick / rail combo landed clean
 progression.addXP(amount, reason)   // → XP added (fires level-ups)
 progression.onLevelUp(fn)           // → unsubscribe; fn({ level, prev, rank, rankUp })
 progression.onAchievement(fn)       // → unsubscribe; fn({ id, title, desc, xp, icon })
@@ -237,6 +247,7 @@ Bus events (state.js):
 - `challengeDone`
 - `dailySweep`
 - `personalBest {mapId, stat, label, value, prev, text, was}`
+- `newTrick {name, count, xp}`
 - `progressRideSummary`
 
 **For reward cases.** Grant a case on level-ups like this:

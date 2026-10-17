@@ -156,6 +156,21 @@ export async function run(test, assert) {
     assert.equal(p.ensureDay().progress.near, 5);
   });
 
+  await test('progression: trick book pays XP once per new trick, normalised names', () => {
+    const { p, of } = make();
+    p.startRide('voltage-park');
+    const xp0 = p.state.xp;
+    assert.equal(p.recordTrickName('Perfect Left 540 Mute'), true);
+    assert.equal(p.recordTrickName('Left 540 Mute'), false, 'Perfect is the same trick');
+    assert.equal(p.recordTrickName('Boardslide to 50-50 · 6.2 m'), true);
+    assert.equal(p.recordTrickName('Boardslide to 50-50 · 9 m'), false, 'rail length is not a new trick');
+    assert.equal(of('newTrick').length, 2);
+    assert.ok(p.state.xp >= xp0 + 2 * core.XP_SOURCES.newTrick);
+    assert.deepEqual(p.trickBook().map((t) => t.n), [2, 2]);
+    assert.equal(core.trickKey('Locked-in Nose press 50-50 grab · 4.0 m'), 'Nose press 50-50 grab');
+    assert.deepEqual(sanitizeState({ life: { trickBook: ['x'] } }).life.trickBook, {});
+  });
+
   // ---------------------------------------------------------------- juice: combo chain + time warp
   await test('juice combo: own chain grows per different move, banks a bonus, loses on crash', () => {
     const pl = { state: 1, flow: null };

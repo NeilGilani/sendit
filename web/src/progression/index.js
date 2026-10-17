@@ -10,6 +10,7 @@
 //   progression.rerollsLeft()         → number
 //   progression.getAchievements()     → [{ id, title, desc, xp, icon, unlocked (ms or 0) }]
 //   progression.getPersonalBests(mapId) → { score, air, spin, kmh, combo }
+//   progression.getTrickBook()        → [{ name, n }] every trick / rail combo landed clean, with counts
 //   progression.addXP(amount, reason) → XP actually added
 //   progression.onLevelUp(fn)         → unsubscribe; fn({ level, prev, rank, rankUp })
 //   progression.onAchievement(fn)     → unsubscribe; fn({ id, title, desc, xp, icon })
@@ -26,7 +27,7 @@ const localStore = {
   set(k, v) { try { globalThis.localStorage?.setItem(k, JSON.stringify(v)); } catch { /* private mode / quota */ } },
 };
 
-const BUS = { xp: 'progressXp', levelUp: 'juiceLevelUp', achievement: 'achievement', challengeDone: 'challengeDone', dailySweep: 'dailySweep', challengeProgress: 'challengeProgress', personalBest: 'personalBest' };
+const BUS = { newTrick: 'newTrick', xp: 'progressXp', levelUp: 'juiceLevelUp', achievement: 'achievement', challengeDone: 'challengeDone', dailySweep: 'dailySweep', challengeProgress: 'challengeProgress', personalBest: 'personalBest' };
 const listeners = new Map();   // core event → Set(fn)
 function fire(name, detail) {
   for (const fn of listeners.get(name) || []) { try { fn(detail); } catch (e) { console.error('[progression] listener', e); } }
@@ -47,6 +48,7 @@ export const progression = {
   rerollsLeft: () => C().ensureDay().rerollsLeft,
   getAchievements: () => C().achievements(),
   getPersonalBests: (mapId) => C().pbs(mapId),
+  getTrickBook: () => C().trickBook(),
   addXP: (n, reason) => C().addXP(n, reason),
   onLevelUp: (fn) => subscribe('levelUp', fn),
   onAchievement: (fn) => subscribe('achievement', fn),
@@ -75,7 +77,7 @@ export function trackProgression({ player, getMapId }) {
     const grade = !e.clean ? 'sketchy' : e.grade === 'stomped' || e.perfect ? 'stomped' : 'clean';
     P.recordLanding({ clean: e.clean, trick: e.trick, air: e.air > 0.35 ? e.air : 0, grade, spin, flips });
   });
-  on('grindScore', () => { if (open) { P.state.life.tricks++; P.bump('tricks'); } });
+  on('grindScore', ({ label }) => { if (open) { P.state.life.tricks++; P.bump('tricks'); if (!/^Sketchy/.test(label || '')) P.recordTrickName(label); } });
   on('grindEnd', ({ dist, reason }) => { if (open && reason !== 'bail') P.recordGrind(dist || 0); });
   on('nearMiss', () => { if (open) P.recordNearMiss(); });
   on('juiceComboBanked', ({ mult, bonus }) => { if (open) P.recordCombo(mult, bonus); });
