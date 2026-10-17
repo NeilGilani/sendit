@@ -17,6 +17,8 @@ import { PERF, perfQ } from './perf.js';
 
 const CELL = 750;
 const TREES_LOD1_WIDEN = 1.25;   // LOD1 keeps every other frond card, a little wider
+// Distant fronds get more opaque with the texture mip level (keeps coverage, fewer flickering holes).
+export const ALPHA_BOOST = { value: 0.38 };
 
 // ---------------------------------------------------------------- textures
 /** Needle frond (RGBA): a twig along u with needles fanning out; alpha cut-out, tapered outline. */
@@ -326,7 +328,7 @@ float tvn(vec3 p) {
   return mix(mix(mix(th1(n), th1(n + 1.0), f.x), mix(th1(n + 57.0), th1(n + 58.0), f.x), f.y),
              mix(mix(th1(n + 113.0), th1(n + 114.0), f.x), mix(th1(n + 170.0), th1(n + 171.0), f.x), f.y), f.z);
 }
-uniform vec3 uNeedle; uniform vec3 uNeedle2; uniform vec3 uBark; uniform vec3 uTreeSnow; uniform float uSnowLoad;
+uniform vec3 uNeedle; uniform vec3 uNeedle2; uniform vec3 uBark; uniform vec3 uTreeSnow; uniform float uSnowLoad; uniform float uAlphaBoost;
 vec3 tTreeN = vec3(0.0, 1.0, 0.0); float tTreeNW = 0.0; float tNeedle = 0.0;
 `;
 const FRAG = /* glsl */`
@@ -337,7 +339,7 @@ const FRAG = /* glsl */`
     // Keep foliage coverage at distance: boost alpha with the mip level, then sharpen the edge.
     vec2 tdx = dFdx(vMapUv * 256.0), tdy = dFdy(vMapUv * 256.0);
     float lvl = max(0.0, 0.5 * log2(max(dot(tdx, tdx), dot(tdy, tdy))));
-    float a = diffuseColor.a * (1.0 + lvl * 0.38);
+    float a = diffuseColor.a * (1.0 + lvl * uAlphaBoost);
     diffuseColor.a = clamp((a - 0.42) / max(fwidth(a), 1e-4) + 0.5, 0.0, 1.0);
   }
   #endif
@@ -397,7 +399,7 @@ function treeMaterial(opts) {
     uniforms: {
       uNeedle: { value: new THREE.Color(TREES.needle) }, uNeedle2: { value: new THREE.Color(TREES.needle2) },
       uBark: { value: new THREE.Color(TREES.bark) }, uTreeSnow: { value: new THREE.Color(TREES.snow) },
-      uSnowLoad: { value: TREES.snowLoad }, ...opts.lod,
+      uSnowLoad: { value: TREES.snowLoad }, uAlphaBoost: ALPHA_BOOST, ...opts.lod,
     },
     vertPars: VERT_PARS, vertPre: VERT_PRE, fragPars: FRAG_PARS, frag: FRAG,
     // Backlit needles: thin needle sprays at the branch tips glow when the sun is behind the tree.
