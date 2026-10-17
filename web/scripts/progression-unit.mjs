@@ -261,6 +261,11 @@ export async function run(test, assert) {
     cb.update(30);
     assert.ok(cb.state());
     assert.equal(cb.state().left, 1);
+    // Repeats wear out: twenty close shaves in a row add far less than twenty different moves.
+    pl.state = 1; emit('crashed', 'x');
+    for (let i = 0; i < 20; i++) emit('score', { label: 'Close shave', points: 15 });
+    assert.ok(cb.state().mult < 2, `20 close shaves → ×${cb.state().mult}`);
+    pl.state = 2;
     assert.equal(moveKey('Perfect Left 540 Mute'), 'left 540 mute');
     assert.equal(moveKey('Boardslide · 6.2 m'), 'boardslide');
     offs.forEach((o) => o()); cb.dispose();

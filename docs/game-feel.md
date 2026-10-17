@@ -37,7 +37,7 @@ There is one live chain, and the HUD shows it at the top centre, whichever syste
 Rules for the juice/combo.js chain:
 
 - Every scored move adds its points to the chain: tricks, rails, close shaves, drops and the Blackspruce tree slalom. Distance markers (`250 m`) are not moves.
-- The multiplier grows by `step` for each *different* move. A repeat counts `repeatCredit`; the move key strips Perfect, Sketchy, numbers and lengths.
+- The multiplier grows by `step` for each *different* move. The k-th repeat of a move counts `repeatCredit` / k (repeats wear out, as in THPS), so twenty close shaves add far less than twenty different moves. The move key strips Perfect, Sketchy, numbers and lengths.
 - Air and rails keep the chain alive. (For the flow source only air does, as in flow.js. The Challenge combo keeps its own clock.) After `window` seconds on the snow the chain banks: `addScore("Combo ×m", pts × (m − 1))`.
 - A crash loses the chain, and a "COMBO LOST −pts" banner shakes on screen.
 - While the chain rides on an air or a rail at ×1.5 or more, the panel turns pink and shows **LAND IT**.
@@ -49,7 +49,7 @@ Tunables (`JUICE_COMBO`):
 | `window` | 3.4 s | Time on the snow without a new move before the chain banks. |
 | `step` | 0.5 | Multiplier added per different move. |
 | `max` | 6 | Multiplier cap. |
-| `repeatCredit` | 0.35 | How much a repeated move counts. |
+| `repeatCredit` | 0.35 | How much the first repeat of a move counts; the k-th counts this / k. |
 | `minBankMult` | 1.5 | Below this, the chain ends without a bonus line. |
 
 Bus events:

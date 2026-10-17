@@ -2,7 +2,7 @@
 //   • flow maps (player.flow, physics/flow.js): mirrors the line chain (flowChain / flowBanked / flowLost)
 //   • Challenge mode (activities.js): mirrors the style combo (combo / comboBanked / comboLost)
 //   • everywhere else: its own chain — every scored move adds to it, the multiplier grows by
-//     JUICE_COMBO.step per DIFFERENT move (repeats count `repeatCredit`), the chain banks as a
+//     JUICE_COMBO.step per DIFFERENT move (the k-th repeat counts `repeatCredit` / k), the chain banks as a
 //     "Combo ×N" bonus after `window` s on the snow without a new move (air and rails keep it alive),
 //     and a crash loses it.
 // Events (all sources): juiceCombo {mult, pts, n, items, source} | null, juiceComboBanked {bonus, mult, pts, source},
@@ -13,7 +13,7 @@ export const JUICE_COMBO = {
   window: 3.4,          // s on the snow without a new move before the chain banks
   step: 0.5,            // multiplier per different move
   max: 6,
-  repeatCredit: 0.35,   // a repeated move counts this much towards the multiplier
+  repeatCredit: 0.35,   // the first repeat of a move counts this much towards the multiplier, the k-th this / k
   minBankMult: 1.5,     // below this the chain just ends (no bonus line)
 };
 
@@ -100,7 +100,7 @@ export class ComboTracker {
     const c = this.chain;
     const seen = c.seen.get(key) || 0;
     c.seen.set(key, seen + 1);
-    c.n += seen ? this.C.repeatCredit : 1;
+    c.n += seen ? this.C.repeatCredit / seen : 1;   // the k-th repeat counts repeatCredit / k (THPS: repeats wear out)
     c.pts += points;
     c.items.push(label);
     if (c.items.length > 6) c.items.shift();
