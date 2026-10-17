@@ -232,7 +232,7 @@ export function mountParkHud(course) {
   // ---- grind audio
   let ctx = null, buf = null, src = null, gain = null, loading = false;
   async function ensure() {
-    if (ctx || loading) return;
+    if (ctx || loading || window.__senditAudio?.engine) return;   // the main audio engine (audio/grind.js) plays grinds when it runs
     loading = true;
     try {
       const C = window.AudioContext || window.webkitAudioContext;
