@@ -68,7 +68,7 @@ export const GULLY = {
 export const BANDS = [
   { name: 'Okama Lip', uc: 600, v0: -170, v1: 60, h: 6, var: 1.5, bench: 30, wob: 6, seed: 1, gaps: [[20, 16]] },
   { name: 'Makura Cliff', uc: 990, v0: -560, v1: -380, h: 9, var: 2.5, bench: 36, wob: 5, seed: 2, gaps: [[-505, 12]] },
-  { name: 'Fox Ledge', uc: 1355, v0: -360, v1: -150, h: 8, var: 2, bench: 34, wob: 6, seed: 3, gaps: [[-200, 14]] },
+  { name: 'Fox Ledge', uc: 1355, v0: -440, v1: -150, h: 8, var: 2, bench: 34, wob: 6, seed: 3, gaps: [[-200, 14]] },
   { name: 'Ash Steps', uc: 760, v0: -660, v1: -560, h: 7, var: 2, bench: 30, wob: 6, seed: 4, gaps: [] },
 ];
 
@@ -148,7 +148,7 @@ export const DROP_ZONES = [
   ['Kitsunebi Gully', 445, 470],
   ['Senbon Torii', 1460, 40],
   ['Shrine Village', 1720, -50],
-  ['Fir Gullies', 1960, 40],
+  ['Fir Gullies', 2040, -40],
 ];
 
 // The canonical lines, as (u, v) waypoints ('gully' = the gully's centre line, 'weave' = the glade weave):
@@ -157,7 +157,7 @@ export const WEAVE = { u0: 700, u1: 1460, v: -55, amp: 42, wave: 110 };
 export const RIDE_LINES = {
   okama: { name: 'Okama Bowl', pts: [[0, 0], [150, -20], [400, -55], [620, 20], [800, -40], [1100, -20], [1400, -70], [1550, -80], [1700, -60], [1900, -40], [2150, -10], [2500, 20]] },
   kazan: { name: 'Kazan Rim', pts: [[0, 0], [40, 110], 'crest', [1480, 228], [1600, 250], [1750, 270], [2000, 300], [2250, 260], [2500, 240]] },
-  makura: { name: 'Makura Pillows', pts: [[0, 0], [200, -130], [500, -300], [640, -430], [960, -440], [1030, -420], [1320, -400], [1450, -300], [1600, -210], [1800, -190], [2100, -120], [2500, -60]] },
+  makura: { name: 'Makura Pillows', pts: [[0, 0], [200, -130], [500, -300], [640, -430], [960, -440], [1030, -420], [1320, -395], [1460, -380], [1600, -250], [1800, -190], [2100, -120], [2500, -60]] },
   shirakaba: { name: 'Shirakaba Weave', pts: [[0, 0], [300, -60], [560, -90], [650, -100], 'weave', [1520, -30], [1700, -60], [2000, -60], [2500, -20]] },
   kitsunebi: { name: 'Kitsunebi Gully', pts: [[405, 545], [440, 500], 'gully', [1640, 400], [1800, 415], [2000, 420], [2250, 400], [2500, 380]] },
   senbon: { name: 'Senbon Torii', pts: [[1430, 40], [1545, 40], 'tunnel', [1740, 40], [1800, 43], [1852, 46], [1918, 50], [1984, 56], [2100, 60], [2300, 64], [2500, 70]] },

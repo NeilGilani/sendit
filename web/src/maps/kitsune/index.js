@@ -34,7 +34,7 @@ export const KITSUNE_THUMB = svg(`
 export const TRAIL_STATS = {
   okama: { length: 2730, vertical: 1150 },
   kazan: { length: 2720, vertical: 1140 },
-  makura: { length: 2060, vertical: 780 },
+  makura: { length: 2070, vertical: 780 },
   shirakaba: { length: 2180, vertical: 760 },
   kitsunebi: { length: 2300, vertical: 920 },
   senbon: { length: 1070, vertical: 325 },
