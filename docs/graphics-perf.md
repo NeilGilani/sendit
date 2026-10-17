@@ -185,6 +185,29 @@ Quality 1 stays at 14–16 ms GPU. What it took to keep the cost flat:
 - The near pool refills every 3 m from a spatial grid (tight margins, fewer collapsed instances).
 - Beyond the near fronds, trees cast shadows with cheap shadow-only cones.
 
+## Overnight tree pass (the "weird tree rendering")
+
+What was odd, and what changed (`gfx/trees.js`):
+- **Dark striped spires.** The mid LOD was a different crown: 10 whorls of wide cards around a big
+  dark core. Its frond-top snow read as white horizontal stripes on a navy cone. Blackspruce hands
+  trees over to it at ~18 m, so most trees there looked like that. Now LOD1 is LOD0 itself (same seed,
+  same cards) with every other card dropped and the rest 25 % wider, and the same core, trunk and skirts.
+- **Dither stipple** in the hand-over bands. The colour pass has no dither any more:
+  - LOD0 **geomorphs** into LOD1 across the near band (`aMorph3` per vertex: odd cards retract into the
+    trunk, even cards widen) and swaps where the two are identical.
+  - LOD1 retracts its cards into the opaque far cone across the mid band.
+  - Only the shadow pass still dithers, where the PCF filter blurs it.
+- **Needle shimmer / alpha-test sparkle**: 4× (and 2×) scene MSAA with alpha-to-coverage needles is
+  implemented (`PERF.msaa`). On this Intel Arc iGPU, though, even 2× measured about 3× the frame cost
+  (90.7 vs 30.1 ms, interleaved under heavy contention), so it is **off** on every tier. Turn it on for
+  discrete GPUs. Raising the mip-level alpha boost of distant fronds (`ALPHA_BOOST`, 0.38 -> 0.8) made no
+  measurable difference to frame-to-frame shimmer (frozen clock, 3 cm camera nudge), so it stays at 0.38.
+
+Cost: LOD1 now has more cards (57 + skirts instead of 50) but a smaller core. The near band draws only
+LOD0 (no doubled rasterisation). This night's GPU numbers were unreliable: three other sessions each held
+30–50 % of the GPU, and timer queries got lost. Re-check with `map2-perf.mjs` / `gfxperf.mjs` on a quiet
+machine.
+
 ## Next levers, if a weaker GPU needs more
 
 - **Shadow map**: casters inside a 1200 m-deep ortho box. Pulling the far plane in would cull up-sun terrain
