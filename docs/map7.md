@@ -46,7 +46,7 @@ downhill). The fjord surface is world y = 1850 (`SEA`), so the valley haze sits 
 | 1360…1780 | the apron | 25° | **Bølgene**: five big wandering rollers across the whole slope |
 | 1780…2140 | birch line | 18° | **Bjørkehoppet** kickers, sparse trees with glades along the lines |
 | 2140…2390 | the village | 11° → 5° | **Kjøpmannshuset**, **Bakeriet**, **Postkontoret** (the roof-hop row), the school, the prayer house, the old smithy, Fiskarheimen |
-| 2390…2470 | beach + harbour | 0° | **Naustgapet** (the boathouse), the quay (**Brygga**) with the MÅL · FINISH arch at u 2430, the pier (**Kaia**) 86 m into the fjord, five rorbuer and the sjøhus on stilts, two sjark at the pier, færinger on the Sandvika beach, four hjell racks, sea ice floes along the shore |
+| 2380…2470 | beach + harbour | 4° → 0° | **Naustgapet** (the boathouse), the quay (**Brygga**) with the MÅL · FINISH arch at u 2430, the pier (**Kaia**) 86 m into the fjord, five rorbuer and the sjøhus on stilts, two sjark at the pier, færinger on the Sandvika beach, four hjell racks, sea ice floes along the shore |
 | 2470… | **the fjord** | | 60 m deep, ~4 km across; the far shore's range rises straight out of the water (the big one is SEA + 1830 m) |
 | left, v ≈ −1080 → −640 | **Fjordryggen** (the shoulder) | 29° → 5° | its own profile from a sub-summit (1,105 m), twelve wandering rollers on the crest, swinging into the bay at Sandvika |
 | right, v ≈ 470 → 690 | **Kvalneset** (the headland) | 32° → 3° | a ridge from the cirque's right rim out to a point 30 m over the fjord: **Trappa I** (9 m), **II** (12 m), **III** (13 m), **Neskanten** (15 m), the lighthouse, then a sea cliff |
@@ -129,7 +129,7 @@ No shared file is touched. Everything goes through existing opt-in course hooks:
 `macro(x, z)` (everywhere, also the mid ring and the 30 km backdrop):
 
 - **Face** = the fall-line profile (12° col, 30° rollover, 42° / 38° / 32° face, 25° apron, 18° birches, 11° / 5°
-  village, flat beach), shifted so it lands exactly on the beach (SEA + 1.2 m), plus the **cirque** cross-section:
+  village, a 4° beach down to the quay), shifted so it lands exactly on the beach (SEA + 1.2 m), plus the **cirque** cross-section:
   a bowl between the left rim (v ≈ −720) and the headland's root, rims that wander, rock walls ringing the upper
   cirque; outside the left rim a steep rocky flank down to the shoulder.
 - **Shoulder** (Fjordryggen) = its own profile (29° → 5°, rising behind its top into the summit massif) as a crowned
@@ -249,10 +249,10 @@ instant after a big drop; sustained speeds on the face are 25–31 m/s (56–70 
 
 **Trick style** (spins off every real air, no tuck): 12 / 12 finish, **0 crashes**, 1 stumble; the village line at
 10–12 m/s (that is what the beach slope and the lower boathouse were tuned for: a slow rider used to stall on the
-boathouse ramp and stop on a dead-flat beach). **Carve style** (forced linked turns every 1.5 s): every snowboard
-run finishes with 0 crashes; on skis the forced turns scrub the gentle lower slopes to a crawl and 6 runs time
-out at 300 s (no crashes) — a bot artefact, but it says the bottom 300 m is flat enough that you need to let the
-skis run.
+boathouse ramp and stop on a dead-flat beach). **Carve style** (forced linked turns every 1.5 s, ±10 m): 9 / 12 finish, **0 crashes**; on skis the forced weave
+scrubs the headland crest, the low shoulder and the roof hops down to a crawl and three runs time out at 300 s — a
+bot artefact (it never lets the skis run), but the beach now falls at 4° to the line so a turning rider still
+reaches the finish (at 2.5° the green trail's carve run stopped 22 m short).
 
 ### Unit, fuzz, end to end
 

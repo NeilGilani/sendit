@@ -25,7 +25,7 @@ export const PROFILE = [
   [360, 18],    // birch line: Bjørkehoppet
   [180, 11],    // the village slope
   [70, 5],      // down to the beach
-  [70, 2.5],    // the beach still runs down to the quay (no dead flat before the finish)
+  [70, 4],      // the beach still runs down to the quay (no dead flat before the finish: turning riders reach it)
   [9000, 0],    // the beach / quay flats (the coast cut takes it under the sea)
 ];
 export const BEHIND = [[22, 4], [200, -34], [9000, -12]];   // behind the col (negative = falling away backward)
