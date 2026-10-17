@@ -7,7 +7,7 @@
 // installJuice() is called once by main.js after the systems exist; main.js calls juice.update() per
 // frame and multiplies the physics clock by juice.timeScale(dt).
 import { ComboTracker } from './combo.js';
-import { mountJuiceHud, gradeOf } from './hud.js';
+import { mountJuiceHud, gradeOf, TIERS } from './hud.js';
 import { TimeWarp, installImpact } from './impact.js';
 import { installSpeedFx } from './speedfx.js';
 import { MusicEnergy } from './music.js';
@@ -56,6 +56,12 @@ export function installJuice({ player, cam, sound, input, post, camera, fx, acti
   on('juiceCombo', (s) => {
     const m = s?.mult ?? 1;
     if (s && m > lastMult + 0.01 && lastPts < 60 && sound?.ctx) sound.oneShot?.('combo_tick', 0.3, 0.85 + Math.min(m, 6) * 0.07)?.catch?.(() => {});
+    // A new tier word (NICE, SICK, INSANE…): a bright high tick and a short buzz.
+    const tier = TIERS.filter((t) => m >= t[0]).length, was = TIERS.filter((t) => lastMult >= t[0]).length;
+    if (s && tier > was) {
+      input?.rumble?.(0.2 + tier * 0.08, 0.7, 110);
+      if (sound?.ctx) sound.oneShot?.('combo_tick', 0.42, 1.3 + tier * 0.08)?.catch?.(() => {});
+    }
     lastMult = m;
   });
   // Rails: a light buzz on the lock-in and on each kink.
