@@ -61,6 +61,8 @@ export const PHYSICS = {
   trickStyle: false,          // big-mountain trick extras: Tail grab / Truck driver on skis, tweaked grabs (labels, +50 % grab points)
   slowmo: null,               // { minAir, minDrop, scale, easeIn, hold, easeOut, cooldown }: apex slow motion on huge airs (player.js)
   flow: null,                 // { enabled, … } turns on the flow layer (physics/flow.js: line chains, flow meter, SEND IT state)
+  wallAlign: false,           // steep transitions (pipe walls): the gear self-aligns to its path on the snow, not its horizontal part
+  grind: null,                // physics/grind.js GRIND_DEFAULTS overrides (maps with rails)
   // Aerodynamic auto-tuck
   autoTuckDelay: 2.5,         // seconds without directional input
   autoTuckSpeedRatio: 0.6,

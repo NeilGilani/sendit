@@ -330,7 +330,9 @@ export class Activities {
     const total = this.time + this.penalty;
     const length = this.course.finishAt;
     const speeds = this.course.challenge?.medalSpeeds || CHALLENGE.medalSpeeds;   // a map may set its own
-    const medal = medalFor(total, length, speeds);
+    // A map may judge the run instead of timing it (course.challenge.judge() → { total, medal, rows? }).
+    const judged = this.course.challenge?.judge?.() ?? null;
+    const medal = judged ? judged.medal : medalFor(total, length, speeds);
     const prev = bestFor(this.key);
     const isBestTime = !prev || total < prev.time;
     const best = {
@@ -344,6 +346,7 @@ export class Activities {
       time: total, raw: this.time, penalty: this.penalty, medal, best, isBestTime, isBestScore: this.runScore >= best.score && this.runScore > 0,
       score: this.runScore, gates: this.gatesPassed, gateTotal: this.gates.length, flakes: this.found.size, flakeTotal: this.flakes.length,
       targets: Object.fromEntries(Object.entries(speeds).map(([k, v]) => [k, length / v])),
+      judged,
     };
     emit('runFinished', res);
     return res;

@@ -11,9 +11,11 @@ import { angleDiff, lerpAngle, clamp } from './physics/math.js';
 import { SkiPhysics } from './physics/ski.js';
 import { SnowboardPhysics } from './physics/snowboard.js';
 import { Flow } from './physics/flow.js';
+import { Grind } from './physics/grind.js';
+import { pathYaw } from './physics/edge.js';
 import { getEquipmentSpec, deriveHandling, normalizeType } from './equipment/registry.js';
 
-export const State = { FROZEN: 0, GROUNDED: 1, AIR: 2, CRASH: 3, LIFT: 4 };
+export const State = { FROZEN: 0, GROUNDED: 1, AIR: 2, CRASH: 3, LIFT: 4, GRIND: 5 };
 const UP = new THREE.Vector3(0, 1, 0);
 const _X = new THREE.Vector3(1, 0, 0), _qf = new THREE.Quaternion();
 const _n = new THREE.Vector3(), _v = new THREE.Vector3(), _t1 = new THREE.Vector3(), _t2 = new THREE.Vector3();
@@ -29,6 +31,8 @@ export class Player {
     if (terrain?.course?.dropZones?.length && typeof document !== 'undefined') {
       on('rideStarted', () => setTimeout(() => emit('hint', `Drop zones: keys 1–${Math.min(9, terrain.course.dropZones.length)} or d-pad ◀ ▶`), 5000));
     }
+    this.grind = terrain?.course?.rails?.length ? new Grind(this, terrain.course.rails) : null;   // rails, boxes, tubes (opt-in: course.rails)
+    if (terrain?.course?.onPlayer) terrain.course.onPlayer(this);   // a map's own per-rider hooks (opt-in)
     if (this.flow && typeof document !== 'undefined') import('./flowhud.js').then((m) => m.mountFlowHud(this)).catch((e) => console.warn('[flow] HUD failed', e));
     this.state = State.FROZEN;
     this.position = new THREE.Vector3();
@@ -165,8 +169,9 @@ export class Player {
       case State.AIR: this.airStep(dt); break;
       case State.CRASH: this.crashStep(dt); break;
       case State.LIFT: this.liftStep(dt); break;
+      case State.GRIND: this.grind.step(dt); break;
     }
-    if (this.state === State.GROUNDED || this.state === State.AIR) { this.collide(); this.keepInside(); this.nearMiss(dt); }
+    if (this.state === State.GROUNDED || this.state === State.AIR) { this.collide(); this.keepInside(); this.nearMiss(dt); this.grind?.detect(dt); }
     this.stumbleT = Math.max(0, this.stumbleT - dt);
     if (this.flow) this.flow.update(dt);
     this._hintCool = Math.max(0, this._hintCool - dt);
@@ -443,7 +448,8 @@ export class Player {
       if (sp > P.landSpeedCap) this.velocity.multiplyScalar((P.landSpeedCap + (sp - P.landSpeedCap) * 0.35) / sp);
       this.speed = this.velocity.length();   // not the in-air speed (vertical included) on the speedometer for a frame
     }
-    const velYaw = Math.atan2(-this.velocity.x, -this.velocity.z);
+    // (P.wallAlign: landing back on a pipe wall, the path is down the wall, not its horizontal part.)
+    const velYaw = P.wallAlign && n.y < 0.94 ? pathYaw(this.velocity, n) : Math.atan2(-this.velocity.x, -this.velocity.z);
     // Landing on a sidewall bends the path; a rider lined up with the flight pivots into the new line
     // (PHYSICS.landRedirect degrees absorbed, 0 = off). preYaw = the flight direction before touchdown.
     if (P.landRedirect && this._preLandYaw !== undefined) {

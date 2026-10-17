@@ -136,9 +136,10 @@ export class UI {
     el.className = `medal ${r.medal || ''}`;
     el.textContent = r.medal ? r.medal[0].toUpperCase() : '';
     $('resTitle').textContent = r.medal ? `${r.medal.toUpperCase()} MEDAL` : 'FINISH';
-    $('resTime').textContent = fmtTime(r.time);
+    $('resTime').textContent = r.judged ? `${r.judged.total.toFixed(2)} / 100` : fmtTime(r.time);
     const T = r.targets;
-    const rows = [
+    // A judged run (course.challenge.judge, e.g. a slopestyle final) brings its own rows.
+    const rows = r.judged?.rows ?? [
       ['Best time', fmtTime(r.best.time), r.isBestTime],
       ['Gates', `${r.gates}/${r.gateTotal}${r.penalty ? `  (+${r.penalty}s)` : ''}`],
       ['Style score', `${r.score}`, r.isBestScore],

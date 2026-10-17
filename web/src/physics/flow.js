@@ -221,6 +221,7 @@ export class Flow {
   finishRun() {
     const r = this.run;
     if (!r || r.time < 5) return;
+    if (this.C.summary === false) { this.newRun(); return; }   // a map with its own run summary (e.g. a judged park run)
     const avg = r.speedSum / Math.max(1, r.ground);
     const clamp25 = (x) => Math.max(0, Math.min(25, x));
     const line = clamp25(r.biggestDrop * 0.4 + r.drops * 1.6 + r.features.size * 1.5);   // + linking different named features
