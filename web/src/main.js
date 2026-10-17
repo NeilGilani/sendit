@@ -69,8 +69,6 @@ const ui = new UI({
 
 let activities, life;
 let course, snowfall, terrain, sky, scatter, lifts, features, player, rider, cam, fx, sound, composer, post;
-let juice = null;              // in-ride game feel (juice/index.js)
-let progressUpdate = null;     // XP / dailies / achievements (progression/index.js)
 let currentMap = null;          // { map, variant, course } from the map registry
 let stage = null, lobby = null, stageReady = null;
 installRideTracker({ getMapId: () => currentMap?.map.id ?? 'unknown' });
@@ -193,7 +191,7 @@ async function boot() {
   window.__sendit = {
     activities, life,
     fx, course, player, rider, terrain, camera, game, scene, renderer, features, scatter,
-    lobby, stage, profile: profileStore, services, map: currentMap, ui, juice,
+    lobby, stage, profile: profileStore, services, map: currentMap, ui,
   };
 }
 
@@ -342,6 +340,9 @@ on('nearMiss', () => input.rumble(0, 0.55, 70));
 on('jumped', () => input.rumble(0.15, 0.3, 60));
 on('hardBrake', () => input.rumble(0.3, 0.6, 200));
 let rumbleT = 0;
+
+// Game feel (juice/index.js: hit-stop, announcer, punches…) and progression (progression/index.js), set up in boot().
+let juice = null, progressUpdate = null;
 function rumbleCarve(dt) {
   rumbleT -= dt;
   if (rumbleT > 0 || game.mode !== Mode.RIDING || player.state !== State.GROUNDED) return;

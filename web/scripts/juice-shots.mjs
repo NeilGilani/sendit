@@ -101,5 +101,11 @@ await page.evaluate(() => { document.exitPointerLock?.(); window.__sendit.ui.h.m
 await page.waitForFunction(() => window.__sendit.game.mode === 0, null, { timeout: 60000 }).catch(() => {});
 await page.waitForTimeout(2200);
 await shot('7-lobby-recap');
+await page.evaluate(() => window.__sendit.lobby.select?.('progress'));
+await page.waitForTimeout(1200);
+await shot('8-lobby-progress');
+await page.evaluate(() => window.__sendit.lobby.select?.('settings'));
+await page.waitForTimeout(1000);
+await shot('9-lobby-settings');
 console.log('errors', errors);
 await browser.close();
