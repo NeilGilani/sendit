@@ -71,3 +71,18 @@ Numbers are starting points that we tune in play. Items marked *recalled* come f
 8. **Music energy.** It lifts the track on hot streaks.
 9. **Achievements.** These are long-tail goals.
 10. **Live air read-out.** Rotation ticks up per 180°, which makes spinning satisfying mid-air.
+
+## Built beyond the first list
+
+These were added after the first pass, still from the research above:
+
+- **Trick book.** Each first landing of a trick pays XP, which pushes variety (THPS repeat decay, turned around as a reward).
+- **Challenge split deltas against your best run** (Trackmania).
+- **Combo tier words**, NICE to GODLIKE (SSX, Tony Hawk).
+- **Streak call-outs.** Stomps in a row, and clean tricks in a row.
+- **A weekly challenge.** It is the longer loop. It resets on Monday and never takes away what was earned.
+- **A ride recap card** ("+XP", the level bar filling, "one more run?").
+- **A TODAY dailies strip** next to the Ride button.
+- **Floating score pops** for small scores.
+- **Rising-pitch combo ticks.**
+- **Reduced-motion defaults.**
