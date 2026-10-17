@@ -11,9 +11,10 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 let errors = 0;
 page.on('pageerror', (e) => { errors++; console.log('[pageerror]', e.message); });
 page.on('console', (m) => { if (m.type() === 'error') { errors++; console.log('[error]', m.text().slice(0, 300)); } });
-const shot = async (n) => { await page.screenshot({ path: `${outDir}/${map}-${n}.png` }); console.log('shot', n); };
+const shot = async (n) => { await page.screenshot({ path: `${outDir}/${map}${process.env.FP ? '-fp' : ''}-${n}.png` }); console.log('shot', n); };
 await page.goto(`${base.replace(/\/?$/, '/')}?ride&map=${map}&equip=${equip}`, { timeout: 300000, waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => window.__sendit?.game.mode === 1, null, { timeout: 400000 });
+if (process.env.FP) await page.evaluate(async () => { const { setSetting } = await import('/src/state.js'); setSetting('view', 'fp'); });   // FP=1: helmet cam
 await page.waitForTimeout(6000);
 const stage = (steps) => page.evaluate(async (steps) => {
   const { emit, addScore } = await import('/src/state.js');

@@ -131,7 +131,8 @@ const CSS = /* css */`
 #chal #comboHud { display: none; }
 #chal:not(.hidden) ~ #juiceHud .cb { top: 122px; }
 #chal:not(.hidden) ~ #juiceHud .bn { top: 196px; }
-body.fp #juiceHud .an { top: 34%; }
+body.fp #juiceHud .an { top: 42%; }   /* helmet cam: no rider in the middle, keep clear of the combo panel */
+body.fp #notes { bottom: 130px; }      /* the helmet cam's speed read-out sits bottom right */
 `;
 
 /**
