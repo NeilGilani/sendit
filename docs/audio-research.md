@@ -17,7 +17,7 @@ post-mortems, Farnell's *Designing Sound*, mixing and WebAudio practice). No acc
 | Powder | Quiet, soft, muffled "pfff"; fresh snow swallows the highs | Absorption ≈ 0.25 at 100 Hz → 0.75 at 2 kHz [measured]; low-pass ≈ 600 + 40·v Hz, edge hiss −12…−18 dB |
 | Snowboard vs skis | One wide base: lower, rumbling, a growl on edge, a flat-base slap on landings; two skis: higher, two contacts, a double clack | Board bending 16 / 37 / 65 Hz, torsion 30 / 54 / 86 Hz; the CC0 board-on-ice recording (Nox_Sound #667729) peaks at **250 Hz**, centroid ≈ 930 Hz [measured by us] |
 | Cold snow | Squeaks and crunches below about −10 °C (dominant ≈ 1 kHz, harder friction 1.5–3.5 kHz) | At riding speed the contact patch reaches 0 °C even on −3.5 °C snow (tribometer, 5–25 m/s) → squeak only when slow |
-| Landing | Body thud (60–90 Hz), the base slapping, a burst of snow; in powder a soft whoomp | Thud 60–90 Hz, ~80–150 ms; powder burst low-passed ≈ 1.5 kHz |
+| Landing | A body thud, the base slapping, a burst of snow; in powder a soft whoomp | The notes suggested a 60–90 Hz thud, but CC0 snow impacts (#675895, #683789) show a broadband crack, a body at 125–250 Hz and scattered crunchy debris [measured by us]. The landings follow the recordings. |
 | Pole plant | A tick as the tip punches in, a crunch, a soft basket thud | Short bursts 3–4 kHz / 1.5–2 kHz + ~150 Hz |
 
 ## 2. Wind
