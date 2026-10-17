@@ -26,7 +26,6 @@ export class MusicEnergy {
     Object.assign(this, { sound, player, combo });
     this.level = 0; this.burst = 0; this.lifted = false; this.liftT = 0;
     this.emitT = 0; this.stingT = 0;
-    const C = JUICE_MUSIC;
     this.offs = [
       on('landed', (e) => {
         if (!e.clean || e.result === 'crash') return;
@@ -39,7 +38,6 @@ export class MusicEnergy {
       on('crashed', () => { this.burst = 0; this.level *= 0.5; }),
       on('mode', (m) => { if (m === Mode.MENU) { this.level = 0; this.burst = 0; this.release(); } }),
     ];
-    void C;
   }
 
   dispose() { for (const o of this.offs) o(); this.release(); }
