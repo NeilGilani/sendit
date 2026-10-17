@@ -130,7 +130,7 @@ export const AUDIO = {
     roof: { gain: 0.6 },                // landing on a roof: hollow timber boom, creak, snow off the eaves
     bump: { gain: 0.45, from: 0.25, rise: 0.12, full: 1.2, minGap: 0.25 },   // compression (m/s into the snow) rising fast: a whump
     push: { gain: 0.35, period: 0.65 },  // pushing on the flat: double-pole strokes (skis) / back-foot kicks (board)              // sprayed snow falling back after a slash / hockey stop
-    grind: { gain: 0.5, sample: 0.55, scrape: 0.5, clank: 0.5 },
+    grind: { gain: 1.0, sample: 0.8, scrape: 0.5, clank: 0.7 },   // a rail grind is as loud as a hard carve
     faceShot: { gain: 0.4, powder: 0.55, sink: 0.08, minSpeed: 7, minGap: 1.2 },   // powder thrown into the face at a turn
     gate: { gain: 0.45 },
     drop: { riser: 0.3, hit: 0.5 },     // music drops (game-feel's musicDrop): the riser and the 'boost' hit
