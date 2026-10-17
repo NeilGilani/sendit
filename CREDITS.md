@@ -22,6 +22,8 @@ All resort, lift, piste, gear and brand names in the game are invented.
 
 ## Sound & music (CC0)
 - All sound effects (powder, groomed swish, edge carve, wind, landing, birds) and the ambient piece "Golden Hour" were synthesized for this project with `tools/gen_audio.py` and are released under CC0 1.0.
+- The web game's snow, wind, trick, grind, lift, breath and ambience sounds are synthesized live in code (`web/src/audio/`, CC0 1.0); no third-party recordings are shipped.
+- These CC0 1.0 Freesound recordings were used only as listening and measurement references to calibrate the engine; they are not distributed. Thanks to Lydmakeren (#567839, groomed POV run), Nox_Sound (#667729, snowboard on ice), facemusic (#39082, creaky snow), kyles (#454092, Alpine gusts), cribbler (#592379, ski pass-by), Selector (#680075, skiers passing), musicbrain (#215690, snow crunch) and xkeril (#720302, Zermatt slope). See `docs/audio-research.md`.
 
 ## Fonts
 - Godot's built-in default font (part of the engine).
