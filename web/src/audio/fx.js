@@ -147,6 +147,15 @@ export class FX {
     this.noise(when + 0.3, { buf: 'pink', f: 1600, f2: 900, q: 0.5, gain: G * 0.25, attack: 0.2, hold: 0.3, decay: 0.8 });   // snow sliding off the eaves
   }
 
+  /** A stumble: an edge catches — skis clatter (or the board slaps), a quick scrape and a short spray. */
+  stumble(when, board = 0, powder = 0) {
+    const G = this.T.stumble.gain;
+    if (board) this.noise(when, { f: rnd(800, 1100), q: 0.9, gain: G * 0.6 * (1 - 0.6 * powder), decay: 0.04 });
+    else { this.modal(when, [[rnd(1000, 1300), 1, 0.05], [rnd(2600, 3200), 0.5, 0.03]], G * 0.3 * (1 - 0.7 * powder)); this.modal(when + rnd(0.04, 0.09), [[rnd(950, 1250), 1, 0.05]], G * 0.2 * (1 - 0.7 * powder)); }
+    this.noise(when + 0.01, { buf: 'pink', f: rnd(1800, 2600) * (1 - 0.4 * powder), f2: 1100, q: 0.7, gain: G * 0.6, attack: 0.02, decay: 0.25 });
+    this.noise(when + 0.03, { f: 2000, q: 0.9, gain: G * 0.25, attack: 0.02, decay: 0.08 });   // cloth
+  }
+
   /** Face shot: deep powder flying up over the goggles and jacket — a soft whump and a fizz of flakes. */
   faceShot(when, k = 1) {
     const G = this.T.faceShot.gain * k;

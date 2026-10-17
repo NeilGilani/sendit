@@ -104,6 +104,8 @@ mountain drops in pitch with time.
 | Grab rustle | `player.grab` rises past 0.5 in the air (on release, a shorter rustle) |
 | Landing | `landed` (rawImpact), shaped on CC0 snow-impact recordings: a broadband crack, a body thud at 120–200 Hz, a flat-base slap (board) or double clack (skis), crunchy debris grains thinning out over ~0.5 s, and the snow burst (short and bright on hardpack, long and fluffy in powder) |
 | Roof landing | `landingGrade` with a `roof` (Ravenspire's lift station and shacks; the village roofs on the Kitsune and Fjordline branches): the hollow timber structure booms (78–390 Hz modes), creaks, and snow slides off the eaves |
+| Stumble | `stumble`: an edge catches. Skis clatter (or the board slaps), with a quick scrape, cloth and a short spray; the old cue plays softer under it. |
+| Rail bail | `grindEnd` with reason `bail`: the rail clangs and the body lands beside it |
 | Crash tumble | `crashed`: 4–6 decaying impacts, cloth, a long slide, and a 'yard sale': skis and poles clattering, or the board slapping |
 | Tree / rock pass | Any tree or rock passing within 6 m above 6 m/s (`player.scatter.nearest`, read-only): the near-miss sound at a softer level |
 | Near miss | `nearMiss`: pink band sweeping 2.6 kHz → 650 Hz (Doppler) with a 4 → 9 → 4 ms comb sweep, panned to the obstacle's side from the travel direction; trees add needle rustle |

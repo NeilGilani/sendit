@@ -338,6 +338,7 @@ export class AudioEngine {
         break;
       }
       case 'landingGrade': if (d.roof) { this.fx.roof(when, d.rawImpact ?? d.impact ?? 6); this.count('roof'); } break;
+      case 'stumble': this.fx.stumble(when, board, powder); break;
       case 'parkLanding': if (d.clean) this.amb.cheer(when + 0.2, clamp((d.dist ?? 15) / 20, 0.6, 1.3)); break;
       case 'crashed': this.fx.crash(when, 1, powder, board); this.crashT = this.T.duck.crashHold; this.breath.jolt(0.35); this.breath.huff(when + 0.03, this.T.fx.breath.gain * this.T.perspective[this.view].breath); break;
       case 'musicEnergy': this.setMusicEnergy(d.level ?? 0); break;   // (SoundScape calls these directly; the test drives them as events)
@@ -353,7 +354,7 @@ export class AudioEngine {
       case 'grindStart': this.grind.setKind(d.kind, when, true); this.grind.clank(when, d.kind, 1); break;
       case 'grindKink': this.grind.tick(when, clamp((d.kink ?? 10) / 20, 0.3, 1)); break;
       case 'grindHop': this.grind.popOff(when); break;
-      case 'grindEnd': if (d.reason !== 'bail') this.grind.popOff(when); break;
+      case 'grindEnd': if (d.reason !== 'bail') this.grind.popOff(when); else { this.grind.clank(when, d.kind || this.grind.kind, 1.2); this.fx.landing(when + 0.12, 7, { powder: 0, board }); } break;   // a bail: gear and body off the steel
       case 'grindClip': this.grind.clank(when, 'rail', 0.6); break;
       default: break;
     }

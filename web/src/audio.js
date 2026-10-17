@@ -72,7 +72,7 @@ export class SoundScape {
     on('ravenCaw', (p) => this.caw(p));   // ravens around a map's summit
     on('landingGrade', ({ grade }) => { if (grade === 'stomped') this.oneShot('boost', 0.3, 1.25); });   // the stomp boost
     on('lineGoal', () => { this.oneShot('medal', 0.7, 1.05); this.chime(); });
-    on('stumble', () => this.oneShot('combo_lost', 0.3, 1.2));
+    on('stumble', () => this.oneShot('combo_lost', 0.2, 1.2));   // the game cue, softer: the engine plays the stumble itself
     on('score', ({ points }) => { if (points >= 60) this.oneShot('combo_tick', 0.3, 1 + Math.min(points, 400) / 400); });
     // A board's tail pop sits lower than a skier's hop (sample under the engine's synthesized take-off).
     on('jumped', (d) => this.oneShot('jump_pop', 0.18 + d * 0.25, (this.skier.equipment?.type === 'snowboard' ? 0.78 : 0.95) + Math.random() * 0.15, this.engine.fxBus));
@@ -81,7 +81,7 @@ export class SoundScape {
     E('takeoff'); E('landed'); E('crashed'); E('hardBrake'); E('parkLanding'); E('landingGrade');
     E('grindStart'); E('grindKink'); E('grindHop'); E('grindEnd'); E('grindClip');
     E('nearMiss', (d) => ({ ...d, pan: this.sideOf(d.x, d.z) }));
-    E('gate'); E('liftBoarded'); E('liftArrived');
+    E('gate'); E('liftBoarded'); E('liftArrived'); E('stumble');
     on('rideStarted', ({ equipment }) => this.engine.event('rideStarted', { board: equipment === 'snowboard' ? 1 : 0 }, c.currentTime));
     on('crashed', () => this.oneShot('crash', 0.3, 1, this.engine.fxBus));
     if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('audiodebug')) this.mountDebug();
