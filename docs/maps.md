@@ -159,20 +159,21 @@ Map `ravenspire`. An isolated face with stacked cliff bands, spines, pillows, a 
 
 ### Voltage Park (Event terrain park · night session)
 
-Map `voltage-park`. Floodlit park built for contests: a slopestyle course, three lanes, a jib garden, a superpipe and a big air tower.
+Map `voltage-park`. A fast floodlit contest park: a slopestyle course to the Megawatt mega kicker and a road gap,
+stacked lanes, spines, a superpipe and a big air tower. The map declares its own trails (maps/voltage/layout.js
+`TRAILS`, `course.trailSpawn`); every trail is ridden on to the finish line.
 
 | trail id | name | difficulty | length | vertical | start |
 | --- | --- | --- | --- | --- | --- |
-| `slopestyle` | Slopestyle Course ★ | ▬ park | 790 m | 230 m | default spawn |
-| `rail-surge` | Rail Section 2 · Surge | ▬ park | 690 m | 200 m | drop zone "Rail Section 2" |
-| `rail-overload` | Rail Section 3 · Overload | ▬ park | 620 m | 180 m | drop zone "Rail Section 3" |
-| `jump-line` | Jump Line ★ | ▬ park | 470 m | 140 m | drop zone "Jump Line" |
-| `big-air` | The Tower · Big Air ★ | ▬ park | 470 m | 150 m | drop zone "The Tower" |
-| `superpipe` | The Conduit · Superpipe | ▬ park | 440 m | 130 m | drop zone "The Conduit" |
-| `spark-lane` | Spark Lane | ▬ park | 760 m | 210 m | drop zone "Spark Lane" |
-| `current-lane` | Current Lane | ▬ park | 760 m | 210 m | drop zone "Current Lane" (else at) |
-| `high-voltage` | High Voltage | ▬ park | 500 m | 150 m | drop zone "High Voltage" |
-| `the-grid` | The Grid · Jib Garden | ▬ park | 750 m | 210 m | drop zone "The Grid" |
+| `slopestyle` | Slopestyle Course ★ | ▬ park | 1145 m | 385 m | the start ramp's deck (default) |
+| `spark` | Spark Lane | ● green | 1110 m | 368 m | course.trailSpawn (top of the lane) |
+| `current` | Current Lane | ■ blue | 1110 m | 368 m | course.trailSpawn (top of the lane) |
+| `high-voltage` | High Voltage ★ | ◆ black | 1110 m | 368 m | course.trailSpawn (top of the lane) |
+| `grid` | The Grid | ▬ park | 1100 m | 362 m | course.trailSpawn (top of the Grid) |
+| `stairway` | The Stairway | ◆ black | 768 m | 271 m | drop zone 9 (top of the Launch) |
+| `hip-row` | Hip Row | ■ blue | 680 m | 229 m | course.trailSpawn |
+| `superpipe` | The Conduit | ◆ black | 651 m | 219 m | drop zone 6 (top of the pipe) |
+| `big-air` | The Tower ★ | ◆◆ double-black | 679 m | 228 m | drop zone 5 (the scaffold deck) |
 
 ### Lake Tahoe (Sierra Nevada · California / Nevada)
 

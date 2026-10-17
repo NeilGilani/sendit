@@ -619,14 +619,13 @@ export class VoltageCourse {
     return { x: START_X + t.start[0], z: t.start[1], heading: -Math.PI / 2 };
   }
 
-  /** The trails with their measured length (start → finish line, m) and vertical (m). */
+  /** The trails with their measured length (start → the finish line, m) and vertical (the snow, m): every trail
+   *  is ridden on to the finish (scripts/trails-check.mjs measures the same way). */
   trailInfo() {
     return TRAILS.map(({ id, name, difficulty, description }) => {
       const s = this.trailSpawn(id), u0 = s.x - START_X;
-      const end = id === 'superpipe' ? PIPE.u1 : id === 'big-air' ? this.bigAir.marks.landingEnd.a + this.bigAir.x - START_X : FINISH_U;
-      const top = id === 'big-air' || id === 'slopestyle' ? this.heightAt(s.x, s.z, this.base(s.x, s.z)) ?? this.profileAt(u0) : this.profileAt(u0);
       this.activeTrail = null;
-      return { id, name, difficulty, description, length: Math.round(end - u0), vertical: Math.round(top - this.profileAt(end)) };
+      return { id, name, difficulty, description, length: Math.round(FINISH_U - u0), vertical: Math.round(this.height(s.x, s.z) - this.height(START_X + FINISH_U, 0)) };
     });
   }
 

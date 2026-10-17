@@ -39,7 +39,7 @@ export const PITCH = { plunge: 265, bench2: 300, launch: 385, jumps: 455, mega: 
 
 // Scaffold start ramps: a deck `top` m over the snow, rolled into at `inDeg` (the first metres of the run).
 export const START_RAMPS = [
-  { name: 'Start Ramp', u: -16, v: 0, top: 9, deckLen: 4, inDeg: 36, R: 9, hw: 3.2 },
+  { name: 'Start Ramp', u: -16, v: 0, top: 9, deckLen: 14, inDeg: 36, R: 9, hw: 3.2 },
 ];
 
 // ------------------------------------------------------------------ the slopestyle course
@@ -133,7 +133,6 @@ export const HIPS = [
   { name: 'Hip Four', lane: 'hips', u: 995, v: -242, turn: 28, lipDeg: 28, R: 13, kickH: 3.2, table: 16, vMax: 24, hw: 3.2, deckHw: 7, landHw: 9, maxDeg: 40 },
   { name: 'Current Transfer', lane: 'current', u: 745, v: 148, turn: 26, lipDeg: 27, R: 12, kickH: 2.8, table: 13, vMax: 23, hw: 3, deckHw: 6, landHw: 8, maxDeg: 40 },
   { name: 'Spark Side Hit', lane: 'spark', u: 1012, v: 62, turn: 14, lipDeg: 25, R: 10, kickH: 2.0, table: 10, vMax: 21, hw: 2.4, deckHw: 4, landHw: 5.5, maxDeg: 40 },
-  { name: 'Current Side Hit', lane: 'current', u: 962, v: 129, turn: -10, lipDeg: 25, R: 10, kickH: 2.0, table: 10, vMax: 21, hw: 2.4, deckHw: 4, landHw: 5.5, maxDeg: 40 },
   { name: 'High Side Hit', lane: 'high', u: 735, v: 176, turn: 14, lipDeg: 25, R: 10, kickH: 2.0, table: 10, vMax: 21, hw: 2.4, deckHw: 4, landHw: 5.5, maxDeg: 40 },
   { name: 'Stairway Hip', lane: 'stair', u: 995, v: 250, turn: -25, lipDeg: 27, R: 12, kickH: 2.9, table: 14, vMax: 23, hw: 3, deckHw: 6, landHw: 8, maxDeg: 40 },
 ];
@@ -216,15 +215,15 @@ export const DROP_ZONES = [
 // drop zone index) and is ridden to the finish; `lanes` are the feature lanes that count toward it when a run is
 // classified at the finish (runCompleted). Length and vertical are measured from the course (course.js trailInfo).
 export const TRAILS = [
-  { id: 'slopestyle', name: 'Slopestyle Course', difficulty: 'park', start: 0, lanes: ['slope'], description: 'Start ramp, three rail sections, Lightning, Thunder, Voltage, Megawatt and the road gap: the judged run.' },
+  { id: 'slopestyle', name: 'Slopestyle Course', difficulty: 'park', featured: true, start: 0, lanes: ['slope'], description: 'Start ramp, three rail sections, Lightning, Thunder, Voltage, Megawatt and the road gap: the judged run.' },
   { id: 'spark', name: 'Spark Lane', difficulty: 'green', start: [30, 70], lanes: ['spark'], description: 'The flow lane: small tables, boxes, a stacked double, rollers, a side hit and a quarterpipe.' },
   { id: 'current', name: 'Current Lane', difficulty: 'blue', start: [30, 125], lanes: ['current'], description: 'Rails on the benches, then the Triple Stack, a step-down and the transfer hip into High Voltage.' },
-  { id: 'high-voltage', name: 'High Voltage', difficulty: 'black', start: [30, 186], lanes: ['high'], description: 'Pro rails, two big tables, the Canal gap, a step-up and the 5 m quarterpipe.' },
+  { id: 'high-voltage', name: 'High Voltage', difficulty: 'black', featured: true, start: [30, 186], lanes: ['high'], description: 'Pro rails, two big tables, the Canal gap, a step-up and the 5 m quarterpipe.' },
   { id: 'grid', name: 'The Grid', difficulty: 'park', start: [40, 247], lanes: ['grid'], description: 'A jib garden: 16 boxes, tubes and rails in rows.' },
   { id: 'stairway', name: 'The Stairway', difficulty: 'black', start: 8, lanes: ['stair'], description: 'Step-down, step-up, step-down, then over the Stairway Spine.' },
   { id: 'hip-row', name: 'Hip Row', difficulty: 'blue', start: [460, -236], lanes: ['hips'], description: 'Four hips down the left side of the park.' },
   { id: 'superpipe', name: 'The Conduit', difficulty: 'black', start: 5, lanes: ['pipe'], description: 'A 22 ft superpipe, 240 m long.' },
-  { id: 'big-air', name: 'The Tower', difficulty: 'double-black', start: 4, lanes: ['bigair'], description: 'A 33 m scaffold big air: 93 km/h on the in-run, 3 s in the air.' },
+  { id: 'big-air', name: 'The Tower', difficulty: 'double-black', featured: true, start: 4, lanes: ['bigair'], description: 'A 33 m scaffold big air: 93 km/h on the in-run, 3 s in the air.' },
 ];
 
 // Line goals (physics/flow.js, course.lineGoals): named features in order, in one clean run.

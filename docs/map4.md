@@ -99,7 +99,7 @@ Three rail sections, each with three parallel options (pick your line), then fiv
 | lane | v | identity · what is there |
 |---|---|---|
 | **Spark Lane** (green ●) | 70 | **flow.** Small tables on the bench (6–10 m), a box, a fat tube and a ledge, a down box, pump rollers. Under the Launch a **stacked double** (two 14 m tables back to back), a butter box, two more tables (16 / 18 m), three rollers, a **side hit**, the **Spark QP** (3.2 m) |
-| **Current Lane** (blue ■) | 125 | **the Triple Stack.** A table, flat-down / box / kink / tube on the benches. Under the Launch **three 18–19 m tables back to back**, ridden upright at ~14.5 m/s (each landing runs straight into the next in-run). The **Current Transfer** (a hip at v 148 that sends you into High Voltage), a **step-down**, a **side hit** on the lane's line (10° skew) and a 22 m table |
+| **Current Lane** (blue ■) | 125 | **the Triple Stack.** A table, flat-down / box / kink / tube on the benches. Under the Launch **three 18–19 m tables back to back**, ridden upright at ~14.5 m/s (each landing runs straight into the next in-run). The **Current Transfer** (a hip at v 148 that sends you into High Voltage), a **step-down** and a 22 m table |
 | **High Voltage** (pro, black ◆) | 186 | down-flat-down, rainbow rail, 13 m down rail, a kink; under the Launch two pro tables (22 / 27 m, 16–17.5 m/s), a side hit, **the Canal** (a 14 m-wide ice-blue channel, then a 9 m landing mound), a **step-up**, the **Voltage QP** (5.2 m) |
 | **The Grid** (jib garden, orange ⬭) | 236–258, u 50–262 | 16 jibs in seven rows every 30–33 m, three columns: boxes, tubes, rails, a flat box, an A-frame, a 14 m rail, a kink, an S-rail, a rainbow box, a down box, a ledge, a battleship, a cannon, a finale DFD |
 | **The Stairway** (step line) | 245, under the Grid | **Stair Drop 1** (a step-down: the deck falls away 6°, 20 m table), **Stair Up** (a 32° kicker over a 7 m table to a deck 1.8 m above the lip), **Stair Drop 2** (24 m), the **Stairway Hip** |
@@ -145,8 +145,8 @@ Three rail sections, each with three parallel options (pick your line), then fiv
    the Canal, the step-up and the 5.2 m QP.
 3. **Lane hopper.** Spark Ledge → Down Box → Spark Double → **the Spine** → **Current Transfer** → the Canal →
    the step-up: three lanes in one run.
-4. **The Triple Stack.** Drop zone 7. Three tables back to back, upright, no speed check, then the step-down,
-   the side hit and Current 3.
+4. **The Triple Stack.** Drop zone 7. Three tables back to back, upright, no speed check, then the step-down
+   and Current 3.
 5. **The Stairway.** Drop zone 9: step-down, step-up, step-down, then over the **Stairway Spine** into High
    Voltage's step-up.
 6. **Megawatt.** Drop zone 4: down Voltage's landing, Megawatt (2.4–2.8 s, slow motion), the road gap.
@@ -261,12 +261,17 @@ far LOD and the tree scatter are untouched by the park.
   - `registerMap({ trails })` lists nine trails: slopestyle (park), Spark (green), Current (blue), High Voltage
     (black), the Grid (park), the Stairway (black), Hip Row (blue), the Conduit (black) and the Tower
     (double-black).
-  - Each has `{ id, name, difficulty, description, length, vertical }`. Length and vertical are measured by
-    `course.trailInfo()`, and map4-unit checks they still match `TRAIL_SIZE` in index.js after a layout change.
+  - Each has `{ id, name, difficulty, description, length, vertical, featured? }`. Length and vertical are
+    measured from the start to the finish line on the snow, as `scripts/trails-check.mjs` does, by
+    `course.trailInfo()`. map4-unit checks they still match `TRAIL_SIZE` in index.js after a layout change.
+  - `maps/adapters.js` (the trails session's block) keeps the mountain card. Its trail list mirrors these; the
+    registry uses the map's own.
   - `course.trailSpawn(id) → { x, z, heading }`: a drop zone, or the top of the lane. The data is `TRAILS` in
     layout.js.
 - **`runCompleted`** `{ mapId, trailId, distance, time, score, judged? }` goes out on the state.js bus when a run
   reaches the finish (zen `runComplete` or Challenge `runFinished`) — park.js.
+  - `profile/tracker.js` also emits it for every map. The park only announces a finish nobody announced in the
+    last 2 s (the rule the other maps use), so there is one event per run.
   - The trail is the one most of the run's features (takeoffs and grinds) were on, else the trail it started on.
   - The clock and distance start at the top, at a drop zone or at the spawn.
 - **Atmosphere — the night final** (`VOLTAGE_ATMOSPHERE` in tuning.js, applied by `world.js applyMapAtmosphere`).
@@ -605,7 +610,7 @@ zone), every spine crossed clean. The lines:
 - **the slopestyle course:** A, B, C (three rail sections + Lightning, Thunder, Voltage, Megawatt, the Gap);
 - **Spark:** all its tables, the double, the rails, the side hit, the QP;
 - **the lane hopper:** Spark → the Spine → Current Transfer → the Canal → the step-up → the QP;
-- **Current** and **Current Box:** the Triple Stack, the side hit, the step-down, Current 3;
+- **Current** and **Current Box:** the Triple Stack, the step-down, Current 3;
 - **High Voltage:** four rails, two pro tables, the side hit, the Canal, the step-up, the QP;
 - **the Stairway**, and the **Stairway → Stairway Spine → step-up** line;
 - **five Grid lines** (every other row; together all 16 jibs);
@@ -669,6 +674,10 @@ spot counts.
 | contended, back to back | voltage-park | 23.6 / 34.5 ms | 31.1 / 20.1 / 18.7 / 19.0 / 18.1 / 34.5 | 162–349 | 3.6–4.0 M |
 | contended, back to back | valcrest-gully | 32.2 / 41.9 ms | 41.9 / 37.4 / 31.4 / 24.7 / 26.7 / 30.8 | 172–387 | 2.8–3.1 M |
 
+After the 02:33 merge and the night final with its floodlight pools, quiet windows at q1 / 1600×900 give 13.9 ms
+with the pools and 12.4 ms without (they cost ~1.5 ms of additive fill). Contended runs that night ranged
+22–40 ms for both Voltage and Valcrest.
+
 Voltage sits in the 14–16 ms budget and under Valcrest. Under the same contention it costs about two-thirds of
 Valcrest. The triangles are summed over every pass (shadow cascades included). The park snow went to 0.75 m rows
 on the big jumps and 1.6 m columns on the level decks: 547k → 356k vertices (the old park had 289k), and
@@ -713,7 +722,9 @@ What it costs:
   don't collide (riding under a rail passes through).
 - **Non-twin skis.** Skis that aren't twin tips (anything but the park skis) can't land switch. Straight airs in
   the pipe and QPs then need a 180.
-- **Night lighting.** The night final is one key light plus a bright ambient. The floodlight heads glow but don't
-  pool light on the snow; real light cones would need local lights (a graphics feature).
+- **Night lighting.** The night final is one key light plus a bright ambient.
+  - Under each light tower a warm additive glow on the snow fakes the floodlight pool (props.js `lightPools`, one
+    draw).
+  - It doesn't light riders or features; real light cones would need local lights (a graphics feature).
 - **Merge watch-list.** player.js, physics/edge.js, config.js, rider.js (pose functions), activities.js, ui.js,
   physics/flow.js, maps/builtin.js (one line).

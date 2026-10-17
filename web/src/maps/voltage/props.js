@@ -381,7 +381,7 @@ function buildDressing(course, T, M) {
     lamps.push(led);
   };
   course.obstaclesExtra = [];
-  arch(-14, -11, 11, 'VOLTAGE PARK  ·  SLOPESTYLE  ·  START', '#ffe14d', '#140a3a', 4.5);
+  arch(-8, -11, 11, 'VOLTAGE PARK  ·  SLOPESTYLE  ·  START', '#ffe14d', '#140a3a', 4.5);
   arch(76, -22, 22, 'SECTION 1  ·  THE CIRCUIT', '#2ff5d6', '#1b1550');
   arch(160, -22, 22, 'SECTION 2  ·  SURGE', '#3d8bff', '#1b1550');
   arch(258, -24, 24, 'THE PLUNGE  ·  SECTION 3  ·  OVERLOAD', '#ff3d9a', '#1b1550', 7);
@@ -396,9 +396,9 @@ function buildDressing(course, T, M) {
   arch(GRID.u0 - 18, 226, 268, 'THE GRID  ·  JIB GARDEN', '#ffe14d', '#1b1550');
   arch(PIPE.u0 + 2, PIPE.v - 26, PIPE.v + 26, 'THE CONDUIT  ·  22 FT SUPERPIPE', '#2ff5d6', '#140a3a', 9);
   // --- start hut: a dark box with an LED band, the gate wand.
-  { const x = X(-21), y = H(x, 0); const hut = new THREE.BoxGeometry(6, 3.2, 9); hut.translate(x, y + 1.6, 0); darks.push(hut); const band = new THREE.BoxGeometry(6.1, 0.25, 9.1); band.translate(x, y + 2.9, 0); lamps.push(band); }
+  { const x = X(-14), v = -9, y = H(x, v); const hut = new THREE.BoxGeometry(6, 3.2, 5); hut.translate(x, y + 1.6, v); darks.push(hut); const band = new THREE.BoxGeometry(6.1, 0.25, 5.1); band.translate(x, y + 2.9, v); lamps.push(band); }
   // --- light towers along both sides of the course and the park
-  const towers = [];
+  const towers = [], pools = [];
   for (let u = 20; u <= FINISH_U + 40; u += 75) for (const v of [-46, 46, 100, 160, 220, -140, -205]) towers.push([u + (v % 3) * 7, v]);
   for (const [u, v] of towers) {
     const x = X(u), y = H(x, v);
@@ -407,7 +407,10 @@ function buildDressing(course, T, M) {
     const head = new THREE.BoxGeometry(1.6, 0.9, 2.6); head.translate(x, y + 16.3, v); darks.push(head);
     for (let k = -1; k <= 1; k++) { const l = new THREE.BoxGeometry(0.25, 0.55, 0.65); l.translate(x - 0.82, y + 16.3, v + k * 0.8); lamps.push(l); }
     course.obstaclesExtra.push([x, v, 0.35, 'tower']);
+    pools.push([x, v]);
   }
+  // Floodlight pools on the snow (the night final): one merged, terrain-hugging additive mesh.
+  if (course.atmosphere?.preset === 'night' && pools.length) g.add(lightPools(pools, T));
   // --- crowd fences along the jump line and the finish (barriers with sponsor panels) + spectators
   const crowd = [];
   const fence = (u0, u1, v, side) => {
@@ -518,6 +521,27 @@ function buildDressing(course, T, M) {
   if (lamps.length) g.add(new THREE.Mesh(strip(lamps), M.lamp));
   for (const o of course.obstaclesExtra) course.obstacles?.push(o);
   return g;
+}
+
+/** A warm-white glow on the snow around each light tower (additive, no depth write, one draw). */
+function lightPools(list, T) {
+  const R = 20, N = 9, buf = new GeoBuf();
+  for (const [x0, z0] of list) {
+    buf.grid(N, N, (i, j) => {
+      const dx = (i / (N - 1) * 2 - 1) * R, dz = (j / (N - 1) * 2 - 1) * R, x = x0 + dx, z = z0 + dz;   // (rows along x: the quads face up)
+      return [x, T.getHeight(x, z) + 0.08, z];
+    });
+  }
+  const geo = buf.build();
+  const mat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: /* glsl */`varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: /* glsl */`varying vec2 vUv; void main() { float r = length(vUv - 0.5) * 2.0; float k = pow(max(0.0, 1.0 - r), 1.8); gl_FragColor = vec4(vec3(1.0, 0.93, 0.80) * k * 0.30, 1.0); }`,
+  });
+  const m = new THREE.Mesh(geo, mat);
+  m.name = 'LightPools';
+  m.renderOrder = 2;
+  return m;
 }
 
 // ------------------------------------------------------------------ flags & crowd (instanced, animated in the shader)
