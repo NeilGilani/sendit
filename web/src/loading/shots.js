@@ -87,6 +87,22 @@ export function planMove(kind, shot, sun, r, H) {
       m.look = (s, com) => com.clone().lerp(M, 0.1 + 0.15 * s);
       break;
     }
+    case 'close': {
+      // Tight drone follow-orbit: ~5 m off the rider, swinging slowly round through the trick (FPV-style).
+      const R = r.range(4.6, 6.2), h = r.range(0.4, 1.6), a0 = side * r.range(0.9, 1.4), sweep = -side * r.range(0.8, 1.3);
+      m.fov = r.range(38, 46);
+      m.pos = (s, com, t) => {
+        const a = a0 + sweep * ease(s);
+        const p = V(com.x + Math.sin(a) * R, com.y + h, com.z + Math.cos(a) * R);
+        p.y = Math.max(p.y, H(p.x, p.z) + 1.2);
+        return p;
+      };
+      m.look = (s, com) => com.clone();
+      m.lag = 7;
+      m.t0 = -0.9;
+      m.endAfterLanding = 1.2;
+      return m;
+    }
     case 'follow': {
       // Behind the rider on the in-run, then drifts out over the cliff (like a drone that keeps flying).
       m.fov = 56;

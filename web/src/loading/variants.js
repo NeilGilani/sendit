@@ -88,6 +88,7 @@ export const CAMERAS = {
   tele: { name: 'Long lens', w: 2 },            // telephoto from across the bowl, peaks stacked behind
   reveal: { name: 'Drone reveal', w: 2 },       // starts tight, pulls back and up over the range
   follow: { name: 'Chase', w: 1 },              // behind and above the rider off the lip, over the void
+  close: { name: 'Close orbit', w: 3.5 },         // a drone swinging round the rider ~5 m away through the trick
 };
 
 export function rng(seed) {

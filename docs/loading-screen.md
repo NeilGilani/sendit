@@ -115,6 +115,7 @@ carries the pose: `renderPos` / `renderOrient` (centre-of-mass ballistic arc, ro
 | Long lens | 7–9.5° FOV from far up the shoulder; the range stacked huge behind the rider |
 | Drone reveal | starts at the lip, pulls back and up as the rider lands |
 | Chase | behind the rider on the in-run, keeps flying out over the cliff |
+| Close orbit | a drone ~5 m off the rider swinging round through the trick (the most frequent move) |
 
 Every planned move is lifted until it clears the snow and sees the apex, the touchdown and the lip
 (one constant lift, so the move stays smooth). The look-at is damped (the operator lags), there is a
@@ -175,7 +176,8 @@ by ±5 s. Every comparison is interleaved run by run (`node scripts/loadtime.mjs
 | static screen only (old cost) | 5.85 s | 5.57 s | – |
 | live scene (default) | 6.81 s | 6.33 s | 45–53 (35 on the cold-shader run) |
 
-Paired deltas (warm pairs): +0.1, +1.2, +0.7, +2.4, +1.1 s → **about +1 s (≈ +15 %)** on this saturated
+Paired deltas (warm pairs): +0.1, +1.2, +0.7, +2.4, +1.1 s; a later round on the final terrain shaders
+(02:00): +0.8, +0.3, +0.8, +3.8, +0.3 s (medians 6.12 s static vs 7.58 s live) → **about +1 s (≈ +15 %)** on this saturated
 laptop. An earlier round (00:45, busier machine) gave 9.34 s vs 8.58 s (+0.8 s). With the old
 bar-only screen at the start of the night, boot measured 10.4–11.8 s (warm) under heavier load.
 
