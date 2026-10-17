@@ -49,7 +49,7 @@ async function render(spec, sr, secs) {
   }
   // a steady 'music' tone so ducking shows up in the stats
   if (spec.musicTone) {
-    const o = ctx.createOscillator(); o.frequency.value = 220; const g = ctx.createGain(); g.gain.value = 0.2; o.connect(g); g.connect(eng.duck); o.start();
+    const o = ctx.createOscillator(); o.frequency.value = 220; const g = ctx.createGain(); g.gain.value = 0.07; o.connect(g); g.connect(eng.duck); o.start();   // ≈ the real music level after the music bus
   }
   const dt = spec.dt || 1 / 60, frames = spec.frames || [];
   const evs = [...(spec.events || [])].sort((a, b) => a.t - b.t);
