@@ -120,6 +120,10 @@ levels in dB relative to the loudest band, for the loudest 15 % of seconds.
 Envelope modulation in the references is low (0.2–0.6 % for the groomed run, 1–2 % on the icy board), so the
 continuous layers stay smooth and the "events" (edges, plants, slashes) carry the rhythm.
 
+**Also compared:** a skateboard rail grind (#655371) and slide (#845524), a chairlift tower pass (#519459) and a
+chairlift ride (#263134), a body fall (#675895) and an impact (#683789) in snow, a French resort descent (#558792),
+two skydiving freefalls (#811077, #169913) and an air rush (#267899).
+
 Other CC0 recordings listed in the notes for future comparison: lift towers and chairlift rides, a walk in crunchy
 snow (#215690), a slope ambience in Zermatt (#720302), skiers passing (#680075), tree creaks (#370266) and snow
 falling from trees (#116136).
