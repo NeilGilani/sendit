@@ -32,8 +32,10 @@ the numbers and the comparisons with real recordings are in `docs/audio-research
 
 ```
 destination ← soft clip (tanh, ceiling 0.86) ← limiter (−2 dB, 20:1) ← master (settings.master × 0.8)
-   master ← glue (−12 dB, 1.6:1) ← sfx (settings.sfx) ← snow  · wind · ambience · fx · ui
-   master ← music (settings.music) ← low-pass (air / bail) ← duck ← Zen track + challenge track
+   master ← glue (−12 dB, 1.6:1) ← sfx (settings.sfx) ┬─ camera-distance stage (gain + low-pass) ← snow · wind · fx
+                                                      ├─ ambience · ui
+                                                      └─ reverb (per map) ← sends from fx, ambience, a little snow
+   master ← music (settings.music) ← low-pass (air / bail / calm) ← duck ← Zen track + challenge track
 ```
 
 - The bus gains are `AUDIO.mix`. The settings sliders (master, sfx, music) scale the matching nodes, so they work
