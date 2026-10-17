@@ -108,6 +108,7 @@ mountain drops in pitch with time.
 | Near miss | `nearMiss`: pink band sweeping 2.6 kHz → 650 Hz (Doppler) with a 4 → 9 → 4 ms comb sweep, panned to the obstacle's side from the travel direction; trees add needle rustle |
 | Hard brake | `hardBrake`: spray fan and rough scrape onset (the worklet carries the sustained stop) |
 | Spray patter | After a slash or hard brake: the thrown snow pattering back down (a soft fizz of tiny landings 0.2–0.9 s later) |
+| Bumps / rollers | `player.compression` rising fast (> 0.25 m/s pressed into the snow): a padded whump through the legs and a crunch of compacting snow |
 | Push strokes | W held below the gear's push speed on the flat (`player._ctrl.up`, read-only): a stroke every ~0.65 s. Skis double-pole (both tips plus a crunchy shove); a board kicks with the back foot. |
 | Grinds | `grindStart` (modal clang, modes retuned ±3 % per rail), the frame's grind speed (continuous scrape and sample), `grindKink` (tick), `grindHop` / `grindEnd` (pop-off). Boxes are duller and lower. |
 | Crowd cheer | Park map: `parkLanding` (clean) or a perfect / stomped `landed`; the PA announcer reacts ~1.4 s later |

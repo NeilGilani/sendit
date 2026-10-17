@@ -40,6 +40,7 @@ export function readRider(p, o = {}) {
     tuck: p.tuck || 0,
     board: p.equipment?.type === 'snowboard' ? 1 : 0,
     butter: Math.abs(p.butter || 0) + Math.abs(p.press || 0),
+    comp: p.compression || 0,   // m/s pressed into the snow over bumps / rollers (decays in ~0.12 s)
     grindV: g ? g.v || 0 : 0,
     grindKind: g ? g.rail?.kind || 'rail' : '',
     grindHop: g ? (g.hop ? 1 : 0) : 0,

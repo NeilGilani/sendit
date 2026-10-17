@@ -301,6 +301,13 @@ export class AudioEngine {
     if (r.st === ST.AIR && r.grab > 0.5 && !this.grabbing) { this.grabbing = true; this.fx.grab(when); this.count('grab'); }
     if (this.grabbing && (r.grab < 0.25 || r.st !== ST.AIR)) { this.grabbing = false; if (r.st === ST.AIR) this.fx.grab(when, true); }
     if (prev && prev.st !== ST.CRASH && r.st === ST.CRASH) this.crashT = this.T.duck.crashHold;
+    // bumps and rollers: the legs absorbing a sudden compression
+    const B = F.bump, dc = r.comp - (prev?.comp ?? 0);
+    if (grounded && r.comp > B.from && dc > B.rise && when - (this.lastBump ?? -9) > B.minGap) {
+      this.lastBump = when;
+      this.fx.bump(when, clamp(r.comp / B.full, 0.3, 1.3), r.board, powder);
+      this.count('bump');
+    }
     // pushing on the flat: a stroke every ~0.65 s while W is held below push speed
     if (r.push) { if ((this.pushT = (this.pushT ?? 0) - (when - (this.lastWhen ?? when))) <= 0) { this.pushT = F.push.period * (0.9 + Math.random() * 0.2); this.fx.push(when, r.board); this.count('push'); } }
     else this.pushT = 0.12;   // the first stroke comes a beat after W goes down

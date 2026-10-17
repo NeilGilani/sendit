@@ -21,7 +21,7 @@ if (wavDir) mkdirSync(wavDir, { recursive: true });
 const DT = 1 / 60;
 const F0 = { st: 1, speed: 0, vy: 0, edge: 0, edgeSign: 0, skid: 0, skidAmt: 0, carve: 0, cq: 1, load: 1, stop: 0, brake: 0,
   groomed: 1, powder: 0, rock: 0, extra: 0, deep: 0, sink: 0, spin: 0, flip: 0, grab: 0, air: 0, tuck: 0, board: 0, butter: 0,
-  grindV: 0, grindKind: '', grindHop: 0 };
+  grindV: 0, grindKind: '', grindHop: 0, comp: 0, push: 0 };
 function frames(seconds, fn) {
   const out = [];
   for (let i = 0; i < seconds / DT; i++) { const t = i * DT; out.push({ ...F0, ...fn(t, i) }); }
@@ -118,6 +118,7 @@ add('fjord-and-bell', { seconds: 12, map: 'fjordline', tune: { ambience: { gulls
 add('ridge-howl', { seconds: 16, map: 'ravenspire', tune: { wind: { gust: { tau: 1.2 } } }, frames: frames(16, () => ({ speed: 0 })) });
 add('camera-pulls-away', { seconds: 6, frames: frames(6, (t) => ({ speed: 14, ...carve(t, 2.6, 0.8, 14), camDist: t < 2 ? 5 : 5 + (t - 2) * 30 })) });
 add('push-off', { seconds: 4, frames: frames(4, (t) => ({ speed: ramp(t, 0, 4, 0.5, 5), push: 1, board: t > 2 ? 1 : 0 })) });
+add('bumps', { seconds: 5, frames: frames(5, (t) => ({ speed: 12, ...carve(t, 2.6, 0.4, 12), comp: (t % 1) < 0.1 ? 0.9 * ((t % 1) / 0.1) : 0.9 * Math.exp(-((t % 1) - 0.1) / 0.12) })) });
 if (traceDir) for (const type of ['ski', 'snowboard', 'bigmountain']) {
   const f = join(traceDir, `trace-${type}.json`);
   if (!existsSync(f)) continue;
@@ -180,6 +181,7 @@ if (has('cold-slow-board')) expect((R['cold-slow-board'].events.squeak || 0) >= 
 if (has('music-energy-drop')) { const r = R['music-energy-drop']; expect(r.centroid > 0 && (r.events.musicDrop || 0) === 1, 'music energy and drops drive the music'); }
 if (has('camera-pulls-away')) expect(lvl('camera-pulls-away', 5, 6) < lvl('camera-pulls-away', 0.5, 1.8) * 0.4, 'the rider fades when the camera pulls far away');
 if (has('push-off')) expect((R['push-off'].events.push || 0) >= 5, 'pushing off on the flat makes strokes');
+if (has('bumps')) expect((R['bumps'].events.bump || 0) >= 4, 'bumps and rollers thump through the legs');
 if (has('park-crowd')) expect(lvl('park-crowd', 3.2, 5) > lvl('park-crowd', 0.5, 2.5) * 1.5, 'a clean park landing gets a cheer');
 await browser.close();
 if (errors.length) { console.log('page errors:', errors.slice(0, 5)); fails++; }

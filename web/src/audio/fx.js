@@ -130,6 +130,14 @@ export class FX {
     this.noise(when + 0.06, { buf: 'pink', f: rnd(1300, 1800), q: 0.9, gain: G * 0.7, attack: 0.03, decay: 0.15 });
   }
 
+  /** Absorbing a bump or a roller: a padded whump through the legs and a crunch of compacting snow. */
+  bump(when, k = 1, board = 0, powder = 0) {
+    const G = this.T.bump.gain * clamp(k, 0.3, 1.4);
+    this.thump(when, { f: rnd(95, 125) * (board ? 0.85 : 1), f2: 60, gain: G * 0.7, decay: 0.09 });
+    this.noise(when, { buf: 'pink', type: 'lowpass', f: 700 * (1 - 0.4 * powder), q: 0.6, gain: G * 0.6, attack: 0.008, decay: 0.12 });
+    for (let i = 0; i < 6; i++) this.noise(when + Math.random() * 0.1, { f: rnd(900, 3000) * (1 - 0.5 * powder), q: 1.3, gain: G * rnd(0.15, 0.35), decay: rnd(0.006, 0.015) });
+  }
+
   /** Face shot: deep powder flying up over the goggles and jacket — a soft whump and a fizz of flakes. */
   faceShot(when, k = 1) {
     const G = this.T.faceShot.gain * k;
