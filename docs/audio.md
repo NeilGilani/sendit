@@ -119,6 +119,9 @@ mountain drops in pitch with time.
 | Blackspruce | Wind soughing in the conifers (gusty mid band), trunks creaking (stick-slip pulses through woody resonances), birds, tree plops |
 | Ravenspire | Strong, gusty high-altitude wind, ravens, cold snow (squeakier grains when slow), the heli |
 | Voltage Park | Calmer wind, a crowd (procedural voiced babble of 24 "voices", looped on two decorrelated players), cheers on clean landings, and a far-off PA announcer every 25–50 s. The announcer is unintelligible on purpose: one formant voice through a 400 Hz–3 kHz horn band with 90 / 190 / 310 ms stadium slaps. |
+| Dragonback (map 5 branch) | Exposed ridges: strong, very gusty wind, cold snow, a long open reverb tail |
+| Kitsune Peak (map 6 branch) | A powder volcano at dusk: calm air, cold dry snow, birch creaks, and a distant temple bell every 40–80 s (bronze modal partials with 2–9 s decays) |
+| Fjordline (map 7 branch) | Ski to sea: waves rolling in and washing out far below (swell, break, recede, every 7–11 s) and gull cries over the water |
 | Every map | Riding a chairlift: rope hum and tower rattles |
 
 **The place (reverb):** a per-map convolution send on the one-shots, the ambience and a little of the snow. Its

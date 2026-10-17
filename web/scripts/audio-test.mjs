@@ -114,6 +114,7 @@ add('landings', { seconds: 9, solo: 'fxBus', frames: frames(9, (t) => (t < 4.5 ?
 add('cold-slow-board', { seconds: 8, map: 'ravenspire', frames: frames(8, (t) => ({ board: 1, speed: ramp(t, 0, 8, 1, 14), ...carve(t, 3, 0.4, 6) })) });
 add('music-energy-drop', { seconds: 7, music: true, tune: { mix: { snow: 0, wind: 0, ambience: 0, fx: 0 } }, frames: frames(7, () => ({ speed: 0 })),
   events: [{ t: 0, name: 'musicEnergy', d: { level: 0 } }, { t: 3, name: 'musicDrop', d: { strength: 1 } }, { t: 3, name: 'musicEnergy', d: { level: 1 } }] });
+add('fjord-and-bell', { seconds: 12, map: 'fjordline', tune: { ambience: { gulls: { every: [1, 2] } }, maps: { fjordline: { bell: 1 } } }, frames: frames(12, () => ({ speed: 0 })) });
 if (traceDir) for (const type of ['ski', 'snowboard', 'bigmountain']) {
   const f = join(traceDir, `trace-${type}.json`);
   if (!existsSync(f)) continue;

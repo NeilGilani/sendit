@@ -142,12 +142,19 @@ export const AUDIO = {
     blackspruce: { wind: 0.28, windF: 820, birds: 0.8, trees: 1, crowd: 0, cold: 0.35, gustiness: 0.8, sough: 0.6, verb: 0.22, verbTime: 1.1, verbPre: 0.012, verbDark: 0.7 },
     ravenspire: { wind: 0.6, windF: 560, birds: 0.25, trees: 0, crowd: 0, cold: 0.7, gustiness: 1.6, verb: 0.1, verbTime: 2.4, verbPre: 0.09, verbDark: 0.8 },
     'voltage-park': { wind: 0.22, windF: 700, birds: 0.4, trees: 0, crowd: 1, pa: 1, cold: 0.15, gustiness: 0.7, park: 1, verb: 0.14, verbTime: 1.0, verbPre: 0.02, verbDark: 0.5 },
+    // maps on other branches (profiles apply when they merge; ids from their registerMap)
+    dragonback: { wind: 0.65, windF: 600, birds: 0.15, trees: 0, crowd: 0, cold: 0.6, gustiness: 1.7, verb: 0.08, verbTime: 2.0, verbPre: 0.07, verbDark: 0.8 },
+    'kitsune-peak': { wind: 0.22, windF: 720, birds: 0.3, trees: 0.6, sough: 0.3, crowd: 0, cold: 0.6, gustiness: 0.6, bell: 1, verb: 0.18, verbTime: 1.2, verbPre: 0.02, verbDark: 0.7 },
+    fjordline: { wind: 0.4, windF: 540, birds: 0.4, trees: 0.1, crowd: 0, cold: 0.3, gustiness: 1.2, sea: 1, gulls: 1, verb: 0.12, verbTime: 1.6, verbPre: 0.05, verbDark: 0.7 },
     'lake-tahoe': { wind: 0.35, windF: 680, birds: 1, trees: 0.4, crowd: 0, cold: 0.25, gustiness: 1 },
   },
   ambience: {
     creak: { gain: 0.16, every: [6, 16] },       // tree creaks (stick-slip squeal), seconds between
     crowd: { gain: 0.22, cheer: 1.6 },
     sough: { gain: 0.3 },
-    pa: { gain: 0.08, every: [25, 50] },          // the park announcer, far off (horn band + slap echoes)
+    pa: { gain: 0.08, every: [25, 50] },
+    bell: { gain: 0.05, every: [40, 80] },        // a distant temple bell (kitsune-peak)
+    sea: { gain: 0.25 },                          // waves on the fjord far below (fjordline)
+    gulls: { gain: 0.04, every: [12, 30] },          // the park announcer, far off (horn band + slap echoes)
   },
 };

@@ -20,6 +20,12 @@ export class Ambience {
     this.creakT = rnd(3, 8);
     this.gust = 0;
     this.cheerCool = 0;
+    // the sea (a fjord map): waves rolling in and washing out, far below
+    this.sea = ctx.createGain(); this.sea.gain.value = 0; this.sea.connect(this.bed);
+    const sw = ctx.createBufferSource(); sw.buffer = fx.pink; sw.loop = true; sw.playbackRate.value = 0.8;
+    this.seaLp = ctx.createBiquadFilter(); this.seaLp.type = 'lowpass'; this.seaLp.frequency.value = 700; this.seaLp.Q.value = 0.5;
+    sw.connect(this.seaLp); this.seaLp.connect(this.sea); sw.start(0, Math.random());
+    this.waveT = 1; this.bellT = rnd(8, 20); this.gullT = rnd(5, 15);
   }
 
   setMap(id) {
@@ -136,6 +142,27 @@ export class Ambience {
     src.connect(g); g.connect(this.paIn); src.start(when);
   }
 
+  /** A large bronze bell far off: the hum, the strike and inharmonic partials with long decays. */
+  bell(when, gain) {
+    const f0 = rnd(105, 125), pan = rnd(-0.5, 0.5);
+    this.fx.modal(when, [[f0 * 0.5, 0.6, 9], [f0, 1, 7], [f0 * 1.19, 0.5, 5], [f0 * 1.56, 0.45, 4], [f0 * 2.0, 0.35, 3.5], [f0 * 2.66, 0.25, 2.5], [f0 * 3.33, 0.15, 1.8]], gain, pan, this.bed);
+    this.fx.noise(when, { buf: 'brown', type: 'lowpass', f: 300, q: 0.7, gain: gain * 0.4, decay: 0.15, pan, out: this.bed });
+  }
+
+  /** A gull's cry over the water: two or three falling 'kee-ow's (a sine glide with a nasal band). */
+  gull(when, gain) {
+    const c = this.ctx, n = 2 + Math.floor(Math.random() * 2), pan = c.createStereoPanner ? c.createStereoPanner() : null;
+    if (pan) { pan.pan.value = rnd(-0.8, 0.8); pan.connect(this.bed); }
+    for (let i = 0; i < n; i++) {
+      const t = when + i * rnd(0.32, 0.45), d = rnd(0.22, 0.32), f = rnd(1900, 2400);
+      const o = c.createOscillator(), g = c.createGain(), bp = c.createBiquadFilter();
+      o.type = 'triangle'; o.frequency.setValueAtTime(f * 0.85, t); o.frequency.linearRampToValueAtTime(f, t + 0.04); o.frequency.exponentialRampToValueAtTime(f * 0.62, t + d);
+      bp.type = 'bandpass'; bp.frequency.value = 2000; bp.Q.value = 1.5;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + 0.03); g.gain.setTargetAtTime(0, t + d * 0.6, d * 0.2);
+      o.connect(bp); bp.connect(g); g.connect(pan || this.bed); o.start(t); o.stop(t + d + 0.2);
+    }
+  }
+
   cheer(when, k = 1) {
     if (!this.profile.crowd || this.cheerCool > 0) return;
     this.cheerCool = 2.5;
@@ -157,6 +184,24 @@ export class Ambience {
       this.paT = rnd(this.T.pa.every[0], this.T.pa.every[1]);
       this.announce(when, 1);
       if (Math.random() < 0.4) this.announce(when + rnd(2.5, 4.5), 1);
+    }
+    // distant temple bell (a dusk powder volcano): one slow strike now and then
+    if (P.bell > 0 && o.riding !== false && (this.bellT -= dt) <= 0) {
+      this.bellT = rnd(this.T.bell.every[0], this.T.bell.every[1]);
+      this.bell(when, this.T.bell.gain * P.bell);
+    }
+    // the sea: each wave swells for ~2.5 s, breaks, and washes out over ~4 s (the next one 7–11 s later)
+    if (P.sea > 0 && (this.waveT -= dt) <= 0) {
+      this.waveT = rnd(7, 11);
+      const g = this.sea.gain, G = this.T.sea.gain * P.sea * rnd(0.6, 1);
+      g.cancelScheduledValues(when); g.setValueAtTime(g.value, when);
+      g.linearRampToValueAtTime(G * 0.5, when + 2.2); g.linearRampToValueAtTime(G, when + 2.6); g.setTargetAtTime(G * 0.15, when + 2.7, 1.6);
+      this.seaLp.frequency.cancelScheduledValues(when); this.seaLp.frequency.setValueAtTime(500, when);
+      this.seaLp.frequency.linearRampToValueAtTime(1600, when + 2.6); this.seaLp.frequency.setTargetAtTime(450, when + 2.7, 1.8);
+    }
+    if (P.gulls > 0 && o.riding !== false && (this.gullT -= dt) <= 0) {
+      this.gullT = rnd(this.T.gulls.every[0], this.T.gulls.every[1]) / P.gulls;
+      this.gull(when, this.T.gulls.gain * P.gulls);
     }
     if (P.trees > 0 && (this.creakT -= dt) <= 0) {
       const [a, b] = this.T.creak.every;
