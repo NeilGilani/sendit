@@ -284,7 +284,9 @@ Add a variant to an item in `web/src/profile/items.js`:
 - The world keeps rendering under the opening overlay. In headless runs on the shared GPU (other
   sessions benchmarking at the same time) the reel ran well below the lobby's frame rate with stalls of
   0.4–2 s that we could not pin on one element: hiding the card art, the streaks or the audio changed
-  nothing reliably, while an empty overlay ran at 60 fps. Three real costs were removed (a mask-image
+  nothing reliably, while an empty overlay ran at 60 fps. The opener's own work per frame is under
+  0.6 ms and the stalls are not main-thread long tasks, so they sit in compositing / the GPU; some
+  openings ran at 57 fps with a 117 ms worst frame. A warm-up pass did not help and was dropped. Three real costs were removed (a mask-image
   that re-rastered the cards, a CSS variable that restyled them every frame, a forced reflow per tick).
   The reel is time-based, so timing and the landing stay exact at any frame rate; it still needs a check
   on a quiet machine, and pausing the world render while the overlay covers it (main.js) would help.
