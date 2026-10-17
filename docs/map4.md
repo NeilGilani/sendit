@@ -68,7 +68,7 @@ its sidewall and yellow sweet-spot markers either side.
 |---|---|---|
 | **Spark Lane** (small, green ●) | 70 | four small tables (5–8 m, 1.3–1.7 m kickers, 22–24°), a 7 m box, a fat tube and a ledge (ride-on), a down box, a butter box, pump rollers, the **Spark QP** (3.2 m) |
 | **Current Lane** (medium, blue ■) | 125 | three medium tables (10–14 m, 2–3 m kickers), flat-down rail, box, kink, tube, rollers, a **step-down** |
-| **High Voltage** (pro, black ◆) | 186 | down-flat-down, rainbow rail, 13 m down rail, a big kink, two big tables (17.5 / 21 m, 3.6 / 4.1 m kickers, 29–31°), a **step-up** (land on a raised deck 2.4 m above the lip), the **Voltage QP** (5.2 m) |
+| **High Voltage** (pro, black ◆) | 186 | down-flat-down, rainbow rail, 13 m down rail, a big kink, two big tables (17.5 / 21 m, 3.6 / 4.1 m kickers, 29–31°), a **step-up** (a 30° kicker over a short table to a deck 1 m above the lip; 10.5–13.5 m/s at the lip, sweet at 12), the **Voltage QP** (5.2 m) |
 | **The Grid** (jib garden, orange ⬭) | 236–258 | 16 jibs in rows every 25–35 m, three columns: boxes, tubes, rails, a flat box, an A-frame, a 14 m rail, a kink, an S-rail, a rainbow box, a down box, a ledge, a battleship, a cannon, a finale DFD |
 
 Every lane feature has a coloured sign on a post, as a resort would mark it. Lane entries have their own arches.
@@ -339,8 +339,13 @@ Each grounded or air step, `detect()` looks at the segments in the rider's hash 
 
 ### Feel
 
-- **Sparks.** Hot orange-white sparks stream off metal rails and tubes, and a fine spray comes off boxes and
-  ledges, with bursts on lock-on and at kinks (sparks.js).
+- **Sparks** (sparks.js, driven by grind.js's `railSpark`, which carries where the gear is and which way it is
+  going):
+  - Saturated orange sparks thrown back and out at foot level off metal rails and tubes.
+  - A faint dusting of snow off boxes and ledges.
+  - Bursts on lock-on and at kinks.
+  - Normal blending: additive orange on sunlit snow sums to white and was invisible.
+  - Point size is clamped, so nothing fogs the rider.
 - **Sound.** The grind loop (assets/audio/grind_loop.ogg) plays with pitch and volume set by speed and rail kind,
   plus a synthesized clank on lock-on.
 - **HUD.** The balance meter shows the live trick name, the rail and the length; switch-up, banked and lost pops
@@ -376,8 +381,10 @@ Each grounded or air step, `detect()` looks at the segments in the rider's hash 
   | **High Voltage** | DFD → rainbow → down rail → both pro tables | +2200 |
   | **Grid Runner** | four grid rails | +1500 |
 
-- **Golden snowflakes** (12): over each big lip, on five rails, high in the pipe, over the big air, on the step-up
-  deck and at the QP's coping.
+- **Golden snowflakes** (12): over each big lip, 3.5 m past the end of five rails (you fly through them after
+  popping off), high in the pipe, over the big air, on the step-up deck and at the QP's coping.
+  - Never on a rail itself: the generic pick-up puff (activities.js) would hang around a slow grinding rider like a
+    cloud. That was the "white haze" bug.
 - **The slopestyle judge** (scoring.js; research §7: one overall impression out of 100).
 
   | Part | Points | How it's scored |
@@ -483,16 +490,19 @@ The slopestyle course (each line = three rail sections + the three tables):
 - **Judging.** Straight airs and plain 50-50s judge 34–50. A 360 / 540 / double backflip line with a switch-up
   lipslide judges 50–71. Gold (80+) needs bigger spins, sweet spots on all three and varied grinds: the room to
   progress.
-- **The lanes, the Grid, the hips, the big air and the pipe.** Every line reaches the finish.
-  - **Grid.** The left and right columns ride every jib, and the centre column 5 of 6.
-  - **Spark Lane.** Every rail, both gear.
-  - **High Voltage.** 3–4 of its 4 rails, then both pro tables and the step-up.
-  - **The Tower.** A clean 720 in the sweet zone on both gear.
-  - **The Conduit.** 2–5 m pipe airs, landed fakie.
-- **Bot misses.** The few rails the bot misses (Current Flat-Down on skis, High Down Rail on skis, the Grid
-  S-Rail / Down Box) are its line-up after a landing; the rails themselves lock (above).
-- **Bot crashes.** The few crashes are a backflip under-rotated off Voltage on a board, a fast QP run-in landing
-  beside the Spark QP, and an overshoot on a pro table.
+- **The lanes, the Grid, the hips, the big air and the pipe.** `node web/scripts/map4-bot.mjs both all clean
+  --check` passes **28/28 line rides** (14 lines × skis and board). Every one reaches the finish with 0 crashes and
+  every rail of its line ridden:
+  - all three Grid columns (16 jibs);
+  - Spark, Current and High Voltage with all their rails, tables, the step-down and the step-up;
+  - both skew kickers;
+  - the Tower (clean, sweet / deep zone);
+  - the Conduit (2–5 m airs, landed fakie).
+- **How the bot rides.** It checks speed like a rider:
+  - Skis plough; hard pulses come only when the bot is much too fast.
+  - A board skids 0.15 s in every 0.6 s, never within 24 m of a rail, so it lines up again.
+  - It never pops at a rail's ramp.
+  - It rides out around the quarterpipes: a QP across a lane is a dead end you would ride up and back for ever.
 
 ### Fuzz (map4-fuzz.mjs 60 30)
 
@@ -542,8 +552,8 @@ The park's added cost is small:
   path (`wallAlign`), so the rider's pose on a wall is approximate.
 - **Wallrides.** There are none. The research suggests 4–9 m wallrides; they need a vertical-surface mode like the
   grind.
-- **Line bot.** It still misses a few lane rails right after a landing (alignment). The rails themselves all lock
-  (map4-rails). The bot's QP run-ins are fast, so it sometimes lands beside the QP.
+- **Quarterpipes at the bottom of the lanes.** They span their lane: to carry on to the finish, ride around them
+  (or air them and turn out sideways).
 - **Visual-only extras.** The crowd, the arches and the DJ booth are not obstacles beyond their posts. Rail legs
   don't collide (riding under a rail passes through).
 - **Non-twin skis.** Skis that aren't twin tips (anything but the park skis) can't land switch. Straight airs in
