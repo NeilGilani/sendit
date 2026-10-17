@@ -206,6 +206,37 @@ export async function run(test, assert) {
     offs.forEach((o) => o()); cb.dispose();
   });
 
+  await test('juice splits: deltas against the best run, saved only on a new best', async () => {
+    const { SplitTracker, fmtDelta } = await import('../src/juice/splits.js');
+    const mem = new Map();
+    const storage = { get: (k) => mem.get(k) ?? null, set: (k, v) => mem.set(k, v) };
+    const act = { key: 'test-course', time: 0, penalty: 0 };
+    const sp = new SplitTracker(act, storage);
+    const got = [];
+    const offs = [on('juiceSplit', (e) => got.push(e)), on('juiceSplitFinal', (e) => got.push({ final: true, ...e }))];
+    emit('activity', { type: 'challenge' });
+    act.time = 10; emit('gate', { pass: true });
+    act.time = 20; act.penalty = 2; emit('gate', { pass: false });
+    emit('runFinished', { time: 30, isBestTime: true, best: { time: 30 } });
+    assert.equal(got[0].delta, null, 'first run: nothing to compare');
+    assert.deepEqual(mem.get('sendit.splits.test-course'), { s: [10, 22], t: 30 });
+    got.length = 0;
+    emit('activity', { type: 'challenge' });
+    act.time = 9.5; act.penalty = 0; emit('gate', { pass: true });
+    act.time = 23; emit('gate', { pass: true });
+    emit('runFinished', { time: 31, isBestTime: false, best: { time: 30 } });
+    assert.equal(got[0].delta.toFixed(2), '-0.50');
+    assert.equal(got[1].delta.toFixed(2), '1.00');
+    assert.equal(got[2].final, true);
+    assert.equal(got[2].delta, 1);
+    assert.deepEqual(mem.get('sendit.splits.test-course').s, [10, 22], 'a slower run keeps the old splits');
+    emit('activity', { type: 'zen' });
+    emit('gate', { pass: true });
+    assert.equal(got.length, 3, 'no splits outside challenge runs');
+    assert.equal(fmtDelta(-0.4219), '−0.42');
+    offs.forEach((o) => o()); sp.dispose();
+  });
+
   await test('juice time warp: hit-stop freezes, eases back to real time, respects cooldown', () => {
     const w = new TimeWarp();
     assert.equal(w.scale(0.016), 1);

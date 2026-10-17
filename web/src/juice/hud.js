@@ -11,6 +11,7 @@
 import { on, game, Mode } from '../state.js';
 import { PHYSICS as P } from '../config.js';
 import { trim } from './combo.js';
+import { fmtDelta } from './splits.js';
 import { reducedMotion } from './impact.js';
 
 export const JUICE_HUD = {
@@ -20,6 +21,9 @@ export const JUICE_HUD = {
   nearStreakWindow: 2.6,     // s between close shaves that still count as a streak
   stompedImpact: 0.55,       // × PHYSICS.hardLanding: a perfect landing this soft is STOMPED
 };
+
+/** Combo tiers: [from multiplier, word, colour]. */
+export const TIERS = [[2, 'NICE', '#2ff5d6'], [3, 'SICK', '#7af0ff'], [4, 'INSANE', '#ffe14d'], [5, 'UNREAL', '#ff9a3d'], [6, 'GODLIKE', '#ff5fb0']];
 
 const GRADES = {
   stomped: { text: 'STOMPED', color: '#ffe14d', glow: 'rgba(255,200,60,.9)' },
@@ -47,6 +51,14 @@ const CSS = /* css */`
 #juiceHud .cb.risk .tm i { background: linear-gradient(90deg, #ff6bb0, #ffe14d); }
 @keyframes jhBlink { from { opacity: .45; } to { opacity: 1; } }
 @keyframes jhBump { 0% { transform: scale(1); } 35% { transform: scale(1.38) rotate(-5deg); } 100% { transform: scale(1); } }
+#juiceHud .cb .tr { display: block; height: 18px; font-size: 16px; letter-spacing: .32em; margin-top: 2px; -webkit-text-stroke: 1px #1b1446; paint-order: stroke fill; }
+#juiceHud .cb .tr.pop { animation: jhTier .5s cubic-bezier(.2,1.8,.4,1); }
+@keyframes jhTier { 0% { transform: scale(2.2); opacity: 0; } 40% { opacity: 1; } 100% { transform: scale(1); } }
+/* challenge split delta (next to the timer) */
+#juiceHud .sp { position: absolute; left: calc(50% + 118px); top: 30px; font-size: 26px; -webkit-text-stroke: 1.5px #1b1446; paint-order: stroke fill; opacity: 0; white-space: nowrap; }
+#juiceHud .sp.show { animation: jhSplit 2.2s ease-out forwards; }
+#juiceHud .sp small { display: block; font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 800; font-size: 10px; letter-spacing: .28em; color: rgba(250,248,243,.75); -webkit-text-stroke: 0; }
+@keyframes jhSplit { 0% { opacity: 0; transform: translateX(-12px); } 10% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
 /* announcer */
 #juiceHud .an { position: absolute; left: 50%; top: 37%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; opacity: 0; }
 #juiceHud .an.show { animation: jhSlam var(--hold, 1.6s) cubic-bezier(.2,.9,.3,1) forwards; }
@@ -127,7 +139,8 @@ export function mountJuiceHud({ player, combo, input }) {
   root.id = 'juiceHud';
   root.innerHTML = `
     <div class="eg"></div><div class="fl"></div>
-    <div class="cb"><div><span class="m stroke">×1</span><span class="p stroke">0</span></div><div class="it"></div><div class="tm"><i></i></div><div class="rk">LAND IT</div></div>
+    <div class="cb"><div><span class="m stroke">×1</span><span class="p stroke">0</span></div><div class="tr"></div><div class="it"></div><div class="tm"><i></i></div><div class="rk">LAND IT</div></div>
+    <div class="sp"><span></span><small>SPLIT</small></div>
     <div class="an"><div class="nw">NEW TRICK</div><div class="g"><span></span></div><div class="t"></div><div class="s"></div></div>
     <div class="air"><div class="d">0</div><div class="x"></div></div>
     <div class="co stroke"></div>
@@ -136,6 +149,7 @@ export function mountJuiceHud({ player, combo, input }) {
     <div class="sc"><b class="stroke">0</b><small>SCORE</small></div>`;
   host.appendChild(root);
   const $ = (s) => root.querySelector(s);
+  const cbTr = $('.cb .tr'), sp = $('.sp');
   const cb = $('.cb'), cbM = $('.cb .m'), cbP = $('.cb .p'), cbIt = $('.cb .it'), cbTm = $('.cb .tm i');
   const an = $('.an'), anG = $('.an .g'), anT = $('.an .t'), anS = $('.an .s');
   const air = $('.air'), airD = $('.air .d'), airX = $('.air .x');
@@ -167,12 +181,26 @@ export function mountJuiceHud({ player, combo, input }) {
     cbM.classList.toggle('hot', s.mult >= 2.5 && s.mult < 4);
     cbM.classList.toggle('blaze', s.mult >= 4);
     if (s.mult > lastMult + 0.01) restart(cbM, 'bump');
+    // Tier words as the multiplier climbs (the word pops when a new tier is reached).
+    const tier = TIERS.filter((t) => s.mult >= t[0]).pop();
+    const word = tier ? tier[1] : '';
+    if (cbTr.textContent !== word) { cbTr.textContent = word; cbTr.style.color = tier?.[2] || ''; if (word && s.mult > lastMult) restart(cbTr, 'pop'); }
     lastMult = s.mult;
   });
   on('juiceComboBanked', ({ bonus, mult }) => {
     banner(`${mult >= 4 ? 'MONSTER ' : ''}COMBO ×${trim(mult)}  +${fmt(bonus)}`, mult >= 4 ? '#ff9a3d' : '#ffe14d');
     if (mult >= 2.5) edge('rgba(255,200,60,.5)');
   });
+  // Challenge splits vs the best run (juice/splits.js).
+  const split = (d, label) => {
+    if (!riding() && label !== 'FINISH') return;
+    sp.firstChild.textContent = fmtDelta(d);
+    sp.style.color = d <= 0 ? '#2ff5d6' : '#ff6bb0';
+    sp.lastChild.textContent = label;
+    restart(sp);
+  };
+  on('juiceSplit', ({ i, delta }) => { if (delta != null) split(delta, `GATE ${i + 1}`); });
+  on('juiceSplitFinal', ({ delta }) => { if (delta != null) split(delta, 'FINISH'); });
   on('juiceComboLost', ({ pts }) => { if (pts >= 60) banner(`COMBO LOST  −${fmt(pts)}`, '#ff6bb0', true); });
   // Line goals on flow maps (their own banner is hidden with the rest of the flow chain HUD).
   on('lineGoalStep', ({ name, step, of }) => callout(`${name.toUpperCase()}  ${step} / ${of}`));
@@ -274,7 +302,12 @@ export function mountJuiceHud({ player, combo, input }) {
     if (show) {
       const deg = halves * 180;
       const txt = deg ? String(deg) : flips ? 'FLIP' : '';
-      if (airD.textContent !== txt) { airD.textContent = txt; if (halves > lastHalf) restart(airD, 'tick'); }
+      if (airD.textContent !== txt) {
+        airD.textContent = txt;
+        if (halves > lastHalf) restart(airD, 'tick');
+        // The number heats up with the rotation: white → cyan → gold → orange.
+        airD.style.color = deg >= 1080 ? '#ff9a3d' : deg >= 720 ? '#ffe14d' : deg >= 360 ? '#2ff5d6' : '#fffaf0';
+      }
       const x = [flips ? `${flips > 1 ? `${flips}× ` : ''}FLIP` : '', grab.toUpperCase()].filter(Boolean).join(' · ');
       if (airX.textContent !== x) airX.textContent = x;
     }

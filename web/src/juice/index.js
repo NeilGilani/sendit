@@ -12,9 +12,10 @@ import { TimeWarp, installImpact } from './impact.js';
 import { installSpeedFx } from './speedfx.js';
 import { MusicEnergy } from './music.js';
 import { mountJuiceSettings } from './settings.js';
+import { SplitTracker } from './splits.js';
 import { game, Mode, on } from '../state.js';
 
-export function installJuice({ player, cam, sound, input, post, camera, fx }) {
+export function installJuice({ player, cam, sound, input, post, camera, fx, activities }) {
   const combo = new ComboTracker(player);
   const warp = new TimeWarp();
   const hud = typeof document !== 'undefined' ? mountJuiceHud({ player, combo, input }) : null;
@@ -23,8 +24,9 @@ export function installJuice({ player, cam, sound, input, post, camera, fx }) {
   try { if (post) speedfx = installSpeedFx({ post, camera }); } catch (e) { console.warn('[juice] speed fx off', e); }
   const music = new MusicEnergy({ sound, player, combo });
   mountJuiceSettings();
+  const splits = activities ? new SplitTracker(activities) : null;
   const juice = {
-    combo, warp, hud, speedfx, music,
+    combo, warp, hud, speedfx, music, splits,
     /** Physics time scale for this frame (hit-stop / micro slow-mo); 1 = real time. */
     timeScale(dt) { return game.mode === Mode.RIDING ? warp.scale(dt) : 1; },
     update(dt, time) {

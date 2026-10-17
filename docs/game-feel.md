@@ -9,6 +9,8 @@ In-ride juice runs on every map, and session-to-session progression sits on top 
 | `web/src/juice/impact.js` | Hit-stop and micro slow-mo (`TimeWarp`), camera punches and rumble. |
 | `web/src/juice/speedfx.js` | Speed-rush post pass: edge zoom blur, chromatic fringe and rush lines. |
 | `web/src/juice/music.js` | Music energy and drops. |
+| `web/src/juice/splits.js` | Challenge split deltas against the best run. |
+| `web/src/juice/settings.js` | Shake, hit-stop and speed-rush rows in the settings grid. |
 | `web/src/juice/index.js` | `installJuice()`, which main.js calls once. |
 | `web/src/progression/core.js` | Pure logic: XP curve, levels, dailies, achievements and personal bests. |
 | `web/src/progression/index.js` | Public API and the ride tracker. Storage key: `sendit.progression`. |
@@ -62,7 +64,8 @@ The HUD regions, from top to bottom:
 
 - **Combo panel.** It appears from ×1.5 and shows ×mult (cyan, then gold from ×2.5, then blazing orange from ×4), the points, the last three moves and a timer bar. The multiplier bumps on every increase.
 - **Announcer, at 37 % of the height**, under the combo panel and above the rider. A grade badge sits over the trick name in big slanted type, with +points and extras (drop height, SWITCH) below. It slams in at 1.9× scale with blur and settles in about 0.2 s.
-- **Live air, at 33 % of the height.** Air and announcer never show together. Once the air passes 0.45 s, the rotation shows in 180° steps and bumps on each new 180. It also shows flips (`FLIP`, `2× FLIP`) and the grab being held.
+- **Combo tiers.** Under the multiplier a tier word pops in as each tier is reached: NICE from ×2, SICK ×3, INSANE ×4, UNREAL ×5, GODLIKE ×6 (`TIERS`).
+- **Live air, at 33 % of the height.** Air and announcer never show together. The number heats up with the rotation: white, then cyan from 360, gold from 720, orange from 1080. Once the air passes 0.45 s, the rotation shows in 180° steps and bumps on each new 180. It also shows flips (`FLIP`, `2× FLIP`) and the grab being held.
 - **Call-outs, below centre.** CLOSE SHAVE, then ×n for a streak within 2.6 s (gold from ×3). RAZOR CLOSE! appears under 0.8 m. RAIL LOST and line-goal steps also show here.
 - **Banners.** `COMBO ×3 +1,240` (MONSTER COMBO from ×4), with a gold edge glow from ×2.5. Line goals on flow maps also show here.
 - **Rolling score, top right.** It counts up toward the ride's score and bumps gold when a chunk of 100 or more lands. The snowflake counter moves under it.
@@ -127,6 +130,14 @@ These are separate from the existing trauma shake, which is unchanged.
 - **Speed rush effect** (`settings.juiceSpeedFx`) turns the post pass off when unchecked.
 
 With the system's *reduced motion* preference on and no shake setting saved, shake and punches default to 0.4 and the white landing flashes are off.
+
+## 3b. Challenge splits (juice/splits.js)
+
+These are Trackmania-style split times. At every Challenge gate (passed or missed), the run's clock including penalties is compared with the same gate on your best run. A delta flashes beside the timer: −0.42 in cyan when ahead, +0.31 in pink when behind, labelled GATE n. A FINISH delta shows at the end.
+
+The best run's splits are saved only when the activity reports a new best time, under `sendit.splits.<courseKey>` as `{ s: [gate times], t: finish time }`. A first run shows nothing to compare against.
+
+Events: `juiceSplit {i, time, best, delta}` and `juiceSplitFinal {time, best, delta, isBest}`.
 
 ## 4. Speed rush (juice/speedfx.js)
 
