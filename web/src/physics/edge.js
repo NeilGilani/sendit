@@ -226,11 +226,14 @@ export class EdgePhysics {
     // curvature (C.carveInput blends it in): the turn grows evenly with the stick at 50–70 mph. Slow
     // carves never reach the grip limit, so they're unchanged; stops / ploughs set their own edge.
     const frac = mode.edge === undefined ? clamp(th / Math.max(thMax, 1e-3), 0, 1) : 1;
-    const kIn = kGrip * lerp(1, frac, C.carveInput ?? 0);
+    const hi = C.carveInputV ? smoothstep(C.carveInputV[0], C.carveInputV[1], speed) : 1;   // the high-speed handling below phases in over carveInputV
+    const cIn = (C.carveInput ?? 0) * hi;
+    const kIn = kGrip * lerp(1, Math.pow(frac, C.carveCurve ?? 1), cIn);   // carveCurve < 1: small inputs keep some bite
     const k = Math.min(kGeo, kIn);
     // Over-demand that does skid is capped at washMax × the grip curvature: at 30 m/s a full edge asks
     // 3–4× what grip allows, which used to turn into a 15–19° wash-out.
-    const wash = Math.min(Math.max(0, kGeo - kGrip) * (1 - C.carveAssist), kGrip * (C.washMax ?? Infinity)) * lerp(1, frac, C.carveInput ?? 0);
+    const over = Math.max(0, kGeo - kGrip) * (1 - C.carveAssist);
+    const wash = lerp(over, Math.min(over, kGrip * (C.washMax ?? Infinity)), hi) * lerp(1, Math.pow(frac, C.carveCurve ?? 1), cIn);
     const track = 1 - smoothstep(C.trackBeta[0] * DEG, C.trackBeta[1] * DEG, Math.abs(beta));
     let yaw = eSide * Math.abs(vf) * (k * track + wash) * (1 - this.stop);
     // Rotary pivot (skidded steering) only fills the gap between what the carve gives and the turn
@@ -239,7 +242,7 @@ export class EdgePhysics {
     // At speed the turn asked for is held near what the grip can carve (C.pivotGrip ×), so full lock
     // is a deep carve with a little drift instead of washing out into a skid.
     const wantFull = lerp(C.pivotRate, C.turnRateFast, smoothstep(C.pivotFade[0], C.pivotFade[1], speed)) * H.pivot;
-    const want = Math.abs(s) * Math.min(wantFull, C.pivotGrip ? kGrip * Math.abs(vf) * C.pivotGrip : Infinity);
+    const want = Math.abs(s) * lerp(wantFull, Math.min(wantFull, C.pivotGrip ? kGrip * Math.abs(vf) * C.pivotGrip : Infinity), hi);
     let pivot = Math.sign(s) * Math.max(0, want - Math.abs(yaw) * (Math.sign(yaw) === Math.sign(s) ? 1 : 0)) * (1 - this.stop) * (mode.pivotMul ?? 1);
     // Pivot can't wind the skid angle up forever: fade as β (same direction) approaches betaMax.
     if (pivot * beta > 0) pivot *= Math.max(0, 1 - Math.abs(beta) / (C.betaMax * DEG));

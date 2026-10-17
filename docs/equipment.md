@@ -138,6 +138,11 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
    - **You need speed to get on edge.** The edge angle is the body's lean plus angulation (knees, hips, ankles), and the lean needs a turn force to lean against: `tan φ = a / g`. So `maxEdge` is capped at the largest θ with `θ ≤ atan(min(v²/(R_eff·cos θ), a_max)/g) + angulation`, found by bisection. Angulation is 26° for skis and 24° for the board.
    - In practice: about 29° at 3 m/s, 35–44° at 5 m/s, and the full 64–68° from about 8 m/s. Slow turns therefore come from the rotary pivot (a skid), not a deep carve. Turn rate when slow is unchanged.
    - **Letting go.** With the keys or stick back at neutral (|steer| < 0.05), the input relaxes at `steerRelease` instead of `steerResponse`, and the edge flattens at `edgeRelease` instead of `edgeResponse` (skis 22 / 22 vs 14 / 14, board 18 / 15 vs 11 / 9). A released turn stops about 40% sooner (`node web/scripts/physics-release.mjs`: skis 0.22 → 0.13 s, board 0.32 → 0.20 s at 12 m/s; edge flat 0.33 → 0.22 s and 0.47 → 0.28 s). Turn-in, linked turns (one key straight into the other) and partial stick steering are unchanged. At high speed (Ravenspire) the skis still realign onto their path for a further ~0.1–0.2 s, a slow counter-swing under 10°/s.
+   - **High-speed handling (50–70 mph).** At speed the grip limit is reached on a light edge (about 20° at 30 m/s), so before, 30%, 60% and full stick all gave the same turn and the rest of the input only became skid (14.6° on skis and 18.8° on the board at full lock, 30 m/s). Three tunables phase in over `carveInputV` (16 → 26 m/s), so Valcrest and Blackspruce's tree slalom keep the snappy response:
+     - `carveInput` (1) with `carveCurve` (0.8): the held share of the max edge picks that share^0.8 of the grip-limited curvature, so the turn grows evenly with the stick.
+     - `pivotGrip` (1.15): the rotary pivot asks at most 1.15× the grip-limited carve rate, so full lock is a deep carve with a little drift.
+     - `washMax` (0.2): over-demand that skids is capped at 0.2× the grip curvature.
+   - Measured with `node web/scripts/physics-steer.mjs` (pinned speed, flat snow, each map's physics). Skis at 30 m/s: stick 30 / 60 / 100% path rate 33.8 / 37.3 / 38.5 → 12.9 / 24.8 / 37.7 °/s, skid 14.6° → 6.7°, a 0.12 s key tap 6.1° → 3.2° (finer corrections), turn-in 0.08 → 0.18 s (builds instead of snapping). Board at 30 m/s: skid 18.8° → 5.9°, full-lock path rate 34.0 → 33.0 °/s. Edge-to-edge stays 0.1–0.13 s; at 8–18 m/s nothing changed. The Blackspruce bot (`map2-bot.mjs --verify`) finishes all four runs with no crash.
 2. **Sidecut carving.** Path curvature is `κ = engage(θ) / (R_eff · cos θ)`.
    - `engage` blends in from 3° to 14° of edge.
    - `R_eff = R_sidecut · (1 + k·smoothstep(v))`. Per the research, gear bent at speed carves longer arcs than its printed radius.
@@ -248,6 +253,7 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
   | Group | Keys |
   |---|---|
   | Speed and steering | `maxVelocity` (also the HUD/FX speed ratio), `steerResponse`, `steerRelease` (back to neutral once let go) |
+  | High-speed handling | `carveInput`, `carveCurve`, `carveInputV`, `pivotGrip`, `washMax` |
   | Edge | `maxEdge` (`maxEdgeToe`/`maxEdgeHeel`), `edgeSwitchTime` (`heelToToe`/`toeToHeel`), `edgeResponse`, `edgeRelease` (flattening with the input released), `engage` |
   | Grip and sidecut | `latG` (toe/heel), `speedRadius`/`speedRadiusV`, `carveAssist` |
   | Redirect | `gripRate`, `flatGrip`, `carveEff`, `skidEff`, `skidMu`, `carvePump` |
@@ -266,7 +272,9 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
   | Landing | `landClean`/`landStumble`/`landCrash`/`landSlide`, `switchLand` |
 - `ANIM`:
   - Lean and edge caps: `maxLean`, `maxGearEdge`.
-  - `angulation`, `angulationReverse` (the share kept when the edge is below the lean, 0.25), `polePlantTime`.
+  - `angulation`, `angulationReverse` (the share kept when the edge is below the lean or already on the other side, 0), `crossover` (the upper body leading into the new turn at an edge change), `polePlantTime`.
+  - Skis: `skiCounter` (counter-rotation per rad of lean), `skiStanceCarve` (wider stance in deep carves).
+  - Head: `headLevel` (share of the body's world roll the head takes back out), `headLook` (head turn into the carve per rad of lean).
   - Letting go: `rollRelease` (the lean eases back up, 15 vs `rollResponse` 10) and `leadRelease` (the upper-body turn lead, 10 vs 6), used only while the steer is released and the value is heading back to neutral.
   - Skis: `skiPressPitch`, `skiPressShift`, `skiPopSnap`.
   - Flips: `flipPivot` (centre of mass height), `flipTuckLift`, `flipLoadArch`. In the air the drawn tuck follows the physics tuck (`player.flipTuck`); a flip turning open is drawn as a layout (body long, arms out), and spins wrap the arms in (`player.spinTuck` > 0) or fling them wide (< 0) — `Rider.armSpin`.
@@ -296,18 +304,24 @@ At runtime, `registerVariant(type, spec)` adds a model (for DLC or user presets)
 
 ## Rider animation (rider.js)
 
+- **Proportions** (`web/src/character/body.js`, `PROPORTIONS`, applied once to the rest pose at load). The Quaternius model has a superhero cut. Measured on its bind pose (1.81 m), the head was about 20% too wide for the body, and the arm span was 1.65 m (real arm span ≈ height), mostly from a short upper arm. Now the head is ×0.94 (helmet included), the upper arm +4.5 cm, the forearm +1.5 cm and the hands ×0.92. Bones move, not vertices, so the body, outfit and helmet follow.
+- **Head stabilisation (both):** the head takes `headLevel` (45%) of the body's roll from vertical back out, so the eyes stay nearer level. On a board it does this through head pitch, because the board leans about an axis that runs through the hips. On a traverse the lean only cancels the slope, so the head stays as it is. Measured: ski carve head roll 20–25° → 18–22° at a deeper lean; board heel-side carve 42–45° → 22–25°.
+
 - **Shared layers:**
   - **Lean** = `atan(contact force across the gear / g)`. Carving leans in; a stop leans back up the hill.
   - The gear rolls further, to the physics edge angle, with the board pivoting about its biting edge.
   - Squash and stretch, chatter, sink, neon, lift seat, crash tumble.
 - **Skis:**
-  - Angulation: the hips move inside and the spine counter-rolls, so the upper body stays upright. Only edge beyond the lean angulates. When the lean is bigger than the edge (riding across a cross-slope, or a turn being let go while the body is still leaned in), only `angulationReverse` of it is used. Before, the spine rolled further into the lean there: the head tipped uphill by about twice the cross-slope on a straight run, and swung further into the turn just after letting go (head tilt peak 42° → 35°, settled in 0.62 → 0.40 s).
+  - Angulation: the hips move inside and the spine counter-rolls, so the upper body stays upright. Only edge on the lean's side and beyond it angulates (`angulationReverse` 0). Before, a lean bigger than the edge (a cross-slope, a turn being let go) or an edge already rolled to the other side (every edge change) rolled the spine further into the lean or the old turn.
+  - Crossover: at an edge change the upper body leads the hips into the new turn (`crossover`). Measured with `web/scripts/rider-seq.mjs` on a Valcrest slalom: at the edge change the chest rolls 12–20° instead of 37–46°, and the head 10–15° instead of 31–37°.
+  - Counter-rotation: the hips and shoulders face the outside of a carve (`skiCounter` × lean, about 30° from the skis at full lean), and the head looks along the path into the turn (`headLook`). A hockey stop still keeps the upper body facing down the path.
+  - Inclination: lean = atan(contact force / g), up to `maxLean` 0.9 rad (52°), so high-g carves at speed read aggressive. The stance widens up to 3.5 cm per ski at full lean.
   - Hockey-stop counter-rotation: the torso keeps facing down the path.
   - Pole plant on every edge change at speed, a double-pole cycle when pushing with W, snowplough wedge, tuck, grabs.
   - When leaning, the inside ski is lifted back to the snow (inside knee flexes, outside leg extends).
 - **Snowboard:**
   - Sideways stance: the chest faces the toe edge, with binding angles on the feet and knees toward the toes.
-  - Hips and shoulders open toward the nose; the head turns toward the travel direction, over the back shoulder when switch.
+  - Hips and shoulders open toward the nose; the head turns toward the travel direction (`headTurn` 1.5 rad: about 8° off it riding straight), over the back shoulder when switch.
   - The upper body leads the turn, and comes back square at `leadRelease` once the steer is let go.
   - Toe side: knees drive and the torso stays tall. Heel side: sits down with the arms forward.
   - Crouching (speed, W) mostly bends the knees; the hips fold `crouchHinge` (0.19 rad) per unit crouch. A straight run holding W leans the torso about 28° over the toes (it was 33°, which read as a sideways lean from the chase camera).
