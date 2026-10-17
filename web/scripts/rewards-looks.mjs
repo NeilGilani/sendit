@@ -20,6 +20,7 @@ const LOOKS = {
   topo: ['jacket-tuff-shell:topo', 'pants-cargo:desert', 'helmet-tuff:copper-chrome', 'goggles-tuff:amber-iridium', 'face-balaclava:skull'],
   lights: ['jacket-tuff-shell-hood:northern-lights', 'pants-tuff-bib:avalanche', 'helmet-tuff:bronze', 'gloves-tuff-mitt:expedition'],
   alpine: ['jacket-retro-suit:alpine-78', 'helmet-tuff:summit-stars', 'goggles-tuff:ice-blue', 'face-gaiter:topo-olive'],
+  expedition: ['jacket-retro-suit:expedition-86', 'helmet-tuff:copper-chrome', 'goggles-tuff:aurora-lens', 'face-gaiter:arcade'],
 };
 
 const [url = 'http://localhost:5193/', outDir = 'looks', which = 'all'] = process.argv.slice(2);
