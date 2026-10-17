@@ -159,7 +159,7 @@ class SnowProcessor extends AudioWorkletProcessor {
     g.ice = T.ice.gain * wI * sc * (0.5 + edge + Math.min(1, skid)) * ground;
     // cold snow (below about −10 °C) squeaks under the base when slow: short creaks, gone by ~12 m/s (meltwater)
     const C = T.squeak;
-    g.squeak = C.gain * clamp(p.cold, 0, 1) * (1 - sstep(C.vFade, C.vMax, speed)) * mv * (hard + 0.3 * wP) * ground * lerp(1, 1.3, board);
+    g.squeak = C.gain * sstep(C.coldFrom, C.coldFull, p.cold) * (1 - sstep(C.vFade, C.vMax, speed))   // only genuinely cold maps squeak * mv * (hard + 0.3 * wP) * ground * lerp(1, 1.3, board);
     g.squeakRate = (C.rate0 + C.rateV * speed) * mv;
     // edge squeal: stick-slip while skidding on hard / icy snow (a harmonic ladder ~350–500 Hz in the field recordings)
     g.squeal = T.squeal.gain * Math.min(1, Math.max(skid, stop)) * sstep(0.35, 0.8, edge) * (wG * 0.6 + wK * 0.6 + wI * 1.4) * sstep(1.5, 5, speed) * (1 - 0.5 * board) * ground;

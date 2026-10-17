@@ -64,7 +64,7 @@ export const AUDIO = {
     skid: { gain: 0.95, f: 1700, fIce: 3800, q: 0.8, rough: 0.75, roughF: 45, spray: 0.4, sprayF: 2600, stop: 1.4, from: 0.08, full: 0.7 },
     // cold snow squeak (below ≈ −10 °C, per map `cold`): creaks of 40–160 ms at 350 Hz–1.3 kHz when slow,
     // fading out by 12 m/s as friction melts the contact (the creaky-snow CC0 board recording, facemusic #39082)
-    squeak: { gain: 0.3, rate0: 1.5, rateV: 1.6, fMin: 350, fMax: 1300, q: 4, durMin: 0.04, durMax: 0.16, vFade: 4, vMax: 12 },
+    squeak: { gain: 0.3, rate0: 1.5, rateV: 1.6, fMin: 350, fMax: 1300, q: 4, durMin: 0.04, durMax: 0.16, vFade: 4, vMax: 12, coldFrom: 0.3, coldFull: 0.7 },
     // edge squeal when skidding hard on hard / icy snow: stick-slip makes a harmonic ladder (≈ 350–500 Hz
     // fundamental, partials to 3 kHz) that latches on and off — heard in the French resort CC0 descent
     squeal: { gain: 0.55, fMin: 330, fMax: 520, band: 1800, duty: 0.6 },
