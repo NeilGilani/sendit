@@ -62,8 +62,8 @@ post-mortems, Farnell's *Designing Sound*, mixing and WebAudio practice). No acc
 
 ## 4. Comparison with reference recordings
 
-All references are CC0 previews from Freesound, downloaded without an account and used for analysis only; none
-are shipped. `node web/scripts/audio-compare.mjs <url> <files…>` prints these profiles. Values are octave-band
+All references are CC0 previews from Freesound, downloaded without an account. They are used for analysis; only
+three short excerpts ship, as granular textures (see below). `node web/scripts/audio-compare.mjs <url> <files…>` prints these profiles. Values are octave-band
 levels in dB relative to the loudest band, for the loudest 15 % of seconds.
 
 | Recording | 63 | 125 | 250 | 500 | 1k | 2k | 4k | 8k | 16k | centroid |
@@ -87,12 +87,14 @@ levels in dB relative to the loudest band, for the loudest 15 % of seconds.
 | Skydive freefall, ~50 m/s (DangerLaef #811077) | −12 | −4 | 0 | 0 | −3 | −5 | −9 | −15 | −24 | 0.8 kHz |
 | Our rider wind at 30 m/s (first build) | −4 | −3 | 0 | −1 | −3 | −8 | −22 | −18 | −21 | 0.5 kHz, a hole at 4 kHz |
 | Our rider wind at 30 m/s (tuned) | −4 | −3 | 0 | −1 | −4 | −7 | −11 | −12 | −19 | 0.7 kHz |
+| Skiers passing a recordist (Selector #680075) | −5 | 0 | −3 | −7 | −5 | −4 | −4 | −4 | −11 | 1.8 kHz |
+| Our other-skier pass (first build) | −33 | −14 | −3 | 0 | −3 | −6 | −9 | −18 | −36 | 0.9 kHz, too dark |
 
 **What changed because of the comparison:**
 - The glide hiss became pink noise between a rising high-pass and low-pass. Pink noise is flat in octave bands,
   like the groomed reference.
 - The crystal-grain layer dropped by 9 dB. It had been masking everything with a 4 kHz fizz.
-- The board's body moved to a 230 Hz band.
+- The board's body moved to a 260–320 Hz band, with no sub-bass.
 - The ambient wind moved up to ~650 Hz with more hiss.
 - **Spectrograms** (`web/scripts/audio-spectrogram.mjs`) compared the time structure too:
   - **Groomed run:** the real run dips ~10 dB above 3 kHz at each edge change, so the hiss now drops when the
@@ -124,9 +126,8 @@ continuous layers stay smooth and the "events" (edges, plants, slashes) carry th
 chairlift ride (#263134), a body fall (#675895) and an impact (#683789) in snow, a French resort descent (#558792),
 two skydiving freefalls (#811077, #169913) and an air rush (#267899).
 
-Other CC0 recordings listed in the notes for future comparison: lift towers and chairlift rides, a walk in crunchy
-snow (#215690), a slope ambience in Zermatt (#720302), skiers passing (#680075), tree creaks (#370266) and snow
-falling from trees (#116136).
+Other CC0 recordings listed in the notes for future comparison: a walk in crunchy snow (#215690), a slope ambience
+in Zermatt (#720302), tree creaks (#370266) and snow falling from trees (#116136).
 
 ## 5. Gaps
 
