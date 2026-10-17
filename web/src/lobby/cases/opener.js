@@ -163,6 +163,7 @@ class Opener {
         this.lastCell = cell;
       }
       if (k > 0.55 && !this.tense) { this.tense = true; this.el.classList.add('tense'); }
+      if (k > 0.3 && !this.stopRiser && !this.frozen) this.stopRiser = caseSfx.riser(T.spinDur * 0.7);
       this.trace.push({ t: +t.toFixed(4), x: +x.toFixed(2), v: +v.toFixed(1), card: cell });
       if (k >= 1 && this.phase === 'spin') { this.phase = 'hold'; this.holdAt = t; this.land(); }
     }
@@ -174,6 +175,7 @@ class Opener {
   seek(t) { this.frozen = t; }
 
   land() {
+    this.stopRiser?.();
     caseSfx.land();
     this.win.style.setProperty('--spd', 0);
     this.cards[this.result.reel.winAt].classList.add('win');
@@ -264,6 +266,7 @@ class Opener {
     this.phase = 'closing';
     if (this.lobby?.overlay === this) this.lobby.overlay = null;
     removeEventListener('keydown', this.onKey, true);
+    this.stopRiser?.();
     this.el.classList.add('out');
     const el = this.el;
     setTimeout(() => {

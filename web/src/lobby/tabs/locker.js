@@ -50,7 +50,9 @@ registerLobbyTab({
 
     const render = () => {
       const P = ctx.profile;
-      const owned = P.ownedIn(slot);
+      // New first, then the rarest, starters last.
+      const owned = P.ownedIn(slot).sort((a, b) => (!!(b.entry && !b.entry.seen) - !!(a.entry && !a.entry.seen))
+        || (rarityOf(b.variant.rarity).rank - rarityOf(a.variant.rarity).rank) || (!!a.variant.starter - !!b.variant.starter));
       const cur = P.equipped(slot);
       const curKey = cur ? ownKey(cur.item.id, cur.variant.id) : null;
       const col = P.collection();

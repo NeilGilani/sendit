@@ -57,6 +57,9 @@
 .cr-window::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: var(--spd, 0);
   background: repeating-linear-gradient(180deg, rgba(255,255,255,.07) 0 2px, transparent 2px 9px), linear-gradient(90deg, rgba(8,10,24,.55), rgba(8,10,24,.15) 50%, rgba(8,10,24,.55)); }
 .cr-strip .cr-card { width: 9.2em; height: 100%; flex: none; }
+/* The lens: a brighter, sharper strip around the marker (CS2 draws the centre sharp over a dimmer reel). */
+.cr-reel::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 11em; margin-left: -5.5em; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 245, 200, .07) 30%, rgba(255, 245, 200, .1) 50%, rgba(255, 245, 200, .07) 70%, transparent); }
 .cr-marker { position: absolute; left: 50%; top: -0.6em; bottom: -0.6em; width: 0; pointer-events: none; }
 .cr-marker::before { content: ''; position: absolute; left: -2px; top: 0; bottom: 0; width: 4px; background: #e8d84a; border-radius: 2px; box-shadow: 0 0 10px #ffe55a, 0 0 24px rgba(255, 229, 90, .6); }
 .cr-marker::after, .cr-marker i { content: ''; position: absolute; left: -0.6em; border: .6em solid transparent; }

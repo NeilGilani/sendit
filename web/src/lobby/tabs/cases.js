@@ -12,6 +12,9 @@ import { SERIES, SERIES_ORDER } from '../../profile/items.js';
 import { CASE_XP, EARN, PITY, casePool, caseOdds, nextMilestone, skin } from '../../profile/rewards.js';
 
 const ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M3 12h18M9 8V6a3 3 0 0 1 6 0v2M10 12v2h4v-2"/></svg>';
+// The XP bar fills from where you last saw it (e.g. back from a ride), wrapping through 100 % for each
+// case earned meanwhile.
+let shown = null;   // { xp, earned } last rendered
 const pct = (v) => (v >= 10 ? v.toFixed(0) : v >= 1 ? v.toFixed(1) : v.toFixed(2));
 
 registerLobbyTab({
@@ -64,7 +67,7 @@ registerLobbyTab({
 
         <div class="cs-prog">
           <div class="cs-prog-head"><span>Next case</span><b>${Math.floor(r.xp)} / ${CASE_XP} XP</b></div>
-          <div class="cs-bar"><i style="--v:${(r.xp / CASE_XP).toFixed(3)}"></i></div>
+          <div class="cs-bar cs-xp"><i style="--v:${(shown && shown.earned === r.earned ? Math.min(shown.xp, r.xp) / CASE_XP : shown ? shown.xp / CASE_XP : r.xp / CASE_XP).toFixed(3)}"></i></div>
           <div class="cs-prog-head" style="margin-top:.3em"><span>${Math.ceil(left)} XP to go · about ${fmtKm((left / EARN.perKm) * 1000 * 0.55)} and ${Math.max(1, Math.round((left * 0.45) / EARN.finish))} runs</span></div>
           ${gains?.length ? `<ul class="cs-gains" aria-label="Last ride">${gains.slice(0, 5).map((g) => `<li><span>${esc(g.label)}</span><b>+${Math.round(g.xp)}</b></li>`).join('')}</ul>` : ''}
         </div>
@@ -97,6 +100,19 @@ registerLobbyTab({
         <p class="lp-hint">Bad-luck protection: if ${PITY - 1} cases in a row give nothing Covert or better, the next one is Covert (${Math.max(0, PITY - 1 - r.sinceRed)} to go).</p>
         <p class="lp-hint"><span class="g-pad"><kbd>Y</kbd> open a case</span><span class="g-kb">Odds are fixed and shown before you open. Cases are only earned by riding.</span></p>`;
       root.querySelector('.cs-open').addEventListener('click', () => { caseSfx.click(); open(); });
+      // Animate the bar: up to 100 % per case earned since last time, then to the current XP.
+      const bar = root.querySelector('.cs-xp i');
+      const wraps = shown ? Math.max(0, r.earned - shown.earned) : 0;
+      shown = { xp: r.xp, earned: r.earned };
+      if (bar) {
+        let step = 0;
+        const next = () => {
+          if (!bar.isConnected) return;
+          if (step < wraps) { bar.style.setProperty('--v', 1); step++; setTimeout(() => { bar.style.transition = 'none'; bar.style.setProperty('--v', 0); void bar.offsetWidth; bar.style.transition = ''; next(); }, 850); }
+          else bar.style.setProperty('--v', (r.xp / CASE_XP).toFixed(3));
+        };
+        requestAnimationFrame(() => requestAnimationFrame(next));
+      }
       root.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => { pickId = b.dataset.pick; caseSfx.click(); render(); }));
       root.querySelectorAll('[data-show]').forEach((b) => b.addEventListener('click', () => { showSeries = showSeries === b.dataset.show ? null : b.dataset.show; render(); root.querySelector(`[data-show="${b.dataset.show}"]`)?.focus(); }));
     };

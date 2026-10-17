@@ -122,6 +122,27 @@ export const caseSfx = {
     }
   },
 
+  /**
+   * Tension riser under the crawl: a quiet filtered-noise swell and a sine that climbs a fifth over
+   * `dur` seconds. Returns stop() (the landing cuts it).
+   */
+  riser(dur = 4) {
+    if (!ac()) return () => {};
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(NOTE(57), t); o.frequency.exponentialRampToValueAtTime(NOTE(64), t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05 * vol(), t + dur);
+    o.connect(g).connect(out); o.start(t); o.stop(t + dur + 0.5);
+    const s = noise(), flt = ctx.createBiquadFilter(), g2 = ctx.createGain();
+    flt.type = 'bandpass'; flt.Q.value = 3; flt.frequency.setValueAtTime(600, t); flt.frequency.exponentialRampToValueAtTime(3200, t + dur);
+    g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.06 * vol(), t + dur);
+    s.loop = true; s.connect(flt).connect(g2).connect(out); s.start(t); s.stop(t + dur + 0.5);
+    return () => {
+      const n = ctx.currentTime;
+      for (const gg of [g, g2]) { gg.gain.cancelScheduledValues(n); gg.gain.setValueAtTime(Math.max(gg.gain.value, 0.0001), n); gg.gain.exponentialRampToValueAtTime(0.0001, n + 0.08); }
+    };
+  },
+
   /** The reel crawling past a rare card it will not stop on. */
   tease() {
     if (!ac()) return;
