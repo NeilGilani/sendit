@@ -101,7 +101,7 @@ const P = (name, def = 0, min = -1e9, max = 1e9) => ({ name, defaultValue: def, 
 class SnowProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [P('speed'), P('ground'), P('edge'), P('load', 1), P('skid'), P('stop'), P('groomed', 1), P('powder'), P('ice'), P('park'),
-      P('sink'), P('board'), P('chatter'), P('cold'), P('rate', 1), P('low', 1), P('gain', 1)];
+      P('sink'), P('board'), P('chatter'), P('cold'), P('rate', 1), P('low', 1), P('gain', 1), P('turn')];
   }
 
   constructor(opts) {
@@ -177,6 +177,8 @@ class SnowProcessor extends AudioWorkletProcessor {
     g.texRate = (X.rate0 + X.rateV * Math.min(1, s01)) * clamp(p.rate, 0.25, 2);
     g.width = lerp(T.width.ski, T.width.board, board);
     g.board = board;
+    // skis: the outside ski carries the turn, so a carve leans toward it (turning right → the left ski)
+    g.bal = clamp(p.turn, -1, 1) * T.width.outside * (1 - board);
     g.out = T.out * p.gain;
     // filter frequencies (rate = slow-motion pitch)
     const r = clamp(p.rate, 0.25, 2);
@@ -321,8 +323,9 @@ class SnowProcessor extends AudioWorkletProcessor {
         if (ci === 0) this._l = c.absorb; else this._r = c.absorb;
       }
       const m = (this._l + this._r) * 0.5, sd = (this._l - this._r) * 0.5 * width;
-      L[i] = safe((m + sd) * outG);
-      if (R !== L) R[i] = safe((m - sd) * outG);
+      const bal = a.bal * it + g.bal * t;
+      L[i] = safe((m + sd) * outG * (1 + bal));
+      if (R !== L) R[i] = safe((m - sd) * outG * (1 - bal));
     }
     return true;
   }

@@ -212,7 +212,7 @@ export class AudioEngine {
     const powder = r.powder * (0.5 + 0.5 * Math.max(r.deep, r.powder));
     const snowParams = {
       speed: r.speed, ground, edge, load: r.load, skid: skid + clamp(r.butter, 0, 1) * 0.15, stop: r.stop, groomed: r.groomed - park, powder, ice, park,
-      sink, board: r.board, chatter, cold: map.cold, rate, low: persp.snowLow, gain: persp.snow,
+      sink, board: r.board, chatter, cold: map.cold, rate, low: persp.snowLow, gain: persp.snow, turn: r.edgeSign * edge,
     };
     // ---- wind (relative airspeed ≈ rider speed; the crash tumble keeps some)
     const spin = air ? Math.abs(r.spin) + Math.abs(r.flip) : 0;

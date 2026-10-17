@@ -72,7 +72,8 @@ playback rate follows speed (0.85–1.15), and their level follows the same spee
 hiss. The skid texture follows skid and stop. The engine posts them to the worklet mono, high-passed at 100 Hz and
 RMS-normalised. Set them with `snow.tex`; 0 turns them off.
 
-Stereo width is 0.75 for skis (two contacts, two independent noise streams) and 0.25 for a board.
+Stereo width is 0.75 for skis (two contacts, two independent noise streams) and 0.25 for a board. On skis the
+carve leans up to 22 % toward the outside, loaded ski (turning right, the left ski).
 
 ## The wind (`sendit-wind`)
 
