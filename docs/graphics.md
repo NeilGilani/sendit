@@ -68,6 +68,8 @@ How it works:
 - Everything downstream follows on its own: the baked mountain shadows, the sun light and its shadows, the
   sky dome, the spray lighting and the snowfall glints.
 
+Sky colours: `skyHorizon` is the **sun-side** horizon. The opposite horizon blends 60 % toward `skyZenith`, the blue-violet anti-solar side of a real twilight. The horizon colour fades out quickly with elevation, so the upper sky that lights the shade keeps the zenith colour. The haze follows the sun-relative horizon (warm toward the sun, cool away).
+
 Presets are in `ATMOSPHERE_PRESETS` (`gfx/atmosphere.js`). With a low sun, point it down the run
 (`sunBearing`): on a deep gully like Valcrest, a sun lower than about 15 deg that comes across the
 gully leaves the floor in mountain shadow.
@@ -138,6 +140,7 @@ spray.emit(contacts, dt, { powder, normal });
 | Sun glare / lens ghosts | off / off | on / off | on / on |
 | Spray shadows (dithered, in the sun shadow map) | off | on | on |
 | SMAA preset | Low | Low | High |
+| Scene MSAA (+ alpha-to-coverage needles) | off | off | off (opt-in `PERF.msaa`: too costly on an iGPU) |
 
 All of these live in one table: `PERF` in `web/src/gfx/perf.js`. Measurements and reasoning are in
 `docs/graphics-perf.md`.
@@ -152,9 +155,9 @@ the first time mid-ride. Measured with `web/scripts/gfxpopin.mjs` on all three m
 
 | What | Where | How |
 |---|---|---|
-| Tree LODs | `gfx/trees.js` | Fronds (LOD0) → mid fronds (LOD1) → far cone shells cross-fade over a band before each hand-over distance (25 % / 15 % of the distance). Neighbouring LODs use complementary screen-door dither (interleaved gradient noise on `gl_FragCoord`), so each pixel is drawn by exactly one of them. Every instance computes its band position in the vertex shader from the **live** camera position (`uLodEye`), not the pool centre of the last refill. Fully handed-over instances collapse in the vertex shader. Far shells never `discard` (keeps early-z for thousands of them): they sit complete inside the dissolving mid fronds, and shrink into the snow at the far distance. |
+| Tree LODs | `gfx/trees.js` | LOD1 is the same tree as LOD0: same seed and cards, with every other frond card left out and the rest 25 % wider, plus the same core, trunk and skirts. (It used to be a different, sparser crown around a big dark core, which read as dark navy spires with white stripes.) The colour pass has no dither. Across the near band (25 % of the hand-over distance) LOD0 **geomorphs** into LOD1: a per-vertex `aMorph3` delta retracts the odd cards into the trunk and widens the even ones. It swaps where the two are identical. Across the mid band (15 %) LOD1 retracts its cards into the opaque far cone, which is already there. Every instance computes its band position in the vertex shader from the **live** camera position (`uLodEye`), not the pool centre of the last refill. Fully handed-over instances collapse in the vertex shader. Far shells never `discard` (that keeps early-z for thousands of them), and they shrink into the snow at the far distance. |
 | Tree pools | `gfx/trees.js` | The near pool is refilled every 3 m from a 32 m spatial grid, the mid pool and the shadow cones every 10 m. Each pool holds every tree it can draw before the next refill. Capacity is every tree of the kind, so dense forests never get holes that fill in as you come closer. A dense map's `course.perf` hint still shrinks the hand-over distances. |
-| Tree shadows | `gfx/trees.js` | Near fronds cast with the same dither (custom depth material, same sway). Beyond them, shadow-only cones (far-shell geometry, drawn in the shadow pass only) cast for every tree in the shadow range (`box / sin(sun elevation)`). Shadows no longer pop in when a tree crosses the near radius. |
+| Tree shadows | `gfx/trees.js` | Near fronds cast with the same morph and sway (custom depth material). Beyond them, shadow-only cones (far-shell geometry, drawn in the shadow pass only) cast for every tree in the shadow range (`box / sin(sun elevation)`). In the shadow pass only, fronds and cones cross-fade with complementary screen-door dither, which the PCF filter turns into a soft blend. Shadows no longer pop in when a tree crosses the near radius. |
 | Boulders, fences, ice | `scatter.js`, `world.js` `withDistanceFade()` | Each instance shrinks into the snow over the last 22 % before its cull distance, so whole 750 m cells never pop. Vertex-only, no `discard`. Boulders switch to low poly only once every rock in the cell is beyond 400 m. |
 | Terrain chunks | `terrain.js` | Geomorphing (CDLOD-style): each vertex carries `aMorph` = (height difference to the next-coarser grid, LOD). Over the last 30 % before a LOD distance the vertex slides onto the coarser surface, so the chunk looks identical when it swaps. The same applies to the 10 m mid ring. Chunk geometry is built ahead along the camera velocity (3 s look-ahead), and spare geometry stays in an LRU cache (48) instead of being rebuilt. |
 | Track parallax (high) | `gfx/snow.js` | The trench parallax offset fades out over 32–45 m instead of switching off at 45 m. |

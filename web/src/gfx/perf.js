@@ -14,7 +14,9 @@ export const PERF = {
   // settings, so medium relies on the baked terrain sky-visibility and per-tree AO instead.
   ao: [null, null, { mode: 'Medium', halfRes: true }],
   smaa: ['LOW', 'LOW', 'HIGH'],                // SMAA preset
-  msaa: [0, 0, 4],                             // scene-pass MSAA samples (trees use alpha-to-coverage when > 0)
+  // Scene-pass MSAA samples (trees switch to alpha-to-coverage when > 0). Off: on an Intel Arc iGPU even 2x
+  // measured ~3x the frame cost (half-float multisampled target). Worth enabling on a discrete GPU.
+  msaa: [0, 0, 0],
   bloomScale: [0.7, 1, 1],                     // × POST.bloom.intensity
   glare: [false, true, true],                  // occlusion-aware veiling glare toward the sun
   flare: [false, false, true],                 // faint lens ghosts
