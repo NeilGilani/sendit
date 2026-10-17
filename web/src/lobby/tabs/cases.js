@@ -57,7 +57,7 @@ registerLobbyTab({
         <div class="cs-hero${pick ? '' : ' empty'}">
           ${caseArt(series, { count: pick ? cases.filter((c) => c.series === series).length : 0 })}
           <div class="cs-hero-text"><b>${esc(S.name)}</b><small>${esc(S.blurb)}</small>
-            ${pick ? `<small>From: ${esc({ run: 'a finished run', distance: 'distance ridden', duplicate: 'duplicates', welcome: 'welcome gift', veteran: 'your riding so far', milestone: 'a milestone' }[pick.source] || pick.source)}</small>` : ''}</div>
+            ${pick ? `<small>From: ${esc({ run: 'a finished run', distance: 'distance ridden', duplicate: 'duplicates', welcome: 'welcome gift', veteran: 'your riding so far', milestone: 'a milestone', rank: 'a new rank' }[pick.source] || pick.source)}</small>` : ''}</div>
         </div>
         <button type="button" class="cs-open${pick ? ' pulse' : ''}" ${pick ? '' : 'disabled'} data-autofocus>
           ${pick ? `Open case <small>${cases.length > 1 ? `· ${cases.length} ready` : ''}</small>` : 'No case ready'}
@@ -80,6 +80,7 @@ registerLobbyTab({
           <span>First run on each map · new trail</span><b>+${EARN.firstMap} · +${EARN.firstTrail}</b>
           <span>Next milestone: ${esc(ms.label)} (${fmtKm(Math.max(0, ms.m - r.distance))} to go)</span><b>+${ms.xp} XP</b>
           <span>Duplicates turn into progress</span><b>+10 % to a whole case</b>
+          <span>Every new rank (level 5, 10, 20, 35, 60)</span><b>a case</b>
         </div>
 
         <h3 class="lp-h3">Collection</h3>

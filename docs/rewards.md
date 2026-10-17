@@ -78,6 +78,7 @@ you see both. Sources (`EARN` in rewards.js):
 | first finish of each trail | 120 (once per trail) |
 | distance milestones | 1 km 50, 5 km 100, 10 km 150, 25 km 250, 50 km 400, 100 km a whole case, then a case every 100 km |
 | duplicates | see the grade table |
+| a new rank in the game-feel progression (levels 5, 10, 20, 35, 60; bus event `juiceLevelUp` with `rankUp`) | a whole case |
 
 **Pacing** (unittest simulates it minute by minute over 3 hours): a typical rider (0.7 km per minute, a
 finished run every 3 minutes, a second map after 90 minutes) gets the **first case at 13 minutes** (the

@@ -398,6 +398,12 @@ await test('tracker: finished runs emit runCompleted and earn case XP; leaving c
   const want = 3.4 * rewards.EARN.perKm + 2 * rewards.EARN.finish + rewards.EARN.medal.gold + rewards.EARN.firstMap + rewards.EARN.firstTrail + 50;   // + the first-km milestone
   assert.ok(Math.abs(r.xpTotal - want) < 1e-6, `xp ${r.xpTotal} vs ${want}`);
   assert.equal(profileStore.profile.stats.runsCompleted, 2);
+  // A rank-up in the game-feel progression (bus event juiceLevelUp) is a milestone case; a plain level-up is not.
+  const before = profileStore.unopened.length;
+  st.emit('juiceLevelUp', { level: 4, rankUp: false });
+  st.emit('juiceLevelUp', { level: 5, rankUp: true });
+  assert.equal(profileStore.unopened.length, before + 1);
+  assert.equal(profileStore.unopened.at(-1).source, 'rank');
 });
 
 await test('store: openCase persists the pull and emits rewards / caseEarned', () => {

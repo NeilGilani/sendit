@@ -6,6 +6,8 @@
 //           'runFinished' { medal, … }    → a finished Challenge run (activities.js)
 //           'rideEnded' { score, … }      → closes the session (main.js emits it when leaving a ride)
 //           window 'pagehide'             → closes an open session so closing the tab mid-ride counts
+//           'juiceLevelUp' { rankUp }     → the game-feel progression (progression/index.js) reached a new
+//                                            rank (levels 5, 10, 20, 35, 60): a milestone case
 // Emits:    'runCompleted' { mapId, trailId, distance, time, score, mode, medal, equipment }
 //                                          one per finished run, Zen or Challenge (distance and time
 //                                          of that run alone; generic hook for anything run-based)
@@ -31,6 +33,7 @@ export function installRideTracker({ getMapId, getTrailBoard = () => null, getMa
   on('runComplete', () => { if (session) { session.runs += 1; runDone({ mode: 'zen' }); } });
   on('runFinished', (res) => { if (session) { session.runs += 1; runDone({ mode: 'challenge', medal: res?.medal ?? null, score: res?.score }); } });
   on('rideEnded', (snap) => finish(snap || scoreSnapshot()));
+  on('juiceLevelUp', (e) => { if (e?.rankUp) profileStore.grantCase('rank'); });
   globalThis.addEventListener?.('pagehide', () => {
     if (session && game.mode !== Mode.MENU) finish(scoreSnapshot());
   });
