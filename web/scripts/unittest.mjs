@@ -249,6 +249,41 @@ await test('migration v1 → v2: keeps the worn colourway, adds a welcome case a
   assert.equal(schema.migrateProfile(null).profile.rewards.cases.length, 0);
 });
 
+await test('items: every reward skin is well formed (unique ids, known grade / case / print / finish, real models)', async () => {
+  const { PATTERNS, FINISHES, DECALS, GARMENTS } = await import('../src/character/outfits.js');
+  const { SERIES } = await import('../src/profile/items.js');
+  const { getEquipmentSpec } = await import('../src/equipment/registry.js');
+  const grades = new Set(RARITIES.map((r) => r.id));
+  for (const item of catalog.listItems()) {
+    if (item.id.startsWith('test-')) continue;
+    const ids = item.variants.map((v) => v.id);
+    assert.equal(new Set(ids).size, ids.length, `${item.id}: duplicate variant ids`);
+    if (item.model.kind === 'outfit') assert.ok(GARMENTS[item.slot]?.[item.model.ref], `${item.id}: garment ${item.model.ref}`);
+    if (item.model.kind === 'equipment' && item.slot !== 'bindings') {
+      const type = item.slot === 'board' ? 'snowboard' : 'ski';
+      assert.equal(getEquipmentSpec(type, item.model.ref).id, item.model.ref, `${item.id}: spec ${item.model.ref}`);
+    }
+    for (const v of item.variants) {
+      const tag = `${item.id}:${v.id}`;
+      assert.ok(v.name, `${tag}: name`);
+      if (v.starter) continue;
+      if (!v.rarity) continue;
+      assert.ok(grades.has(v.rarity), `${tag}: grade ${v.rarity}`);
+      assert.ok(v.series === '*' || SERIES[v.series], `${tag}: case ${v.series}`);
+      const c = v.colors || {};
+      if (c.pat) assert.ok(c.pat in PATTERNS, `${tag}: print ${c.pat}`);
+      if (c.finish) assert.ok(c.finish in FINISHES, `${tag}: finish ${c.finish}`);
+      if (c.decal) assert.ok(c.decal in DECALS, `${tag}: decal ${c.decal}`);
+      for (const [k, val] of Object.entries(c)) if (typeof val === 'string' && val.startsWith('#')) assert.match(val, /^#[0-9a-f]{6}$/i, `${tag}: colour ${k}`);
+    }
+  }
+  // Exactly one starter per slot, and it is what a fresh loadout wears.
+  for (const slot of OUTFIT.concat(['skis', 'board'])) {
+    const starters = catalog.listItems({ slot }).flatMap((i) => i.variants.filter((v) => v.starter));
+    assert.equal(starters.length, 1, `${slot}: ${starters.length} starters`);
+  }
+});
+
 await test('odds: every case has items in every tier and every skin can drop', () => {
   const all = new Set(catalog.rewardSkins().map(({ item, variant }) => `${item.id}:${variant.id}`));
   const reach = new Set();
