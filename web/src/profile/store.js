@@ -99,7 +99,7 @@ class ProfileStore {
   }
 
   // ------------------------------------------------------------ map, unlocks, name
-  setMap(id, variant = null) { this.update((p) => { p.map = { id, variant }; }, 'map'); }
+  setMap(id, variant = null, trail = null) { this.update((p) => { p.map = { id, variant, trail }; }, 'map'); }
 
   unlock(itemId) {
     if (this.profile.unlocks.items.includes(itemId)) return;

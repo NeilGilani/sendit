@@ -22,7 +22,7 @@ export function defaultProfile(now = Date.now()) {
     createdAt: now,
     updatedAt: now,
     loadout: { equipment: DEFAULT_EQUIPMENT, slots: defaultSlots() },
-    map: { id: DEFAULT_MAP_ID, variant: null },
+    map: { id: DEFAULT_MAP_ID, variant: null, trail: null },   // trail: maps/registry.js trail id (docs/maps.md)
     links: { settings: SETTINGS_KEY },   // settings stay in state.js; the profile only links to them
     stats: {
       rides: 0, runsCompleted: 0, distance: 0, airTime: 0, smoothTurns: 0,
@@ -83,7 +83,7 @@ export function sanitize(p) {
   out.stats = { ...d.stats, ...(p.stats || {}) };
   out.links = { ...d.links, ...(p.links || {}) };
   out.unlocks = { items: Array.isArray(p.unlocks?.items) ? p.unlocks.items.filter((x) => typeof x === 'string') : [] };
-  out.map = p.map && typeof p.map.id === 'string' ? { id: p.map.id, variant: p.map.variant ?? null } : d.map;
+  out.map = p.map && typeof p.map.id === 'string' ? { id: p.map.id, variant: p.map.variant ?? null, trail: typeof p.map.trail === 'string' ? p.map.trail : null } : d.map;
   const lo = p.loadout || {};
   const slots = {};
   for (const slot of Object.keys(SLOTS)) {

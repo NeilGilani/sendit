@@ -37,7 +37,7 @@ await test('v0 (nothing stored) migrates legacy best score and mountain', () => 
   assert.equal(from, 0);
   assert.ok(migrated);
   assert.equal(profile.stats.bestScore, 777);
-  assert.deepEqual(profile.map, { id: 'lake-tahoe', variant: { resort: 'homewood', run: 2 } });
+  assert.deepEqual(profile.map, { id: 'lake-tahoe', variant: { resort: 'homewood', run: 2 }, trail: null });
 });
 
 await test('garbage input becomes a default profile', () => {
@@ -135,7 +135,7 @@ await test('map registry: selection precedence and fallback', async () => {
   registry.registerMap({ id: 'broken', name: 'Broken', load: async () => { throw new Error('boom'); } });
   registry.registerMap({ id: 'lake-tahoe', name: 'Tahoe', load: async ({ variant }) => ({ kind: 'tahoe', variant }) });
   const P = (q) => new URLSearchParams(q);
-  assert.deepEqual(registry.resolveMapSelection(P(''), null), { id: 'valcrest-gully', variant: null, source: 'default' });
+  assert.deepEqual(registry.resolveMapSelection(P(''), null), { id: 'valcrest-gully', variant: null, trail: 'main', source: 'default' });
   assert.equal(registry.resolveMapSelection(P(''), { map: { id: 'broken' } }).source, 'profile');
   assert.equal(registry.resolveMapSelection(P(''), { map: { id: 'gone' } }).id, 'valcrest-gully');
   assert.deepEqual(registry.resolveMapSelection(P('resort=kirkwood&run=1'), null).variant, { resort: 'kirkwood', run: 1 });
@@ -146,6 +146,93 @@ await test('map registry: selection precedence and fallback', async () => {
   assert.equal(res.fellBack, true); assert.equal(res.course.kind, 'default');
   assert.equal((await registry.loadMap({ id: 'lake-tahoe', variant: { resort: 'a', run: 0 } })).course.kind, 'tahoe');
   assert.throws(() => registry.registerMap({ id: 'x', name: 'X' }));
+});
+
+await test('map registry: mountains and trails are normalised static data', () => {
+  const warn = console.warn; console.warn = () => {};
+  const m = registry.registerMap({
+    id: 't-peak', name: 'T Peak', description: 'Test', order: 50, load: async () => ({}),
+    mountain: { id: 't-range', name: 'T Range', region: 'Testland', accent: '#f00' },
+    trails: [
+      { id: 'top', name: 'Top', difficulty: 'black', length: 1200, vertical: 400, featured: true },
+      { id: 'kids', name: 'Kids', difficulty: 'green' },
+      { id: 'kids', name: 'Dup', difficulty: 'green' },          // duplicate id: skipped
+      { id: 'odd', name: 'Odd', difficulty: 'purple' },          // unknown difficulty → blue
+      { name: 'no id' },
+    ],
+  });
+  registry.registerMap({ id: 't-park', name: 'T Park', order: 51, load: async () => ({}), mountain: { id: 't-range' }, trails: [{ id: 'jib', name: 'Jib', difficulty: 'park' }] });
+  console.warn = warn;
+  assert.deepEqual(m.trails.map((t) => t.id), ['top', 'kids', 'odd']);
+  assert.equal(registry.getTrail('t-peak', 'odd').difficulty, 'blue');
+  assert.equal(registry.getTrail('t-peak', 'top').mapId, 't-peak');
+  assert.equal(registry.defaultTrail('t-peak').id, 'top');
+  assert.equal(m.mountain.blurb, 'Test', 'blurb defaults to the description');
+  const plain = registry.getMap('valcrest-gully');
+  assert.equal(plain.mountain.id, 'valcrest-gully', 'no mountain: its own');
+  assert.deepEqual(plain.trails.map((t) => [t.id, t.difficulty]), [['main', 'blue']], 'no trails: one main trail');
+  const range = registry.getMountain('t-range');
+  assert.deepEqual(range.maps.map((x) => x.id), ['t-peak', 't-park'], 'maps sharing a mountain id share a card');
+  assert.equal(range.trails.length, 4);
+  assert.deepEqual(range.spread, { green: 1, blue: 1, black: 1, 'double-black': 0, park: 1 });
+  assert.equal(range.name, 'T Range');
+  for (const d of registry.DIFFICULTY_IDS) assert.ok(registry.DIFFICULTIES[d].label);
+});
+
+await test('map registry: trail selection from URL, profile and variants', () => {
+  const P = (q) => new URLSearchParams(q);
+  registry.registerMap({
+    id: 'lake-tahoe', name: 'Tahoe', load: async ({ variant }) => ({ kind: 'tahoe', variant }),
+    trails: [
+      { id: 'kirkwood:0', name: 'K0', difficulty: 'black', group: 'Kirkwood', variant: { resort: 'kirkwood', run: 0 } },
+      { id: 'kirkwood:1', name: 'K1', difficulty: 'double-black', group: 'Kirkwood', variant: { resort: 'kirkwood', run: 1 } },
+      { id: 'homewood:0', name: 'H0', difficulty: 'blue', group: 'Homewood', variant: { resort: 'homewood', run: 0 } },
+    ],
+  });
+  const s1 = registry.resolveMapSelection(P('map=t-peak&trail=kids'), null);
+  assert.deepEqual([s1.id, s1.trail, s1.source], ['t-peak', 'kids', 'url']);
+  assert.equal(registry.resolveMapSelection(P('map=t-peak&trail=nope'), null).trail, 'top', 'unknown trail → default');
+  assert.equal(registry.resolveMapSelection(P(''), { map: { id: 't-peak', trail: 'odd' } }).trail, 'odd', 'profile trail');
+  assert.equal(registry.resolveMapSelection(P(''), { map: { id: 't-peak', trail: 'gone' } }).trail, 'top');
+  // Legacy ?resort=&run= picks the matching trail; a trail brings its variant.
+  assert.equal(registry.resolveMapSelection(P('resort=kirkwood&run=1'), null).trail, 'kirkwood:1');
+  assert.deepEqual(registry.resolveMapSelection(P('map=lake-tahoe&trail=homewood:0'), null).variant, { resort: 'homewood', run: 0 });
+  assert.deepEqual(registry.resolveMapSelection(P(''), { map: { id: 'lake-tahoe', variant: { resort: 'kirkwood', run: 0 }, trail: 'homewood:0' } }).variant, { resort: 'homewood', run: 0 }, 'trail wins over a stale variant');
+  assert.equal(registry.resolveMapSelection(P(''), { map: { id: 'lake-tahoe', variant: { resort: 'x', run: 3 } } }).trail, null, 'a variant no trail names is kept');
+  // Reloads: other map, or a trail on another variant.
+  const cur = { map: registry.getMap('lake-tahoe'), variant: { resort: 'kirkwood', run: 0 } };
+  assert.equal(registry.needsReload(cur, 'lake-tahoe', 'kirkwood:0'), false);
+  assert.equal(registry.needsReload(cur, 'lake-tahoe', 'kirkwood:1'), true);
+  assert.equal(registry.needsReload(cur, 't-peak', 'top'), true);
+  assert.equal(registry.needsReload({ map: registry.getMap('t-peak'), variant: null }, 't-peak', 'kids'), false);
+  assert.equal(registry.selectionQuery('t-peak', 'kids', 'ride&at=1,2&quality=2').toString(), 'quality=2&map=t-peak&trail=kids');
+  assert.equal(registry.trailBoardId('t-peak', 'top'), 't-peak', 'default trail keeps the map board');
+  assert.equal(registry.trailBoardId('t-peak', 'kids'), 't-peak/kids');
+});
+
+await test('map registry: trailSpawn / trailFinish with fallbacks', () => {
+  const fb = { position: { x: 1, z: 2 }, heading: 0.5 };
+  const course = {
+    trailSpawn: (id) => ({ a: { x: 10, z: 20, heading: 1 }, nohead: { x: 3, z: 4 }, bad: { x: NaN, z: 0 } })[id] ?? null,
+    trailFinish: (id) => ({ a: { x: 5, z: 6 }, p: { progress: 900 } })[id] ?? null,
+  };
+  assert.deepEqual(registry.trailSpawnFor(course, 'a', fb), { x: 10, z: 20, heading: 1, fallback: false });
+  assert.deepEqual(registry.trailSpawnFor(course, 'nohead', fb), { x: 3, z: 4, heading: 0.5, fallback: false });
+  assert.equal(registry.trailSpawnFor(course, 'bad', fb).fallback, true);
+  assert.equal(registry.trailSpawnFor(course, 'none', fb).fallback, true);
+  assert.equal(registry.trailSpawnFor({}, 'a', fb).fallback, true, 'no trailSpawn method');
+  const warn = console.warn; console.warn = () => {};
+  assert.equal(registry.trailSpawnFor({ trailSpawn: () => { throw new Error('x'); } }, 'a', fb).fallback, true);
+  console.warn = warn;
+  assert.deepEqual(registry.trailFinishFor(course, 'a'), { x: 5, z: 6, radius: 30 });
+  assert.deepEqual(registry.trailFinishFor(course, 'p'), { progress: 900 });
+  assert.equal(registry.trailFinishFor(course, 'none'), null);
+});
+
+await test('profile: setMap saves map, variant and trail', () => {
+  profileStore.setMap('t-peak', null, 'kids');
+  assert.deepEqual(profileStore.profile.map, { id: 't-peak', variant: null, trail: 'kids' });
+  assert.equal(schema.sanitize({ ...profileStore.profile, map: { id: 'a', trail: 7 } }).map.trail, null);
 });
 
 await test('map registry: lobby spot down the run, looking where the view opens up', () => {
