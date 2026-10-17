@@ -53,8 +53,9 @@ export class TimeWarp {
     this.cool = Math.max(0, this.cool - dt);
     const p = this.cur;
     if (!p) return (this.k = 1);
+    const first = this.t === 0;
     this.t += dt;
-    if (this.t < p.freeze) return (this.k = 0);
+    if (this.t < p.freeze || (first && p.freeze > 0)) return (this.k = 0);   // a long frame never skips the freeze
     const u = Math.min(1, (this.t - p.freeze) / Math.max(1e-3, p.recover));
     if (u >= 1) { this.cur = null; return (this.k = 1); }
     return (this.k = p.slow + (1 - p.slow) * u * u * (3 - 2 * u));
