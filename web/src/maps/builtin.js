@@ -70,3 +70,4 @@ registerMap({
 import './ravenspire/index.js';
 import './blackspruce/index.js';   // map 2: Blackspruce Plunge (steep tree run)
 import './voltage/index.js';      // map 4: Voltage Park (terrain park, rails)
+import './dragonback/index.js';   // map 5: Dragonback (ridges)
