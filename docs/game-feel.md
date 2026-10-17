@@ -211,6 +211,9 @@ Bus events: `musicEnergy {level}` at 5 Hz, and `musicDrop {kind, strength}`.
 - **Challenge results.** An extra row reads "XP this ride +N · level L", with ▲ when the ride levelled up.
 - **First rides.** One hint 15 s into each of the first two rides explains that tricks, combos, close shaves and dailies earn XP.
 - **Ranks (`RANKS`).** Rookie from level 1, Shredder from 5, Ripper from 10, Pro from 20, Legend from 35, Mountain God from 60. Each rank has a colour, used for the badge, the celebration and the Progress tab.
+- **Rank emblems.** `rankEmblem(level)` draws one chevron per rank tier (up to four), with a star from Legend. They appear on the chip badge and the Progress card, where the next rank is shown too ("Ripper at level 10", `nextRank()`).
+- **Ride button.** It glows gold while today's 2× XP is unused.
+- **Stacked level-ups.** Several levels gained at once (a big XP jump) play as one celebration of the highest level ("LEVEL UP · +4").
 - **Level-up.** If a trick is announced while it plays, it fades back to let the trick read. It waits (up to 4 s) while the rider is in the air or a trick is being announced, then plays a full-screen celebration (rings, the level number slamming in, the rank and XP to the next level) plays over the ride and the lobby. Level-ups queue, rumble, give a music drop and flash.
 - **XP bar.** A small bar under the speedometer fills in ride and fades out after 2.5 s.
 - **Ride recap.** Back in the lobby after a ride, a card slides in on the right. It counts up "+1,240 XP", animates the level bar from where the ride started, and lists the ride's best trick, plus the dailies, achievements and personal bests from that ride, and the distance and score. It ends with "ONE MORE RUN? PRESS ENTER", hides after 9 s or on click, and comes from `progressRideSummary`.
