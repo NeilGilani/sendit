@@ -201,13 +201,13 @@ export const LINE_GOALS = [
 // Trails (the lobby's mountain browser, docs/maps.md): one per signature line. [id, name, difficulty, line key,
 // start, description]. start: null = the normal spawn (the first trail must be the default start), '@ridge:u' =
 // on that ridge's crest at u, pointing down it, or [u, v]. Every trail finishes at the valley (FINISH_U).
-// length / vertical are measured start → finish along the line (scripts/map5-trails.mjs).
+// length / vertical (index.js) are the shared measure: fall-line metres start → finish (scripts/trails-check.mjs).
 export const TRAILS = [
   ['ride-the-dragon', 'Ride the Dragon', 'double-black', 'spine', null, "The Dragon's Spine top to bottom: two steps, the Little Gap, the Spine's Gap, the Fork, the Organ Pipes.", true],
   ['twin-hop', 'Twin Hop', 'black', 'twins', '@twinL:150', 'Hop the Twins and back, then the Staircase: seven ridge-to-ridge airs.', true],
   ['scale-jump', 'Scale Jump', 'black', 'scales', '@spine:200', 'Off the Spine onto the Scales, the Tail, Wyrm Leap onto the Knife.'],
   ['bladerunner', 'Bladerunner', 'double-black', 'blade', '@blade:110', 'The Blade’s knife edge, Blade Leap onto the Shard, the Organ Pipes.'],
-  ['the-blade', 'The Blade', 'double-black', 'bladecrest', '@blade:110', 'The whole knife edge, through the Blade’s Notch.'],
+  ['the-blade', 'The Blade', 'double-black', 'bladecrest', '@blade:140', 'The whole knife edge, through the Blade’s Notch.'],
   ['dragons-tooth', "The Dragon's Tooth", 'double-black', 'keel', '@keel:110', 'The broad Keel, Keel Leap, the Sentinel’s notch, then the East Wall’s 38 m prow.', true],
   ['wishbone', 'West Fin & Wishbone', 'black', 'wishbone', '@westfin:110', 'West Fin’s prow onto the pillows, the Hollow, the Wishbone, West Buttress.'],
   ['the-staircase', 'The Staircase', 'black', 'twins', '@stair1:790', 'Four ridges en échelon, hop to hop to hop.'],

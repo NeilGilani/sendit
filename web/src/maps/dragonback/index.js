@@ -29,20 +29,21 @@ export const DRAGONBACK_THUMB = svg(`
   <path d="M10 44 Q30 49 52 44" stroke="#3b3b3b" stroke-width="0.4" fill="none"/>
   <g><circle cx="16" cy="45.6" r="0.9" fill="#2f63c8"/><circle cx="22" cy="46.6" r="0.9" fill="#f4f4f0"/><circle cx="28" cy="47.1" r="0.9" fill="#cc2b24"/><circle cx="34" cy="47.1" r="0.9" fill="#258c4d"/><circle cx="40" cy="46.6" r="0.9" fill="#f2c526"/><circle cx="46" cy="45.6" r="0.9" fill="#2f63c8"/></g>`);
 
-// Trail lengths / verticals (m, start → the finish line along the line): measured by scripts/map5-trails.mjs.
+// Trail lengths / verticals (m): the shared measure (scripts/trails-check.mjs --measure): fall-line metres from the
+// start to the finish line, and the drop from the start to the finish.
 const TRAIL_STATS = {
-  'ride-the-dragon': [2910, 1580],
-  'twin-hop': [2760, 1500],
-  'scale-jump': [2720, 1490],
-  'bladerunner': [2760, 1540],
-  'the-blade': [2740, 1540],
-  'dragons-tooth': [2950, 1540],
-  'wishbone': [2820, 1540],
-  'the-staircase': [1890, 980],
-  'the-knife': [1280, 610],
-  'organ-pipes': [1420, 710],
-  'the-gullies': [2690, 1520],
-  'the-slot': [2760, 1550],
+  'ride-the-dragon': [2280, 1555],
+  'twin-hop': [2140, 1480],
+  'scale-jump': [2090, 1470],
+  'bladerunner': [2180, 1520],
+  'the-blade': [2150, 1515],
+  'dragons-tooth': [2180, 1515],
+  'wishbone': [2180, 1525],
+  'the-staircase': [1500, 960],
+  'the-knife': [1040, 585],
+  'organ-pipes': [1160, 685],
+  'the-gullies': [2160, 1495],
+  'the-slot': [2190, 1525],
 };
 
 registerMap({
