@@ -22,51 +22,62 @@ export function planMove(kind, shot, sun, r, H) {
   // Put the camera on the side away from the sun, so the rider and the powder are backlit.
   const sunSide = Math.sign(sun.x) || 1;
   const side = r() < 0.78 ? -sunSide : sunSide;
-  const keepAbove = (p) => { const g = H(p.x, p.z) + 1.2; if (p.y < g) p.y = g; return p; };
   const m = { kind, fov: 40, side, sway: r.range(0.15, 0.35), lag: 4.5 };
+  // Most moves sit up-slope of the action (+Z) and look down the line: the range, the horn or the sky
+  // fills the frame behind the rider instead of the slope.
   switch (kind) {
     case 'dolly': {
-      const d = r.range(13, 18), h = r.range(0.5, 4.5);   // a touch above the arc: the range sits behind the rider
-      m.a = V(side * d, M.y + h, M.z + r.range(4, 8));
-      m.b = V(side * d * 0.9, M.y + h - 1.5, M.z - r.range(6, 10));
-      m.fov = r.range(30, 38);
-      m.look = (s, com) => com.clone().lerp(M, 0.2);
-      m.pos = (s) => m.a.clone().lerp(m.b, ease(s));
+      // Side drone at mid-arc height, out over the void beside the arete, tracking down the line a
+      // little slower than the rider: the range and sky behind, the rider crossing the frame.
+      const d = r.range(15, 21), h = r.range(-1.5, 2.5);
+      const z0 = r.range(6, 11), z1 = M.z - r.range(2, 8);
+      m.pos = (s, com) => V(side * d, M.y + h + (1 - s) * 3, z0 + (z1 - z0) * ease(s));
+      m.fov = r.range(36, 44);
+      m.look = (s, com) => com.clone().lerp(M, 0.12);
       break;
     }
     case 'orbit': {
-      const R = r.range(8.5, 12), a0 = side > 0 ? r.range(0.15, 0.6) : Math.PI - r.range(0.15, 0.6), sweep = side * r.range(0.9, 1.3) * (r() < 0.5 ? 1 : -1);
-      const h = r.range(-1.5, 2.5);
-      m.fov = r.range(42, 50);
-      m.pos = (s) => V(A.x + Math.cos(a0 + sweep * (s - 0.5)) * R, A.y + h - s * 1.5, A.z + Math.sin(a0 + sweep * (s - 0.5)) * R * 0.8 - 2);
+      // Arcs round the apex on the up-slope side while the rider hangs in the air.
+      const R = r.range(9, 12.5), h = r.range(0.5, 3.5);
+      const a0 = side * r.range(1.25, 1.6), a1 = side * r.range(0.25, 0.55);   // from the side round toward behind
+      m.fov = r.range(40, 48);
+      m.pos = (s) => { const a = a0 + (a1 - a0) * ease(s); return V(A.x + Math.sin(a) * R, A.y + h - s * 1.5, A.z + Math.cos(a) * R); };
       m.look = (s, com) => com.clone().lerp(A, 0.3);
+      m.minPitch = -24;
       break;
     }
     case 'low': {
-      const p = V(Lp.x + side * r.range(5, 8), Lp.y + 0.2, Lp.z - r.range(5, 9));
-      m.a = keepAbove(p.clone());
-      m.b = keepAbove(p.clone().add(V(side * 1.5, 0.6, 2.5)));
-      m.fov = r.range(52, 62);
+      // Cliff-base up-shot: low beside the foot of the rock band, looking up as the rider flies over
+      // against the sky, then panning down to the touchdown.
+      const x = side * r.range(6, 9), z = -shot.line.cliffLen - r.range(2, 5);
+      m.a = V(x, H(x, z) + 1.2, z);
+      m.b = V(x + side * 1.5, H(x + side * 1.5, z - 2.5) + 1.4, z - 2.5);
+      m.fov = r.range(46, 54);
       m.pos = (s) => m.a.clone().lerp(m.b, ease(s));
-      m.look = (s, com) => com.clone().lerp(A, 0.25).add(V(0, 1.5, 0));
-      m.lag = 3.2;
+      m.look = (s, com) => com.clone().add(V(0, 0.5, 0));
+      m.lag = 3.6;
+      m.free = true;                       // may tilt freely (looks up)
+      m.t0 = -0.45;                        // join just before the pop (the in-run is behind the band)
+      m.targets = [A, M, shot.com(shot.Ta * 0.75, V(0, 0, 0))];
       break;
     }
     case 'tele': {
-      const d = r.range(85, 130);
-      m.a = keepAbove(V(side * d, A.y + r.range(-6, 12), A.z - r.range(25, 55)));
-      m.b = m.a.clone().add(V(0, 0, -r.range(4, 10)));
-      m.fov = r.range(8.5, 12);
+      // Long lens from far up the shoulder: the range stacked huge behind the rider.
+      const d = r.range(35, 60), back = r.range(85, 125);
+      m.a = V(side * d, 0, A.z + back);
+      m.a.y = Math.max(H(m.a.x, m.a.z) + 3, A.y + r.range(2, 7));
+      m.b = m.a.clone().add(V(-side * r.range(4, 10), 0, 0));
+      m.fov = r.range(7, 9.5);
       m.pos = (s) => m.a.clone().lerp(m.b, s);
       m.look = (s, com) => com.clone().lerp(M, 0.35);
       m.lag = 2.6; m.sway = 0.04;
       break;
     }
     case 'reveal': {
-      m.a = keepAbove(V(side * 4.5, lip.y + 1.5, 7));
-      m.b = V(side * r.range(30, 45), A.y + r.range(28, 42), r.range(35, 55));
+      m.a = V(side * 4.5, lip.y + 1.8, 7);
+      m.b = V(side * r.range(26, 40), A.y + r.range(26, 40), r.range(40, 60));
       m.fov = 46;
-      m.fov1 = 58;
+      m.fov1 = 56;
       m.pos = (s) => m.a.clone().lerp(m.b, ease(smooth(0.05, 1.0, s)));
       m.look = (s, com) => com.clone().lerp(M, 0.25 + 0.4 * s);
       break;
@@ -83,10 +94,33 @@ export function planMove(kind, shot, sun, r, H) {
       };
       m.look = (s, com) => com.clone().add(V(0, -0.3, -2));
       m.lag = 6;
-      break;
+      return m;
     }
     default: return planMove('dolly', shot, sun, r, H);
   }
+  // Clearance + line of sight: lift the whole move until the camera clears the snow and sees the
+  // apex, the touchdown and the lip at its key positions (one constant lift keeps the move smooth).
+  const targets = m.targets || [A, M, Lp.clone().add(V(0, 0.5, 0)), shot.com(shot.Ta * 0.25, V(0, 0, 0))];
+  let lift = 0;
+  for (let k = 0; k < 24; k++) {
+    let ok = true;
+    for (const s of [0, 0.25, 0.5, 0.75, 1]) {
+      const p = m.pos(s, A, 0).add(V(0, lift, 0));
+      if (p.y < H(p.x, p.z) + 1.4) { ok = false; break; }
+      for (const t of targets) {
+        for (let i = 1; i < 12; i++) {
+          const q = p.clone().lerp(t, i / 12);
+          if (q.y < H(q.x, q.z) + 0.2) { ok = false; break; }
+        }
+        if (!ok) break;
+      }
+      if (!ok) break;
+    }
+    if (ok) break;
+    lift += 0.8;
+  }
+  if (lift > 0) { const pos = m.pos; m.pos = (s, com, t) => pos(s, com, t).add(V(0, lift, 0)); }
+  m.lift = lift;
   return m;
 }
 
@@ -118,6 +152,11 @@ export class CameraRig {
     if (this.snap) { this.look.copy(want); this.snap = false; }
     else this.look.lerp(want, 1 - Math.exp(-m.lag * dt));
     cam.lookAt(this.look);
+    // Keep the horizon in frame: never tilt down steeper than the move allows (the rider sits lower).
+    const minP = (m.minPitch ?? -13) * Math.PI / 180;
+    const dir = this.look.clone().sub(cam.position);
+    const pitch = Math.atan2(dir.y, Math.hypot(dir.x, dir.z));
+    if (!m.free && pitch < minP) cam.lookAt(cam.position.clone().add(V(dir.x, Math.tan(minP) * Math.hypot(dir.x, dir.z), dir.z)));
     const fov = m.fov1 ? m.fov + (m.fov1 - m.fov) * ease(s) : m.fov;
     if (Math.abs(cam.fov - fov) > 1e-3) { cam.fov = fov; cam.updateProjectionMatrix(); }
     const fd = cam.position.distanceTo(com);

@@ -2,7 +2,7 @@
 // Usage: node scripts/loadingshot.mjs [baseUrl] [outDir] [variants] [times] [size]
 //   variants  ';'-separated query strings without '?', e.g. "loadseed=1;loadseed=2&loadtrick=cork900"
 //             (default: 4 random seeds)
-//   times     comma list of seconds after the live scene's first frame (default 1,4,8,12,16)
+//   times     comma list of seconds after the first trick shot starts (default 1,4,8,12,16)
 //   size      WxH (default 1600x900)
 // Every variant runs with ?loadhold (the overlay stays up after the game has loaded). Prints the
 // shot info, scene stats and any console errors; exits 1 on errors.
@@ -27,6 +27,8 @@ for (const q of variants) {
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(`${base}?loadhold&${q}`, { waitUntil: 'commit' });
   await page.waitForFunction(() => window.__loading?.firstFrameAt > 0 || document.getElementById('loading')?.classList.contains('static'), null, { timeout: 150000 });
+  // Time from the first trick shot when there is one (else from the first frame).
+  if (!/loaddebug=cam/.test(q)) await page.waitForFunction(() => !!window.__loading?.sceneInfo, null, { timeout: 150000 }).catch(() => {});
   const t0 = Date.now();
   const tag = q.replace(/[^a-z0-9]+/gi, '_');
   for (const t of times) {

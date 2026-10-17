@@ -58,7 +58,11 @@ vec3 aerial(vec3 col, vec3 wp) {
   od = od * dist * 4.2e-5 * uHazeDensity + dist * 2.5e-6 * uHazeDensity;
   vec3 trans = exp(-od * vec3(0.78, 0.92, 1.18));
   trans = max(trans, vec3(0.03));
-  vec3 ins = horizonColor(vec3(dir.x, max(dir.y, 0.0) * 0.4, dir.z)) * 0.9;
+  // Inscatter: the horizon colour that way with only a little of the sun's glow (it would wash
+  // every ridge toward the sun into the sky).
+  vec2 hh = normalize(dir.xz + 1e-5), ss = normalize(uSunDirA.xz + 1e-5);
+  float az = dot(hh, ss) * 0.5 + 0.5;
+  vec3 ins = mix(uAwayHorizon, uHorizon, az * az) * 0.92 + uGlow * 0.22 * pow(max(dot(dir, uSunDirA), 0.0), 6.0);
   return col * trans + ins * (1.0 - trans);
 }
 `;

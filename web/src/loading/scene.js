@@ -193,7 +193,7 @@ export class LoadingScene {
     const composer = this.composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 4 });
     this.renderPass = new RenderPass(this.scene, camera);
     composer.addPass(this.renderPass);
-    this.dof = new DepthOfFieldEffect(camera, { worldFocusDistance: 10, worldFocusRange: 6, bokehScale: 2.2, resolutionScale: 0.5 });
+    this.dof = new DepthOfFieldEffect(camera, { worldFocusDistance: 10, worldFocusRange: 6, bokehScale: 1.6, resolutionScale: 0.5 });
     this.dofPass = new EffectPass(camera, this.dof);
     composer.addPass(this.dofPass);
     this.bloom = new BloomEffect({ intensity: 0.55, luminanceThreshold: 2.4, luminanceSmoothing: 0.9, mipmapBlur: true, radius: 0.78 });
@@ -267,6 +267,7 @@ export class LoadingScene {
     this.lastTrick = trick; this.lastCam = cam;
     const shot = this.shot = new Shot({ H: this.height.H, line: this.height.line, trick, gear: v.gear, r });
     this.move = planMove(cam, shot, this.sunDir, r, this.height.H);
+    if (this.move.t0 != null) shot.tStart = Math.max(shot.tStart, this.move.t0);
     this.simT = shot.tStart;
     this.shotScreen = 0;
     this.shotLen = shot.screenLength();
@@ -348,7 +349,7 @@ export class LoadingScene {
     if (com) {
       this.dof.target = com;
       const dist = this.rig.focus;
-      this.dof.cocMaterial.worldFocusRange = Math.max(2.5, dist * (cam.fov < 20 ? 0.18 : 0.6));
+      this.dof.cocMaterial.worldFocusRange = Math.max(3, dist * (cam.fov < 20 ? 0.25 : 0.9));
       this.dofPass.enabled = true;
     } else this.dofPass.enabled = false;
     // Sun glare position for the grade.

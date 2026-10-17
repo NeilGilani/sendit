@@ -62,7 +62,7 @@ export function makeHeight(v) {
   };
   const line = {
     inrun: Math.tan(14 * D), lipUp: 0.21, lipLen: 4,
-    cliff: r.range(11, 15), cliffLen: r.range(4.2, 5.4), land: Math.tan(r.range(33, 37) * D),
+    cliff: r.range(12, 16), cliffLen: r.range(4.6, 6), land0: Math.tan(r.range(24, 28) * D), land1: Math.tan(r.range(36, 40) * D),
   };
   // Hero line profile along z (0 = lip; +z uphill in-run, −z the cliff and landing).
   const profile = (z) => {
@@ -73,9 +73,20 @@ export function makeHeight(v) {
     }
     const u = -z, L = line.cliffLen;
     const s = u < L ? (1 - Math.cos(Math.PI * u / L)) / 2 : 1;
-    const sp = (x) => 3 * Math.log1p(Math.exp(x / 3));
-    return -line.cliff * s - line.land * (sp(u - L * 0.5) - sp(-L * 0.5));
+    // Apron below the band: eases in at land0 (a catchable landing) and steepens to land1 down the face.
+    const f = Math.min(apron.length - 1.001, u * 4);
+    const i = f | 0;
+    return -line.cliff * s - (apron[i] + (apron[i + 1] - apron[i]) * (f - i));
   };
+  // Integrated apron drop (0.25 m steps to 600 m): slope ramps from 0 at the lip to land0 past the
+  // band, then to land1 between 15 m and 80 m.
+  const apron = new Float32Array(2401);
+  for (let k = 1; k < apron.length; k++) {
+    const u = (k - 0.5) * 0.25;
+    const sl = line.land0 * smooth(line.cliffLen * 0.25, line.cliffLen * 1.2, u) + (line.land1 - line.land0) * smooth(15, 80, u);
+    apron[k] = apron[k - 1] + sl * 0.25;
+  }
+  line.land = line.land0;
   const hz = M.horn ? { x: (r() < 0.5 ? -1 : 1) * r.range(1400, 3200), z: -r.range(7500, 11000), h: r.range(1500, 2100) * M.peakScale, rot: r() * Math.PI } : null;
   const regional = (x, z) => {
     const u = -z, ax = Math.abs(x), rr = Math.hypot(x, z);
@@ -89,8 +100,15 @@ export function makeHeight(v) {
     const across = smooth(2800, 8000, u) + 0.75 * smooth(1800, 6000, ax) * (1 - smooth(-2000, 1500, -u));
     y += (Math.pow(big, 1.25) * 1.25 - 0.3) * amp * (0.35 + 0.65 * Math.min(1, across));
     y += fbm(x / 900 + 3.1, z / 900 + 9.7, 6) * 160 * smooth(300, 3000, rr);
-    // Side spines radiating from our peak (the line sits on one of them).
-    y += -0.000045 * x * x * (1 - smooth(800, 2500, rr)) * smooth(-200, 600, u);
+    // We stand on an arete: the mountain falls away steeply to both sides of the line (so side views
+    // look out across the void to the ranges), fading out a couple of kilometres away.
+    const fall = 3 * Math.log1p(Math.exp((ax - 14) / 3));
+    const near = (1 - smooth(900, 2600, rr)) * (1 - 0.6 * smooth(250, 900, z));
+    y -= Math.min(fall * 0.66, 520) * near;
+    // Spur-and-gully relief down both flanks (ribs run down the fall line, i.e. across x): rock
+    // spurs between snow couloirs instead of one smooth white wedge.
+    const rib = 1 - Math.abs(n3(ax / 70 + 2.1, z / 16));
+    y += (rib * rib * 14 - 5) * smooth(18, 70, ax) * near;
     if (hz) {
       // A lone horn across the valley: a four-faced pyramid, ridged and skewed.
       const dx = x - hz.x, dz = z - hz.z;
@@ -128,11 +146,6 @@ export function makeHeight(v) {
     y += fbm(x / 16 + 4.4, z / 16 + 2.2, 3) * 0.9 * smooth(5, 14, Math.abs(z + 2)) + fbm(x / 55, z / 55 + 8.1, 3) * 3.0 * smooth(10, 40, Math.abs(z));
     const det = fbm(x / 26 + 1.3, z / 26 + 7.7, 5) * (0.35 + 5.5 * Math.min(1, off)) + fbm(x / 7, z / 7, 3) * 0.12;
     y += det;
-    // Buttresses flanking the lip (rock towers either side of the take-off).
-    for (const s of [-1, 1]) {
-      const bx = x - s * 17, bz = z + 2;
-      y += 6.5 * Math.exp(-(bx * bx) / 30 - (bz * bz) / 60) * (0.7 + 0.3 * n3(x / 4, z / 4));
-    }
     return reg * (1 - w) + (y + reg * 0.25 * (1 - w)) * w;
   };
   return { H, line, profile, horn: hz };
@@ -342,14 +355,15 @@ const TERRAIN_FRAG = /* glsl */`
   }
   // Snow relief: soft drifts + wind ripples from the noise gradients (fades with distance).
   float e = 0.004;
-  vec2 q = vW.xz * 0.018;
+  // Wind-carved: long drifts and sastrugi stretched along the wind, not round blotches.
+  vec2 q = vec2(dot(vW.xz, uWindDir), dot(vW.xz, vec2(-uWindDir.y, uWindDir.x))) * vec2(0.008, 0.03);
   float h0 = texture2D(noiseTex, q).r, hx = texture2D(noiseTex, q + vec2(e, 0.0)).r, hy = texture2D(noiseTex, q + vec2(0.0, e)).r;
   vec2 qf = vW.xz * 0.09 + 0.37;
   float f0 = texture2D(noiseTex, qf).g, fx = texture2D(noiseTex, qf + vec2(e, 0.0)).g, fy = texture2D(noiseTex, qf + vec2(0.0, e)).g;
   vec2 q2 = vec2(dot(vW.xz, uWindDir), dot(vW.xz, vec2(-uWindDir.y, uWindDir.x))) * vec2(0.9, 0.25);
   float r0 = texture2D(noiseTex, q2).b, rx = texture2D(noiseTex, q2 + vec2(e, 0.0)).b;
   float fade = 1.0 - smoothstep(0.08, 1.2, tFP);
-  vec3 Ns = normalize(N + vec3(hx - h0, 0.0, hy - h0) * (-30.0) * (1.0 - smoothstep(2.0, 12.0, tFP)) + vec3(fx - f0, 0.0, fy - f0) * (-3.5) * fade + vec3(uWindDir.x, 0.0, uWindDir.y) * (rx - r0) * (-30.0) * fade * 0.16);
+  vec3 Ns = normalize(N + (vec3(uWindDir.x, 0.0, uWindDir.y) * (hx - h0) + vec3(-uWindDir.y, 0.0, uWindDir.x) * (hy - h0)) * (-24.0) * (1.0 - smoothstep(2.0, 12.0, tFP)) + vec3(fx - f0, 0.0, fy - f0) * (-3.5) * fade + vec3(uWindDir.x, 0.0, uWindDir.y) * (rx - r0) * (-30.0) * fade * 0.16);
 #ifdef FAR
   if (tree > 0.01) {
     float sp = texture2D(noiseTex, vW.xz * 0.05).r;

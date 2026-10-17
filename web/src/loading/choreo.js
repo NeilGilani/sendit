@@ -42,13 +42,13 @@ export class Shot {
     this.T = TRICKS[trick];
     const T = this.T;
     this.board = gear === 'snowboard';
-    this.speed = r.range(13.5, 16);                        // m/s off the lip
-    const ang = (r.range(17, 23) + (T.flip ? 3 : 0)) * Math.PI / 180;
+    this.speed = r.range(10.5, 12.5);                      // m/s off the lip
+    const ang = (r.range(11, 16) + (T.flip ? 4 : 0)) * Math.PI / 180;
     this.v0 = new THREE.Vector3(r.range(-0.4, 0.4), this.speed * Math.sin(ang), -this.speed * Math.cos(ang));
     this.spinDir = r() < 0.5 ? -1 : 1;
     this.flipDir = 1;                                      // back / corked over the back shoulder
     this.rollDir = r() < 0.5 ? -1 : 1;
-    this.slow = r.range(0.24, 0.34);                       // slow-motion rate in the air
+    this.slow = r.range(0.27, 0.36);                       // slow-motion rate in the air
     this.slashSide = r() < 0.5 ? -1 : 1;
     this.pivot = ANIM.flipPivot;
     this.p0 = new THREE.Vector3(0, H(0, 0) + this.pivot, 0);   // COM at the pop
@@ -67,8 +67,8 @@ export class Shot {
     // Rotation: spins can land switch (540, 900).
     const turns = T.spin / Math.PI;
     this.landSwitch = Math.round(turns) % 2 === 1;
-    this.tStart = -2.4;                                    // in-run start (real s before the pop)
-    this.tEnd = this.Ta + 3.2;                             // ride-out end
+    this.tStart = -1.9;                                    // in-run start (real s before the pop)
+    this.tEnd = this.Ta + 2.7;                             // ride-out end
     this.state = { grounded: true, landed: false, slashing: false };
     // Ride-out path (computed once): starts at the touchdown, follows the fall line, slashes.
     this.out = this.planRideOut();
