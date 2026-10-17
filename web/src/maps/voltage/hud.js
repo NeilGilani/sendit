@@ -7,7 +7,7 @@ import { predictLipSpeed } from './park.js';
 
 const CSS = /* css */`
 #parkHud { position: absolute; inset: 0; pointer-events: none; font-family: "Arial Black", "Segoe UI Black", Impact, sans-serif; font-style: italic; color: #fffaf0; }
-#parkHud .bal { position: absolute; left: 50%; bottom: 120px; width: 340px; transform: translateX(-50%); opacity: 0; transition: opacity .15s; text-align: center; }
+#parkHud .bal { position: absolute; left: 50%; bottom: 168px; width: 340px; transform: translateX(-50%); opacity: 0; transition: opacity .15s; text-align: center; }
 #parkHud .bal.on { opacity: 1; }
 #parkHud .bal .trick { font-size: 26px; -webkit-text-stroke: 1.2px #1b1446; paint-order: stroke fill; text-shadow: 0 0 16px rgba(47,245,214,0.6); white-space: nowrap; }
 #parkHud .bal .len { font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 800; font-size: 13px; letter-spacing: .18em; opacity: .85; margin: 2px 0 8px; }
@@ -18,8 +18,8 @@ const CSS = /* css */`
 #parkHud .pop { position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap; opacity: 0; -webkit-text-stroke: 1.2px #1b1446; paint-order: stroke fill; }
 #parkHud .pop.show { animation: pkPop 1.3s ease-out forwards; }
 @keyframes pkPop { 0% { opacity: 0; transform: translateX(-50%) translateY(8px) scale(.9); } 12% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.06); } 22% { transform: translateX(-50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-14px); } }
-#parkHud .p1 { bottom: 205px; font-size: 22px; }
-#parkHud .p2 { bottom: 236px; font-size: 30px; }
+#parkHud .p1 { bottom: 262px; font-size: 22px; }
+#parkHud .p2 { bottom: 294px; font-size: 30px; }
 #parkHud .p3 { top: 150px; font-size: 20px; }
 #parkHud .spd { position: absolute; right: 36px; bottom: 150px; width: 210px; opacity: 0; transition: opacity .25s; text-align: right; }
 #parkHud .spd.on { opacity: 1; }

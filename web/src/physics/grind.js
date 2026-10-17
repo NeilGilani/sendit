@@ -392,7 +392,12 @@ export class Grind {
       const edge = g.dir > 0 ? hi : lo;
       ds -= Math.abs(edge - g.s);
       const ni = g.seg.i + g.dir;
-      if (ni < 0 || ni >= rail.segs.length) { g.s = edge; this.place(dt); this.leave('end', dt); return; }
+      if (ni < 0 || ni >= rail.segs.length) {
+        g.s = edge; this.place(dt);
+        // Still loading at the end of the rail: the pop goes off as you leave it (late: no perfect pop).
+        if (g.charging && g.chargeT >= C.tapTime) { g.toEnd = 99; this.popOff(); return; }
+        this.leave('end', dt); return;
+      }
       const next = rail.segs[ni];
       // A kink kicks the balance (harder the faster and sharper); facets of a curve barely do.
       const joint = g.dir > 0 ? next : g.seg;

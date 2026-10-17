@@ -28,7 +28,7 @@ export const LINES = {
   sparkLedge: { start: [150, 72], feats: [jib('Spark Ledge')] },
   current: { start: [50, 125], feats: [jump('Current 1'), jib('Current Flat-Down'), jib('Current Kink'), jump('Current 2', 'spin360'), jib('Current Tube'), jump('Current 3'), { kind: 'jump', name: 'Step-Down' }] },
   currentBox: { start: [110, 128], feats: [jib('Current Box')] },
-  high: { start: [60, 186], feats: [jib('High DFD'), jib('High Rainbow'), jib('High Down Rail'), jump('High Voltage 1', 'spin360'), jump('High Voltage 2', 'flip'), jib('High Kink'), { kind: 'stepup', name: 'Step-Up' }, { kind: 'qp', name: 'Voltage QP' }] },
+  high: { start: [60, 186], feats: [jib('High DFD'), jib('High Rainbow'), jib('High Down Rail'), jib('High Kink'), jump('High Voltage 1', 'spin360'), jump('High Voltage 2', 'flip'), { kind: 'stepup', name: 'Step-Up' }, { kind: 'qp', name: 'Voltage QP' }] },
   gridL: { start: [40, 236], feats: ['Grid Box A', 'Grid Flat Box', 'Grid A-Frame', 'Grid Kink', 'Grid Rainbow Box', 'Grid Battleship', 'Grid Finale DFD'].map(jib) },
   gridM: { start: [40, 247], feats: ['Grid Rail A', 'Grid Down Rail', 'Grid Long Rail', 'Grid S-Rail', 'Grid Down Box', 'Grid Cannon'].map(jib) },
   gridR: { start: [40, 257], feats: ['Grid Tube A', 'Grid Wide Tube', 'Grid Ledge'].map(jib) },

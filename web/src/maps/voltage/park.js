@@ -52,10 +52,11 @@ export function attachPark(course, pl) {
     const into = v.x * n[0] + v.z * n[1];             // + = moving back into the pipe
     if (into >= 0 || v.y < 1) return;
     v.x -= into * n[0]; v.z -= into * n[1];
-    v.y = Math.sqrt(v.y * v.y + into * into);
+    // A transition can only send you so high: past ~12 m/s up (7 m out) the legs give and the rest is lost.
+    v.y = Math.min(12, Math.sqrt(v.y * v.y + into * into));
     // Hang just inside the coping and drift back in a little (0.6 m/s), so the way down is the steep transition,
     // not the deck — and the air has a direction for the rider to spot the landing by (back down the wall).
-    const back = 0.6;
+    const back = Math.min(0.8, Math.max(0.2, 1.1 / Math.max(0.5, 2 * v.y / 9.81)));   // ≈ 1.1 m back in over the whole air
     v.y = Math.sqrt(Math.max(0, v.y * v.y - back * back));
     v.x += n[0] * back; v.z += n[1] * back;
     pl.position.x += n[0] * 0.25; pl.position.z += n[1] * 0.25;

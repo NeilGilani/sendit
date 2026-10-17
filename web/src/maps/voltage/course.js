@@ -181,7 +181,7 @@ export class VoltageCourse {
     if (remain > 0.5) B.line(remain, deckDeg);
     B.width(s.landHw);
     const outR = s.outR ?? 30;
-    const land = B.efhLanding(lip, { vMax: s.vMax, vn: s.vn ?? 3.4, Rk: s.Rk ?? Math.max(3, s.table * 0.22), minDeg: 22, maxDeg: s.maxDeg ?? 34, extra: s.extra ?? 8, outR });
+    const land = B.efhLanding(lip, { vMax: s.vMax, vn: s.vn ?? 3.4, Rk: s.Rk ?? Math.max(3, s.table * 0.22), minDeg: 22, maxDeg: s.maxDeg ?? 38, extra: s.extra ?? 8, outR });
     B.toBase(outR, 4);
     const f = B.build({ name: s.name, kind: 'jump', lane: s.lane ?? (slope ? 'slope' : null), rake: 1.1 });
     // Side profile: a ride-up ramp to the deck beside the kicker (20°), the same as the deck from the lip on.

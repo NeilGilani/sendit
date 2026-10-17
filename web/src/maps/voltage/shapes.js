@@ -98,7 +98,7 @@ export class ProfileBuilder {
    * kept between minDeg and maxDeg (descending angles) and runs on straight for `extra` m past vMax.
    * lip = { a, y, ang } (take-off point and angle). Returns { vMin, vMax, sweet } and draws the pen.
    */
-  efhLanding(lip, { vMax, vn = 3.6, popN = 1.2, drag = 0.0027, g = 9.81, Rk = 5, minDeg = 24, maxDeg = 36, extra = 10, outR = 28 }) {
+  efhLanding(lip, { vMax, vn = 3.6, vnCap = 6.8, popN = 1.2, drag = 0.0027, g = 9.81, Rk = 5, minDeg = 24, maxDeg = 36, extra = 10, outR = 28 }) {
     const th = lip.ang * DEG;
     const fly = (v) => {
       const pts = [];
@@ -156,17 +156,21 @@ export class ProfileBuilder {
     this.mark('knuckle');
     const land = [];
     let S = { a: this.a, y: this.y };
-    let sweet = null, vTop = vMin, short = false;
+    let sweet = null, vTop = vMin, short = false, vClamp = null;
     for (let v = vMin + 0.05; v <= vMax; v += 0.05) {
       const c = cross(fly(v), S.a, S.y, phi);
       if (!c) continue;                                 // lands on the knuckle's roll-over: a faster flight next
       const nphi = surfAngle(c[2], c[3]);
+      // The landing is as steep as it gets (maxDeg): beyond the speed where that still leaves ≤ vnCap into the
+      // slope, the flights land harder than the design allows — the designed window ends there.
+      const Vc = Math.hypot(c[2], c[3]), into = Vc * Math.sin(Math.max(0, -Math.atan2(c[3], c[2]) - nphi));
+      if (into > vnCap) break;
       // Draw the straight piece S → c, then turn to the new angle there.
-      land.push([c[0], c[1]]);
+      land.push([c[0], c[1], v]);
       S = { a: c[0], y: c[1] };
+      if (vClamp === null && nphi >= maxDeg * DEG - 1e-6) vClamp = v;   // from here the landing can't follow the flights
       phi = nphi;
       vTop = v;
-      if (!sweet && v >= vMin + (vMax - vMin) * 0.35) sweet = { a: c[0], y: c[1], v };
       // The hill can't go below the snow: stop where the run-out transition would meet it.
       const e = this.arcEnd(outR, this.baseAngle(c[0] + 6), c[0], c[1], -phi / DEG);
       if (e.y <= this.baseAt(e.a) + 0.05) { short = true; break; }
@@ -179,9 +183,13 @@ export class ProfileBuilder {
     this.ang = -phi / DEG;
     this.mark('landingEnd');
     if (!short) this.line(extra);
+    // The sweet spot: in the constant-EFH part of the landing, a little under half way (research: just past the
+    // knuckle, 17–23 m from the lip on a big jump) — where the softest landings and the most room either side meet.
+    const vS = vMin + 0.45 * ((vClamp ?? vTop) - vMin);
+    for (const q of land) if (q[2] >= vS) { sweet = { a: q[0], y: q[1], v: q[2] }; break; }
     if (!sweet) sweet = { a: S.a - (S.a - K.a) * 0.4, y: S.y, v: (vMin + vTop) / 2 };
     this.sweet = sweet;
-    return { vMin, vMax: vTop, vAsked: vMax, sweet, angle: phi / DEG, short };
+    return { vMin, vMax: vTop, vAsked: vMax, vEfh: vClamp ?? vTop, sweet, angle: phi / DEG, short };
   }
   /** Finish: resample to a uniform grid. */
   build(meta = {}) {

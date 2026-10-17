@@ -52,9 +52,9 @@ export const JIBS = [
 // 30–38° landings). lip = u of the lip; table = lip → knuckle (m); vMax = fastest take-off the landing is built
 // for (EFH ≤ ~0.7 m from the knuckle to there, then straight). kickH = lip height over the in-run snow.
 export const JUMPS = [
-  { name: 'Lightning', short: 'Jump 1', u: 392, v: -3, lipDeg: 27, R: 16, kickH: 3.6, table: 15, vMax: 21, hw: 3.2, deckHw: 11, landHw: 13, deckDeg: 2 },
-  { name: 'Thunder', short: 'Jump 2', u: 502, v: -3, lipDeg: 29, R: 18, kickH: 4.1, table: 18, vMax: 23, hw: 3.4, deckHw: 11, landHw: 13, deckDeg: 2 },
-  { name: 'Voltage', short: 'Jump 3', u: 616, v: -3, lipDeg: 30, R: 20, kickH: 4.6, table: 21, vMax: 25, hw: 3.6, deckHw: 12, landHw: 14, deckDeg: 2 },
+  { name: 'Lightning', short: 'Jump 1', u: 392, v: -3, lipDeg: 27, R: 16, kickH: 3.6, table: 15, vMax: 21, hw: 3.2, deckHw: 11, landHw: 13, deckDeg: 4 },
+  { name: 'Thunder', short: 'Jump 2', u: 502, v: -3, lipDeg: 29, R: 18, kickH: 4.1, table: 18, vMax: 23, hw: 3.4, deckHw: 11, landHw: 13, deckDeg: 4 },
+  { name: 'Voltage', short: 'Jump 3', u: 616, v: -3, lipDeg: 30, R: 20, kickH: 4.6, table: 21, vMax: 25, hw: 3.6, deckHw: 12, landHw: 14, deckDeg: 4 },
 ];
 
 // ------------------------------------------------------------------ the park lanes (small / medium / pro)
@@ -111,15 +111,15 @@ export const LANE_JIBS = [
   { name: 'Spark Down Box', lane: 'spark', u: 460, v: 72, kind: 'box', half: 0.4, segs: [[8, -17]], h0: 0.4, ramp: 'flush', difficulty: 0.75 },
   { name: 'Spark Butter Box', lane: 'spark', u: 590, v: 70, kind: 'box', half: 0.5, segs: [[9, -15]], h0: 0.35, ramp: 'flush', difficulty: 0.7 },
   // Current: flat-downs, a kink, a wide tube
-  { name: 'Current Flat-Down', lane: 'current', u: 150, v: 120, kind: 'rail', segs: [[3, 0], [5, -22]], h0: 0.7, ramp: { gap: 1.0, drop: -0.05 }, difficulty: 1.1 },
-  { name: 'Current Box', lane: 'current', u: 150, v: 131, kind: 'box', half: 0.3, segs: [[9, -12]], h0: 0.45, ramp: 'flush', difficulty: 0.9 },
-  { name: 'Current Kink', lane: 'current', u: 210, v: 125, kind: 'rail', segs: [[4, -10], [5, -26]], h0: 0.8, ramp: { gap: 1.0, drop: -0.05 }, difficulty: 1.2 },
+  { name: 'Current Flat-Down', lane: 'current', u: 168, v: 121, kind: 'rail', segs: [[3, 0], [5, -22]], h0: 0.7, ramp: { gap: 1.0, drop: -0.05 }, difficulty: 1.1 },
+  { name: 'Current Box', lane: 'current', u: 168, v: 131, kind: 'box', half: 0.3, segs: [[9, -12]], h0: 0.45, ramp: 'flush', difficulty: 0.9 },
+  { name: 'Current Kink', lane: 'current', u: 232, v: 125, kind: 'rail', segs: [[4, -10], [5, -26]], h0: 0.8, ramp: { gap: 1.0, drop: -0.05 }, difficulty: 1.2 },
   { name: 'Current Tube', lane: 'current', u: 440, v: 121, kind: 'tube', half: 0.45, segs: [[8, -16]], h0: 0.6, ramp: 'flush', difficulty: 1.0 },
   // High Voltage: big DFD, rainbow rail, a long down rail
   { name: 'High DFD', lane: 'high', u: 110, v: 186, kind: 'rail', segs: [[4, -24], [4, 0], [4, -24]], h0: 1.1, ramp: { gap: 1.4, drop: -0.05 }, difficulty: 1.45 },
   { name: 'High Rainbow', lane: 'high', u: 180, v: 186, kind: 'rail', shape: 'rainbow', len: 11, hump: 1.0, h0: 0.7, ramp: { gap: 1.2, drop: -0.05 }, difficulty: 1.5 },
   { name: 'High Down Rail', lane: 'high', u: 250, v: 186, kind: 'rail', segs: [[13, -20]], h0: 1.1, ramp: { gap: 1.2, drop: -0.05 }, difficulty: 1.3 },
-  { name: 'High Kink', lane: 'high', u: 549, v: 186, kind: 'rail', segs: [[3, 0], [5, -26], [3, -8]], h0: 1.0, ramp: { gap: 1.2, drop: -0.05 }, difficulty: 1.45 },
+  { name: 'High Kink', lane: 'high', u: 290, v: 186, kind: 'rail', segs: [[3, 0], [5, -26], [3, -8]], h0: 1.0, ramp: { gap: 1.2, drop: -0.05 }, difficulty: 1.45 },
 ];
 
 // THE GRID — a jib garden: rows of boxes, tubes and rails, all ride-on or small gap-ons, every 8–20 m.
