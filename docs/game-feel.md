@@ -136,6 +136,7 @@ This is one `EffectPass`, inserted before SMAA through `composer.addPass(pass, i
 - **Pulses.** `huge` 1, `stomp` 0.75, `bank` 0.55, `flow` 0.8; they decay at 2.4/s.
 - **Cost.** The pass is disabled whenever its intensity is about 0.
 - **Quality.** Low = off, medium = 4 blur taps, high = 8 (`JUICE_SPEEDFX.taps`).
+- **Measured cost.** `node web/scripts/juice-perf.mjs <url> 1` runs alternating forced-on and off windows, back to back. At medium, 1600×900, on a shared GPU (00:30 PDT, other sessions running), the median frame was 8.5 ms with the pass on and 8.7 ms off. No difference showed above the noise.
 
 ## 5. Music energy (juice/music.js)
 
