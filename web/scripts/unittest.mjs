@@ -37,7 +37,7 @@ await test('v0 (nothing stored) migrates legacy best score and mountain', () => 
   assert.equal(from, 0);
   assert.ok(migrated);
   assert.equal(profile.stats.bestScore, 777);
-  assert.deepEqual(profile.map, { id: 'lake-tahoe', variant: { resort: 'homewood', run: 2 } });
+  assert.deepEqual(profile.map, { id: 'lake-tahoe', variant: { resort: 'homewood', run: 2 }, trail: null });
 });
 
 await test('garbage input becomes a default profile', () => {
@@ -355,6 +355,21 @@ await test('progression: milestones and first-run bonuses pay once; dupes become
   const col = rewards.collection(p);
   assert.ok(col.pct > 0.5 && col.pct <= 1, `collection ${(col.pct * 100).toFixed(0)} %`);
   assert.equal(p.rewards.opened, 300 + fromDupes);
+});
+
+await test('bad-luck protection: red or gold at least every PITY cases', () => {
+  const p = schema.defaultProfile();
+  const rng = rewards.seeded(99);
+  let since = 0, worst = 0, pities = 0;
+  for (let i = 0; i < 3000; i++) {
+    rewards.grantCase(p, 'test');
+    const r = rewards.openCase(p, null, rng);
+    pities += r.pity ? 1 : 0;
+    since = ['legendary', 'gold'].includes(r.rarity) ? 0 : since + 1;
+    worst = Math.max(worst, since);
+  }
+  assert.ok(worst < rewards.PITY, `longest dry streak ${worst} < ${rewards.PITY}`);
+  assert.ok(pities > 0 && pities < 60, `${pities} pity pulls in 3000`);
 });
 
 await test('store: openCase persists the pull and emits rewards / caseEarned', () => {

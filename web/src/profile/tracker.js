@@ -9,22 +9,24 @@
 // Emits:    'runCompleted' { mapId, trailId, distance, time, score, mode, medal, equipment }
 //                                          one per finished run, Zen or Challenge (distance and time
 //                                          of that run alone; generic hook for anything run-based)
-//           'rideRecorded' { score, distance, airTotal, runs, mapId, rank, isNewBest }
+//           'rideRecorded' { score, distance, airTotal, runs, mapId, rank, isNewBest, trailBoard, trailRank, trailNewBest }
+// getTrailBoard() (optional) names a second board the ride also lands on: the trail's (maps/registry.js trailBoardId).
 // Case XP: every finished run credits the distance ridden since the last credit plus the finish
 // bonuses (profileStore.creditRun → rewards.js); leaving the ride credits the remaining distance.
 import { on, emit, game, scoreSnapshot, Mode } from '../state.js';
 import { profileStore } from './store.js';
 import { services } from '../services/index.js';
 
-const trailOf = () => globalThis.__sendit?.activities?.key ?? null;
 const mapNameOf = () => globalThis.__sendit?.map?.map?.name ?? null;
 
-export function installRideTracker({ getMapId, getTrailId = trailOf, getMapName = mapNameOf }) {
+export function installRideTracker({ getMapId, getTrailBoard = () => null, getMapName = mapNameOf }) {
   let session = null;
+  // A run's trail: the trail board when the map has trails (docs/maps.md), else the course key.
+  const getTrailId = () => session?.trailBoard ?? globalThis.__sendit?.activities?.key ?? null;
 
   on('rideStarted', () => {
     const t0 = performance.now();
-    session = { t0, runT0: t0, runs: 0, mapId: getMapId(), equipment: profileStore.equipment, credited: 0 };
+    session = { t0, runT0: t0, runs: 0, mapId: getMapId(), trailBoard: getTrailBoard(), equipment: profileStore.equipment, credited: 0 };
   });
   on('runComplete', () => { if (session) { session.runs += 1; runDone({ mode: 'zen' }); } });
   on('runFinished', (res) => { if (session) { session.runs += 1; runDone({ mode: 'challenge', medal: res?.medal ?? null, score: res?.score }); } });
@@ -62,14 +64,17 @@ export function installRideTracker({ getMapId, getTrailId = trailOf, getMapName 
     profileStore.recordRide({ ...snap, duration, runsCompleted: s.runs });
     if (rest > 0) profileStore.creditRun({ mapId: s.mapId, distance: rest, finished: false, equipment: s.equipment });
     const me = services.identity.current();
-    let result = { rank: null, isNewBest: false };
+    let result = { rank: null, isNewBest: false }, trail = { rank: null, isNewBest: false };
+    const entry = (mapId) => ({
+      mapId, score: snap.score, distance: snap.distance, airTime: snap.airTotal,
+      equipment: s.equipment, playerId: me.id, name: profileStore.profile.displayName,
+    });
     try {
-      result = await services.leaderboard.submit({
-        mapId: s.mapId, score: snap.score, distance: snap.distance, airTime: snap.airTotal,
-        equipment: s.equipment, playerId: me.id, name: profileStore.profile.displayName,
-      });
+      result = await services.leaderboard.submit(entry(s.mapId));
+      if (s.trailBoard && s.trailBoard !== s.mapId) trail = await services.leaderboard.submit(entry(s.trailBoard));
     } catch (e) { console.warn('[tracker] leaderboard submit failed', e); }
-    const rec = { ...snap, runs: s.runs, duration, mapId: s.mapId, rank: result.rank, isNewBest: result.isNewBest };
+    const rec = { ...snap, runs: s.runs, duration, mapId: s.mapId, rank: result.rank, isNewBest: result.isNewBest,
+      trailBoard: s.trailBoard, trailRank: trail.rank, trailNewBest: trail.isNewBest };
     emit('rideRecorded', rec);
     return rec;
   }

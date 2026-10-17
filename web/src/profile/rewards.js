@@ -31,6 +31,11 @@ export const DISTANCE_MILESTONES = [
   { m: 100000, xp: CASE_XP, label: '100 km ridden' },
 ];
 export const MILESTONE_EVERY = 100000;
+/**
+ * Bad-luck protection (disclosed in the Cases tab, like Apex's legendary pity): if this many cases in a
+ * row open without a Covert (red) or gold item, the next one is red or gold (gold keeps its share).
+ */
+export const PITY = 40;
 const HISTORY = 40;
 
 export function defaultRewards() {
@@ -45,6 +50,7 @@ export function defaultRewards() {
     history: [],                // last openings: [{ at, key, rarity, dupe }]
     best: null,                 // rarest pull: { key, rarity, at }
     dupeXp: 0,
+    sinceRed: 0,                // openings since the last red or gold (bad-luck protection, PITY)
   };
 }
 
@@ -53,7 +59,7 @@ export function sanitizeRewards(r) {
   if (!r || typeof r !== 'object') return d;
   const num = (v, f = 0) => (Number.isFinite(Number(v)) ? Number(v) : f);
   const out = { ...d };
-  for (const k of ['xp', 'xpTotal', 'earned', 'opened', 'seq', 'distance', 'milestone', 'dupeXp']) out[k] = Math.max(0, num(r[k]));
+  for (const k of ['xp', 'xpTotal', 'earned', 'opened', 'seq', 'distance', 'milestone', 'dupeXp', 'sinceRed']) out[k] = Math.max(0, num(r[k]));
   out.xp = Math.min(out.xp, CASE_XP - 1e-6);
   out.distanceBy = { skis: Math.max(0, num(r.distanceBy?.skis)), snowboard: Math.max(0, num(r.distanceBy?.snowboard)) };
   out.cases = (Array.isArray(r.cases) ? r.cases : []).filter((c) => c && SERIES[c.series]).slice(0, 200)
@@ -111,10 +117,12 @@ function rollTier(odds, rng) {
   return RARITIES.find((r) => odds[r.id] > 0).id;
 }
 
-/** Roll one case: { key, item, variant, rarity }. */
-export function rollCase(series, rng = Math.random) {
+/** Roll one case: { key, item, variant, rarity }. `pity` = only red or gold can drop (same relative odds). */
+export function rollCase(series, rng = Math.random, pity = false) {
   const pool = casePool(series);
-  const tier = rollTier(caseOdds(series), rng);
+  const odds = caseOdds(series);
+  if (pity) for (const r of RARITIES) if (RARITY[r.id].rank < RARITY.legendary.rank) odds[r.id] = 0;
+  const tier = rollTier(odds, rng);
   const e = pick(pool[tier], rng);
   return { ...e, rarity: tier };
 }
@@ -243,7 +251,9 @@ export function openCase(p, caseId, rng = Math.random, now = Date.now()) {
   const i = caseId ? r.cases.findIndex((c) => c.id === caseId) : 0;
   if (i < 0 || !r.cases[i]) return null;
   const [c] = r.cases.splice(i, 1);
-  const res = rollCase(c.series, rng);
+  const pity = r.sinceRed >= PITY - 1;
+  const res = rollCase(c.series, rng, pity);
+  r.sinceRed = rarityOf(res.rarity).rank >= RARITY.legendary.rank ? 0 : r.sinceRed + 1;
   const reel = buildReel(res, c.series, rng);
   const inv = p.inventory.items;
   const dupe = !!inv[res.key];
@@ -258,7 +268,7 @@ export function openCase(p, caseId, rng = Math.random, now = Date.now()) {
   r.history.push({ at: now, key: res.key, rarity: res.rarity, dupe, series: c.series });
   if (r.history.length > HISTORY) r.history.splice(0, r.history.length - HISTORY);
   if (!r.best || rarityOf(res.rarity).rank > rarityOf(r.best.rarity).rank) r.best = { key: res.key, rarity: res.rarity, at: now };
-  return { case: c, key: res.key, item: res.item, variant: res.variant, rarity: res.rarity, dupe, dupeXp, cases, reel };
+  return { case: c, key: res.key, item: res.item, variant: res.variant, rarity: res.rarity, dupe, dupeXp, cases, reel, pity };
 }
 
 // ------------------------------------------------------------------ collection

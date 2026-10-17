@@ -42,6 +42,8 @@ const seed = await page.evaluate(async ({ seedArg, want, near }) => {
 }, { seedArg, want: process.env.RARITY || '', near: !!process.env.NEAR });
 console.log('seed', seed);
 await page.waitForTimeout(800);
+const fps = (ms) => page.evaluate((ms) => new Promise((r) => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (performance.now() - t0 < ms) requestAnimationFrame(f); else r(+(n / (ms / 1000)).toFixed(1)); }; requestAnimationFrame(f); }), ms);
+console.log('lobby fps before opening', await fps(2000));
 const times = timesArg.split(',').filter(Boolean).map(Number);
 const t0 = Date.now();
 await page.evaluate((seed) => { window.__senditCasesApi.open(null, seed); }, seed);

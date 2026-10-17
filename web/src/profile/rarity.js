@@ -10,7 +10,7 @@ export const RARITIES = [
   { id: 'rare', name: 'Restricted', short: 'Rare', color: '#8847ff', weight: 14.0, dupeXp: 250 },
   { id: 'epic', name: 'Classified', short: 'Epic', color: '#d32ce6', weight: 4.4, dupeXp: 400 },
   { id: 'legendary', name: 'Covert', short: 'Legendary', color: '#eb4b4b', weight: 1.3, dupeXp: 700 },
-  { id: 'gold', name: 'Exceedingly Rare', short: 'Gold', color: '#e4ae39', weight: 0.3, dupeXp: 1000 },
+  { id: 'gold', name: 'Exceedingly Rare', short: 'Gold', color: '#e4ae39', weight: 0.3, dupeXp: 2000 },
 ];
 
 export const RARITY = Object.fromEntries(RARITIES.map((r, i) => [r.id, { ...r, rank: i }]));
