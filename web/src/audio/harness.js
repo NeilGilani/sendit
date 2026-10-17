@@ -170,5 +170,39 @@ window.analyzeAudio = async function analyzeAudio(b64, opts = {}) {
   return { seconds: L.length / sr, sr, top: avg(top), mid: avg(mid), topRms: top[0]?.rms, midRms: mid[0]?.rms, centroidTop: top.reduce((s, r) => s + r.centroid, 0) / top.length, centroidMid: mid.reduce((s, r) => s + r.centroid, 0) / Math.max(1, mid.length), mod, rows: opts.rows ? rows.map((r) => ({ t: r.t, rms: +r.rms.toFixed(4), c: Math.round(r.centroid) })) : undefined };
 };
 
+/** Spectrogram PNG (data URL) of a recording: log-frequency 50 Hz–16 kHz, dB colour, optional time window. */
+window.spectrogram = async function spectrogram(b64, o = {}) {
+  const bin = atob(b64), u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  const ctx = new OfflineAudioContext(2, 48000, 48000);
+  const buf = await ctx.decodeAudioData(u8.buffer);
+  const sr = buf.sampleRate, L = buf.getChannelData(0), R = buf.numberOfChannels > 1 ? buf.getChannelData(1) : L;
+  const from = Math.floor((o.from || 0) * sr), to = Math.min(L.length, o.to ? Math.floor(o.to * sr) : L.length);
+  const W = o.width || 900, H = o.height || 300, N = 2048;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H + 16;
+  const g = cv.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, W, H + 16);
+  const img = g.createImageData(W, H);
+  const re = new Float64Array(N), im = new Float64Array(N);
+  const fLo = 50, fHi = 16000;
+  for (let x = 0; x < W; x++) {
+    const s = Math.floor(from + (to - from - N) * x / W);
+    for (let i = 0; i < N; i++) { const h = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / N); re[i] = ((L[s + i] || 0) + (R[s + i] || 0)) * 0.5 * h; im[i] = 0; }
+    fft(re, im);
+    for (let y = 0; y < H; y++) {
+      const f = fLo * Math.pow(fHi / fLo, 1 - y / H), k = Math.max(1, Math.round(f * N / sr));
+      const m = re[k] * re[k] + im[k] * im[k];
+      const db = 10 * Math.log10(m / (N * N / 16) + 1e-14);
+      const v = Math.max(0, Math.min(1, (db + 100) / 80));
+      const o4 = (y * W + x) * 4;
+      img.data[o4] = 255 * Math.min(1, v * 2); img.data[o4 + 1] = 255 * Math.max(0, v * 2 - 1) ** 0.8; img.data[o4 + 2] = 255 * Math.max(0, 0.5 - v) * (v > 0.05 ? 1 : 0) + 60 * v; img.data[o4 + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  g.fillStyle = '#ccc'; g.font = '11px sans-serif';
+  for (const f of [100, 300, 1000, 3000, 10000]) { const y = H * (1 - Math.log(f / fLo) / Math.log(fHi / fLo)); g.fillRect(0, y, 6, 1); g.fillText(f >= 1000 ? f / 1000 + 'k' : f, 8, y + 4); }
+  g.fillText(`${o.label || ''}  ${((to - from) / sr).toFixed(1)} s`, 40, H + 12);
+  return cv.toDataURL('image/png');
+};
+
 window.AUDIO = AUDIO;
 window.harnessReady = true;

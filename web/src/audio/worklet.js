@@ -74,7 +74,7 @@ class SnowProcessor extends AudioWorkletProcessor {
     this.ch = [0, 1].map((c) => ({
       rng: new Rng(1234567 + c * 7919), pink: new Pink(), brown: 0,
       hiss: new SVF(), hissLP: new SVF(), powHP: new SVF(), c1: new SVF(), c2: new SVF(), growl: new SVF(), skid: new SVF(), spray: new SVF(), powder: new SVF(),
-      base: new SVF(), iceH: new SVF(), iceB: new SVF(), scr1: new SVF(), scr2: new SVF(), grain: new SVF(), absorb: 0,
+      lowCut: new SVF(), base: new SVF(), iceH: new SVF(), iceB: new SVF(), scr1: new SVF(), scr2: new SVF(), grain: new SVF(), absorb: 0,
     }));
     this.rng = new Rng(424242);
     // grains
@@ -101,7 +101,9 @@ class SnowProcessor extends AudioWorkletProcessor {
     const sc = mv * Math.min(1.3, Math.pow(s01, T.hiss.exp));
     const hard = wG + wI + wK;
     const g = {};
-    g.hiss = T.hiss.gain * sc * (wG + wK * T.hiss.park + wI * T.hiss.ice + wP * T.hiss.powder) * (1 - 0.5 * sink) * ground;
+    // flat, unweighted skis between turns are much quieter than a loaded edge (the groomed reference dips ~10 dB)
+    const weight = lerp(T.hiss.flat, 1, Math.max(sstep(0.05, 0.5, edge), Math.min(1, skid * 2)));
+    g.hiss = T.hiss.gain * sc * weight * lerp(1, T.hiss.boardGain, board) * (wG + wK * T.hiss.park + wI * T.hiss.ice + wP * T.hiss.powder) * (1 - 0.5 * sink) * ground;
     g.cord = T.corduroy.depth * (wG + wK * 0.6) * (1 - edge) * ground * mv;
     g.carve = T.carve.gain * Math.pow(edge, T.carve.edgeExp) * Math.pow(load, T.carve.loadExp) * sc * (wG + wK + wI * T.carve.ice + wP * T.carve.powder) * ground * (1 - 0.35 * Math.min(1, skid));
     g.growl = T.carve.growl * board * edge * sc * load * (hard + 0.3 * wP) * ground;
@@ -113,8 +115,9 @@ class SnowProcessor extends AudioWorkletProcessor {
     g.ice = T.ice.gain * wI * sc * (0.5 + edge + Math.min(1, skid)) * ground;
     g.chatter = clamp(p.chatter, 0, 1) * T.chatter.depth * ground;
     g.grainRate = (T.grains.rate0 + T.grains.ratePerV * speed * (1 + T.grains.rateEdge * edge * load) + 900 * Math.min(1, skid) * mv) * mv * ground;
-    g.grainRate = Math.min(T.grains.max, g.grainRate) * clamp(p.rate, 0.2, 1.5);
-    g.grainAmp = T.grains.gain * (wG + wK + wI * 0.8 + wP * 0.6) * (0.55 + 0.45 * Math.min(1, s01)) * (1 - 0.5 * sink);
+    g.grainRate = Math.min(T.grains.max, g.grainRate) * clamp(p.rate, 0.2, 1.5) * lerp(1, T.grains.boardRate, board);
+    g.grainDecay = lerp(1, T.grains.boardDecay, board);   // a board's wide base: fewer, coarser, choppier grains
+    g.grainAmp = T.grains.gain * (wG + wK + wI * 0.8 + wP * 0.6) * (0.55 + 0.45 * Math.min(1, s01)) * (1 - 0.5 * sink) * lerp(1, T.grains.boardAmp, board) * lerp(0.7, 1, weight);
     g.width = lerp(T.width.ski, T.width.board, board);
     g.board = board;
     g.out = T.out * p.gain;
@@ -166,7 +169,7 @@ class SnowProcessor extends AudioWorkletProcessor {
       c.growl.set(g.fGrowl, 0.8, fs);
       c.skid.set(g.fSkid, T.skid.q, fs); c.spray.set(T.skid.sprayF * g.r, 0.6, fs);
       c.powder.set(g.fPowder, T.powder.q, fs);
-      c.base.set(T.base.f * g.r, 0.7, fs);
+      c.base.set(T.base.f * g.r, 0.7, fs); c.lowCut.set(T.base.lowCut, 0.7, fs);
       c.iceH.set(T.ice.hp * g.r, 0.7, fs); c.iceB.set(T.ice.bp * g.r, T.ice.q, fs);
       c.scr1.set(this.scrF1 * g.r * lerp(1, 0.7, g.board), S.q, fs); c.scr2.set(this.scrF2 * g.r * lerp(1, 0.7, g.board), S.q, fs);
       c.grain.set(g.fGrain, T.grains.q, fs);
@@ -199,7 +202,7 @@ class SnowProcessor extends AudioWorkletProcessor {
         const k = this.gi; this.gi = (this.gi + 1) % K;
         const u = this.rng.u();
         env[k] = grainAmp * (0.12 + 0.88 * u * u * u);
-        const tau = lerp(T.grains.decayMin, T.grains.decayMax, this.rng.u());
+        const tau = lerp(T.grains.decayMin, T.grains.decayMax, this.rng.u()) * g.grainDecay;
         dec[k] = Math.exp(-1 / (tau * fs));
         pan[k] = width > 0.5 ? (this.rng.u() < 0.5 ? 0.15 : 0.85) + this.rng.bi() * 0.12 : 0.5 + this.rng.bi() * 0.2;
       }
@@ -214,7 +217,7 @@ class SnowProcessor extends AudioWorkletProcessor {
         const c = ci === 0 ? C0 : C1;
         const w = c.rng.bi(), pk = c.pink.next(w);
         c.brown = (c.brown + 0.02 * w) / 1.02;
-        const br = c.brown * 3.5;
+        const br = c.lowCut.hp(c.brown * 3.5);   // no sub-bass rumble under the base (the board reference is quiet below 150 Hz)
         let s = c.hissLP.lp(c.hiss.hp(pk * 0.8 + w * T.hiss.white)) * hiss * 1.8 * cordAM;
         s += (c.c1.bp(w) * 1.3 + c.c2.bp(w)) * carve * chatAM;
         s += c.growl.bp(br) * growl * 1.6;

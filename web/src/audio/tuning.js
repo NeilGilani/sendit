@@ -42,15 +42,15 @@ export const AUDIO = {
     vStart: 0.4,          // below this nothing slides
     // glide hiss: pink noise band, centre rises with speed
     // (+7 dB per speed doubling ≈ v^1.15; centre ≈ 1.6 kHz · (v / 5)^0.45 — research-real.md §3)
-    hiss: { gain: 0.5, hp: 300, lp: 7000, lpMax: 15000, fExp: 0.45, white: 0.12, board: 0.45, exp: 1.15, powder: 0.18, ice: 0.8, park: 1.05 },
+    hiss: { gain: 0.5, hp: 300, lp: 7000, lpMax: 15000, fExp: 0.45, white: 0.12, board: 0.38, boardGain: 0.55, flat: 0.4, exp: 1.15, powder: 0.18, ice: 0.8, park: 1.05 },
     // groomer corduroy: fine ridges ~2.2 cm apart → a zippy AM at v / spacing on flat bases
     corduroy: { depth: 0.22, spacing: 0.022 },
     // crystal grains: Poisson clicks (fracturing snow) — the granular crunch that never loops
     grains: { rate0: 60, ratePerV: 160, rateEdge: 2.2, max: 5000, gain: 0.2, decayMin: 0.00025, decayMax: 0.0016,
-      fGroomed: 2600, fIce: 4200, fPowder: 900, fCold: 1300, q: 0.55, raw: 0.08, board: 0.65 },
+      fGroomed: 2600, fIce: 4200, fPowder: 900, fCold: 1300, q: 0.55, raw: 0.08, board: 0.65, boardRate: 0.35, boardDecay: 4, boardAmp: 1.1 },
     // the edge "rip" of a carve: two resonant bands + board growl, wobbling slowly
     carve: { gain: 0.75, f1: 520, f2: 1700, fSpeed: 0.7, q1: 1.2, q2: 1.5, wobble: 0.12, edgeExp: 1.3, loadExp: 0.9,
-      ice: 1.35, powder: 0.25, boardF: 0.5, growl: 1.2, growlF: 260 },
+      ice: 1.35, powder: 0.25, boardF: 0.5, growl: 1.2, growlF: 320 },
     // edge chatter on hard snow: irregular AM at 16–34 Hz
     chatter: { fMin: 20, fMax: 40, boardMin: 15, boardMax: 35, depth: 0.85 },   // ski / board bending modes
     // skid / slide / hockey stop: rough scrape + thrown spray
@@ -59,7 +59,7 @@ export const AUDIO = {
     // fresh snow absorbs the highs: low-pass ≈ 600 + 40·v Hz, edge hiss −15 dB
     powder: { gain: 0.42, f0: 600, fPerV: 40, q: 0.55, hp: 110, shh: 0.9, sinkBoost: 1.6, absorbF: 2600, absorbMax: 0.85 },
     // a snowboard's wide flat base: low rumble on hardpack
-    base: { gain: 0.75, f: 230 },   // the board reference (snowboard on ice) peaks at 250 Hz
+    base: { gain: 0.75, f: 260, lowCut: 130 },   // the board reference (snowboard on ice) peaks at 250 Hz
     // ice: thin harsh scrape on top of everything else
     ice: { gain: 0.38, hp: 2200, bp: 3800, q: 1.0,
       scrape: { gain: 3.0, q: 8, fMin: 2000, fMax: 6000, walk: 0.06 } },   // narrow edge-scrape peaks wandering 2–6 kHz
