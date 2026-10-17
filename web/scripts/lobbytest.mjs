@@ -304,7 +304,6 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await ctx.close();
 }
 
-
 await browser.close();
 ok(errors.length === 0, `no console errors${errors.length ? `:\n  ${errors.slice(0, 8).join('\n  ')}` : ''}`);
 console.log(failures ? `\n${failures} check(s) failed` : '\nall checks passed');
