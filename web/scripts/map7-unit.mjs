@@ -53,8 +53,8 @@ for (const t of L.TRAILS) {
   const sh = c.height(s.x, s.z);
   const ahead = c.height(s.x - Math.sin(s.heading) * 30, s.z - Math.cos(s.heading) * 30);
   ok(`trailSpawn(${t.id}) on the snow, inside the tile, facing downhill`, Number.isFinite(s.x + s.z + s.heading) && Math.abs(s.x) < 1450 && Math.abs(s.z) < 1450 && sh > SEA + 20 && ahead < sh - 3, `${Math.round(sh - SEA)} m above the sea, ${Math.round(sh - ahead)} m drop over 30 m`);
-  const fh = c.height(f.x, f.z);
-  ok(`trailFinish(${t.id}) at the water's edge`, f.radius > 20 && fh > SEA - 1 && fh < SEA + 60 && c.progress(f.x, f.z) > L.FINISH_U - f.radius - 20, `${Math.round(fh - SEA)} m above the sea, progress ${Math.round(c.progress(f.x, f.z))}`);
+  const fh = c.height(f.at.x, f.at.z);
+  ok(`trailFinish(${t.id}) at the water's edge`, f.progress === L.FINISH_U && fh > SEA - 1 && fh < SEA + 60 && Math.abs(c.progress(f.at.x, f.at.z) - L.FINISH_U) < 60, `${Math.round(fh - SEA)} m above the sea, progress ${Math.round(c.progress(f.at.x, f.at.z))}`);
 }
 ok('unknown trail → null', c.trailSpawn('nope') === null && c.trailFinish('nope') === null);
 ok('default spawn is the first trail (Skaret)', c.spawnPoint().x === c.trailSpawn('skaret').x);
@@ -75,7 +75,8 @@ ok(`summit col ${Math.round(c.top - SEA)} m above the fjord (Lyngen: 1,200–1,6
   const u = 312, vc = L.COULOIR.centre(u);
   let w = 0;
   for (let dv = -30; dv <= 30; dv += 0.5) if (H(u, vc + dv) - H(u, vc) < 3) w += 0.5;
-  ok(`Skaret's choke is narrow (${w} m of floor) with ≥ 25 m walls`, w > 5 && w < 14 && H(u, vc + 30) - H(u, vc) > 25 && H(u, vc - 30) - H(u, vc) > 25);
+  const wall = (sg) => { let m = 0; for (let d = 8; d <= 40; d += 1) m = Math.max(m, H(u, vc + sg * d) - H(u, vc)); return m; };
+  ok(`Skaret's choke is narrow (${w} m of floor) with ≥ 25 m walls`, w > 5 && w < 14 && wall(1) > 25 && wall(-1) > 25, `${wall(-1).toFixed(0)} / ${wall(1).toFixed(0)} m`);
   let steep = 0;
   for (let k = 120; k < 560; k += 20) steep += (H(k - 2, L.COULOIR.centre(k - 2)) - H(k + 2, L.COULOIR.centre(k + 2))) / 4;
   steep = Math.atan(steep / 22) * 180 / Math.PI;

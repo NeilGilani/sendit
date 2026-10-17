@@ -299,7 +299,11 @@ export class FjordlineCourse {
     if (low > 0) e += low * (fbm(u / 260 + 4, v / 120, 2) - 0.5) * 14;
     // Big buttresses and bowls across the whole mountain (seen from the fjord it must not read as a plane).
     const wide = sstep(60, 300, u) * (1 - sstep(1900, 2200, u)) * land;
-    if (wide > 0) e += wide * (fbm(u / 700 + 1.3, v / 230 + 8.1, 3) - 0.5) * 80 * (1 - 0.8 * Math.exp(-((this.lineDistFast(u, v) / 50) ** 2)));
+    if (wide > 0) {
+      // Twice as strong far from the lines (≥ 200 m): ribs and bowls you see from the fjord, the lines ride as before.
+      const ld = this.lineDistFast(u, v);
+      e += wide * (fbm(u / 700 + 1.3, v / 230 + 8.1, 3) - 0.5) * (80 + 90 * sstep(90, 200, ld)) * (1 - 0.8 * Math.exp(-((ld / 50) ** 2)));
+    }
     if (u > 130 && u < 1750) e += this.outcrops(u, v);
     for (const B of BUTTRESSES) e += buttress(u, v, B);
     e += this.spines(u, v);
@@ -384,7 +388,8 @@ export class FjordlineCourse {
   hits(u, v) {
     let add = 0;
     for (const [hu, hv, L, H, kind] of HITS) {
-      const du = u - hu, dv = Math.abs(v - hv);
+      // Long rollers wander across the slope (a ruler-straight 600 m roller reads as a terrace from the fjord).
+      const du = u - hu - (L > 100 ? 22 * (noise1(v / 110, hu) * 2 - 1) : 0), dv = Math.abs(v - hv);
       if (du < -60 || du > 30 || dv > L + 25) continue;
       const lat = 1 - sstep(L - 14, L + 10, dv);
       if (lat <= 0) continue;
@@ -402,7 +407,8 @@ export class FjordlineCourse {
     if (dv > R.half + 10) return 0;
     const lat = 1 - sstep(R.half - 50, R.half + 10, dv);
     let add = 0;
-    for (const ur of R.us) { const t = (u - ur) / R.width; if (Math.abs(t) < 3.5) add += R.h * Math.exp(-t * t); }
+    const wob = 14 * (noise1(v / 70, 5) * 2 - 1);
+    for (const ur of R.us) { const t = (u - ur - wob) / R.width; if (Math.abs(t) < 3.5) add += R.h * Math.exp(-t * t); }
     return add * lat;
   }
 
@@ -421,8 +427,9 @@ export class FjordlineCourse {
     if (H <= 0.05) return e;
     const t = (dv - hw) / C.mass;
     // Steep walls at the foot (quarter-pipe transition), a rough top, falling back to the face on the outside.
-    const w = t < 0.02 ? 0.12 * (t / 0.02) ** 2 : t < 0.16 ? 0.12 + 0.88 * smooth((t - 0.02) / 0.14) : 1 - sstep(0.55, 1, t);
-    const rough = 1 + 0.18 * (ridged(u / 25, v / 25, 2) - 0.5);
+    // (aretes along the couloir's lips, the rock mass falling away outside them, not a flat-topped block).
+    const w = t < 0.02 ? 0.12 * (t / 0.02) ** 2 : t < 0.16 ? 0.12 + 0.88 * smooth((t - 0.02) / 0.14) : 1 - 0.55 * sstep(0.16, 0.7, t) - 0.45 * sstep(0.6, 1, t);
+    const rough = 1 + 0.4 * (ridged(u / 22, v / 22, 2) - 0.5);
     return e + H * w * rough;
   }
 
@@ -471,7 +478,7 @@ export class FjordlineCourse {
       return 'Skaret';
     }
     if (u > SPINES.u0 && u < SPINES.u1 && v > SPINES.v0 - 10 && v < SPINES.v1 + 10) return 'Sølvryggene';
-    for (const [hu, hv, L, , kind, name] of HITS) if (u > hu - 22 && u < hu + 6 && Math.abs(v - hv) < L) return name || (kind === 'lip' ? 'Wind Lip' : 'Roller');
+    for (const [hu, hv, L, , kind, name] of HITS) if (u > hu - (L > 100 ? 45 : 22) && u < hu + (L > 100 ? 28 : 6) && Math.abs(v - hv) < L) return name || (kind === 'lip' ? 'Wind Lip' : 'Roller');
     if (Math.abs(v - SHOULDER.crest(u)) < SHOULDER_ROLLERS.half && SHOULDER_ROLLERS.us.some((r) => Math.abs(u - r) < 18)) return 'Fjordryggen Roller';
     if (u < 70) return 'The Col';
     return null;
@@ -498,6 +505,8 @@ export class FjordlineCourse {
 
   pisteAt(x, z) {
     const u = x - START_X;
+    // The village lanes, the beach and the harbour stay clear (scatter.js also plants sparse trees where forestAt is 0).
+    if (u > 2330 - 25 * noise1(z / 60, 9) && u > coastU(z) - 240) return 1;
     if (u > 1550 && this.lineDist(u, z) < 13 + 4 * (noise1(u / 41 + z / 57, 77) * 2 - 1)) return 1;
     for (const s of this.structures) if (Math.hypot(x - s.x, z - s.z) < s.R + 10) return 1;
     return 0;
@@ -579,12 +588,17 @@ export class FjordlineCourse {
     return z ? { x: z.x, z: z.z, heading: z.heading } : null;
   }
 
-  /** The trail's finish: the harbour quay, Sandvika (the cruiser) or the lighthouse (the headland). */
+  /**
+   * The trail's finish ({ progress } form of the contract): every trail ends at the water's edge, so the finish is
+   * "reached the coast" — progress() is normalised to the bay, Sandvika and the point, which keeps a rider who
+   * strays to another beach from being stuck without a finish. `at` is where the trail's own finish is (the
+   * harbour quay, Sandvika for the cruiser, the lighthouse for the headland), for HUD / map markers.
+   */
   trailFinish(trailId) {
     if (!TRAILS.some((t) => t.id === trailId)) return null;
-    if (trailId === 'kvalneset') return { x: START_X + LIGHTHOUSE.u + 20, z: HEADLAND.crest(LIGHTHOUSE.u + 20), radius: 45 };
-    if (trailId === 'fjordlopa') return { x: START_X + 2470, z: -470, radius: 70 };
-    return { x: START_X + FINISH_U + 10, z: -100, radius: 150 };
+    const at = trailId === 'kvalneset' ? { x: START_X + LIGHTHOUSE.u + 20, z: HEADLAND.crest(LIGHTHOUSE.u + 20) }
+      : trailId === 'fjordlopa' ? { x: START_X + 2470, z: -470 } : { x: START_X + FINISH_U + 10, z: -100 };
+    return { progress: FINISH_U, at };
   }
 
   /** Which trail a rider at world (x, z) is on: the nearest canonical line (and its trail). */
@@ -606,9 +620,12 @@ export class FjordlineCourse {
   onPlayer(p) {
     const run = { t: 0, trail: null, votes: new Map(), finished: false, vote: 0 };
     const reset = () => { run.t = 0; run.votes.clear(); run.finished = false; run.trail = null; run.vote = 0; p._fjordSplash = 0; };
+    let lastEmit = -1e9;   // the ride tracker (profile/tracker.js) also announces finished runs: never twice
+    const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
     const done = (res) => {
       if (run.finished) return;
       run.finished = true;
+      if (now() - lastEmit < 2000) return;
       let trail = run.trail, n = 0;
       for (const [k, c] of run.votes) if (c > n) { n = c; trail = k; }
       const ev = { mapId: this.id, trailId: trail ?? this.trailAt(p.position.x, p.position.z), distance: Math.round(game.distance), time: +(res?.raw ?? res?.time ?? run.t).toFixed(2), score: Math.round(res?.score ?? game.score) };
@@ -618,6 +635,7 @@ export class FjordlineCourse {
     const offs = [
       on('rideStarted', reset), on('resetTop', reset),
       on('dropZone', (z) => { reset(); run.trail = z?.trail ?? null; }),
+      on('runCompleted', (e) => { if (e?.mapId === this.id && e !== this.lastRun) lastEmit = now(); }),
       on('runComplete', () => done(null)),
       on('runFinished', (res) => done(res)),
     ];
@@ -678,7 +696,9 @@ export class FjordlineCourse {
     return { x: nx, z, heading: Math.abs(z + 100) < 40 ? -Math.PI / 2 : toQuay };
   }
 
-  lobbySpot() { return { x: START_X + 22, z: 120, heading: -Math.PI / 2 + 0.12 }; }
+  /** The lobby stands on the beach by the quay, looking out over the pier, the rorbuer and the fjord (the lobby camera
+   *  looks down a little: uphill it would see only snow). */
+  lobbySpot() { return { x: START_X + 2392, z: -40, heading: -1.78 }; }
 
   // ---------------------------------------------------------------- collectibles, gates
   /** The 12 golden snowflakes: on the lips, the couloir, the roofs, the headland, the pier. y above the snow. */

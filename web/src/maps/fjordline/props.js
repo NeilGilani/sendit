@@ -470,7 +470,7 @@ function buildCairn(course, M, terrain, bag) {
     const k = i / 9, rad = 1.0 - k * 0.75;
     const s = new THREE.DodecahedronGeometry(0.42 * (1 - k * 0.4), 0);
     s.translate(c.x + (r() - 0.5) * rad, g + 0.25 + k * 2.1, c.z + (r() - 0.5) * rad);
-    bag.add(M.stone, s.toNonIndexed());
+    bag.add(M.stone, s);   // polyhedra are already non-indexed
   }
 }
 
@@ -511,14 +511,18 @@ void main() {
   vec3 N = normalize(vec3(-g.x * calm, 1.0, -g.y * calm));
   vec3 R = reflect(-V, N);
   R.y = abs(R.y) + 0.002;
-  vec3 sky = skyLUT(lut, R);
+  // Reflected sky: a fjord's horizon reflects the far shore's dark mountains, not the bright horizon sky, so
+  // the reflection reads higher, bluer sky, dimmed toward the horizon.
+  vec3 Rs = normalize(vec3(R.x, max(R.y, 0.0) * 0.8 + 0.22, R.z));
+  vec3 sky = skyLUT(lut, Rs) * mix(0.55, 0.9, smoothstep(0.02, 0.3, R.y));
   float ndv = max(dot(N, V), 0.0);
   float fr = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
   // Water body: deep blue-green, lit by the sky; the shallows by the shore turn teal over the pale shingle.
   float u = vWp.x - startX;
   float sh = 1.0 - smoothstep(0.0, 45.0, abs(u - shoreU));
-  vec3 body = mix(deep, shallow, sh * 0.6) * (skyAmb * 0.9 + sunCol * max(sunDir.y, 0.0) * 0.25);
-  vec3 col = mix(body, sky * 0.92, fr);
+  float skyL = dot(skyAmb, vec3(0.2126, 0.7152, 0.0722));
+  vec3 body = mix(deep, shallow, sh * 0.6) * (skyL * 2.2 + 0.35);   // lit by the sky's brightness, keeps its own blue (it must survive the warm haze)
+  vec3 col = mix(body, sky, fr * 0.8);
   // The sun's glitter path: sharp specular on the ripples, broader warm sheen.
   float sd = max(dot(R, sunDir), 0.0);
   col += sunCol * (pow(sd, 900.0) * 60.0 + pow(sd, 90.0) * 1.2) * (0.6 + 0.4 * calm);
@@ -532,7 +536,7 @@ function buildWater(terrain) {
   const uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
     lut: { value: ATMO.tex }, noiseTex: { value: noise }, sunDir: { value: globals.uSunDir.value }, sunCol: { value: globals.uSunCol.value },
     skyAmb: { value: globals.uSkyAmb.value }, time: { value: 0 },
-    deep: { value: new THREE.Color(0x0d2b44).convertSRGBToLinear() }, shallow: { value: new THREE.Color(0x2d7a80).convertSRGBToLinear() },
+    deep: { value: new THREE.Color(0x1b4d78).convertSRGBToLinear() }, shallow: { value: new THREE.Color(0x2f8a8f).convertSRGBToLinear() },
     shoreU: { value: SHORE_U }, startX: { value: START_X },
   }]);
   uniforms.noiseTex.value = noise;
@@ -546,6 +550,7 @@ function buildWater(terrain) {
   m.name = 'FjordWater';
   m.frustumCulled = false;
   m.receiveShadow = false;
+  m.renderOrder = 5;   // after the terrain: early depth rejects the water the land hides
   m.onBeforeRender = () => {
     uniforms.time.value = globals.uTime.value;
     uniforms.lut.value = ATMO.tex;   // re-baked by the per-map atmosphere hook

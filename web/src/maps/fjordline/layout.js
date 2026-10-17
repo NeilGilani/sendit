@@ -25,6 +25,7 @@ export const PROFILE = [
   [360, 18],    // birch line: Bjørkehoppet
   [180, 11],    // the village slope
   [70, 5],      // down to the beach
+  [70, 4],      // the beach still runs down to the quay (no dead flat before the finish: turning riders reach it)
   [9000, 0],    // the beach / quay flats (the coast cut takes it under the sea)
 ];
 export const BEHIND = [[22, 4], [200, -34], [9000, -12]];   // behind the col (negative = falling away backward)
@@ -141,7 +142,9 @@ export function finishCoastU(v) {
 }
 
 // The fjord beyond: the far shore, and how deep the water gets.
-export const FJORD = { farShore: 6400, depth: 60, shelf: 0.9 };
+// depth 44: the seabed stays above features.js's valley-fog threshold (mistTop − 150 = 1800), so no fog pocket
+// billboard is planted on the shallow shelf, where it poked through the water as a hazy rectangle.
+export const FJORD = { farShore: 6400, depth: 44, shelf: 0.9 };
 
 // Buildings. u, v = centre; yaw = rotation of the long axis away from the fall line (rad); L along it, W across;
 // roof: 'gable' (ridge across the long axis), 'mono'; stilts: m of stilts on the water side (rorbuer).
@@ -149,13 +152,13 @@ export const FJORD = { farShore: 6400, depth: 60, shelf: 0.9 };
 export const BUILDINGS = [
   // The roof-hop row on the jump line (Brygga): long axis down the fall line, ridge across it.
   // Each roof is a kicker: ride the drift up the uphill slab, air off the ridge, land on the downhill slab or past the eave.
-  { id: 'hus1', name: 'Kjøpmannshuset', u: 2205, v: -112, L: 13, W: 10, roof: 'gable', pitch: 27, eave: 3.6, drift: 0.62, driftSlope: 0.05, ramp: 3.2, colour: 'white', chimney: [0.25, 0.62] },
+  { id: 'hus1', name: 'Kjøpmannshuset', u: 2205, v: -112, L: 13, W: 10, roof: 'gable', pitch: 27, eave: 3.6, drift: 0.62, driftSlope: 0.05, ramp: 3.2, colour: 'red', chimney: [0.25, 0.62] },
   { id: 'hus2', name: 'Bakeriet', u: 2262, v: -108, L: 12, W: 9, roof: 'gable', pitch: 28, eave: 3.4, drift: 0.62, driftSlope: 0.05, ramp: 3.2, colour: 'ochre', chimney: null },
-  { id: 'hus3', name: 'Postkontoret', u: 2318, v: -106, L: 12, W: 9.5, roof: 'gable', pitch: 26, eave: 3.4, drift: 0.62, driftSlope: 0.05, ramp: 3.2, colour: 'red', chimney: [-0.3, -0.62] },
+  { id: 'hus3', name: 'Postkontoret', u: 2318, v: -106, L: 12, W: 9.5, roof: 'gable', pitch: 26, eave: 3.4, drift: 0.62, driftSlope: 0.05, ramp: 3.2, colour: 'white', chimney: [-0.3, -0.62] },
   // Naust: the boathouse at the top of the beach (jump it: Naustgapet).
-  { id: 'naust', name: 'Naustgapet', u: 2400, v: -110, L: 8, W: 7, roof: 'gable', pitch: 32, eave: 2.4, drift: 0.92, driftSlope: 0.04, ramp: 3, colour: 'tar', chimney: null, yaw: 0 },
+  { id: 'naust', name: 'Naustgapet', u: 2400, v: -110, L: 8, W: 7, roof: 'gable', pitch: 30, eave: 2.1, drift: 0.92, driftSlope: 0.04, ramp: 3, colour: 'tar', chimney: null, yaw: 0 },
   // Village houses off the line.
-  { id: 'hus4', name: 'Skolen', u: 2240, v: 40, L: 18, W: 10, roof: 'gable', pitch: 32, eave: 5.2, drift: 0, driftSlope: 0.05, colour: 'white', yaw: Math.PI / 2 },
+  { id: 'hus4', name: 'Skolen', u: 2240, v: 40, L: 18, W: 10, roof: 'gable', pitch: 32, eave: 5.2, drift: 0, driftSlope: 0.05, colour: 'red', yaw: Math.PI / 2 },
   { id: 'hus5', name: 'Bedehuset', u: 2300, v: -300, L: 14, W: 9, roof: 'gable', pitch: 40, eave: 4.6, drift: 0, driftSlope: 0.05, colour: 'white', yaw: Math.PI / 2 },
   { id: 'hus6', name: 'Gamle Smia', u: 2335, v: 110, L: 9, W: 7, roof: 'gable', pitch: 36, eave: 3.2, drift: 0, driftSlope: 0.05, colour: 'red', chimney: [0, 0.4] },
   { id: 'hus7', name: 'Fiskarheimen', u: 2195, v: 180, L: 11, W: 9, roof: 'gable', pitch: 34, eave: 4.0, drift: 0, driftSlope: 0.05, colour: 'ochre' },
@@ -169,7 +172,7 @@ export const BUILDINGS = [
 ];
 
 // The harbour: a timber quay along the shore and a pier into the fjord (rideable decks), all at QUAY m above the sea.
-export const QUAY = 2.0;
+export const QUAY = 1.4;   // flush with the beach (no curb), 1.4 m over the water
 export const HARBOUR = {
   quay: { u0: SHORE_U - 22, u1: SHORE_U + 6, v0: -240, v1: 30 },       // along the shore, the finish arch on it
   pier: { u0: SHORE_U - 4, u1: SHORE_U + 86, v0: -52, v1: -44 },       // out into the fjord (jump off the end: splash)
