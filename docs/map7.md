@@ -100,7 +100,8 @@ itself (the props sample the same function the physics uses).
 ```
 web/src/maps/fjordline/
   index.js       registerMap (id 'fjordline', order 7): mountain card (Skarvtinden · Lyngen, Troms), trails (static),
-                 thumbnail (inline SVG), lobby spot; loads course.js and props.js lazily
+                 thumbnail (inline SVG), lobby spot (on the beach by the quay, looking out over the pier and the
+                 fjord); loads course.js and props.js lazily
   layout.js      every feature: profiles (face, shoulder), cirque, couloir, bands, spines, buttresses, hits, shoulder
                  rollers, headland, coast, buildings, harbour, drop zones, trails, line goals, ride lines
   course.js      FjordlineCourse: height function, tile generation, Course-compatible interface, features hooks,

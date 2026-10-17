@@ -696,7 +696,9 @@ export class FjordlineCourse {
     return { x: nx, z, heading: Math.abs(z + 100) < 40 ? -Math.PI / 2 : toQuay };
   }
 
-  lobbySpot() { return { x: START_X + 22, z: 120, heading: -Math.PI / 2 + 0.12 }; }
+  /** The lobby stands on the beach by the quay, looking out over the pier, the rorbuer and the fjord (the lobby camera
+   *  looks down a little: uphill it would see only snow). */
+  lobbySpot() { return { x: START_X + 2392, z: -40, heading: -1.78 }; }
 
   // ---------------------------------------------------------------- collectibles, gates
   /** The 12 golden snowflakes: on the lips, the couloir, the roofs, the headland, the pier. y above the snow. */
