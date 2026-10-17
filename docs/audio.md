@@ -250,6 +250,12 @@ The test fails on:
 
 `audio-dsp.mjs` fails on NaNs, on ordinary riding reaching the worklets' safety knee, and on blow-ups.
 
+## Live debugging
+
+Add `?audiodebug` to the URL for a small overlay showing what the engine is fed: speed, edge, load, skid, the
+surface mix, sink, chatter, wind and spin, the music duck and low-pass, camera distance, music energy, and recent
+event counts. `window.__senditAudio` is the SoundScape and `.engine` the AudioEngine.
+
 ## Tuning tips
 
 - **Too much or too little snow:** `mix.snow`, then the per-layer `gain`s in `snow`.
