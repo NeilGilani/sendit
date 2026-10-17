@@ -68,7 +68,7 @@ const CSS = /* css */`
 #juiceHud .an .t { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.05; letter-spacing: .02em; -webkit-text-stroke: 3px #1b1446; paint-order: stroke fill; text-shadow: 0 5px 0 rgba(27,20,70,.55); }
 #juiceHud .an .s { font-size: 26px; color: #2ff5d6; margin-top: 2px; -webkit-text-stroke: 1.5px #1b1446; paint-order: stroke fill; }
 #juiceHud .an .s small { font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 900; font-size: 14px; letter-spacing: .16em; color: #fffaf0; margin-left: 10px; -webkit-text-stroke: 0; text-shadow: 0 1px 2px #1b1446, 0 0 8px rgba(27,20,70,.9); }
-#juiceHud .an .nw { display: none; margin: 0 auto 6px; width: max-content; font-size: 13px; letter-spacing: .3em; padding: 3px 10px 3px 13px; border-radius: 3px; color: #1b1446;
+#juiceHud .an .nw { display: none; margin: 6px auto 0; width: max-content; font-size: 13px; letter-spacing: .3em; padding: 3px 10px 3px 13px; border-radius: 3px; color: #1b1446;
   background: linear-gradient(90deg, #2ff5d6, #ffe14d); box-shadow: 0 0 18px rgba(47,245,214,.7); animation: jhBlink .35s 4 alternate; }
 #juiceHud .an.new .nw { display: block; }
 @keyframes jhSlam {
@@ -148,7 +148,7 @@ export function mountJuiceHud({ player, combo, input, camera }) {
     <div class="eg"></div><div class="fl"></div>
     <div class="cb"><div><span class="m stroke">×1</span><span class="p stroke">0</span></div><div class="tr"></div><div class="it"></div><div class="tm"><i></i></div><div class="rk">LAND IT</div></div>
     <div class="sp"><span></span><small>SPLIT</small></div>
-    <div class="an"><div class="nw">NEW TRICK</div><div class="g"><span></span></div><div class="t"></div><div class="s"></div></div>
+    <div class="an"><div class="g"><span></span></div><div class="t"></div><div class="s"></div><div class="nw">NEW TRICK</div></div>
     <div class="air"><div class="d">0</div><div class="x"></div></div>
     <div class="co stroke"></div>
     <div class="bn"></div>

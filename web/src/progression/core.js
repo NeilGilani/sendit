@@ -81,6 +81,29 @@ export function dailiesFor(day, rerolls = {}) {
   return out;
 }
 
+// One weekly challenge per local week (Monday to Sunday): a bigger goal, accumulated over the week.
+export const WEEKLY_POOL = [
+  { stat: 'scoreSum', goal: 40000, title: 'Score 40,000 this week', desc: 'Style points across all rides', xp: 1500 },
+  { stat: 'tricks', goal: 60, title: 'Land 60 tricks this week', desc: 'Spins, flips, grabs and rails', xp: 1500 },
+  { stat: 'meters', goal: 25000, title: 'Ride 25 km this week', desc: 'Any map, any mode', xp: 1500, unit: 'km' },
+  { stat: 'near', goal: 200, title: '200 close shaves this week', desc: 'Skim the trees', xp: 1500 },
+  { stat: 'combo3n', goal: 10, title: 'Bank ten ×3 combos this week', desc: 'Chain it, ride it out', xp: 1600 },
+  { stat: 'stomps', goal: 30, title: 'Stomp 30 landings this week', desc: 'PERFECT or STOMPED', xp: 1500 },
+];
+
+/** Monday of the local week as YYYY-MM-DD. */
+export function weekKey(date = new Date()) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return dayKey(d);
+}
+
+export function weeklyFor(week) {
+  const r = rng(`week#${week}`);
+  const t = WEEKLY_POOL[Math.floor(r() * WEEKLY_POOL.length)];
+  return { id: `w:${week}`, scope: 'week', ...t };
+}
+
 // ---------------------------------------------------------------- achievements
 // test(stats, ctx) on lifetime stats (`life`) and this ride's (`ride`); xp on unlock.
 export const ACHIEVEMENTS = [
@@ -124,6 +147,7 @@ export function defaultState() {
     version: PROGRESSION_VERSION, xp: 0,
     life: { rides: 0, tricks: 0, flips: 0, stomps: 0, near: 0, meters: 0, air: 0, grindM: 0, maxSpin: 0, bestMult: 0, topKmh: 0, golds: 0, dailySweeps: 0, maps: {}, trickBook: {} },
     daily: null,           // { day, rerolls: {slot: n}, rerollsLeft, progress: {stat: n}, done: {id: true}, swept }
+    weekly: null,          // { week, progress: {stat: n}, done }
     achievements: {},      // id → unlock time (ms)
     pb: {},                // mapId → { stat: value }
   };
@@ -144,6 +168,7 @@ export function sanitizeState(raw) {
     day: raw.daily.day, rerolls: { ...(raw.daily.rerolls || {}) }, rerollsLeft: num(raw.daily.rerollsLeft, 1),
     progress: { ...(raw.daily.progress || {}) }, done: { ...(raw.daily.done || {}) }, swept: !!raw.daily.swept,
   } : null;
+  s.weekly = raw.weekly && typeof raw.weekly.week === 'string' ? { week: raw.weekly.week, progress: { ...(raw.weekly.progress || {}) }, done: !!raw.weekly.done } : null;
   return s;
 }
 
@@ -196,6 +221,19 @@ export class Progression {
     return this.state.daily;
   }
 
+  ensureWeek() {
+    const week = weekKey(this.now());
+    if (this.state.weekly?.week !== week) this.state.weekly = { week, progress: {}, done: false };
+    return this.state.weekly;
+  }
+
+  /** This week's challenge: { id, title, desc, goal, value, done, xp, unit? }. */
+  weekly() {
+    const w = this.ensureWeek();
+    const c = weeklyFor(w.week);
+    return { ...c, value: Math.min(c.goal, w.progress[c.stat] || 0), done: w.done };
+  }
+
   challenges() {
     const d = this.ensureDay();
     return dailiesFor(d.day, d.rerolls).map((c) => {
@@ -219,6 +257,7 @@ export class Progression {
     const d = this.ensureDay();
     if (max) d.progress[stat] = Math.max(d.progress[stat] || 0, by);
     else d.progress[stat] = (d.progress[stat] || 0) + by;
+    if (!max) { const w = this.ensureWeek(); w.progress[stat] = (w.progress[stat] || 0) + by; }
     this.checkChallenges();
   }
 
@@ -232,6 +271,13 @@ export class Progression {
         this.emit('challengeDone', { challenge: { ...c, done: true } });
         this.addXP(c.xp, `Daily: ${c.title}`);
       }
+    }
+    const wk = this.weekly();
+    if (!wk.done && wk.value >= wk.goal) {
+      this.state.weekly.done = true;
+      this.ride?.dailies.push(wk.title);
+      this.emit('weeklyDone', { challenge: { ...wk, done: true } });
+      this.addXP(wk.xp, `Weekly: ${wk.title}`);
     }
     if (!d.swept && this.challenges().every((c) => c.done)) {
       d.swept = true;
@@ -271,6 +317,7 @@ export class Progression {
     if (!this.ride || points <= 0) return;
     this.ride.score += points;
     this.ride.rideScore = this.ride.score;
+    const w = this.ensureWeek(); w.progress.scoreSum = (w.progress.scoreSum || 0) + points;
     this.pbCheck('score', this.ride.score);
     this.addXP(points * XP_SOURCES.perPoint);
     this.checkChallenges();
@@ -332,6 +379,7 @@ export class Progression {
     if (!this.ride) return;
     this.state.life.bestMult = Math.max(this.state.life.bestMult, mult);
     for (const g of [2.5, 3, 4]) if (mult >= g) this.bump(`combo${g}`, 1, { max: true });
+    if (mult >= 3) this.bump('combo3n');
     this.pbCheck('combo', bonus);
     this.checkAchievements();
   }

@@ -213,6 +213,21 @@ Three challenges are chosen per local day from `CHALLENGE_POOL`, each from a dif
 | Rails | Grind 40, 80 or 150 m |
 | Medals | Earn a bronze, silver or gold medal |
 
+### Weekly challenge
+
+There is one bigger goal per local week, running Monday to Sunday (`WEEKLY_POOL`, `weekKey()`). It accumulates across every ride that week and pays about 1,500 XP once, with a gold toast and the medal sound.
+
+Pool:
+
+- Score 40,000.
+- Land 60 tricks.
+- Ride 25 km.
+- 200 close shaves.
+- Bank ten ×3 combos.
+- Stomp 30 landings.
+
+The Progress tab shows it under the dailies. API: `progression.getWeekly()`. Event: `weeklyDone {challenge}`.
+
 ### Achievements
 
 There are 24 (`ACHIEVEMENTS`), including:
@@ -247,6 +262,7 @@ progression.getProgress()           // → { level, into, need, xp, rank: { name
 progression.getChallenges()         // → [{ id, slot, cat, title, desc, goal, value, done, xp, unit? }] (today's three)
 progression.rerollChallenge(slot)   // → the new challenge, or null (one free swap per day)
 progression.rerollsLeft()           // → number
+progression.getWeekly()             // → this week's challenge { id, title, desc, goal, value, done, xp, unit? }
 progression.getAchievements()       // → [{ id, title, desc, xp, icon, unlocked (ms or 0) }]
 progression.getPersonalBests(mapId) // → { score?, air?, spin?, kmh?, combo? }
 progression.getTrickBook()          // → [{ name, n }] every trick / rail combo landed clean
@@ -266,6 +282,7 @@ Bus events (state.js):
 - `dailySweep`
 - `personalBest {mapId, stat, label, value, prev, text, was}`
 - `newTrick {name, count, xp}`
+- `weeklyDone {challenge}`
 - `progressRideSummary`
 
 **For reward cases.** Grant a case on level-ups like this:

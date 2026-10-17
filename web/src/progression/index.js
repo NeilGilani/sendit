@@ -8,6 +8,7 @@
 //   progression.getChallenges()       → today's three dailies [{ id, slot, title, desc, goal, value, done, xp, unit? }]
 //   progression.rerollChallenge(slot) → the new challenge, or null (one free reroll per day)
 //   progression.rerollsLeft()         → number
+//   progression.getWeekly()           → this week's challenge { id, title, desc, goal, value, done, xp, unit? }
 //   progression.getAchievements()     → [{ id, title, desc, xp, icon, unlocked (ms or 0) }]
 //   progression.getPersonalBests(mapId) → { score, air, spin, kmh, combo }
 //   progression.getTrickBook()        → [{ name, n }] every trick / rail combo landed clean, with counts
@@ -27,7 +28,7 @@ const localStore = {
   set(k, v) { try { globalThis.localStorage?.setItem(k, JSON.stringify(v)); } catch { /* private mode / quota */ } },
 };
 
-const BUS = { newTrick: 'newTrick', xp: 'progressXp', levelUp: 'juiceLevelUp', achievement: 'achievement', challengeDone: 'challengeDone', dailySweep: 'dailySweep', challengeProgress: 'challengeProgress', personalBest: 'personalBest' };
+const BUS = { weeklyDone: 'weeklyDone', newTrick: 'newTrick', xp: 'progressXp', levelUp: 'juiceLevelUp', achievement: 'achievement', challengeDone: 'challengeDone', dailySweep: 'dailySweep', challengeProgress: 'challengeProgress', personalBest: 'personalBest' };
 const listeners = new Map();   // core event → Set(fn)
 function fire(name, detail) {
   for (const fn of listeners.get(name) || []) { try { fn(detail); } catch (e) { console.error('[progression] listener', e); } }
@@ -46,6 +47,7 @@ export const progression = {
   getChallenges: () => C().challenges(),
   rerollChallenge: (slot) => C().reroll(slot),
   rerollsLeft: () => C().ensureDay().rerollsLeft,
+  getWeekly: () => C().weekly(),
   getAchievements: () => C().achievements(),
   getPersonalBests: (mapId) => C().pbs(mapId),
   getTrickBook: () => C().trickBook(),

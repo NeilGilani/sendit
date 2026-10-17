@@ -171,6 +171,31 @@ export async function run(test, assert) {
     assert.deepEqual(sanitizeState({ life: { trickBook: ['x'] } }).life.trickBook, {});
   });
 
+  await test('progression: weekly challenge accumulates all week, pays once, resets on Monday', () => {
+    const { p, of, setNow } = make('2026-10-14T12:00:00');   // a Wednesday
+    assert.equal(core.weekKey(new Date('2026-10-14T12:00:00')), '2026-10-12');
+    assert.equal(core.weekKey(new Date('2026-10-18T23:00:00')), '2026-10-12', 'Sunday is the same week');
+    assert.equal(core.weekKey(new Date('2026-10-19T00:30:00')), '2026-10-19', 'Monday starts a new one');
+    const wk = p.weekly();
+    assert.ok(wk.goal > 0 && wk.xp >= 1500 && wk.title);
+    p.startRide('valcrest-gully');
+    const feed = (n) => {
+      if (wk.stat === 'scoreSum') p.recordScore(n);
+      else if (wk.stat === 'combo3n') { for (let i = 0; i < n; i++) p.recordCombo(3, 100); }
+      else p.bump(wk.stat, n);
+    };
+    feed(Math.ceil(wk.goal / 2));
+    setNow('2026-10-17T12:00:00');   // Saturday: a new day, same week
+    feed(Math.ceil(wk.goal / 2));
+    assert.equal(of('weeklyDone').length, 1);
+    assert.equal(p.weekly().done, true);
+    feed(5);
+    assert.equal(of('weeklyDone').length, 1, 'pays once');
+    setNow('2026-10-19T09:00:00');
+    assert.equal(p.weekly().done, false);
+    assert.equal(p.weekly().value, 0);
+  });
+
   // ---------------------------------------------------------------- juice: combo chain + time warp
   await test('juice combo: own chain grows per different move, banks a bonus, loses on crash', () => {
     const pl = { state: 1, flow: null };

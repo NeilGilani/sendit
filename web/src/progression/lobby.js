@@ -32,6 +32,7 @@ const CSS = /* css */`
 .pg-ch.done .pg-bar i { background: var(--lb-cyan); }
 #lobby .pg-ch button.pg-rr { grid-row: 2; grid-column: 2; font-size: 0.72em; font-weight: 800; padding: 0.25em 0.7em; border-radius: 999px; color: #fff; background: rgba(255,255,255,0.1); transform: none; }
 #lobby .pg-ch button.pg-rr:hover, #lobby .pg-ch button.pg-rr:focus-visible { background: rgba(255,255,255,0.22); }
+.pg-ch.wk { background: linear-gradient(100deg, rgba(255,211,77,0.16), rgba(255,95,176,0.08)); border: 1px solid rgba(255,211,77,0.3); }
 .pg-ach { display: grid; grid-template-columns: repeat(auto-fill, minmax(2.6em, 1fr)); gap: 0.4em; }
 .pg-a { aspect-ratio: 1; border-radius: 0.7em; display: grid; place-items: center; font-size: 1.15em; background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.28); filter: grayscale(1); }
 .pg-a.on { background: linear-gradient(135deg, rgba(255,211,77,0.45), rgba(255,95,176,0.3)); color: #fff; filter: none; box-shadow: 0 0 0 1px rgba(255,211,77,0.5); }
@@ -90,6 +91,7 @@ registerLobbyTab({
       const pb = mapId ? progression.getPersonalBests(mapId) : {};
       const rr = progression.rerollsLeft();
       const book = progression.getTrickBook();
+      const wk = progression.getWeekly();
       el.innerHTML = `
         <h2 class="lp-title">Progress</h2>
         <p class="lp-sub">Level up by riding: style points, distance, dailies and achievements all give XP.</p>
@@ -106,6 +108,12 @@ registerLobbyTab({
             ${!c.done && rr > 0 ? `<button type="button" class="pg-rr" data-slot="${c.slot}" title="Swap this challenge (one free swap a day)">Swap</button>` : ''}
             <div class="pg-bar"><i style="width:${Math.min(100, (c.value / c.goal) * 100).toFixed(1)}%"></i></div>
           </div>`).join('')}
+        <div class="pg-h">This week <small>new on Monday</small></div>
+        <div class="pg-ch wk${wk.done ? ' done' : ''}">
+          <b>${wk.done ? '✓ ' : ''}${esc(wk.title)}</b><span class="xp">+${n(wk.xp)} XP</span>
+          <small>${esc(wk.desc)} · ${fmtVal(wk, wk.value)} / ${fmtVal(wk, wk.goal)}</small>
+          <div class="pg-bar"><i style="width:${Math.min(100, (wk.value / wk.goal) * 100).toFixed(1)}%"></i></div>
+        </div>
         <div class="pg-h">Achievements <small>${got} / ${ach.length}</small></div>
         <div class="pg-ach">${ach.map((a) => `<div class="pg-a${a.unlocked ? ' on' : ''}" title="${esc(a.title)}: ${esc(a.desc)}${a.xp ? ` (+${a.xp} XP)` : ''}">${a.icon}</div>`).join('')}</div>
         <div class="pg-h">Trick book <small>${book.length} landed</small></div>
@@ -121,7 +129,7 @@ registerLobbyTab({
       }));
     };
     render();
-    for (const ev of ['progressXp', 'challengeDone', 'achievement', 'rideRecorded']) ctx.on(ev, render);
+    for (const ev of ['progressXp', 'challengeDone', 'weeklyDone', 'achievement', 'rideRecorded']) ctx.on(ev, render);
   },
 });
 
