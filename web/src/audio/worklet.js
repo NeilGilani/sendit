@@ -249,7 +249,7 @@ class SnowProcessor extends AudioWorkletProcessor {
       const skid = a.skid * it + g.skid * t, spray = a.spray * it + g.spray * t, powder = a.powder * it + g.powder * t;
       const base = a.base * it + g.base * t, ice = a.ice * it + g.ice * t, grainAmp = a.grainAmp * it + g.grainAmp * t;
       const squeal = (a.squeal ?? 0) * it + g.squeal * t;
-      // cold squeak: Poisson creaks — stick-slip pulse trains (40–90 Hz) through a narrow gliding resonance
+      // cold squeak: Poisson creaks — noise jerked at 40–90 Hz (stick-slip) through two gliding band-passes
       const ck = this.ck;
       let ckS = 0;
       if (!ck.on && g.squeak > 1e-4 && this.rng.u() < g.squeakRate / fs) {
@@ -275,7 +275,7 @@ class SnowProcessor extends AudioWorkletProcessor {
       this.cordPh += cordInc * this.cordJit;
       if (this.cordPh >= 1) { this.cordPh -= 1; this.cordJit = 0.85 + this.rng.u() * 0.3; }
       const cordAM = 1 - cord * (0.5 + 0.5 * Math.sin(TAU * this.cordPh));
-      // chatter: irregular AM at 16–34 Hz, each cycle a new depth
+      // chatter: irregular AM (skis 20–40 Hz, board 15–35 Hz), each cycle a new depth
       this.chPh += this.chF * g.chF / fs;
       if (this.chPh >= 1) { this.chPh -= 1; this.chF = lerp(g.chMin, g.chMax, this.rng.u()); this.chAmp = 0.4 + 0.6 * this.rng.u(); }
       const chatAM = 1 - chat * this.chAmp * (0.5 + 0.5 * Math.cos(TAU * this.chPh));
