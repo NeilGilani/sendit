@@ -579,12 +579,17 @@ export class FjordlineCourse {
     return z ? { x: z.x, z: z.z, heading: z.heading } : null;
   }
 
-  /** The trail's finish: the harbour quay, Sandvika (the cruiser) or the lighthouse (the headland). */
+  /**
+   * The trail's finish ({ progress } form of the contract): every trail ends at the water's edge, so the finish is
+   * "reached the coast" — progress() is normalised to the bay, Sandvika and the point, which keeps a rider who
+   * strays to another beach from being stuck without a finish. `at` is where the trail's own finish is (the
+   * harbour quay, Sandvika for the cruiser, the lighthouse for the headland), for HUD / map markers.
+   */
   trailFinish(trailId) {
     if (!TRAILS.some((t) => t.id === trailId)) return null;
-    if (trailId === 'kvalneset') return { x: START_X + LIGHTHOUSE.u + 20, z: HEADLAND.crest(LIGHTHOUSE.u + 20), radius: 45 };
-    if (trailId === 'fjordlopa') return { x: START_X + 2470, z: -470, radius: 70 };
-    return { x: START_X + FINISH_U + 10, z: -100, radius: 150 };
+    const at = trailId === 'kvalneset' ? { x: START_X + LIGHTHOUSE.u + 20, z: HEADLAND.crest(LIGHTHOUSE.u + 20) }
+      : trailId === 'fjordlopa' ? { x: START_X + 2470, z: -470 } : { x: START_X + FINISH_U + 10, z: -100 };
+    return { progress: FINISH_U, at };
   }
 
   /** Which trail a rider at world (x, z) is on: the nearest canonical line (and its trail). */
@@ -606,9 +611,12 @@ export class FjordlineCourse {
   onPlayer(p) {
     const run = { t: 0, trail: null, votes: new Map(), finished: false, vote: 0 };
     const reset = () => { run.t = 0; run.votes.clear(); run.finished = false; run.trail = null; run.vote = 0; p._fjordSplash = 0; };
+    let lastEmit = -1e9;   // the ride tracker (profile/tracker.js) also announces finished runs: never twice
+    const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
     const done = (res) => {
       if (run.finished) return;
       run.finished = true;
+      if (now() - lastEmit < 2000) return;
       let trail = run.trail, n = 0;
       for (const [k, c] of run.votes) if (c > n) { n = c; trail = k; }
       const ev = { mapId: this.id, trailId: trail ?? this.trailAt(p.position.x, p.position.z), distance: Math.round(game.distance), time: +(res?.raw ?? res?.time ?? run.t).toFixed(2), score: Math.round(res?.score ?? game.score) };
@@ -618,6 +626,7 @@ export class FjordlineCourse {
     const offs = [
       on('rideStarted', reset), on('resetTop', reset),
       on('dropZone', (z) => { reset(); run.trail = z?.trail ?? null; }),
+      on('runCompleted', (e) => { if (e?.mapId === this.id && e !== this.lastRun) lastEmit = now(); }),
       on('runComplete', () => done(null)),
       on('runFinished', (res) => done(res)),
     ];

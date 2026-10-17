@@ -470,7 +470,7 @@ function buildCairn(course, M, terrain, bag) {
     const k = i / 9, rad = 1.0 - k * 0.75;
     const s = new THREE.DodecahedronGeometry(0.42 * (1 - k * 0.4), 0);
     s.translate(c.x + (r() - 0.5) * rad, g + 0.25 + k * 2.1, c.z + (r() - 0.5) * rad);
-    bag.add(M.stone, s.toNonIndexed());
+    bag.add(M.stone, s);   // polyhedra are already non-indexed
   }
 }
 

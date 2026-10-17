@@ -53,8 +53,8 @@ for (const t of L.TRAILS) {
   const sh = c.height(s.x, s.z);
   const ahead = c.height(s.x - Math.sin(s.heading) * 30, s.z - Math.cos(s.heading) * 30);
   ok(`trailSpawn(${t.id}) on the snow, inside the tile, facing downhill`, Number.isFinite(s.x + s.z + s.heading) && Math.abs(s.x) < 1450 && Math.abs(s.z) < 1450 && sh > SEA + 20 && ahead < sh - 3, `${Math.round(sh - SEA)} m above the sea, ${Math.round(sh - ahead)} m drop over 30 m`);
-  const fh = c.height(f.x, f.z);
-  ok(`trailFinish(${t.id}) at the water's edge`, f.radius > 20 && fh > SEA - 1 && fh < SEA + 60 && c.progress(f.x, f.z) > L.FINISH_U - f.radius - 20, `${Math.round(fh - SEA)} m above the sea, progress ${Math.round(c.progress(f.x, f.z))}`);
+  const fh = c.height(f.at.x, f.at.z);
+  ok(`trailFinish(${t.id}) at the water's edge`, f.progress === L.FINISH_U && fh > SEA - 1 && fh < SEA + 60 && Math.abs(c.progress(f.at.x, f.at.z) - L.FINISH_U) < 60, `${Math.round(fh - SEA)} m above the sea, progress ${Math.round(c.progress(f.at.x, f.at.z))}`);
 }
 ok('unknown trail → null', c.trailSpawn('nope') === null && c.trailFinish('nope') === null);
 ok('default spawn is the first trail (Skaret)', c.spawnPoint().x === c.trailSpawn('skaret').x);

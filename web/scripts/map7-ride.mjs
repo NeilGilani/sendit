@@ -132,7 +132,7 @@ export function ride(type, key, style = 'send', opts = {}) {
       vSum += p.speed; n++; vMax = Math.max(vMax, p.speed);
       if (course.heightAt(p.position.x, p.position.z) !== null) roofT += DT;
     }
-    if (fin && Math.hypot(p.position.x - fin.x, p.position.z - fin.z) < fin.radius) reachedFinishCircle = true;
+    if (fin && Math.hypot(p.position.x - fin.at.x, p.position.z - fin.at.z) < 150) reachedFinishCircle = true;
     if (process.env.TRACE && Math.abs(t % 1) < DT) trace.push(`${t.toFixed(0)}s u=${u.toFixed(0)} v=${p.position.z.toFixed(0)} y=${(p.position.y - SEA).toFixed(0)} spd=${p.speed.toFixed(1)} st=${p.state}`);
     if (course.progress(p.position.x, p.position.z) >= FINISH_U) { finished = true; break; }
     if (crashes > 6) break;
@@ -158,7 +158,7 @@ if (process.argv[1] && process.argv[1].endsWith('map7-ride.mjs')) {
   for (const k of keys) for (const ty of types) {
     const r = ride(ty, k, style, { spins: Number(process.env.SPINS || 2) });
     const diff = TRAILS.find((x) => x.id === r.trail)?.difficulty;
-    console.log(`\n${RIDE_LINES[k].name} [${diff}] · ${ty} · ${style}: ${r.finished ? 'finished' : r.splash ? 'SPLASH' : 'DNF'} in ${r.time}s  avg ${r.avg} m/s (${(r.avg * 2.237).toFixed(0)} mph)  max ${r.max} (${(r.max * 2.237).toFixed(0)} mph)  crashes ${r.crashes}  stumbles ${r.stumbles}  air ${r.airTotal}s (max ${r.airMax}s)  roof ${r.roofSeconds}s  finish circle ${r.reachedFinishCircle ? 'yes' : 'no'}`);
+    console.log(`\n${RIDE_LINES[k].name} [${diff}] · ${ty} · ${style}: ${r.finished ? 'finished' : r.splash ? 'SPLASH' : 'DNF'} in ${r.time}s  avg ${r.avg} m/s (${(r.avg * 2.237).toFixed(0)} mph)  max ${r.max} (${(r.max * 2.237).toFixed(0)} mph)  crashes ${r.crashes}  stumbles ${r.stumbles}  air ${r.airTotal}s (max ${r.airMax}s)  roof ${r.roofSeconds}s  at its finish ${r.reachedFinishCircle ? 'yes' : 'no'}`);
     if (r.stumbleWhy) console.log(`   stumbles: ${r.stumbleWhy}`);
     for (const a of r.airs) console.log(`   air @u${a.u}: ${a.air}s  drop ${a.drop} m  in ${a.v} m/s  impact ${a.impact} m/s  → ${a.result} ${a.why || ''}`);
     if (r.judged) console.log(`   lines: ${(r.judged.goalList || []).join(', ') || '-'}   linked: ${(r.judged.featureList || []).join(', ')}\n   judged ${r.judged.total}/100  biggest drop ${r.judged.biggestDrop.toFixed(0)} m, longest air ${r.judged.longestAir.toFixed(1)} s`);
