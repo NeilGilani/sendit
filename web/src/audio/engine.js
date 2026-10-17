@@ -319,7 +319,8 @@ class LegacyLoops {
     ['snow_powder', 'snow_groomed', 'snow_carve', 'snow_ice'].forEach((n) => mk(n, snowOut));
     ['wind_speed', 'wind_ambient'].forEach((n) => mk(n, windOut));
   }
-  set(n, v, when, tc = 0.2) { this.L[n]?.g.gain.setTargetAtTime(v, when, tc); }
+  // the snow / wind buses carry +11 dB of make-up for the worklets' low internal level; the loops don't need it
+  set(n, v, when, tc = 0.2) { this.L[n]?.g.gain.setTargetAtTime(v * (n.startsWith('wind') ? 0.27 : 0.28), when, tc); }
   update(when, s, w) {
     const sc = sstep(0.4, 2, s.speed) * Math.min(1, 0.3 + 0.7 * s.speed / 20) * s.ground;
     const tot = Math.max(1e-3, s.groomed + s.powder + s.ice + s.park);
