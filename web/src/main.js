@@ -33,6 +33,10 @@ import { installRideTracker } from './profile/tracker.js';
 import { services } from './services/index.js';
 import { Lobby, LobbyStage, applyEquipment } from './lobby/index.js';
 import { normalizeType } from './equipment/registry.js';
+import { installJuice } from './juice/index.js';
+import { trackProgression } from './progression/index.js';
+import { mountProgressionUi } from './progression/ui.js';
+import './progression/lobby.js';
 
 patchShaderChunks();
 profileStore.load();
@@ -65,6 +69,8 @@ const ui = new UI({
 
 let activities, life;
 let course, snowfall, terrain, sky, scatter, lifts, features, player, rider, cam, fx, sound, composer, post;
+let juice = null;              // in-ride game feel (juice/index.js)
+let progressUpdate = null;     // XP / dailies / achievements (progression/index.js)
 let currentMap = null;          // { map, variant, course } from the map registry
 let stage = null, lobby = null, stageReady = null;
 installRideTracker({ getMapId: () => currentMap?.map.id ?? 'unknown' });
@@ -165,6 +171,9 @@ async function boot() {
   sound = new SoundScape(player, terrain);
 
   setupPost();
+  juice = installJuice({ player, cam, sound, input, post, camera });
+  progressUpdate = trackProgression({ player, getMapId: () => currentMap?.map.id ?? 'unknown' });
+  mountProgressionUi({ juice });
   applyQuality();
   on('settings', ({ key }) => { if (key === 'quality') applyQuality(); });
   addEventListener('resize', onResize);
@@ -184,7 +193,7 @@ async function boot() {
   window.__sendit = {
     activities, life,
     fx, course, player, rider, terrain, camera, game, scene, renderer, features, scatter,
-    lobby, stage, profile: profileStore, services, map: currentMap, ui,
+    lobby, stage, profile: profileStore, services, map: currentMap, ui, juice,
   };
 }
 
@@ -389,7 +398,7 @@ function frame(now) {
   const paused = game.mode === Mode.PAUSED;
   if (!paused) {
     time += dt;
-    acc += dt;
+    acc += dt * (juice ? juice.timeScale(dt) : 1);   // hit-stop / micro slow-mo on big moments (juice/impact.js)
     let n = 0;
     while (acc >= STEP && n < 8) { player.step(STEP); acc -= STEP; n++; }
     if (n === 8) acc = 0;
@@ -404,7 +413,7 @@ function frame(now) {
   lifts.update(time, camera.position);
   life.update(paused ? 0 : dt, time, player, camera.position);
   snowfall.update(camera, time, innerHeight);
-  if (!paused) { fx.update(dt, camera); activities.update(dt); }
+  if (!paused) { fx.update(dt, camera); activities.update(dt * (juice?.warp.k ?? 1)); }
   ui.updateActivity(activities.hud());
   sound.update(dt, camera);
   ui.update(dt, player);
@@ -414,6 +423,8 @@ function frame(now) {
   const riding = game.mode === Mode.RIDING;
   const wantWind = riding ? THREE.MathUtils.smoothstep(player.speedRatio, HUD.windStreakFrom, HUD.windStreakFull) : 0;
   post.update(dt, time, wantWind);
+  juice?.update(paused ? 0 : dt, time);
+  progressUpdate?.(dt);
   input.endFrame();
   composer.render(dt);
 }

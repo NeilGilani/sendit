@@ -1,0 +1,106 @@
+// Progression feedback: the level-up celebration (over the ride and the lobby), and toasts for
+// achievements, finished dailies, personal bests and daily progress milestones (juice HUD toasts).
+// A small XP bar under the speed read-out fills as XP comes in during a ride.
+import { on, game, Mode } from '../state.js';
+import { progression } from './index.js';
+
+const CSS = /* css */`
+#lvlUp { position: fixed; inset: 0; z-index: 40; pointer-events: none; display: grid; place-items: center; opacity: 0; }
+#lvlUp.show { animation: luIn 3.2s ease-out forwards; }
+#lvlUp .ring { position: absolute; left: 50%; top: 42%; width: 140px; height: 140px; margin: -70px 0 0 -70px; border-radius: 50%; border: 6px solid var(--rc, #ffe14d); opacity: 0; }
+#lvlUp.show .ring { animation: luRing 1.1s cubic-bezier(.1,.8,.3,1) forwards; }
+#lvlUp.show .ring.r2 { animation-delay: .14s; }
+#lvlUp .box { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); text-align: center; font-family: "Arial Black", Impact, sans-serif; font-style: italic; color: #fffaf0; white-space: nowrap; }
+#lvlUp .k { font-size: 20px; letter-spacing: .5em; color: var(--rc, #ffe14d); -webkit-text-stroke: 1px #1b1446; paint-order: stroke fill; }
+#lvlUp .n { font-size: 120px; line-height: .95; -webkit-text-stroke: 4px #1b1446; paint-order: stroke fill; text-shadow: 0 0 40px var(--rc, #ffe14d), 0 8px 0 rgba(27,20,70,.6); }
+#lvlUp.show .n { animation: luNum .6s cubic-bezier(.2,1.8,.4,1); }
+#lvlUp .rk { font-size: 24px; letter-spacing: .12em; margin-top: 4px; color: var(--rc, #ffe14d); -webkit-text-stroke: 1px #1b1446; paint-order: stroke fill; }
+#lvlUp .sub { font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 800; font-size: 13px; letter-spacing: .2em; color: rgba(250,248,243,.8); margin-top: 8px; }
+#lvlUp .bg { position: absolute; inset: 0; background: radial-gradient(circle at 50% 42%, rgba(255,225,77,.22), rgba(122,92,255,.12) 35%, transparent 65%); }
+@keyframes luIn { 0% { opacity: 0; } 6% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes luRing { 0% { opacity: 1; transform: scale(.3); } 100% { opacity: 0; transform: scale(5); } }
+@keyframes luNum { 0% { transform: scale(2.4) rotate(-8deg); } 100% { transform: scale(1) rotate(0); } }
+#xpMini { position: absolute; left: 50%; bottom: 30px; width: 150px; transform: translateX(-50%); height: 4px; border-radius: 2px; background: rgba(255,255,255,.18); overflow: hidden; opacity: 0; transition: opacity .6s; }
+#xpMini.on { opacity: 1; }
+#xpMini i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #2ff5d6, #7a5cff); transition: width .35s; }
+#xpMini b { position: absolute; }
+#xpLv { position: absolute; left: 50%; bottom: 36px; transform: translateX(calc(-50% - 92px)); font: 800 11px "Inter", "Segoe UI", sans-serif; letter-spacing: .14em; color: rgba(250,248,243,.7); opacity: 0; transition: opacity .6s; }
+#xpLv.on { opacity: 1; }
+body.fp #xpMini, body.fp #xpLv { display: none; }
+`;
+
+export function mountProgressionUi({ juice }) {
+  if (typeof document === 'undefined') return;
+  const st = document.createElement('style');
+  st.textContent = CSS;
+  document.head.appendChild(st);
+  const lv = document.createElement('div');
+  lv.id = 'lvlUp';
+  lv.innerHTML = '<div class="bg"></div><div class="ring"></div><div class="ring r2"></div><div class="box"><div class="k">LEVEL UP</div><div class="n">2</div><div class="rk"></div><div class="sub"></div></div>';
+  document.body.appendChild(lv);
+  const hud = document.getElementById('hud');
+  const bar = document.createElement('div');
+  bar.id = 'xpMini'; bar.innerHTML = '<i></i>';
+  const lab = document.createElement('div');
+  lab.id = 'xpLv';
+  hud?.appendChild(bar); hud?.appendChild(lab);
+  const fill = bar.firstChild;
+
+  let showT = 0;
+  const paint = () => {
+    const p = progression.getProgress();
+    fill.style.width = `${p.need ? (p.into / p.need) * 100 : 100}%`;
+    lab.textContent = `LV ${p.level}`;
+  };
+  paint();
+  on('progressXp', () => { paint(); showT = performance.now() + 2500; bar.classList.add('on'); lab.classList.add('on'); });
+  setInterval(() => { if (showT && performance.now() > showT) { bar.classList.remove('on'); lab.classList.remove('on'); showT = 0; } }, 300);
+
+  // Level-ups queue (several at once play one after another).
+  const queue = [];
+  let playing = false;
+  const play = () => {
+    const e = queue.shift();
+    if (!e) { playing = false; return; }
+    playing = true;
+    lv.style.setProperty('--rc', e.rank.color);
+    lv.querySelector('.n').textContent = e.level;
+    lv.querySelector('.rk').textContent = e.rankUp ? `NEW RANK · ${e.rank.name.toUpperCase()}` : e.rank.name.toUpperCase();
+    lv.querySelector('.sub').textContent = nextUnlockText(e.level);
+    lv.classList.remove('show'); void lv.offsetWidth; lv.classList.add('show');
+    juice?.hud?.flash(0.3);
+    setTimeout(play, 2400);
+  };
+  on('juiceLevelUp', (e) => { queue.push(e); if (!playing) play(); });
+
+  const toast = (o) => juice?.toast(o);
+  on('achievement', (a) => toast({ kind: 'Achievement unlocked', title: a.title, sub: `${a.desc}${a.xp ? ` · +${a.xp} XP` : ''}`, icon: a.icon || '★', c1: '#ffe14d', c2: '#ff9a3d', hold: 4.2 }));
+  on('challengeDone', ({ challenge: c }) => toast({ kind: 'Daily complete', title: c.title, sub: `+${c.xp} XP`, icon: '✓', c1: '#2ff5d6', c2: '#7a5cff', progress: 1, hold: 4.2 }));
+  on('dailySweep', ({ xp }) => toast({ kind: 'All dailies done', title: 'Clean sweep!', sub: `+${xp} XP · new ones at midnight`, icon: '✦', c1: '#ff9a3d', c2: '#ff3d9a', hold: 4.6 }));
+  on('personalBest', (pb) => {
+    if (game.mode !== Mode.RIDING) return;
+    toast({ kind: 'New personal best', title: pb.text, sub: `was ${pb.was}`, icon: 'PB', c1: '#ff5fb0', c2: '#7a5cff', hold: 3.2 });
+    if (pb.stat === 'score') juice?.hud?.callout('NEW BEST SCORE!', '#ffe14d');
+  });
+  // Daily progress: a quiet nudge at the halfway mark of each one.
+  const half = new Set();
+  on('progressXp', () => {
+    for (const c of progression.getChallenges()) {
+      if (c.done || c.goal <= 1 || half.has(c.id) || c.value < c.goal / 2) continue;
+      half.add(c.id);
+      toast({ kind: 'Daily', title: c.title, sub: `${fmtVal(c, c.value)} / ${fmtVal(c, c.goal)}`, icon: '◔', c1: '#2ff5d6', c2: '#2a7bff', progress: c.value / c.goal, hold: 2.8 });
+    }
+  });
+}
+
+export function fmtVal(c, v) {
+  if (c.unit === 'km') return `${(v / 1000).toFixed(1)} km`;
+  if (c.unit === 's') return `${Math.floor(v)} s`;
+  if (c.unit === 'm') return `${Math.floor(v)} m`;
+  return Math.floor(v).toLocaleString('en-US');
+}
+
+function nextUnlockText(level) {
+  const p = progression.getProgress();
+  return `${p.xp.toLocaleString('en-US')} XP · ${(p.need - p.into).toLocaleString('en-US')} TO LEVEL ${level + 1}`;
+}

@@ -178,5 +178,7 @@ await test('catalog: gear items point at real equipment models', () => {
   assert.equal(profileStore.gearModel('skis'), 'allmountain');
 });
 
+await (await import('./progression-unit.mjs')).run(test, assert);   // progression + juice (game-feel)
+
 console.log(failed ? `\n${failed} failed, ${passed} passed` : `\nall ${passed} passed`);
 process.exit(failed ? 1 : 0);

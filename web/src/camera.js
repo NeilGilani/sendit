@@ -44,6 +44,29 @@ export class CameraController {
 
   addTrauma(a) { this.trauma = clamp(this.trauma + a, 0, 1); }
 
+  /**
+   * Juice punches (juice/impact.js): { fov (deg), dip (m, down), roll (deg) } jump in at once and spring
+   * back (underdamped, a small overshoot). Chase camera only; the helmet cam has its own landing dip.
+   */
+  kick({ fov = 0, dip = 0, roll = 0 } = {}) {
+    const k = this.kicks ||= { fov: [0, 0], dip: [0, 0], roll: [0, 0] };
+    k.fov[0] = clamp(k.fov[0] + fov, -10, 10);
+    k.dip[0] = clamp(k.dip[0] + dip, 0, 0.8);
+    k.roll[0] = clamp(k.roll[0] + roll, -6, 6);
+  }
+
+  stepKicks(dt) {
+    const k = this.kicks;
+    if (!k) return null;
+    for (const s of [k.fov, k.dip, k.roll]) {
+      // x'' = -w² x - 2ζw x'  (w = 15 rad/s, ζ = 0.55), sub-stepped for stability at low frame rates
+      const n = Math.max(1, Math.ceil(dt / 0.008)), h = dt / n;
+      for (let i = 0; i < n; i++) { s[1] += (-225 * s[0] - 16.5 * s[1]) * h; s[0] += s[1] * h; }
+      if (Math.abs(s[0]) < 1e-4 && Math.abs(s[1]) < 1e-3) { s[0] = 0; s[1] = 0; }
+    }
+    return k;
+  }
+
   snap() {
     this.pos.copy(this.player.renderPos).add(new THREE.Vector3(0, C.height, 0));
     this.vel = [0, 0, 0];
@@ -193,6 +216,9 @@ export class CameraController {
     const wantRoll = -s.turnInput * r * THREE.MathUtils.degToRad(7) * (1 - this.side) * (s.state === State.GROUNDED ? 1 : 0);
     this.roll += (wantRoll - this.roll) * (1 - Math.exp(-4 * dt));
     this.camera.rotateZ(this.roll);
+    // Juice punches (kick()): landing dip, near-miss roll; the FoV part is added below.
+    const kk = this.stepKicks(dt);
+    if (kk) { if (kk.dip[0]) this.camera.translateY(-kk.dip[0]); if (kk.roll[0]) this.camera.rotateZ(THREE.MathUtils.degToRad(kk.roll[0])); }
 
     // Trauma shake: offset = noise · trauma²
     // Continuous speed shake on the snow (CAMERA.speedShake, 0 by default) on top of the trauma.
@@ -216,7 +242,7 @@ export class CameraController {
     if (s.state === State.CRASH) wantFov = C.baseFov - 4;
     const rate = this.snapT > 0 || wantFov < this.fov ? C.fovSnapRate : C.fovRiseRate;
     this.fov += (wantFov - this.fov) * (1 - Math.exp(-rate * dt));
-    let fov = this.fov - this.side * 6;
+    let fov = this.fov - this.side * 6 + (kk ? kk.fov[0] : 0);
 
     if (this.intro < 1) {
       this.intro = Math.min(1, this.intro + dt / 2.8);

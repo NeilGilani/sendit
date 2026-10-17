@@ -36,14 +36,12 @@ export class UI {
     on('hint', (t) => this.hint(t));
     on('liftBoarded', (name) => { $('liftlabel').textContent = `${name}  ·  hold W / RT to hurry`; });
     on('mode', () => this.refresh());
-    on('landed', ({ perfect }) => { if (perfect) this.pop('PERFECT!', 'gold'); });
+    // Landing grades, close shaves and combo banks are announced by the juice HUD (juice/hud.js).
     on('landed', ({ air, clean }) => this.trickTip(air, clean));
-    on('stumble', () => this.pop('WOBBLE!', 'pink'));
-    on('nearMiss', () => this.pop('CLOSE SHAVE', 'cyan', true));
+    on('stumble', (kind) => { if (kind !== 'stumble' && kind !== 'slide') this.pop('WOBBLE!', 'pink'); });   // a sketchy landing is graded instead
     on('countdown', (n) => this.pop(n > 0 ? String(n) : 'GO!', n > 0 ? 'cyan' : 'gold'));
     on('gate', ({ pass }) => { if (!pass) this.pop('MISSED GATE  +2s', 'pink', true); });
     on('flake', ({ found, total }) => this.pop(`❄ ${found} / ${total}`, 'gold', true));
-    on('comboBanked', ({ banked, mult }) => { if (mult > 1) this.pop(`+${banked}  ×${trimNum(mult)}`, 'cyan', true); });
     on('combo', () => { const c = $('comboHud'); c.classList.remove('pulse'); void c.offsetWidth; c.classList.add('pulse'); setTimeout(() => c.classList.remove('pulse'), 150); });
     on('crashed', (kind) => this.pop(['YARD SALE!', 'SNOW ANGEL!', 'FACEPLANT!', 'TREE HUGGER!'][kind === 'tree' ? 3 : Math.floor(Math.random() * 3)], 'pink'));
   }
