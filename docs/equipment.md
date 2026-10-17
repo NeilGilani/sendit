@@ -271,7 +271,9 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
   | Butter (skis) | `butterRate`, `butterMaxSpeed`, `butterDrag`, `butterNonTwin` |
   | Landing | `landClean`/`landStumble`/`landCrash`/`landSlide`, `switchLand` |
 - `ANIM`:
-  - Lean and edge caps: `maxLean`, `maxGearEdge`.
+  - Lean and edge caps: `maxLean`, `maxGearEdge`, `maxAngulation` (how far the drawn edge may differ from the lean, 0.7 rad).
+  - `landLeanTime` / `landLeanResponse`: for 0.35 s after a landing the lean catches up at 30/s, so the body is plumb at once on a steep face.
+  - `carveCrouch`: extra crouch at full lean (a lower, athletic stance in hard carves).
   - `angulation`, `angulationReverse` (the share kept when the edge is below the lean or already on the other side, 0), `crossover` (the upper body leading into the new turn at an edge change), `polePlantTime`.
   - Skis: `skiCounter` (counter-rotation per rad of lean), `skiStanceCarve` (wider stance in deep carves).
   - Head: `headLevel` (share of the body's world roll the head takes back out), `headLook` (head turn into the carve per rad of lean).
