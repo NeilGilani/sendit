@@ -77,15 +77,17 @@ function profileMesh(f, T, buf) {
   for (let a = f.a0; a <= end + 1e-6;) {
     rows.push(a);
     const near = marks.some((m) => Math.abs(m - a) < 1.6);
-    a += near ? 0.125 : f.kind === 'roller' ? 0.75 : 0.5;
+    // (the big jumps' long, gently curved landings: 0.75 m rows sag < 1 cm on their curves; lips and knuckles stay fine)
+    a += near ? 0.125 : f.kind === 'roller' || f.kind === 'jump' || f.kind === 'bigair' || f.kind === 'start' ? 0.75 : 0.5;
   }
   if (rows[rows.length - 1] < end) rows.push(end);
   // Columns across: deck (dense where a side profile blends), then the sidewalls.
   const hw = f.maxHw, outer = f.reach - 0.5;
   const cs = new Set();
-  const deckN = Math.max(4, Math.ceil(hw / 0.8));
+  const deckN = Math.max(4, Math.ceil(hw / 1.6));   // (level across: the deck needs few columns)
   for (let k = 0; k <= deckN; k++) cs.add(+(hw * k / deckN).toFixed(3));
   if (f.side) for (const d of [0, 0.35, 0.7, 1.05, 1.4]) cs.add(+(f.side.hwc + d * f.side.blend / 1.4).toFixed(3));
+  if (f.jump?.hw && f.jump.hw < hw) for (const d of [0, 0.4, 1]) cs.add(+(f.jump.hw + d).toFixed(3));   // the kicker's edge
   const sideN = 9;
   for (let k = 1; k <= sideN; k++) cs.add(+(hw + (outer - hw) * Math.pow(k / sideN, 1.6)).toFixed(3));
   const half = [...cs].sort((a, b) => a - b);
@@ -394,7 +396,7 @@ function buildDressing(course, T, M) {
   arch(GRID.u0 - 18, 226, 268, 'THE GRID  ·  JIB GARDEN', '#ffe14d', '#1b1550');
   arch(PIPE.u0 + 2, PIPE.v - 26, PIPE.v + 26, 'THE CONDUIT  ·  22 FT SUPERPIPE', '#2ff5d6', '#140a3a', 9);
   // --- start hut: a dark box with an LED band, the gate wand.
-  { const x = X(-34), y = H(x, 0); const hut = new THREE.BoxGeometry(6, 3.2, 9); hut.translate(x, y + 1.6, 0); darks.push(hut); const band = new THREE.BoxGeometry(6.1, 0.25, 9.1); band.translate(x, y + 2.9, 0); lamps.push(band); }
+  { const x = X(-21), y = H(x, 0); const hut = new THREE.BoxGeometry(6, 3.2, 9); hut.translate(x, y + 1.6, 0); darks.push(hut); const band = new THREE.BoxGeometry(6.1, 0.25, 9.1); band.translate(x, y + 2.9, 0); lamps.push(band); }
   // --- light towers along both sides of the course and the park
   const towers = [];
   for (let u = 20; u <= FINISH_U + 40; u += 75) for (const v of [-46, 46, 100, 160, 220, -140, -205]) towers.push([u + (v % 3) * 7, v]);

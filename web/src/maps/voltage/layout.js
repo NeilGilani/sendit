@@ -28,7 +28,7 @@ export const PROFILE = [
   [85, 14],     // bench: section 3, the lanes' last rails
   [70, 28],     // THE LAUNCH (the drop-in to the jump line)
   [305, 18],    // jump line: Lightning, Thunder, Voltage; the stacks, the pipe, the hips
-  [50, 27],     // the drop into Megawatt
+  [50, 30],     // the drop into Megawatt
   [300, 18],    // Megawatt, the gaps, the step line, the quarterpipes
   [60, 9],      // finish run-out
   [9000, 2],
@@ -71,7 +71,7 @@ export const JUMPS = [
   { name: 'Lightning', short: 'Jump 1', u: 495, v: -3, lipDeg: 29, R: 20, kickH: 4.4, table: 28, vMax: 25, hw: 3.4, deckHw: 11, landHw: 13, deckDeg: 4, maxDeg: 40 },
   { name: 'Thunder', short: 'Jump 2', u: 610, v: -3, lipDeg: 30, R: 20, kickH: 4.5, table: 30, vMax: 27, hw: 3.6, deckHw: 12, landHw: 14, deckDeg: 4, maxDeg: 40 },
   { name: 'Voltage', short: 'Jump 3', u: 720, v: -3, lipDeg: 31, R: 22, kickH: 4.8, table: 32, vMax: 28.5, hw: 3.8, deckHw: 12, landHw: 15, deckDeg: 4, maxDeg: 40 },
-  { name: 'Megawatt', short: 'Jump 4', u: 880, v: -3, lipDeg: 32, R: 24, kickH: 5.6, table: 38, vMax: 31, hw: 4.2, deckHw: 14, landHw: 17, deckDeg: 4, maxDeg: 40 },
+  { name: 'Megawatt', short: 'Jump 4', u: 880, v: -3, lipDeg: 32, R: 24, kickH: 5, table: 36, vMax: 31, hw: 4.2, deckHw: 14, landHw: 17, deckDeg: 4, maxDeg: 40 },
 ];
 
 // Gap jumps: a kicker, then nothing — a channel `gap` m long (the snow, or a road across it) — up to a landing
@@ -203,7 +203,7 @@ export const DROP_ZONES = [
   ['Start Ramp · Slopestyle', 0, 0, 0],         // placed on the start ramp's deck (course.js)
   ['The Plunge · Section 3', 252, 0, 0],
   ['The Launch · Jump Line', 372, -3, 0],
-  ['Megawatt · Mega Kicker', 748, -3, 0],
+  ['Megawatt · Mega Kicker', 0, 0, 0],          // dropping in over Voltage's knuckle (17 m up): course.js
   ['The Tower · Big Air', 0, 0, 0],             // placed on the scaffold deck (course.js)
   ['The Conduit · Superpipe', 0, 0, 0],         // at the top of the pipe
   ['Triple Stack · Current Lane', 372, 125, 0],

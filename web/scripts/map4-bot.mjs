@@ -107,13 +107,13 @@ function ride(type, key, sty) {
   way.forEach((w, i) => { const n = Math.max(1, Math.ceil(Math.hypot(w[0] - px0, w[1] - pz0) / 0.5)); for (let k = 1; k <= n; k++) path.push([px0 + (w[0] - px0) * k / n, pz0 + (w[1] - pz0) * k / n, i]); px0 = w[0]; pz0 = w[1]; });
   let pi = 0, dbgT = [0, 0, 0];
   let wi = 0, t = 0, crashes = 0, stumbles = 0;
-  const ev = { locks: new Set(), banks: [], lost: 0, bails: 0, clips: 0, zones: [], tricks: [], airs: 0, pipe: [], speeds: {}, spines: new Set() };
+  const ev = { locks: new Set(), banks: [], lost: 0, bails: 0, clips: 0, zones: [], tricks: [], airs: 0, pipe: [], speeds: {}, airT: {}, spines: new Set() };
   const offs = [
     on('grindStart', (e) => ev.locks.add(e.name)), on('grindScore', (e) => ev.banks.push(`${e.label} +${e.points}`)), on('grindLost', () => ev.lost++),
     on('grindEnd', (e) => { if (e.reason === 'bail') ev.bails++; }), on('grindClip', () => ev.clips++),
     on('parkLanding', (e) => ev.zones.push(`${e.jump}:${e.zone}`)), on('crashed', (k) => { crashes++; ev.tricks.push(`CRASH(${k}${p.lastCrash ? ':' + p.lastCrash.reason : ''})@u${Math.round(p.position.x - START_X)},${Math.round(p.position.z)}`); }),
     on('stumble', () => stumbles++), on('pipeAir', (e) => ev.pipe.push(e.height.toFixed(1))),
-    on('landed', (e) => { if (e.air > 0.6) ev.airs++; if (e.trick) ev.tricks.push(e.trick); }),
+    on('landed', (e) => { if (e.air > 0.6) ev.airs++; if (e.trick) ev.tricks.push(e.trick); const nm = p.takeoffPos && course.featureAt(p.takeoffPos.x, p.takeoffPos.z); if (nm && e.air > 0.6) ev.airT[nm] = +e.air.toFixed(2); }),
     on('takeoff', () => { const nm = course.featureAt(p.position.x, p.position.z); if (nm) ev.speeds[nm] = +p.speed.toFixed(1); }),
     on('landed', (e) => { const nm = p.takeoffPos && course.featureAt(p.takeoffPos.x, p.takeoffPos.z); if (nm && e.air > 0.3 && course.named.some((n) => n.name === nm && n.kind === 'spine')) { const [, b0] = course.named.find((n) => n.name === nm).f.local(p.takeoffPos.x, p.takeoffPos.z), [, b1] = course.named.find((n) => n.name === nm).f.local(p.position.x, p.position.z); if (process.env.SPN) console.log('   spine', nm, 'b0', b0.toFixed(2), 'b1', b1.toFixed(2), 'air', e.air.toFixed(2), e.result, 'v', p.speed.toFixed(1)); const from = line.feats.find((q) => q.kind === 'spine' && q.name === nm)?.from; if (from && Math.abs(b0) < 1.5 && b1 * from < -1.5 && e.clean) ev.spines.add(nm); } }),
   ];
@@ -183,7 +183,12 @@ function ride(type, key, sty) {
     const nextSpine = way.slice(wi).find((q) => q[2] === 'spine');
     const dSpine = nextSpine ? Math.hypot(nextSpine[0] - pl.position.x, nextSpine[1] - pl.position.z) : 1e9;
     if (pl.state === 1) {
+      const nextQp = way.slice(wi).find((q) => q[2] === 'qp');
+      const dQp = nextQp ? Math.hypot(nextQp[0] - pl.position.x, nextQp[1] - pl.position.z) : 1e9;
       if (dSpine < dJump && dSpine < dRail && dSpine < 60) c.tuck = pl.speed < 14 ? 1 : 0;   // carry speed across a spine
+      else if (dQp < 90 && dQp < dJump && dQp < dRail) {   // a quarterpipe: ~13 m/s (faster and you fly out of it)
+        if (pl.speed > 14.5 && dQp > 12) check(c, pl.speed - 13); else if (pl.speed < 11) c.tuck = 1; else c.brake = UP;
+      }
       else if (dJump < dRail && nextJump && dJump < 160) {
         const F = nextJump[3], Ld = F.jump.land || { vMin: 10, vMax: 14 }, want = Ld.sweet?.v ?? (Ld.vMin + Ld.vMax) / 2;
         // Tucked if that still arrives at or under the sweet spot speed; else stand up; scrub if even that is too fast.
@@ -304,6 +309,7 @@ for (const key of keys) for (const type of types) {
   if (process.env.V) {
     console.log('     banks:', r.ev.banks.join(' | '));
     console.log('     zones:', r.ev.zones.join(' '), 'lip speeds:', JSON.stringify(r.ev.speeds));
+    console.log('     airs (s):', JSON.stringify(r.ev.airT));
     console.log('     tricks:', r.ev.tricks.join(' | '), r.ev.pipe.length ? `pipe airs ${r.ev.pipe.join(' ')} m` : '');
   }
 }

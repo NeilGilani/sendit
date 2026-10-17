@@ -594,6 +594,11 @@ export class VoltageCourse {
         const [x, z] = this.startRamp.world(this.startRamp.marks.top.a - 2.5);
         return { name, x, z, heading: -Math.PI / 2 };
       }
+      if (i === 3) {   // just over Voltage's knuckle: down its landing into the pitch above Megawatt
+        const V = this.features.find((f) => f.name === 'Voltage' && f.jump);
+        const [x, z] = V.world(V.jump.knuckle.a + 1.5);
+        return { name, x, z, heading: -Math.PI / 2 };
+      }
       if (i === 4) {   // the big air's scaffold deck
         const [x, z] = this.bigAir.world(this.bigAir.marks.top.a - BIG_AIR.deckLen + 1);
         return { name, x, z, heading: -Math.PI / 2 };
