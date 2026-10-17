@@ -157,7 +157,9 @@ export class CameraRig {
     const dir = this.look.clone().sub(cam.position);
     const pitch = Math.atan2(dir.y, Math.hypot(dir.x, dir.z));
     if (!m.free && pitch < minP) cam.lookAt(cam.position.clone().add(V(dir.x, Math.tan(minP) * Math.hypot(dir.x, dir.z), dir.z)));
-    const fov = m.fov1 ? m.fov + (m.fov1 - m.fov) * ease(s) : m.fov;
+    let fov = m.fov1 ? m.fov + (m.fov1 - m.fov) * ease(s) : m.fov;
+    // Portrait screens: widen the vertical FOV so the horizontal framing survives (rider + range).
+    if (cam.aspect < 1.2) fov = (2 * Math.atan(Math.tan((fov * Math.PI) / 360) * Math.min(2.2, 1.2 / cam.aspect)) * 180) / Math.PI;
     if (Math.abs(cam.fov - fov) > 1e-3) { cam.fov = fov; cam.updateProjectionMatrix(); }
     const fd = cam.position.distanceTo(com);
     this.focus += (fd - this.focus) * (1 - Math.exp(-5 * dt));

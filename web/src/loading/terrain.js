@@ -354,7 +354,8 @@ const TERRAIN_FRAG = /* glsl */`
     rock *= 1.0 - clamp(ledge, 0.0, 0.85);
   }
   // Snow relief: soft drifts + wind ripples from the noise gradients (fades with distance).
-  float e = 0.004;
+  // Differences over ~4 texels: 1-texel steps pick up the bilinear grid of the noise (a brick pattern).
+  float e = 0.016;
   // Wind-carved: long drifts and sastrugi stretched along the wind, not round blotches.
   vec2 q = vec2(dot(vW.xz, uWindDir), dot(vW.xz, vec2(-uWindDir.y, uWindDir.x))) * vec2(0.008, 0.03);
   float h0 = texture2D(noiseTex, q).r, hx = texture2D(noiseTex, q + vec2(e, 0.0)).r, hy = texture2D(noiseTex, q + vec2(0.0, e)).r;
@@ -363,7 +364,7 @@ const TERRAIN_FRAG = /* glsl */`
   vec2 q2 = vec2(dot(vW.xz, uWindDir), dot(vW.xz, vec2(-uWindDir.y, uWindDir.x))) * vec2(0.9, 0.25);
   float r0 = texture2D(noiseTex, q2).b, rx = texture2D(noiseTex, q2 + vec2(e, 0.0)).b;
   float fade = 1.0 - smoothstep(0.08, 1.2, tFP);
-  vec3 Ns = normalize(N + (vec3(uWindDir.x, 0.0, uWindDir.y) * (hx - h0) + vec3(-uWindDir.y, 0.0, uWindDir.x) * (hy - h0)) * (-24.0) * (1.0 - smoothstep(2.0, 12.0, tFP)) + vec3(fx - f0, 0.0, fy - f0) * (-3.5) * fade + vec3(uWindDir.x, 0.0, uWindDir.y) * (rx - r0) * (-30.0) * fade * 0.16);
+  vec3 Ns = normalize(N + (vec3(uWindDir.x, 0.0, uWindDir.y) * (hx - h0) + vec3(-uWindDir.y, 0.0, uWindDir.x) * (hy - h0)) * (-3.4) * (1.0 - smoothstep(2.0, 12.0, tFP)) + vec3(fx - f0, 0.0, fy - f0) * (-0.35) * fade + vec3(uWindDir.x, 0.0, uWindDir.y) * (rx - r0) * (-30.0) * (1.0 - smoothstep(0.02, 0.18, tFP)) * 0.03);
 #ifdef FAR
   if (tree > 0.01) {
     float sp = texture2D(noiseTex, vW.xz * 0.05).r;

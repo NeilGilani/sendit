@@ -18,8 +18,8 @@
     #loading .ld-ridges { position: absolute; left: 0; bottom: 0; width: 100%; height: 100%; }
     #loading .ld-flakes { position: absolute; inset: -40% 0 0 0; will-change: transform; opacity: .7;
       background-image: radial-gradient(circle, rgba(255,255,255,.95) 0 1.4px, transparent 2.2px), radial-gradient(circle, rgba(255,255,255,.7) 0 1px, transparent 1.6px);
-      background-size: 180px 210px, 110px 130px; background-position: 0 0, 50px 70px; animation: ld-fall 16s linear infinite; }
-    #loading .ld-flakes.b { background-size: 320px 360px, 240px 260px; background-position: 30px 90px, 160px 10px; filter: blur(1.2px); opacity: .55; animation-duration: 9s; }
+      background-size: 173px 211px, 97px 131px; background-position: 0 0, 41px 67px; animation: ld-fall 16s linear infinite; }
+    #loading .ld-flakes.b { background-size: 331px 367px, 229px 263px; background-position: 30px 90px, 160px 10px; filter: blur(1.2px); opacity: .55; animation-duration: 9s; }
     @keyframes ld-fall { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-60px, 28.57%, 0); } }
     #loadcanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 1.8s ease; }
     #loading.live #loadcanvas { opacity: 1; }
@@ -59,6 +59,11 @@
     #loading.out .ld-bars i { transform: scaleY(0); }
     #loading.out #loadcanvas, #loading.out .ld-static { opacity: 0; transform: scale(1.07); transition: opacity var(--out) cubic-bezier(.4,0,.2,1), transform var(--out) cubic-bezier(.3,0,.1,1); }
     #loading.out-quick { opacity: 0; transition: opacity var(--out) ease; }
+    @media (max-aspect-ratio: 1/1) { #loading .ld-bars { display: none; }
+      #loading .ld-ui::before, #loading .ld-ui::after { content: ""; position: absolute; left: 0; right: 0; height: 26vh; pointer-events: none; }
+      #loading .ld-ui::before { top: 0; background: linear-gradient(rgba(5,6,10,.55), transparent); }
+      #loading .ld-ui::after { bottom: 0; background: linear-gradient(transparent, rgba(5,6,10,.7)); }
+      #loading .ld-brand, #loading .ld-foot { z-index: 1; } #loading .ld-brand { top: 18px; } #loading .ld-foot { bottom: 22px; } }
     @media (max-width: 640px) { #loading .ld-foot { flex-direction: column; align-items: stretch; gap: 12px; } #loading .ld-progress { width: 100%; } #loading .ld-msg { text-align: left; } #loading .ld-cap { display: none; } }
     @media (prefers-reduced-motion: reduce) { #loading .ld-flakes, #loading .bar::after { animation: none; } }
   </style>
