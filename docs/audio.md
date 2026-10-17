@@ -1,0 +1,156 @@
+# Audio — the procedural snow, wind and air engine
+
+Everything the rider hears is synthesized live from the physics. The snow under the skis or board, the wind,
+spins, landings, grinds and the mountain ambience are not looped samples, so nothing repeats. The research behind
+the numbers and the comparisons with real recordings are in `docs/audio-research.md`. Every tunable lives in
+`web/src/audio/tuning.js`.
+
+## Files
+
+| File | Role |
+|---|---|
+| `web/src/audio.js` | `SoundScape`, the live wrapper used by `main.js` (unchanged API: `init`, `resume`, `oneShot`, `update(dt, camera)`, `applyVolumes`). Reads the rider every frame, forwards bus events, plays music and UI cues, birds, ravens and the heli. |
+| `web/src/audio/engine.js` | `AudioEngine`, which owns the mix graph, the two worklets, the one-shots, grinds and ambience. It is driven by plain rider frames plus events, and every call takes the context time it applies at, so it works the same live and in an `OfflineAudioContext`. |
+| `web/src/audio/worklet.js` | AudioWorklet DSP: the `sendit-snow` and `sendit-wind` processors (per-sample noise, filters, grains and modulation). It has no imports. Its tunables arrive as `processorOptions`. |
+| `web/src/audio/rider.js` | `readRider(player)` turns `player.js` state into the numbers the engine uses. Read-only. |
+| `web/src/audio/fx.js` | One-shot synthesis: pole plant, edge change, slash, take-off, landing, grab rustle, crash tumble, near-miss pass-by, hard brake, tree creak, crowd cheer. |
+| `web/src/audio/grind.js` | Rail and box grind: a modal metal scrape plus the `grind_loop` sample, lock-on clang, kink ticks and pop-off. |
+| `web/src/audio/ambience.js` | Per-map beds: forest soughing and creaks, park crowd babble and cheers. The distant wind lives in the wind worklet. |
+| `web/src/audio/tuning.js` | Every parameter, in one place. |
+| `web/src/audio/harness.{html,js}` | Offline render and analysis harness for the tests. Dev only; nothing imports it. |
+| `web/scripts/audio-test.mjs` | Headless test that renders ~25 scripted rides and checks levels, clipping, NaNs and sound-design relations, optionally writing WAVs. |
+| `web/scripts/audio-trace.mjs` | Records real-physics rides (skis and board) as rider-frame traces for the test. |
+| `web/scripts/audio-compare.mjs` | Octave-band, centroid and modulation comparison of recordings and renders. |
+
+## Signal flow
+
+```
+destination ← soft clip (tanh, ceiling 0.86) ← limiter (−2 dB, 20:1) ← master (settings.master × 0.8)
+   master ← glue (−12 dB, 1.6:1) ← sfx (settings.sfx) ← snow  · wind · ambience · fx · ui
+   master ← music (settings.music) ← low-pass (air / bail) ← duck ← Zen track + challenge track
+```
+
+- The bus gains are `AUDIO.mix`. The settings sliders (master, sfx, music) scale the matching nodes, so they work
+  exactly as before.
+- The music crossfade and its rests between passes are unchanged. The engine only adds the duck and the low-pass
+  after them.
+
+## The snow engine (`sendit-snow`)
+
+Inputs come from `readRider`: speed, edge angle, load (in g, from the lateral acceleration and compression), skid
+angle and skid amount, stop (hockey stop or plow), surface weights from `terrain.getSurface` (groomed, powder,
+rock / scraped as "ice", and park on maps flagged `park`), deep-snow sink, and snowboard versus skis.
+
+| Layer | What it is | Driven by |
+|---|---|---|
+| Glide hiss | Pink noise between a high-pass (300 Hz) and a low-pass (7 kHz) that both rise as (v/5)^0.45. Gives flat octave bands like the groomed reference. | Level ∝ v^1.15 (+7 dB per doubling); quieter in powder (−15 dB) and when sunk |
+| Corduroy | Zippy amplitude modulation at v / 2.2 cm, jittered | Groomed snow, flat base (fades with edge angle) |
+| Crystal grains | Poisson clicks (0.25–1.6 ms bursts) through a surface band: groomed 2.6 kHz, ice 4.2 kHz, powder 0.9 kHz, cold snow 1.3 kHz | Rate 60 + 160·v·(1 + 2.2·edge·load), plus a burst rate while skidding. This is the never-looping texture |
+| Carve | Two broad resonant bands (520 Hz and 1.7 kHz, rising with speed, slowly wobbling) | edge^1.3 × load^0.9 × speed; louder on ice, quiet in powder |
+| Chatter | Irregular amplitude modulation, each cycle with a new depth: skis 20–40 Hz, board 15–35 Hz (their bending modes) | Hard or icy snow, high edge angle, speed > 8 m/s; ice while skidding |
+| Skid / stop | Rough band-passed scrape (1.7 kHz, or 3.8 kHz on ice) with a lumpy envelope, plus thrown spray | Skid angle or amount; hockey stop ×1.4 |
+| Powder | Pink-and-brown whoosh, high-passed at 110 Hz, low-passed at 600 + 40·v Hz; the whole snow output also gets a low-pass that closes in deep snow | Powder weight × (0.5 + 1.6·sink) |
+| Board base / growl | Band-passed rumble at 230 Hz (flat base) and a 260 Hz growl on edge | Snowboard only |
+| Ice | High-passed, band-passed scrape at 3.8 kHz with chatter | Rock / scraped surface weight |
+
+Stereo width is 0.75 for skis (two contacts, two independent noise streams) and 0.25 for a board.
+
+## The wind (`sendit-wind`)
+
+| Layer | What it is |
+|---|---|
+| Level | floor + (v / 32)^1.6, about 10 dB per speed doubling. That is enough to feel at 50–70 mph without becoming harsh. Real helmets measure about 15.5 dB per doubling. Airborne ×1.25. |
+| Rush | Pink noise → 2-pole low-pass at 250 + 45·U Hz, plus a +5 dB bump at 280 Hz (the helmet band), plus a little pinna hiss. Each ear is independent, and a slow head-yaw process makes one ear louder than the other (±6 dB). Gust squalls at ~3 Hz. |
+| Buffet | Brown rumble below 110 Hz with flutter. Strong in first person, ×0.3 in the chase cam. |
+| Whistles | Two vortex-shedding tones at f = 0.2·U/d for d = 4.2 mm and 7.1 mm (Q 40), latching in and out above ~11 m/s |
+| Clothing flap | Irregular pulses at 8 + 0.55·U Hz through a 380 Hz band, from 11 m/s. Quieter in the air and when tucked. |
+| Tuck | Rush −6 dB and a darker low-pass (the lee of the body) |
+| Spin / flip whoosh | In the air, rotation rate × airtime: the ears alternate facing the airflow, so each half turn pans and swells the rush, and the rush filter sweeps |
+| Gusts | Ornstein–Uhlenbeck processes (2.2 s rider-relative, ~5 s ambient) modulate level and relative airspeed |
+| Map wind | Distant wind over the ridges: band-passed brown noise at the map's `windF`, plus hiss, swelling with the gusts. Level and tone are set per map. |
+
+Slow motion (the apex slow-mo event) scales every filter and modulation rate by 0.55 + 0.45·scale, so the
+mountain drops in pitch with time.
+
+## One-shots and transients
+
+| Sound | Trigger |
+|---|---|
+| Edge change "shff" | The edge sign flips with real edge angle on both sides of it, above 4 m/s |
+| Pole plant (skis) | The same moment (85 % chance, 3–22 m/s, not tucked, ≥ 0.55 s apart), panned to the inside of the new turn |
+| Slash | Edge angle crosses 0.6 rad quickly while skidding, above 6 m/s: an exaggerated fan of spray, as Steep does |
+| Take-off | `takeoff` event: tail or tip tock, plus the snow flicked off. The old `jump_pop` sample sits underneath. |
+| Grab rustle | `player.grab` rises past 0.5 in the air (on release, a shorter rustle) |
+| Landing | `landed` (rawImpact): a 62–78 Hz thud, then a flat-base slap (board) or double clack (skis), then a snow burst (short and bright on hardpack, long and fluffy in powder) |
+| Crash tumble | `crashed`: 4–6 decaying impacts, cloth and a long slide |
+| Near miss | `nearMiss`: pink band sweeping 2.6 kHz → 650 Hz (Doppler) with a 4 → 9 → 4 ms comb sweep, panned to the obstacle's side from the travel direction; trees add needle rustle |
+| Hard brake | `hardBrake`: spray fan and rough scrape onset (the worklet carries the sustained stop) |
+| Grinds | `grindStart` (modal clang, modes retuned ±3 % per rail), the frame's grind speed (continuous scrape and sample), `grindKink` (tick), `grindHop` / `grindEnd` (pop-off). Boxes are duller and lower. |
+| Crowd cheer | Park map: `parkLanding` (clean) or a perfect / stomped `landed` |
+
+## Ambience per map (`AUDIO.maps`)
+
+| Map | Character |
+|---|---|
+| Valcrest | Gentle alpine air, birds, an occasional creak |
+| Blackspruce | Wind soughing in the conifers (gusty mid band), trunks creaking (stick-slip pulses through woody resonances), birds, tree plops |
+| Ravenspire | Strong, gusty high-altitude wind, ravens, cold snow (squeakier grains when slow), the heli |
+| Voltage Park | Calmer wind, a crowd (procedural voiced babble of 24 "voices", looped on two decorrelated players) and cheers on clean landings |
+
+## Mix and perspective
+
+- **Ducking (`AUDIO.duck`):** music −5 dB after 0.5 s of air, −9 dB on a crash (1.6 s), −4 dB toward 30 m/s, −3 dB
+  on rails, −5 dB for 0.35 s on hard landings. Attack 0.25 s, release 1.6 s.
+- **Music low-pass:** 1.2 kHz in big air after 0.4 s, 400 Hz on a bail, opening over ~0.5 s.
+- **First person versus chase (`AUDIO.perspective`):** `settings.view === 'fp'` gives the full helmet wind
+  (buffet, whistles, flap) and the full low end of the snow. The chase cam hears the snow from a little further
+  away (×0.85, less low end), and the wind ×0.75 with little buffeting.
+- **No clipping:**
+  - the glue compressor is gentle on purpose, because Chrome's compressor adds make-up gain that would lift the
+    quiet moments;
+  - a limiter, then a tanh soft clipper with a 0.86 ceiling, keep even the extreme full-volume test under −1 dBFS.
+
+## Events the audio listens to
+
+The audio reads these events (read-only): `takeoff`, `jumped`, `landed`, `crashed`, `nearMiss`, `hardBrake`,
+`stumble`, `landingGrade`, `parkLanding`, `grindStart`, `grindKink`, `grindHop`, `grindEnd`, `grindClip`,
+`slowmo`, `rideStarted` (map id), `settings`, plus the existing game-cue events.
+
+- **No new events were added.**
+- **One guarded line in `maps/voltage/hud.js`:** the park HUD used to play its own grind loop on a second
+  AudioContext. Its `ensure()` now returns early when `window.__senditAudio.engine` exists, so grinds play once,
+  through the main mix and settings.
+
+## Fallback
+
+If AudioWorklet is unavailable, the engine falls back to the old sample loops (`snow_*`, `wind_*`), blended by the
+same parameters. The one-shots, grinds and ambience still work.
+
+## Testing
+
+```
+npm --prefix web run dev -- --port 5192 --strictPort
+node web/scripts/audio-trace.mjs <dir>                     # real-physics traces (optional)
+node web/scripts/audio-test.mjs http://localhost:5192/ [wavDir|-] [traceDir|-] [filter]
+BANDS=1 …                                                  # print octave bands per scenario
+TUNE='{"snow":{"grains":{"gain":0}}}' …                    # A/B a tunable without editing
+node web/scripts/audio-compare.mjs http://localhost:5192/ ref.mp3 render.wav …
+```
+
+The test fails on:
+- a worklet that does not load;
+- non-finite samples or parameters;
+- any peak above −1 dBFS (including all volumes at 1 and extreme inputs);
+- a page error;
+- or a broken relation, such as: carving louder than standing, snow rising with speed, powder quieter and
+  darker than groomed, ice brighter than groomed, a board lower than skis, a hockey stop louder than the carve
+  before it, wind at 30 m/s much louder than at 4 m/s but not overwhelming, first person windier than the chase
+  cam, landings standing out, a forest bed, and a park cheer.
+
+## Tuning tips
+
+- **Too much or too little snow:** `mix.snow`, then the per-layer `gain`s in `snow`.
+- **Brightness:** `snow.hiss.hp` / `lp` and `grains.fGroomed`.
+- **Wind at top speed:** `wind.exp` (steeper means quieter when slow and louder when fast) and `wind.vMax`.
+- **Harshness at 70 mph:** `wind.rush.hiGain`, `wind.whistle.gain`.
+- **Per-map mood:** `maps[id]` (`wind`, `windF`, `gustiness`, `trees`, `crowd`, `cold`, `birds`, `sough`).
