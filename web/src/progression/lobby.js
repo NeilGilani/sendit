@@ -109,7 +109,7 @@ registerLobbyTab({
         <p class="lp-sub">Level up by riding: style points, distance, dailies and achievements all give XP.</p>
         <div class="pg-lvl" style="--rc:${p.rank.color};--p:${pct.toFixed(1)}">
           <div class="pg-num"><span>${p.level}</span></div>
-          <div class="pg-rank">${rankEmblem(p.level, 20)} ${esc(p.rank.name.toUpperCase())}${nr ? `<small> · ${esc(nr.name)} at level ${nr.from}</small>` : ''}</div>
+          <div class="pg-rank">${rankEmblem(p.level, 20)} ${esc(p.rank.name.toUpperCase())}${nr ? `<small>Next rank: ${esc(nr.name)} at level ${nr.from}</small>` : ''}</div>
           <div><div class="pg-xp">${n(p.into)} / ${n(p.need)} XP to level ${p.level + 1} · ${n(p.xp)} total</div><div class="pg-bar"><i style="width:${pct.toFixed(1)}%"></i></div></div>
         </div>
         <div class="pg-h">Daily challenges <small>new in ${untilMidnight()}</small></div>
