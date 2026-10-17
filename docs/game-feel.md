@@ -60,9 +60,9 @@ Bus events:
 
 The HUD regions, from top to bottom:
 
-- **Combo panel.** Shows ×mult (cyan, then gold from ×2.5, then blazing orange from ×4), the points, the last three moves and a timer bar. The multiplier bumps on every increase.
-- **Announcer, upper third.** A grade badge sits over the trick name in big slanted type, with +points and extras (drop height, SWITCH) below. It slams in at 1.9× scale with blur and settles in about 0.2 s.
-- **Live air, centre.** Once the air passes 0.45 s, the rotation shows in 180° steps and bumps on each new 180. It also shows flips (`FLIP`, `2× FLIP`) and the grab being held.
+- **Combo panel.** It appears from ×1.5 and shows ×mult (cyan, then gold from ×2.5, then blazing orange from ×4), the points, the last three moves and a timer bar. The multiplier bumps on every increase.
+- **Announcer, at 37 % of the height**, under the combo panel and above the rider. A grade badge sits over the trick name in big slanted type, with +points and extras (drop height, SWITCH) below. It slams in at 1.9× scale with blur and settles in about 0.2 s.
+- **Live air, at 33 % of the height.** Air and announcer never show together. Once the air passes 0.45 s, the rotation shows in 180° steps and bumps on each new 180. It also shows flips (`FLIP`, `2× FLIP`) and the grab being held.
 - **Call-outs, below centre.** CLOSE SHAVE, then ×n for a streak within 2.6 s (gold from ×3). RAZOR CLOSE! appears under 0.8 m. RAIL LOST and line-goal steps also show here.
 - **Banners.** `COMBO ×3 +1,240` (MONSTER COMBO from ×4), with a gold edge glow from ×2.5. Line goals on flow maps also show here.
 - **Rolling score, top right.** It counts up toward the ride's score and bumps gold when a chunk of 100 or more lands. The snowflake counter moves under it.
@@ -118,11 +118,11 @@ These are separate from the existing trauma shake, which is unchanged.
 
 **Rumble.** Added on top of main.js's own: a stomp (0.35/0.8, 120 ms), a huge landing (0.8/1, 260 ms), a combo bank (0.25/0.6, 140 ms) and a level-up (0.6/1, 420 ms).
 
-**Settings.** These are optional keys in the settings object, and nothing in the settings UI sets them yet:
+**Settings.** `juice/settings.js` adds three rows to the shared settings grid (`#settings .grid`), which the lobby's Settings tab and the pause menu both show:
 
-- `settings.juiceShake` (0 to 1, default 1) scales every punch.
-- `settings.juiceHitstop = false` turns the time warp off.
-- `settings.juiceSpeedFx = false` turns the speed rush off.
+- **Screen shake & punch** (`settings.juiceShake`, 0 to 1, default 1) scales every punch and the existing trauma shake.
+- **Hit-stop & slow motion** (`settings.juiceHitstop`) turns the time warp off when unchecked.
+- **Speed rush effect** (`settings.juiceSpeedFx`) turns the post pass off when unchecked.
 
 ## 4. Speed rush (juice/speedfx.js)
 
@@ -172,7 +172,7 @@ Bus events: `musicEnergy {level}` at 5 Hz, and `musicDrop {kind, strength}`.
 - **Pacing.** A first ride usually reaches level 3, about four rides reach level 5, and the curve slows after that.
 - **Pause screen.** It adds the level, the rank, XP to the next level, and the dailies still open.
 - **Ranks (`RANKS`).** Rookie from level 1, Shredder from 5, Ripper from 10, Pro from 20, Legend from 35, Mountain God from 60. Each rank has a colour, used for the badge, the celebration and the Progress tab.
-- **Level-up.** A full-screen celebration (rings, the level number slamming in, the rank and XP to the next level) plays over the ride and the lobby. Level-ups queue, rumble, give a music drop and flash.
+- **Level-up.** It waits (up to 4 s) while the rider is in the air or a trick is being announced, then plays a full-screen celebration (rings, the level number slamming in, the rank and XP to the next level) plays over the ride and the lobby. Level-ups queue, rumble, give a music drop and flash.
 - **XP bar.** A small bar under the speedometer fills in ride and fades out after 2.5 s.
 - **Ride recap.** Back in the lobby after a ride, a card slides in on the right. It counts up "+1,240 XP", animates the level bar from where the ride started, and lists the dailies, achievements and personal bests from that ride, plus distance and score. It ends with "ONE MORE RUN? PRESS ENTER", hides after 9 s or on click, and comes from `progressRideSummary`.
 
