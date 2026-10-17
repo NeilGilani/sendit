@@ -115,7 +115,7 @@ export function attachPark(course, pl) {
  * up a transition you extend your legs against it and gain speed — PUMP.auto m/s² by itself, × PUMP.timed if
  * you crouched (W) across the flat and let go as the wall starts. Without it no one gets out of a 6.7 m pipe.
  */
-export const PUMP = { auto: 5.5, timed: 1.6, minDeg: 6, maxDeg: 72 };
+export const PUMP = { auto: 5.5, timed: 1.6, minDeg: 6, maxDeg: 72, pipeCap: 21 };
 function pump(course, pl, dt) {
   const P = course.pipe;
   const st = pl._pump || (pl._pump = { crouchT: 0, armed: false });
@@ -128,6 +128,12 @@ function pump(course, pl, dt) {
       if (t <= 0) { st.crouchT = up ? st.crouchT + dt : 0; if (st.crouchT > 0.2) st.armed = true; }
       else if (t < P.tR) wall = { ang: Math.asin(Math.min(1, t / P.R)) / (Math.PI / 180), nx: Math.sign(b) * P.rx, nz: Math.sign(b) * P.rz };
     }
+  }
+  // In the pipe the snow is cut soft and the walls eat speed: above PUMP.pipeCap the same soft-cap drag the rest of
+  // the park only starts at its (much higher) top speed. Faster than that and the airs go long and low, not up.
+  if (P && pl.state === 1) {
+    const [a, b] = P.local(pl.position.x, pl.position.z), sp = pl.velocity.length();
+    if (a > 0 && a < P.length && Math.abs(b) < P.F + P.wallRun && sp > PUMP.pipeCap) pl.velocity.multiplyScalar(Math.max(0.5, 1 - PHYSICS.softCapDrag * (sp - PUMP.pipeCap) ** 2 * dt / sp));
   }
   if (!wall) return;
   // Going up the wall (velocity has a component toward it) on the curved part.

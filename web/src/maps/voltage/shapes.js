@@ -332,6 +332,43 @@ export class PipeFeature {
   }
 }
 
+/**
+ * Spine: a ridge running down the fall line between two lanes (its crest follows the base slope), rounded at the
+ * crest (crestR) and the feet (footR), faces at faceDeg. You ride up one face across it, air the crest sideways
+ * and land on the other face: a transfer into the next lane that keeps all your speed down the hill. The ridge
+ * grows in over `entry` m at the top and fades over `exit` m at the bottom.
+ */
+export class SpineFeature {
+  constructor({ name, x, z, length, H = 3.2, faceDeg = 40, crestR = 1.6, footR = 4, entry = 12, exit = 10, base, lane = null }) {
+    Object.assign(this, { name, kind: 'spine', x, z, length, H, entry, exit, base, lane });
+    this.fx = 1; this.fz = 0; this.rx = 0; this.rz = 1;
+    const al = faceDeg * DEG;
+    this.al = al; this.rc = crestR; this.rf = footR;
+    this.t1 = crestR * Math.sin(al); this.d1 = crestR * (1 - Math.cos(al));
+    const footRise = footR * (1 - Math.cos(al));
+    this.tFace = Math.max(0, (H - this.d1 - footRise) / Math.tan(al));
+    this.W = this.t1 + this.tFace + footR * Math.sin(al);
+    this.outer = this.W;
+    this.box = [x - 1, x + length + 1, z - this.W - 1, z + this.W + 1];
+  }
+  world(a, b = 0) { return [this.x + a, this.z + b]; }
+  local(x, z) { return [x - this.x, z - this.z]; }
+  /** Height over the snow at lateral distance t from the crest line. */
+  cross(t) {
+    if (t <= this.t1) return this.H - (this.rc - Math.sqrt(Math.max(0, this.rc * this.rc - t * t)));
+    if (t <= this.t1 + this.tFace) return this.H - this.d1 - (t - this.t1) * Math.tan(this.al);
+    if (t < this.W) { const w = this.W - t; return this.rf - Math.sqrt(Math.max(0, this.rf * this.rf - w * w)); }
+    return 0;
+  }
+  scale(a) { return smooth(a / this.entry) * (1 - smooth((a - (this.length - this.exit)) / this.exit)); }
+  at(x, z, base) {
+    const a = x - this.x, b = z - this.z;
+    if (a < 0 || a > this.length || Math.abs(b) >= this.W) return null;
+    const h = this.cross(Math.abs(b)) * this.scale(a);
+    return h > 0.004 ? base + h : null;
+  }
+}
+
 // ------------------------------------------------------------------ index
 /** Spatial hash over feature bounding boxes (16 m cells). */
 export class FeatureIndex {

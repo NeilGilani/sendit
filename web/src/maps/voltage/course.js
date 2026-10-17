@@ -9,16 +9,33 @@
 // featureAt (named take-offs), onPlayer (pipe air, sweet-spot and pop feedback).
 import * as THREE from 'three';
 import { fbm, ridged, vnoise, smooth, sstep, mulberry32 } from './noise.js';
-import { ProfileBuilder, ProfileFeature, PipeFeature, FeatureIndex, STEP } from './shapes.js';
+import { ProfileBuilder, ProfileFeature, PipeFeature, SpineFeature, FeatureIndex, STEP } from './shapes.js';
 import {
   TILE, START_X, TOP, FINISH_U, PARK_HALF, PROFILE, BEHIND, JIBS, JUMPS, LANES, LANE_JUMPS, STEPS, HIPS, QUARTERPIPES,
-  ROLLERS, LANE_JIBS, GRID_JIBS, PIPE, BIG_AIR, DROP_ZONES, LINE_GOALS,
+  ROLLERS, LANE_JIBS, GRID_JIBS, PIPE, BIG_AIR, DROP_ZONES, LINE_GOALS, GAPS, SPINES, START_RAMPS,
 } from './layout.js';
 import { VOLTAGE_PHYSICS, VOLTAGE_CAMERA } from './tuning.js';
 import { attachPark } from './park.js';
 import { SlopeJudge } from './scoring.js';
 
 const U_MIN = -6000, U_MAX = 9000;
+
+/**
+ * Where a straight air off lip ({ a, y, ang }) at speed v comes down onto the surface y = surf(a) (along the
+ * axis): the same flight model as the EFH landings (shapes.js: a 1.2 m/s pop along the lip normal, air drag).
+ */
+function flightLanding(lip, v, surf, popN = 1.2, drag = 0.0027) {
+  const th = lip.ang * DEG, h = 1 / 240;
+  let a = lip.a, y = lip.y, va = v * Math.cos(th) - popN * Math.sin(th), vy = v * Math.sin(th) + popN * Math.cos(th);
+  for (let t = 0; t < 8; t += h) {
+    const sp = Math.hypot(va, vy);
+    va -= drag * sp * va * h; vy -= (9.81 + drag * sp * vy) * h;
+    a += va * h; y += vy * h;
+    const g = surf(a);
+    if (vy < 0 && g !== null && y <= g) return a;
+  }
+  return a;
+}
 const DEG = Math.PI / 180;
 const SECTION = { 1: 'Section 1', 2: 'Section 2', 3: 'Section 3' };
 
@@ -41,6 +58,7 @@ export class VoltageCourse {
     this.rails = [];
     this.named = [];                             // { name, kind, x, z, r } take-off zones for featureAt
     this.walls = [];                             // quarterpipe walls (vert assist)
+    this.scaffolds = [];                         // raised ramps on scaffolding (start ramp, the Tower): props.js
     this.buildAll();
     this.index = new FeatureIndex(this.features);
     this.buildPath();
@@ -123,7 +141,10 @@ export class VoltageCourse {
     for (const s of JUMPS) this.addJump(s, { slope: true });
     for (const s of LANE_JUMPS) this.addJump(s, {});
     for (const s of HIPS) this.addJump({ ...s, yaw: s.turn }, { skew: true });
-    for (const s of STEPS) s.kind === 'stepup' ? this.addStepUp(s) : this.addJump({ ...s, deckDeg: -14 }, {});
+    for (const s of STEPS) s.kind === 'stepup' ? this.addStepUp(s) : this.addJump({ deckDeg: -14, ...s }, {});
+    for (const s of GAPS) this.addGap(s);
+    for (const s of SPINES) this.addSpine(s);
+    for (const s of START_RAMPS) this.addStartRamp(s);
     for (const s of QUARTERPIPES) this.addQP(s);
     for (const r of ROLLERS) this.addRoller(...r);
     for (const s of JIBS) this.addJib(s, SECTION[s.sec]);
@@ -223,12 +244,68 @@ export class VoltageCourse {
     const Ys = new Float32Array(f.Y.length), la = f.marks.lip.a, ty = f.yAt(la + 1);
     for (let i = 0; i < Ys.length; i++) { const a = f.a0 + i * STEP; Ys[i] = a >= la + 0.5 ? f.Y[i] : Math.max(B.baseAt(a) - 0.2, ty - (la + 0.5 - a) * Math.tan(20 * DEG)); }
     f.side = { Y: Ys, hwc: s.hw, blend: 1.4 };
-    // The window to land on the deck (the in-run gauge and the landing zones use it).
-    const deck = f.marks.deck;
-    f.jump = { ...s, lipA: la, lipY, knuckle: deck, table: deck.a - la, land: { vMin: s.vMin, vMax: s.vMax, sweet: { a: deck.a + 2.5, y: deck.y, v: s.vSweet } } };
+    // The window to land on the deck (the in-run gauge and the landing zones use it), from the flights: just
+    // over the top of the step → the end of the deck, the sweet spot 3 m onto it.
+    const deck = f.marks.deck, lip = { a: la, y: lipY, ang: s.lipDeg };
+    const landAt = (v) => flightLanding(lip, v, (a) => f.yAt(a));
+    const speedFor = (aWant) => { let lo = 3, hi = 40; for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (landAt(m) < aWant) lo = m; else hi = m; } return (lo + hi) / 2; };
+    const vMin = speedFor(deck.a + 0.6), vMax = speedFor(deck.a + 4 + s.deckLen - 1.5), vSweet = speedFor(deck.a + 3);
+    f.jump = { ...s, lipA: la, lipY, knuckle: deck, table: deck.a - la, land: { vMin, vMax, sweet: { a: deck.a + 3, y: f.yAt(deck.a + 3), v: vSweet } } };
     this.features.push(f);
     const [lx, lz] = f.world(la);
     this.named.push({ name: s.name, kind: 'jump', x: lx, z: lz, r: s.hw + 3, back: 12, f });
+  }
+
+  /**
+   * Gap jump: a kicker, its back face straight down to the snow, a channel of bare snow (or a road), then the
+   * landing mound: a 40 deg face up to a knuckle landH m over the snow and a constant-EFH landing.
+   */
+  addGap(s) {
+    const back = 40;
+    const B = this.kicker(() => this.P(s.u - back, s.v, 0, s.hw), back, s.kickH, s.lipDeg, s.R);
+    B.mark('lip');
+    const lip = { a: B.a, y: B.y, ang: s.lipDeg };
+    for (let g = 0; g < 400 && B.y > B.baseAt(B.a + STEP) + 0.02; g++) B.line(STEP, -60);
+    B.mark('channel');
+    const slope = Math.tan(-B.baseAngle(lip.a + s.gap / 2) * DEG), face = s.landH / (Math.tan(40 * DEG) + slope);
+    B.snow(Math.max(2, lip.a + s.gap - face - 1.2 - B.a));
+    B.mark('channelEnd');
+    B.width(s.landHw);
+    for (let g = 0; g < 400 && B.y < B.baseAt(B.a) + s.landH; g++) B.line(STEP, 40);
+    B.line(1.2, -4);
+    const outR = 30;
+    const land = B.efhLanding(lip, { vMax: s.vMax, vn: 3.4, Rk: 4, minDeg: 22, maxDeg: s.maxDeg ?? 38, extra: 8, outR });
+    B.toBase(outR, 4);
+    const f = B.build({ name: s.name, kind: 'jump', lane: s.lane, rake: 1.1 });
+    f.gap = { a0: f.marks.channel.a, a1: f.marks.channelEnd.a, road: !!s.road, canal: !!s.canal };
+    f.jump = { ...s, lipA: lip.a, lipY: lip.y, land, knuckle: f.marks.knuckle, table: f.marks.knuckle.a - lip.a };
+    this.features.push(f);
+    const [lx, lz] = f.world(lip.a);
+    this.named.push({ name: s.name, kind: 'jump', x: lx, z: lz, r: s.hw + 3, back: 14, f });
+  }
+
+  /** Spine: a ridge down the fall line between two lanes (shapes.js SpineFeature). */
+  addSpine(s) {
+    const f = new SpineFeature({ name: s.name, x: START_X + s.u0, z: s.v, length: s.u1 - s.u0, H: s.H, faceDeg: s.faceDeg, base: this.base, lane: s.lane });
+    this.features.push(f);
+    this.named.push({ name: s.name, kind: 'spine', x: f.x, z: f.z, r: 0, f });
+  }
+
+  /** A scaffold start ramp: a deck top m up, rolled into at inDeg, down onto the snow. */
+  addStartRamp(s) {
+    const B = this.P(s.u, s.v, 0, s.hw);
+    B.lift(s.top);
+    B.line(s.deckLen, -6);
+    B.mark('top');
+    B.arc(s.R, -s.inDeg);
+    B.toBase(s.R * 2, 6);
+    const f = B.build({ name: s.name, kind: 'start', lane: 'slope', rake: 1.1 });
+    let a = f.marks.top.a;
+    while (a < f.a0 + f.len && f.yAt(a) - B.baseAt(a) > 0.6) a += STEP;
+    f.thinUntil = a;
+    this.features.push(f);
+    this.scaffolds.push(f);
+    this.startRamp = f;
   }
 
   /** Quarterpipe across the fall line: transition radius R up to 82°, height H, a deck, a ramp down the back. */
@@ -403,7 +480,7 @@ export class VoltageCourse {
   }
 
   addPipe(s) {
-    const pipe = new PipeFeature({ name: s.name, x: START_X + s.u0, z: s.v, length: s.u1 - s.u0, F: s.F, R: s.R, H: s.H, vertDeg: s.vertDeg, D: s.D, base: this.base });
+    const pipe = new PipeFeature({ name: s.name, x: START_X + s.u0, z: s.v, length: s.u1 - s.u0, F: s.F, R: s.R, H: s.H, vertDeg: s.vertDeg, D: s.D, exit: s.exit ?? 6, base: this.base });
     this.features.push(pipe);
     this.pipe = pipe;
     this.named.push({ name: s.name, kind: 'pipe', x: START_X + (s.u0 + s.u1) / 2, z: s.v, r: 0, pipe });
@@ -417,11 +494,19 @@ export class VoltageCourse {
     B.mark('top');
     B.arc(10, -s.inDeg);
     // In-run until the concave transition (+2 m straight at the lip) leaves the lip kickH over the snow.
+    // (or until the transition would dip into the snow: on a steep hill the in-run meets it before the lip is low
+    // enough, and a transition buried in the snow is a kink that throws the rider's speed away).
+    const arcClear = () => {
+      let m = 1e9;
+      for (let d = -s.inDeg; d <= s.lipDeg; d += 4) { const e = B.arcEnd(s.R, d); m = Math.min(m, e.y - B.baseAt(e.a)); }
+      return m;
+    };
     for (let guard = 0; guard < 2000; guard++) {
       const e = B.arcEnd(s.R, s.lipDeg);
       const lipY = e.y + 2 * Math.tan(s.lipDeg * DEG), lipA = e.a + 2;
       if (lipY - B.baseAt(lipA) <= s.kickH) break;
       B.line(STEP, -s.inDeg);
+      if (arcClear() < 0.4) break;
     }
     B.mark('inrunEnd');
     B.arc(s.R, s.lipDeg).line(2);
@@ -429,9 +514,9 @@ export class VoltageCourse {
     const lip = { a: B.a, y: B.y, ang: s.lipDeg };
     B.width(s.deckHw);
     B.lineBy(-1.2, -58);
-    B.line(s.table - (B.a - lip.a), 4);                    // the table rises a little: a taller knuckle, a longer landing
+    B.line(s.table - (B.a - lip.a), s.deckDeg ?? 4);       // (+: the table rises a little: a taller knuckle, a longer landing)
     B.width(s.landHw);
-    const land = B.efhLanding(lip, { vMax: s.vMax, vn: 3.6, Rk: 6, minDeg: 24, maxDeg: 38, extra: 14, outR: 36 });
+    const land = B.efhLanding(lip, { vMax: s.vMax, vn: 3.6, Rk: 6, minDeg: 24, maxDeg: s.maxDeg ?? 38, extra: 14, outR: 36 });
     B.toBase(36, 4);
     const f = B.build({ name: s.name, kind: 'bigair', lane: 'bigair', rake: 1.1 });
     // The scaffold in-run is a narrow ramp: thin edges until the kicker meets the snow.
@@ -445,6 +530,7 @@ export class VoltageCourse {
     f.side = { Y: Ys, hwc: s.hw, blend: 1.4 };
     f.jump = { ...s, lipA: lip.a, lipY: lip.y, land, knuckle: f.marks.knuckle };
     this.features.push(f);
+    this.scaffolds.push(f);
     this.bigAir = f;
     const [lx, lz] = f.world(lip.a);
     this.named.push({ name: s.name, kind: 'jump', x: lx, z: lz, r: s.hw + 3, back: 30, f });
@@ -457,6 +543,7 @@ export class VoltageCourse {
   featureAt(x, z) {
     for (const n of this.named) {
       if (n.kind === 'pipe') { if (n.pipe.at(x, z, this.base(x, z) - 0.5) !== null) return n.name; continue; }
+      if (n.kind === 'spine') { const [a, b] = n.f.local(x, z); if (a > 0 && a < n.f.length && Math.abs(b) < n.f.W + 0.5) return n.name; continue; }
       if (n.kind === 'jump' || n.kind === 'qp') {
         const [a, b] = n.f.local(x, z), la = n.kind === 'qp' ? n.f.marks.coping.a : n.f.jump.lipA;
         if (Math.abs(b) < n.r && a > la - n.back && a < la + 3) return n.name;
@@ -499,10 +586,14 @@ export class VoltageCourse {
   }
   progress(x) { return x - START_X; }
   tAt() { return 0; }
-  menuFocus() { return new THREE.Vector3(START_X + 400, this.profileAt(400) + 380, 60); }
+  menuFocus() { return new THREE.Vector3(START_X + 560, this.profileAt(560) + 420, 60); }
 
   buildDropZones() {
     return DROP_ZONES.map(([name, u, v, hd], i) => {
+      if (i === 0) {   // the start ramp's deck
+        const [x, z] = this.startRamp.world(this.startRamp.marks.top.a - 2.5);
+        return { name, x, z, heading: -Math.PI / 2 };
+      }
       if (i === 4) {   // the big air's scaffold deck
         const [x, z] = this.bigAir.world(this.bigAir.marks.top.a - BIG_AIR.deckLen + 1);
         return { name, x, z, heading: -Math.PI / 2 };
@@ -551,8 +642,9 @@ export class VoltageCourse {
   }
   rockOk(x, z) { return Math.abs(z) > PARK_HALF + 60 || x - START_X < -150 || x - START_X > FINISH_U + 300; }
   corniceOk(x, z) { return Math.abs(z) > PARK_HALF + 150 || x - START_X < -250; }
-  lobbySpot() { return { x: START_X + 6, z: -9, heading: -Math.PI / 2 + 0.12 }; }
-  spawnPoint() { return { x: START_X + 2, z: 0, heading: -Math.PI / 2 }; }
+  lobbySpot() { return { x: START_X - 22, z: -10, heading: -Math.PI / 2 + 0.14 }; }
+  /** On the start ramp's deck (the run starts with the roll-in). */
+  spawnPoint() { const [x, z] = this.startRamp.world(this.startRamp.marks.top.a - 2.5); return { x, z, heading: -Math.PI / 2 }; }
 
   /** Player hook (player.js): the pipe / quarterpipe vert, landing and pop feedback (park.js). */
   onPlayer(pl) { attachPark(this, pl); }

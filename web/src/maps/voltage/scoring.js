@@ -3,17 +3,20 @@
 //
 // A run is judged section by section on the slopestyle course: three rail sections (the best grind on each:
 // its points carry the rail's difficulty, length, slide / switch / press / switch-ups / spins on and off) and
-// the three jumps (rotation, flips, grab, switch; amplitude from where you landed on the knuckle-to-sweet-spot
+// the five jumps (rotation, flips, grab, switch; amplitude from where you landed on the knuckle-to-sweet-spot
 // landing; execution from the landing grade). Then:
-//   Sections  0–60   six sections × 0–10 (a crash on a section zeroes it)
+//   Sections  0–60   eight sections × 0–10, scaled to 60 (a crash on a section zeroes it)
 //   Variety   0–20   different spin directions / axes, different grinds (THPS-style decay for repeats)
 //   Amplitude 0–10   sweet spots and deep landings on the jumps
-//   Flow      0–10   no crashes, no stalls, carrying speed (average speed over the run)
+//   Flow      0–10   no crashes, no stalls, carrying speed (average speed over the run: 19 m/s for full marks)
 // Medals (Challenge): gold ≥ 80, silver ≥ 65, bronze ≥ 50.
 import { on, emit } from '../../state.js';
+import { START_X } from './layout.js';
 
 export const MEDALS = { gold: 80, silver: 65, bronze: 50 };
-const SECTIONS = ['Section 1', 'Section 2', 'Section 3', 'Lightning', 'Thunder', 'Voltage'];
+const SECTIONS = ['Section 1', 'Section 2', 'Section 3', 'Lightning', 'Thunder', 'Voltage', 'Megawatt', 'The Gap'];
+// Where each section ends along the course (u, m): a crash before it zeroes that section.
+const SECTION_END = [140, 245, 400, 560, 680, 800, 990, 1e9];
 
 export class SlopeJudge {
   constructor(course) {
@@ -93,8 +96,8 @@ export class SlopeJudge {
     const pl = this.course.player;
     if (!pl) return;
     // The section you crashed in is lost.
-    const u = pl.position.x - this.course.spawnPoint().x;
-    const sec = u < 118 ? 'Section 1' : u < 190 ? 'Section 2' : u < 330 ? 'Section 3' : u < 470 ? 'Lightning' : u < 590 ? 'Thunder' : 'Voltage';
+    const u = pl.position.x - START_X;
+    const sec = SECTIONS[SECTION_END.findIndex((e) => u < e)];
     if (Math.abs(pl.position.z) < 40) this.run.sec[sec] = 0;
   }
 
@@ -102,13 +105,13 @@ export class SlopeJudge {
   judge() {
     const r = this.run;
     const sections = SECTIONS.map((n) => ({ name: n, score: r.sec[n] ?? 0 }));
-    const secPts = sections.reduce((s, x) => s + x.score, 0);
+    const secPts = sections.reduce((s, x) => s + x.score, 0) * 60 / (10 * SECTIONS.length);
     let distinct = 0, total = 0;
     for (const [, n] of r.moves) { distinct++; total += n; }
     const variety = Math.min(20, distinct * 2.6 - Math.max(0, total - distinct) * 0.4);
     const amplitude = Math.min(10, r.sweet * 3 + r.deep * 1.5);
     const avg = r.speedT > 0 ? r.speedSum / r.speedT : 0;
-    const flow = Math.max(0, Math.min(10, avg / 1.4 - r.crashes * 4 - r.stalls * 1.5));
+    const flow = Math.max(0, Math.min(10, avg / 1.9 - r.crashes * 4 - r.stalls * 1.5));   // full marks from 19 m/s (68 km/h) average
     const totalScore = Math.round(Math.max(0, Math.min(100, secPts + Math.max(0, variety) + amplitude + flow - r.crashes * 6)) * 100) / 100;
     const medal = totalScore >= MEDALS.gold ? 'gold' : totalScore >= MEDALS.silver ? 'silver' : totalScore >= MEDALS.bronze ? 'bronze' : null;
     const f1 = (x) => x.toFixed(1);

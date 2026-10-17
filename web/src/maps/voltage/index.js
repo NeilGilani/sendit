@@ -28,11 +28,11 @@ export const VOLTAGE_THUMB = svg(`
 registerMap({
   id: 'voltage-park',
   name: 'Voltage Park',
-  description: 'An event terrain park: an Olympic-style slopestyle course, rails everywhere, three lanes, a 22 ft superpipe and a big air tower. Grind it, spin it, stomp it.',
+  description: 'A fast event terrain park: drop off the start ramp into an Olympic-style slopestyle course that ends on the Megawatt mega kicker and a road gap, rails everywhere, stacked lanes, spines, hips, a 22 ft superpipe and a 33 m big air tower. Grind it, spin it, send it.',
   thumbnail: VOLTAGE_THUMB,
   order: 4,
   tags: ['handmade', 'park', 'slopestyle', 'rails'],
-  describe: () => 'Terrain park · slopestyle, rails, superpipe, big air · 38 jibs, 17 jumps',
+  describe: () => 'Terrain park · slopestyle, mega kicker, gaps, spines, superpipe, big air · 38 jibs, 34 jumps',
   load: async () => {
     const course = new VoltageCourse();
     // Meshes and the HUD need the renderer-side modules: loaded only in the browser.

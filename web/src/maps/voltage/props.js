@@ -22,6 +22,7 @@ export function buildVoltageProps(course, { terrain }) {
   const snow = new GeoBuf();
   for (const f of course.features) {
     if (f.kind === 'pipe') pipeMesh(f, T, snow);
+    else if (f.kind === 'spine') spineMesh(f, T, snow);
     else profileMesh(f, T, snow);
   }
   const snowMesh = new THREE.Mesh(snow.build(true), M.snow);
@@ -29,7 +30,8 @@ export function buildVoltageProps(course, { terrain }) {
   snowMesh.receiveShadow = true; snowMesh.castShadow = true;
   group.add(snowMesh);
   group.add(buildRails(course, T, M));
-  group.add(buildScaffold(course, T, M));
+  for (const f of course.scaffolds || []) group.add(buildScaffold(f, T, M));
+  group.add(buildGaps(course, T));
   group.add(buildDressing(course, T, M));
   group.add(buildSparks(course));
   group.traverse((o) => { if (o.isMesh && !o.material.transparent && o.castShadow === undefined) o.castShadow = true; });
@@ -118,6 +120,22 @@ function pipeMesh(p, T, buf) {
     const t = Math.abs(b);
     const dye = Math.abs(t - cop) < 0.12 && p.scale(a) > 0.5;
     const c = dye ? DYE : [1, 1, 1];
+    return [x, y === null ? base - 0.3 : y + 0.02, z, c[0], c[1], c[2]];
+  });
+}
+
+function spineMesh(p, T, buf) {
+  const rows = [];
+  for (let a = 0; a <= p.length; a += 0.75) rows.push(a);
+  const cs = [];
+  for (let t = 0; t <= p.W + 0.3;) { cs.push(t); t += t < p.t1 + 0.3 ? 0.2 : 0.45; }
+  const cols = [...cs.slice(1).reverse().map((t) => -t), ...cs];
+  buf.grid(rows.length, cols.length, (i, j) => {
+    const a = rows[i], b = cols[j];
+    const [x, z] = p.world(a, b);
+    const base = T.baseHeight(x, z);
+    const y = p.at(x, z, base);
+    const c = Math.abs(b) < 0.15 && p.scale(a) > 0.5 ? DYE : [1, 1, 1];   // a dye line along the crest
     return [x, y === null ? base - 0.3 : y + 0.02, z, c[0], c[1], c[2]];
   });
 }
@@ -256,11 +274,9 @@ function buildRails(course, T, M) {
 }
 
 // ------------------------------------------------------------------ big air scaffold
-function buildScaffold(course, T, M) {
+function buildScaffold(f, T, M) {
   const g = new THREE.Group();
-  g.name = 'TowerScaffold';
-  const f = course.bigAir;
-  if (!f) return g;
+  g.name = `Scaffold:${f.name}`;
   const poles = [], braces = [], panels = [];
   const end = f.thinUntil;
   for (let a = f.a0; a <= end; a += 2.5) {
@@ -300,8 +316,40 @@ function buildScaffold(course, T, M) {
   if (poles.length) g.add(new THREE.Mesh(strip([...poles, ...braces]), M.scaffold));
   if (rail.length) g.add(new THREE.Mesh(strip(rail), M.yellow));
   if (panels.length) {
-    const mat = toonMaterial({ name: 'towerPanel', map: bannerTexture('THE TOWER', '#ff3d9a', '#140a3a', 512, 1024, true), side: THREE.DoubleSide, frag: 'toonEmissive = diffuseColor.rgb * 0.25;' });
+    const big = f.kind === 'bigair';
+    const mat = toonMaterial({ name: `towerPanel:${f.name}`, map: bannerTexture(big ? 'THE TOWER' : 'VOLTAGE', big ? '#ff3d9a' : '#ffe14d', '#140a3a', 512, 1024, true), side: THREE.DoubleSide, frag: 'toonEmissive = diffuseColor.rgb * 0.25;' });
     g.add(new THREE.Mesh(strip(panels), mat));
+  }
+  return g;
+}
+
+// ------------------------------------------------------------------ gap channels: the road, the canal
+function buildGaps(course, T) {
+  const g = new THREE.Group();
+  g.name = 'GapChannels';
+  for (const f of course.features) {
+    if (!f.gap) continue;
+    const { a0, a1, road } = f.gap;
+    const w = road ? 26 : 16;                      // across the course (the road runs on past the jump)
+    const buf = new GeoBuf();
+    const rows = [], cols = [];
+    for (let a = a0 + 0.6; a <= a1 - 0.6 + 1e-6; a += 0.75) rows.push(a);
+    for (let b = -w; b <= w + 1e-6; b += 1) cols.push(b);
+    buf.grid(rows.length, cols.length, (i, j) => {
+      const [x, z] = f.world(rows[i], cols[j]);
+      return [x, T.baseHeight(x, z) + 0.04, z];
+    });
+    const geo = buf.build();
+    const tex = road ? roadTexture() : canalTexture();
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1, (2 * w) / 8);
+    const mat = road
+      ? toonMaterial({ name: 'gapRoad', map: tex, color: 0xffffff })
+      : toonMaterial({ name: 'gapCanal', map: tex, color: 0xffffff, rim: 0.5, frag: 'toonEmissive = diffuseColor.rgb * 0.12;' });
+    const m = new THREE.Mesh(geo, mat);
+    m.receiveShadow = true;
+    m.name = road ? 'Road' : 'Canal';
+    g.add(m);
   }
   return g;
 }
@@ -315,12 +363,12 @@ function buildDressing(course, T, M) {
   const poles = [], lamps = [], darks = [], whites = [];
   // --- arches: two posts and a banner across (start gate, rail sections, finish)
   const arch = (u, v0, v1, text, c1, c2, height = 6.5) => {
+    const w = Math.abs(v1 - v0), y = Math.max(H(X(u), v0), H(X(u), v1), H(X(u), (v0 + v1) / 2)) + height;
     for (const v of [v0, v1]) {
-      const x = X(u), y = H(x, v);
-      const p = new THREE.BoxGeometry(0.5, height + 0.5, 0.5); p.translate(x, y + (height + 0.5) / 2 - 0.2, v); darks.push(p);
+      const x = X(u), y0 = H(x, v), ph = y - y0 + 0.8;
+      const p = new THREE.BoxGeometry(0.5, ph, 0.5); p.translate(x, y0 + ph / 2 - 0.2, v); darks.push(p);
       course.obstaclesExtra.push([x, v, 0.4, 'tower']);
     }
-    const w = Math.abs(v1 - v0), y = Math.max(H(X(u), v0), H(X(u), v1), H(X(u), (v0 + v1) / 2)) + height;
     const mat = toonMaterial({ name: `arch:${text}`, map: bannerTexture(text, c1, c2, 1024, 128), side: THREE.DoubleSide, frag: 'toonEmissive = diffuseColor.rgb * 0.35;' });
     const pl = new THREE.Mesh(new THREE.PlaneGeometry(w, 1.6), mat);
     pl.position.set(X(u), y, (v0 + v1) / 2);
@@ -331,10 +379,14 @@ function buildDressing(course, T, M) {
     lamps.push(led);
   };
   course.obstaclesExtra = [];
-  arch(-6, -11, 11, 'VOLTAGE PARK  ·  SLOPESTYLE  ·  START', '#ffe14d', '#140a3a', 5.5);
-  arch(42, -22, 22, 'SECTION 1  ·  THE CIRCUIT', '#2ff5d6', '#1b1550');
-  arch(114, -22, 22, 'SECTION 2  ·  SURGE', '#3d8bff', '#1b1550');
-  arch(190, -24, 24, 'SECTION 3  ·  OVERLOAD', '#ff3d9a', '#1b1550');
+  arch(-14, -11, 11, 'VOLTAGE PARK  ·  SLOPESTYLE  ·  START', '#ffe14d', '#140a3a', 4.5);
+  arch(76, -22, 22, 'SECTION 1  ·  THE CIRCUIT', '#2ff5d6', '#1b1550');
+  arch(160, -22, 22, 'SECTION 2  ·  SURGE', '#3d8bff', '#1b1550');
+  arch(258, -24, 24, 'THE PLUNGE  ·  SECTION 3  ·  OVERLOAD', '#ff3d9a', '#1b1550', 7);
+  arch(378, -26, 26, 'THE LAUNCH  ·  JUMP LINE', '#ffe14d', '#1b1550', 8);
+  arch(752, -26, 26, 'MEGAWATT', '#ffe14d', '#140a3a', 8);
+  arch(470, 230, 260, 'THE STAIRWAY', '#ff8a1f', '#1b1550');
+  arch(470, -252, -214, 'HIP ROW', '#2ff5d6', '#1b1550');
   arch(FINISH_U, -48, 48, 'FINISH  ·  VOLTAGE PARK  ·  FINISH', '#ffe14d', '#140a3a', 8);
   arch(32, 52, 92, 'SPARK LANE  ·  SMALL', '#2ff5d6', '#0e2a33');
   arch(32, 106, 144, 'CURRENT LANE  ·  MEDIUM', '#3d8bff', '#0e1a3a');
@@ -342,7 +394,7 @@ function buildDressing(course, T, M) {
   arch(GRID.u0 - 18, 226, 268, 'THE GRID  ·  JIB GARDEN', '#ffe14d', '#1b1550');
   arch(PIPE.u0 + 2, PIPE.v - 26, PIPE.v + 26, 'THE CONDUIT  ·  22 FT SUPERPIPE', '#2ff5d6', '#140a3a', 9);
   // --- start hut: a dark box with an LED band, the gate wand.
-  { const x = X(-14), y = H(x, 0); const hut = new THREE.BoxGeometry(6, 3.2, 9); hut.translate(x, y + 1.6, 0); darks.push(hut); const band = new THREE.BoxGeometry(6.1, 0.25, 9.1); band.translate(x, y + 2.9, 0); lamps.push(band); }
+  { const x = X(-34), y = H(x, 0); const hut = new THREE.BoxGeometry(6, 3.2, 9); hut.translate(x, y + 1.6, 0); darks.push(hut); const band = new THREE.BoxGeometry(6.1, 0.25, 9.1); band.translate(x, y + 2.9, 0); lamps.push(band); }
   // --- light towers along both sides of the course and the park
   const towers = [];
   for (let u = 20; u <= FINISH_U + 40; u += 75) for (const v of [-46, 46, 100, 160, 220, -140, -205]) towers.push([u + (v % 3) * 7, v]);
@@ -364,7 +416,7 @@ function buildDressing(course, T, M) {
       for (let k = 0; k < 3; k++) crowd.push([x + (k - 1) * 0.75 + (Math.sin(u * 3.1 + k) * 0.2), y, v + side * (1.1 + (k % 2) * 0.9 + Math.random() * 0.6)]);
     }
   };
-  for (const [a, b] of [[330, 760]]) { fence(a, b, -36, -1); fence(a, b, 30, 1); }
+  for (const [a, b] of [[440, 1100]]) { fence(a, b, -36, -1); fence(a, b, 30, 1); }
   fence(FINISH_U - 60, FINISH_U + 60, -60, -1); fence(FINISH_U - 60, FINISH_U + 60, 56, 1);
   // --- finish arena: grandstands (stepped), a big screen, the DJ booth
   for (const side of [-1, 1]) {
@@ -395,7 +447,7 @@ function buildDressing(course, T, M) {
       const b = s * (f.hwAt(k.a - 2) + 0.4);
       const [x, z] = f.world(k.a - 6, b);
       const y = f.yAt(k.a - 6) - 2.2;
-      const mat = toonMaterial({ name: `jump:${f.name}`, map: bannerTexture(f.name.toUpperCase(), f.name === 'Voltage' || f.kind === 'bigair' ? '#ffe14d' : '#2ff5d6', '#140a3a', 1024, 160), side: THREE.DoubleSide, frag: 'toonEmissive = diffuseColor.rgb * 0.3;' });
+      const mat = toonMaterial({ name: `jump:${f.name}`, map: bannerTexture(f.name.toUpperCase(), f.name === 'Voltage' || f.name === 'Megawatt' || f.kind === 'bigair' ? '#ffe14d' : '#2ff5d6', '#140a3a', 1024, 160), side: THREE.DoubleSide, frag: 'toonEmissive = diffuseColor.rgb * 0.3;' });
       const pl = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.6), mat);
       pl.position.set(x, y, z);
       pl.rotation.y = -Math.atan2(f.fz, f.fx);
@@ -550,6 +602,26 @@ function bannerTexture(text, fg = '#ffe14d', bg = '#140a3a', w = 1024, h = 128, 
     }
     g.restore();
   });
+}
+
+function roadTexture() {
+  // Across the channel (u) = the road's width; along it (v) the dashes repeat.
+  return canvasTex(256, 256, (c, w, h) => {
+    c.fillStyle = '#5a5e68'; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 900; i++) { c.fillStyle = `rgba(${150 + Math.random() * 60},${150 + Math.random() * 60},${160 + Math.random() * 60},0.12)`; c.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+    c.fillStyle = '#f2f2ee'; c.fillRect(8, 0, 6, h); c.fillRect(w - 14, 0, 6, h);
+    c.fillStyle = '#ffd23a'; c.fillRect(w / 2 - 4, 0, 8, h * 0.55);
+  }, true);
+}
+
+function canalTexture() {
+  return canvasTex(256, 256, (c, w, h) => {
+    const g = c.createLinearGradient(0, 0, w, 0);
+    g.addColorStop(0, '#cfe9ff'); g.addColorStop(0.12, '#5fb2e6'); g.addColorStop(0.5, '#2b7fc4'); g.addColorStop(0.88, '#5fb2e6'); g.addColorStop(1, '#cfe9ff');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    c.strokeStyle = 'rgba(255,255,255,0.35)'; c.lineWidth = 2;
+    for (let i = 0; i < 14; i++) { const y = Math.random() * h; c.beginPath(); c.moveTo(w * 0.2, y); c.bezierCurveTo(w * 0.4, y - 8, w * 0.6, y + 8, w * 0.8, y); c.stroke(); }
+  }, true);
 }
 
 function fenceTexture() {

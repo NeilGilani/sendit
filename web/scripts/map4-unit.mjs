@@ -31,7 +31,7 @@ await test('registered as map 4 with a thumbnail and a lobby spot', () => {
 await test('per-map tuning applies and resets cleanly', () => {
   applyMapTuning(course);
   assert.equal(PHYSICS.wallAlign, true);
-  assert.equal(PHYSICS.ski.maxVelocity, 21);
+  assert.equal(PHYSICS.ski.maxVelocity, 27);
   assert.equal(PHYSICS.hardLanding, 9);
   applyMapTuning({});
   assert.equal(PHYSICS.wallAlign, false);
@@ -212,9 +212,9 @@ await test('the judge: a clean full slopestyle run scores in the 80s–90s, a cr
   const j = course.judgeRun;
   j.reset();
   for (const s of ['Section 1', 'Section 2', 'Section 3']) j.run.sec[s] = 9;
-  for (const s of ['Lightning', 'Thunder', 'Voltage']) j.run.sec[s] = 8.5;
-  for (const k of ['a', 'b', 'c', 'd', 'e', 'f']) j.move(k);
-  j.run.sweet = 3; j.run.speedSum = 13 * 60; j.run.speedT = 60;
+  for (const s of ['Lightning', 'Thunder', 'Voltage', 'Megawatt', 'The Gap']) j.run.sec[s] = 8.5;
+  for (const k of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) j.move(k);
+  j.run.sweet = 3; j.run.speedSum = 18 * 60; j.run.speedT = 60;
   const good = j.judge();
   assert.ok(good.total >= 80 && good.total <= 100, `total ${good.total}`);
   assert.equal(good.medal, good.total >= MEDALS.gold ? 'gold' : 'silver');
