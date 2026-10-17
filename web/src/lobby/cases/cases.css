@@ -56,7 +56,7 @@
   background: linear-gradient(90deg, rgba(5, 6, 16, 1) 0%, rgba(5, 6, 16, 0) 17%, rgba(5, 6, 16, 0) 83%, rgba(5, 6, 16, 1) 100%); }
 .cr-strip { position: absolute; left: 0; top: 1.1em; bottom: 1.1em; display: flex; gap: .45em; will-change: transform; contain: layout paint; }
 /* Speed streaks instead of a blur filter: cheap, and they fade as the reel slows (--spd 0..1). */
-.cr-window::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: var(--spd, 0); will-change: opacity;
+.cr-streaks { position: absolute; inset: 0; pointer-events: none; opacity: 0; will-change: opacity;
   background: repeating-linear-gradient(180deg, rgba(255,255,255,.07) 0 2px, transparent 2px 9px), linear-gradient(90deg, rgba(8,10,24,.55), rgba(8,10,24,.15) 50%, rgba(8,10,24,.55)); }
 .cr-strip .cr-card { width: 9.2em; height: 100%; flex: none; }
 /* The lens: a brighter, sharper strip around the marker (CS2 draws the centre sharp over a dimmer reel). */

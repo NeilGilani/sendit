@@ -100,6 +100,7 @@ class Opener {
       <div class="cr-case">${caseArt(this.result.case.series)}<div class="cr-light"></div></div>
       <div class="cr-reel" aria-hidden="true">
         <div class="cr-window"><div class="cr-strip">${reel.cards.map((c) => cardHtml(c.key, c.rarity)).join('')}</div></div>
+        <div class="cr-streaks"></div>
         <div class="cr-marker"><i></i></div>
       </div>
       <div class="cr-reveal" hidden></div>
@@ -111,6 +112,7 @@ class Opener {
     this.win = el.querySelector('.cr-window');
     this.cards = [...this.strip.children];
     this.marker = el.querySelector('.cr-marker');
+    this.streaks = el.querySelector('.cr-streaks');
     this.fx = el.querySelector('.cr-fx');
     el.querySelector('.cr-skip').addEventListener('click', () => this.skip());
     requestAnimationFrame(() => el.classList.add('on'));
@@ -149,7 +151,8 @@ class Opener {
       this.strip.style.transform = `translate3d(${-x.toFixed(2)}px,0,0)`;
       // Speed streaks while fast (they fade as the reel slows and the cards sharpen into view).
       const spd = Math.min(1, Math.abs(v) / 5000);
-      if (Math.abs(spd - (this.spd ?? -1)) > 0.02) { this.spd = spd; this.win.style.setProperty('--spd', reduced() ? 0 : spd.toFixed(2)); }
+      // (Opacity on a sibling layer: a CSS variable on the window would restyle all 60 cards every frame.)
+      if (Math.abs(spd - (this.spd ?? -1)) > 0.02) { this.spd = spd; this.streaks.style.opacity = reduced() ? 0 : spd.toFixed(2); }
       const cell = this.cellAt(x);
       if (cell !== this.lastCell) {
         if (t - this.lastTick >= T.tickGap) {
@@ -188,7 +191,7 @@ class Opener {
     this.stopRiser?.();
     caseSfx.land();
     this.rumble(0.25, 0.4, 120);
-    this.win.style.setProperty('--spd', 0);
+    this.streaks.style.opacity = 0;
     this.cards[this.result.reel.winAt].classList.add('win');
     this.el.classList.add('landed');
     this.el.querySelector('.cr-skip').hidden = true;
