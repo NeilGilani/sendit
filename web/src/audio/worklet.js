@@ -332,7 +332,7 @@ class SnowProcessor extends AudioWorkletProcessor {
 class WindProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [P('v'), P('air'), P('buffet', 1), P('whistle', 1), P('rush', 1), P('spin'), P('tuck'), P('ambient'), P('ambF', 380),
-      P('gusty', 1), P('rate', 1), P('gain', 1), P('flap', 1)];
+      P('gusty', 1), P('rate', 1), P('gain', 1), P('flap', 1), P('howl')];
   }
 
   constructor(opts) {
@@ -342,7 +342,8 @@ class WindProcessor extends AudioWorkletProcessor {
     this.names = WindProcessor.parameterDescriptors.map((d) => d.name);
     this.p = {};
     this.rng = new Rng(777);
-    this.ch = [0, 1].map((c) => ({ rng: new Rng(99991 + c * 31337), pink: new Pink(), brown: 0, rush: new SVF(), bump: new SVF(), hp: new SVF(), hi: new SVF(), w1: new SVF(), w2: new SVF(), amb: new SVF(), ambH: new SVF() }));
+    this.ch = [0, 1].map((c) => ({ rng: new Rng(99991 + c * 31337), pink: new Pink(), brown: 0, rush: new SVF(), bump: new SVF(), hp: new SVF(), hi: new SVF(), w1: new SVF(), w2: new SVF(), amb: new SVF(), ambH: new SVF(), howl: new SVF(), howl2: new SVF() }));
+    this.howlF = 300; this.howlTgt = 300; this.howlT = 0;
     this.buf = new SVF(); this.flut = new SVF(); this.bBrown = 0; this.flapF = new SVF(); this.flapPh = 0; this.flapA = 1; this.flapPk = new Pink(); this.flapRng = new Rng(4242);
     this.g1 = 0; this.g2 = 0; this.g3 = 0; this.sqPh = 0; this.sqA = 0; this.sqT = 0; this.lock1 = 0; this.lock2 = 0; this.lockT1 = 0; this.lockT2 = 0; this.lt1 = 0; this.lt2 = 0;
     this.ph = 0;
@@ -387,6 +388,11 @@ class WindProcessor extends AudioWorkletProcessor {
       spin: spinAmt,
     };
     g.ambHi = T.ambient.hiss * g.amb * clamp(0.3 + 0.5 * this.g2 * gusty, 0, 1.5);
+    // ridge howl: on exposed peaks the strongest gusts moan through rock edges (a narrow, gliding resonance)
+    const H = T.howl, gust = Math.max(0, this.g2 - H.from);
+    g.howl = H.gain * clamp(p.howl, 0, 2) * Math.min(1.5, gust * gust) * (p.ambient > 0 ? 1 : 0);
+    if ((this.howlT -= dt) <= 0) { this.howlT = 1.5 + this.rng.u() * 3; this.howlTgt = lerp(H.fMin, H.fMax, this.rng.u()); }
+    this.howlF += (this.howlTgt * (1 + 0.25 * Math.max(0, this.g2)) - this.howlF) * 0.02;
     const a = this.prev || g;
     this.prev = g;
     const fr = clamp(T.rush.f0 + T.rush.fPerV * vEff * lerp(1, T.air.rushUp, air) * (1 - T.tuck.lp * tuck), 150, 4000) * r;
@@ -397,6 +403,7 @@ class WindProcessor extends AudioWorkletProcessor {
     for (const c of this.ch) {
       c.hi.set(fh, T.rush.hiQ, fs); c.bump.set(T.rush.bumpF * r, T.rush.bumpQ, fs); c.hp.set(30, 0.7, fs);
       c.w1.set(f1, T.whistle.q, fs); c.w2.set(f2, T.whistle.q, fs);
+      c.howl.set(this.howlF * r, T.howl.q, fs); c.howl2.set(this.howlF * 1.5 * r, T.howl.q, fs);
       c.amb.set(clamp(p.ambF, 80, 4000) * r, T.ambient.q, fs); c.ambH.set(T.ambient.hissF * r, 0.8, fs);
     }
     this.buf.set(T.buffet.f * r, 0.8, fs); this.flut.set(T.buffet.flutterF, 0.7, fs);
@@ -405,6 +412,7 @@ class WindProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < n; i++) {
       const t = i / n, it = 1 - t;
       const buffet = a.buffet * it + g.buffet * t, rush = a.rush * it + g.rush * t, hi = a.hi * it + g.hi * t;
+      const howl = (a.howl ?? 0) * it + g.howl * t;
       const wh1 = a.wh1 * it + g.wh1 * t, wh2 = a.wh2 * it + g.wh2 * t, amb = a.amb * it + g.amb * t, ambHi = a.ambHi * it + g.ambHi * t;
       const spin = a.spin * it + g.spin * t, outG = a.out * it + g.out * t, flap = a.flap * it + g.flap * t;
       // jacket flapping: irregular pulses at 8–25 Hz through a 200–600 Hz band
@@ -435,6 +443,7 @@ class WindProcessor extends AudioWorkletProcessor {
         s += c.hi.bp(w) * hi * ear * (ci === 0 ? earL : earR) * (1 + (whoosh - 1) * 1.5) + c.hi.bp(pk) * T.spin.air * spin * pz;
         s += (c.w1.bp(w) * wh1 + c.w2.bp(w) * wh2) * 6;
         s += c.amb.bp(c.brown * 3.5) * amb * 2.2 + c.ambH.bp(pk) * ambHi;
+        if (howl > 1e-5) s += (c.howl.bp(pk) + c.howl2.bp(pk) * 0.35) * howl * 4;
         const o = safe(s * outG);
         if (ci === 0) L[i] = o; else if (R !== L) R[i] = o;
       }

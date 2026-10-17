@@ -104,6 +104,8 @@ export const AUDIO = {
     flap: { gain: 0.3, from: 11, full: 24, f0: 8, fPerV: 0.55, f: 380, q: 0.9 },
     // tucked: the body shields the head (lee of a windscreen measures 8–9 dB): rush −6 dB, darker
     tuck: { rush: 0.5, lp: 0.4, flap: 0.5 },
+    // ridge howl: the strongest ambient gusts moan through rock edges on exposed peaks (maps[id].howl)
+    howl: { gain: 0.3, from: 0.6, fMin: 220, fMax: 420, q: 14 },
     // map ambience wind (independent of the rider): distant, over ridges
     ambient: { gain: 0.35, f: 650, q: 0.5, hiss: 0.4, hissF: 1800 },   // alpine gust reference: flat to 2 kHz
     out: 0.227,           // internal output level (×3.0 on the bus): headroom inside the worklet
@@ -140,10 +142,10 @@ export const AUDIO = {
     default: { wind: 0.35, windF: 650, birds: 1, trees: 0, crowd: 0, cold: 0.2, gustiness: 1, verb: 0.08, verbTime: 0.9, verbPre: 0.03, verbDark: 0.6 },
     'valcrest-gully': { wind: 0.3, windF: 620, birds: 1, trees: 0.2, crowd: 0, cold: 0.2, gustiness: 1 },
     blackspruce: { wind: 0.28, windF: 820, birds: 0.8, trees: 1, crowd: 0, cold: 0.35, gustiness: 0.8, sough: 0.6, verb: 0.22, verbTime: 1.1, verbPre: 0.012, verbDark: 0.7 },
-    ravenspire: { wind: 0.6, windF: 560, birds: 0.25, trees: 0, crowd: 0, cold: 0.7, gustiness: 1.6, verb: 0.1, verbTime: 2.4, verbPre: 0.09, verbDark: 0.8 },
+    ravenspire: { howl: 1, wind: 0.6, windF: 560, birds: 0.25, trees: 0, crowd: 0, cold: 0.7, gustiness: 1.6, verb: 0.1, verbTime: 2.4, verbPre: 0.09, verbDark: 0.8 },
     'voltage-park': { wind: 0.22, windF: 700, birds: 0.4, trees: 0, crowd: 1, pa: 1, cold: 0.15, gustiness: 0.7, park: 1, verb: 0.14, verbTime: 1.0, verbPre: 0.02, verbDark: 0.5 },
     // maps on other branches (profiles apply when they merge; ids from their registerMap)
-    dragonback: { wind: 0.65, windF: 600, birds: 0.15, trees: 0, crowd: 0, cold: 0.6, gustiness: 1.7, verb: 0.08, verbTime: 2.0, verbPre: 0.07, verbDark: 0.8 },
+    dragonback: { howl: 1.2, wind: 0.65, windF: 600, birds: 0.15, trees: 0, crowd: 0, cold: 0.6, gustiness: 1.7, verb: 0.08, verbTime: 2.0, verbPre: 0.07, verbDark: 0.8 },
     'kitsune-peak': { wind: 0.22, windF: 720, birds: 0.3, trees: 0.6, sough: 0.3, crowd: 0, cold: 0.6, gustiness: 0.6, bell: 1, verb: 0.18, verbTime: 1.2, verbPre: 0.02, verbDark: 0.7 },
     fjordline: { wind: 0.4, windF: 540, birds: 0.4, trees: 0.1, crowd: 0, cold: 0.3, gustiness: 1.2, sea: 1, gulls: 1, verb: 0.12, verbTime: 1.6, verbPre: 0.05, verbDark: 0.7 },
     'lake-tahoe': { wind: 0.35, windF: 680, birds: 1, trees: 0.4, crowd: 0, cold: 0.25, gustiness: 1 },

@@ -214,7 +214,7 @@ export class AudioEngine {
     const spin = air ? Math.abs(r.spin) + Math.abs(r.flip) : 0;
     const windParams = {
       v: quiet ? 0 : r.speed, air, buffet: persp.buffet, whistle: persp.whistle, flap: persp.flap, rush: 1, spin, tuck: r.tuck,
-      ambient: (o.menu ? 0.6 : 1) * map.wind, ambF: map.windF, gusty: map.gustiness, rate, gain: persp.wind * (o.paused ? 0.5 : 1),
+      ambient: (o.menu ? 0.6 : 1) * map.wind, ambF: map.windF, gusty: map.gustiness, howl: map.howl ?? 0, rate, gain: persp.wind * (o.paused ? 0.5 : 1),
     };
     if (this.worklet) {
       for (const k in snowParams) this.setP(this.sp, 's' + k, k, snowParams[k], when);

@@ -51,6 +51,7 @@ const snowCases = {
 };
 const windCases = {
   still: () => ({ v: 0, ambient: 0.4 }),
+  'ridge howl': () => ({ v: 0, ambient: 0.6, gusty: 2, howl: 1.2 }),
   '30 m/s first person': () => ({ v: 30, ambient: 0.4, buffet: 1, whistle: 1, flap: 1 }),
   'air spin': () => ({ v: 15, air: 1, spin: 12, ambient: 0.3 }),
   'extreme params': (t) => ({ v: 120 * (t % 1), air: 2, spin: 80, tuck: 3, ambient: 4, gusty: 5, rate: 4, buffet: 3, whistle: 3, flap: 3 }),
