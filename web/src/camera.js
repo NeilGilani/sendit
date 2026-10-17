@@ -10,6 +10,7 @@ import { CAMERA as C } from './config.js';
 import { State } from './player.js';
 import { game, Mode, settings, on } from './state.js';
 import { lerpAngle, clamp, smoothstep } from './world.js';
+import { FPView } from './fpview.js';
 
 export class CameraController {
   constructor(camera, player, terrain, input) {
@@ -39,7 +40,7 @@ export class CameraController {
     on('slowmo', ({ scale }) => { this.slow = 1 - scale; });   // apex slow motion: the lens tightens a touch
     on('bump', (v) => this.addTrauma(Math.min(1, v * 0.06) * C.obstacleTrauma));
     on('stumble', () => this.addTrauma(0.25));
-    on('landed', ({ impact }) => { this.fpDipV = (this.fpDipV || 0) + Math.min(2.2, impact * 0.16); });
+    on('landed', ({ impact }) => this.fpView?.kick(impact));
   }
 
   addTrauma(a) { this.trauma = clamp(this.trauma + a, 0, 1); }
@@ -61,7 +62,7 @@ export class CameraController {
     this.t += dt;
     this.trauma = Math.max(0, this.trauma - C.traumaDecay * dt);
     this.snapT = Math.max(0, this.snapT - dt);
-    if (game.mode === Mode.MENU) { this.flyover(dt); this.wasMenu = true; this.setNear(0.25); return; }
+    if (game.mode === Mode.MENU) { this.flyover(dt); this.wasMenu = true; this.setNear(0.25); this.fpView?.reset(); this.fpWas = false; return; }
     if (this.wasMenu) { this.wasMenu = false; if (this.intro >= 1) this.snap(); }
     // First person (helmet cam) — crashes cut to the chase camera so the tumble stays readable.
     if (settings.view === 'fp' && this.rider && this.player.state !== State.CRASH && this.intro >= 1) {
@@ -69,7 +70,7 @@ export class CameraController {
       this.fpWas = true;
       return;
     }
-    if (this.fpWas) { this.fpWas = false; this.snap(); }
+    if (this.fpWas) { this.fpWas = false; this.fpView?.reset(); this.snap(); }
     this.setNear(0.25);
     this.follow(dt);
     if (this.inspect) this.inspectView();
@@ -237,74 +238,10 @@ export class CameraController {
     if (this.camera.near !== n) { this.camera.near = n; this.camera.updateProjectionMatrix(); }
   }
 
-  /**
-   * Helmet cam: eyes just in front of the rider's head bone (so crouch, carve lean, chatter and
-   * landing squash all move the view), looking down the fall line and into the turn, leaning with
-   * the carve, gloves / poles / ski tips in the bottom of the frame, wide FoV that opens with speed.
-   */
+  /** Helmet cam (first person): fpview.js. */
   firstPerson(dt) {
-    const s = this.player, rp = this.rider.p;
-    const k = (r) => 1 - Math.exp(-r * dt);
-    const ground = s.state === State.GROUNDED, air = s.state === State.AIR, lift = s.state === State.LIFT;
-    const r = s.speedRatio;
-    this.setNear(0.05);
-    // Eye position from the head bone.
-    const head = this.rider.bones?.Head;
-    const eye = new THREE.Vector3();
-    if (head) head.getWorldPosition(eye); else eye.copy(s.renderPos).add(new THREE.Vector3(0, 1.55, 0));
-    const fwd = new THREE.Vector3(-Math.sin(s.heading), 0, -Math.cos(s.heading));
-    eye.addScaledVector(fwd, 0.14).add(new THREE.Vector3(0, 0.05, 0));
-    // Landing dip: a damped spring kicked by the impact.
-    this.fpDipV = (this.fpDipV || 0) - (this.fpDip || 0) * 160 * dt - (this.fpDipV || 0) * 14 * dt;
-    this.fpDip = (this.fpDip || 0) + this.fpDipV * dt;
-    eye.y -= this.fpDip;
-    // Snow chatter: fine vertical buzz that grows with speed on the ground.
-    const t = this.t;
-    const chat = ground ? (0.004 + r * r * 0.014) : 0.001;
-    eye.y += (noise1(t * 26, 2.1) * 0.7 + noise1(t * 53, 4.4) * 0.3) * chat;
-    // Look: down the travel direction, leading into the turn, plus mouse / right-stick look.
-    const look = this.input.takeLook();
-    const pad = this.input.pad;
-    this.lookYaw = (this.lookYaw || 0) - look.x * settings.mouseSens * 0.0025 - pad.rx * 2.2 * settings.camSens * dt;
-    this.lookPitch = clamp((this.lookPitch || 0) - look.y * settings.mouseSens * 0.0025 * 57.3 - pad.ry * 70 * settings.camSens * dt, -50, 45);
-    if (Math.abs(look.x) + Math.abs(look.y) + Math.abs(pad.rx) + Math.abs(pad.ry) > 0.05) this.lookIdle = 0;
-    this.lookIdle = (this.lookIdle || 0) + dt;
-    if (this.lookIdle > 1.2) {
-      this.lookYaw = lerpAngle(this.lookYaw, 0, k(2.5));
-      this.lookPitch += -this.lookPitch * k(2.5);
-    }
-    let travel = s.heading;
-    const sp = s.velocity.length();
-    if (sp > 2) travel = lerpAngle(s.heading, Math.atan2(-s.velocity.x, -s.velocity.z), clamp((sp - 2) / 6, 0, 1) * 0.5);
-    const wantYaw = travel - s.turnInput * 0.22 * (0.4 + r) + this.lookYaw;
-    this.fpYaw = this.fpYaw === undefined ? wantYaw : lerpAngle(this.fpYaw, wantYaw, k(air ? 3 : 7));
-    const n = s.groundNormal;
-    const drop = (fwd.x * n.x + fwd.z * n.z) / Math.max(n.y, 0.2);   // > 0 facing downhill
-    const slopeDeg = THREE.MathUtils.radToDeg(Math.atan(Math.max(drop, 0)));
-    // Look down the fall line far enough that the ski tips sit in the bottom of the frame.
-    let wantPitch = -21 - slopeDeg * 0.55 + r * 3 - rp.tuck * 3 + this.lookPitch;
-    if (air) wantPitch = clamp(THREE.MathUtils.radToDeg(Math.atan2(s.velocity.y, Math.max(sp, 1))) * 0.6 - 18, -55, -5) + this.lookPitch;
-    if (lift) wantPitch = -6 + this.lookPitch;
-    this.fpPitch = this.fpPitch === undefined ? wantPitch : this.fpPitch + (wantPitch - this.fpPitch) * k(air ? 2.5 : 6);
-    // Roll: lean with the carve (a share of the body's edge roll) + a touch of chatter.
-    const wantRoll = (rp.roll || 0) * 0.55 + noise1(t * 31, 9.3) * chat * 0.6;
-    this.fpRoll = (this.fpRoll || 0) + (wantRoll - (this.fpRoll || 0)) * k(8);
-    this.camera.position.copy(eye);
-    this.camera.quaternion.setFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(this.fpPitch - this.fpDip * 40), this.fpYaw, this.fpRoll, 'YXZ'));
-    // Shake (trauma), a little gentler than the chase cam.
-    const tr2 = this.trauma * this.trauma;
-    if (tr2 > 1e-4) {
-      const f = this.t * C.shakeFreq;
-      this.camera.rotateX(THREE.MathUtils.degToRad(noise1(f, 11.2) * C.shakeAngle * 0.7 * tr2));
-      this.camera.rotateY(THREE.MathUtils.degToRad(noise1(f, 17.9) * C.shakeAngle * 0.7 * tr2));
-      this.camera.rotateZ(THREE.MathUtils.degToRad(noise1(f, 3.7) * C.shakeAngle * 0.7 * tr2));
-    }
-    // Wide lens that opens with speed; snaps in on hard stops.
-    let wantFov = C.fpFov + r * C.fpFovBonus;
-    if (this.snapT > 0) wantFov = C.fpFov - 5;
-    this.fov += (wantFov - this.fov) * k(this.snapT > 0 || wantFov < this.fov ? C.fovSnapRate : C.fovRiseRate);
-    this.camera.fov = clamp(this.fov, 50, 115);
-    this.camera.updateProjectionMatrix();
+    if (!this.fpView) this.fpView = new FPView(this);
+    this.fpView.update(dt);
   }
 
   damp(cur, target, axis, smooth, dt) {
