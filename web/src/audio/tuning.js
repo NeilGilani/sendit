@@ -160,7 +160,7 @@ export const AUDIO = {
   },
   ambience: {
     creak: { gain: 0.16, every: [6, 16] },       // tree creaks (stick-slip squeal), seconds between
-    crowd: { gain: 0.22, cheer: 1.6 },
+    crowd: { gain: 0.22, cheer: 3.5 },   // a cheer swells ~6–8 dB over the murmur
     sough: { gain: 0.3 },
     lodge: { gain: 0.18, clink: 0.015 },            // the lodge at the bottom: muffled après-ski chatter + clinks (3D)
     pa: { gain: 0.08, every: [25, 50] },

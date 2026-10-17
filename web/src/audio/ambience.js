@@ -30,29 +30,36 @@ export class Ambience {
 
   setMap(id) {
     this.profile = { ...this.maps.default, ...(this.maps[id] || {}) };
-    if (this.profile.crowd && !this.crowd) this.buildCrowd();
+    if (this.profile.crowd && !this.crowd && !this.building) this.pending = this.buildCrowd();
     if (this.profile.pa && !this.paBufs) this.buildPA();
     this.paT = rnd(this.T.pa.every[0], this.T.pa.every[1]) * 0.5;
     if (this.crowd) this.crowd.gain.setTargetAtTime(this.profile.crowd ? this.T.crowd.gain * this.profile.crowd : 0, this.ctx.currentTime, 1);
   }
 
   /** Voiced babble: two dozen 'voices' (jittered glottal pulses through moving vowel formants), 4 s, stereo. */
-  buildCrowd() {
-    const b = this.babble(24);
-    this.crowd = this.ctx.createGain(); this.crowd.gain.value = 0; this.crowd.connect(this.bed);
+  async buildCrowd() {
+    this.building = true;
+    const b = await this.babble(24, 16000);
+    this.crowd = this.ctx.createGain(); this.crowd.gain.value = this.profile.crowd ? this.T.crowd.gain * this.profile.crowd : 0; this.crowd.connect(this.bed);
     for (const [rate, off] of [[1, 0], [0.955, 1.7]]) {
       const src = this.ctx.createBufferSource(); src.buffer = b; src.loop = true; src.loopEnd = 4 - 0.25; src.playbackRate.value = rate;
       const g = this.ctx.createGain(); g.gain.value = 0.55; src.connect(g); g.connect(this.crowd); src.start(0, off);
     }
   }
 
-  /** Voiced babble buffer (4 s, stereo, seamless): `voices` jittered glottal pulse trains through moving vowels. */
-  babble(voices) {
-    const c = this.ctx, sr = c.sampleRate, n = sr * 4, b = c.createBuffer(2, n, sr);
+  /**
+   * Voiced babble buffer (4 s, stereo, seamless): `voices` jittered glottal pulse trains through moving vowels.
+   * Built at a low sample rate (it is dulled to ~2.5 kHz anyway) and yielding between voices, so it never
+   * stalls a frame (24 voices took 171 ms in one go at 48 kHz).
+   */
+  async babble(voices, sr = 16000) {
+    const c = this.ctx, n = sr * 4, b = c.createBuffer(2, n, sr);
+    const envK = 1 - Math.exp(-1 / (0.013 * sr)), lpK = 1 - Math.exp(-2 * Math.PI * 2500 / sr);
     const L = b.getChannelData(0), R = b.getChannelData(1);
     const VOWELS = [[730, 1090], [270, 2290], [530, 1840], [570, 840], [300, 870], [660, 1720], [490, 1350]];
     const res = (f, bw) => { const r = Math.exp(-Math.PI * bw / sr), th = 2 * Math.PI * f / sr; return [2 * r * Math.cos(th), -r * r, 1 - r]; };
     for (let v = 0; v < voices; v++) {
+      if (v % 4 === 3) await new Promise((r) => setTimeout(r, 0));
       const f0 = rnd(95, 240), pan = rnd(0.1, 0.9), amp = rnd(0.4, 1);
       let ph = 0, env = 0, on = Math.random() < 0.5, nextSyl = 0, c1 = res(500, 90), c2 = res(1500, 120);
       let y1 = 0, y2 = 0, z1 = 0, z2 = 0, vib = Math.random() * 6;
@@ -63,7 +70,7 @@ export class Ambience {
           const vw = VOWELS[Math.floor(Math.random() * VOWELS.length)];
           c1 = res(vw[0] * rnd(0.9, 1.1), 90); c2 = res(vw[1] * rnd(0.9, 1.1), 130);
         }
-        env += ((on ? 1 : 0) - env) * 0.0016;
+        env += ((on ? 1 : 0) - env) * envK;
         ph += (f0 * (1 + 0.03 * Math.sin(vib + i / sr * 5.5)) + (Math.random() - 0.5) * 8) / sr;
         let x = 0;
         if (ph >= 1) { ph -= 1; x = 1; }
@@ -79,7 +86,7 @@ export class Ambience {
       let lp = 0, peak = 0;
       const tmp = Float32Array.from(d);
       for (const [dl, g] of [[0.031, 0.5], [0.057, 0.35], [0.089, 0.25]]) { const k = Math.floor(dl * sr); for (let i = k; i < n; i++) d[i] += tmp[i - k] * g; }
-      for (let i = 0; i < n; i++) { lp += (d[i] - lp) * 0.3; d[i] = lp; peak = Math.max(peak, Math.abs(lp)); }
+      for (let i = 0; i < n; i++) { lp += (d[i] - lp) * lpK; d[i] = lp; peak = Math.max(peak, Math.abs(lp)); }
       for (let i = 0; i < n; i++) d[i] /= peak || 1;
       // crossfade the loop seam
       const fade = Math.floor(sr * 0.25);
@@ -93,8 +100,12 @@ export class Ambience {
    * at ~700 Hz) and the odd clink of glasses, placed in 3D at the lodge, fading with distance.
    */
   setLodge(pos) {
-    if (!pos || this.lodge || !this.T.lodge.gain) return;
-    const c = this.ctx, b = this.babble(10);
+    if (!pos || this.lodge || this.lodgePending || !this.T.lodge.gain) return null;
+    return (this.lodgePending = this.buildLodge(pos));
+  }
+
+  async buildLodge(pos) {
+    const c = this.ctx, b = await this.babble(10, 8000);
     const pan = c.createPanner();
     pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.refDistance = 10; pan.maxDistance = 200; pan.rolloffFactor = 1.4;
     if (pan.positionX) { pan.positionX.value = pos.x; pan.positionY.value = pos.y + 2; pan.positionZ.value = pos.z; } else pan.setPosition(pos.x, pos.y + 2, pos.z);

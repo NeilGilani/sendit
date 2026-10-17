@@ -40,7 +40,8 @@ async function render(spec, sr, secs) {
   const eng = await new AudioEngine(ctx, { buffers, load: (n) => loadBuffer(ctx, n) }).init();
   eng.setMap(spec.map || 'default');
   eng.setView(spec.view || 'chase');
-  if (spec.lodgeAt) eng.amb.setLodge(spec.lodgeAt);
+  if (spec.lodgeAt) await eng.amb.setLodge(spec.lodgeAt);
+  if (eng.amb.pending) await eng.amb.pending;   // the park crowd builds asynchronously
   eng.setVolumes(spec.volumes || { master: 0.8, sfx: 0.8, music: 0.6 }, 0);
   if (spec.solo) for (const b of ['snowBus', 'windBus', 'ambBus', 'fxBus', 'uiBus']) if (b !== spec.solo) eng[b].gain.value = 0;
   // the real Zen track at the level audio.js plays it (musicLevel 0.85^1.6), for mix-balance checks
