@@ -602,10 +602,10 @@ export class KitsuneCourse {
     return { x: START_X + u, z: v, heading: Math.atan2(-40, -(ahead - v)) };
   }
 
-  /** Where a trail ends: the finish line across the base at its own spot. { x, z, u, width, heading }. */
+  /** Where a trail ends: the finish line across the base, FINISH_U down the fall line. { progress }. */
   trailFinish(trailId) {
-    const t = this.trails.find((k) => k.id === trailId) || this.trails[0];
-    return { x: START_X + FINISH_U, z: t.finishV, u: FINISH_U, width: 120, heading: -Math.PI / 2 };
+    void trailId;   // every trail ends on the same line across the base (registry.trailFinishFor: { progress })
+    return { progress: FINISH_U };
   }
 
   /** The trail whose line is nearest (u, v): used to name a run that started from a drop zone. */

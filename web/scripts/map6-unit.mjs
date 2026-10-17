@@ -55,7 +55,7 @@ for (const t of c.trails) {
   // Facing roughly downhill: the snow 15 m ahead is lower.
   const ahead = c.height(s.x - Math.sin(s.heading) * 15, s.z - Math.cos(s.heading) * 15);
   ok(`spawn ${t.id} faces downhill`, ahead < c.height(s.x, s.z) - 2);
-  ok(`finish ${t.id}`, finite(f.x, f.z) && f.u === FINISH_U && Math.abs(f.x - (START_X + FINISH_U)) < 1 && inTile(f.x, f.z));
+  ok(`finish ${t.id}`, f.progress === FINISH_U && c.progress(START_X + FINISH_U) === FINISH_U && inTile(START_X + FINISH_U, t.finishV));
   // The line is clear of every hitbox (torii posts sit ≥ 2.5 m from the tunnel line).
   let worst = Infinity, at = null;
   const pts = c.linePoints(t.id);

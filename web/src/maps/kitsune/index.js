@@ -1,6 +1,6 @@
 // Kitsune Peak (map 6): registration, mountain / trails (the mountains-and-trails contract), lobby spot
 // and thumbnail. Imported once from maps/builtin.js.
-//   ?map=kitsune-peak&trail=<id> starts on a trail (until the lobby's trail picker exists).
+//   ?map=kitsune-peak&trail=<id> starts on a trail (the lobby's mountain browser does the same).
 import { registerMap } from '../registry.js';
 import { KitsuneCourse } from './course.js';
 import { TRAILS } from './layout.js';
@@ -40,7 +40,7 @@ export const TRAIL_STATS = {
   senbon: { length: 1070, vertical: 325 },
 };
 
-export const KITSUNE_TRAILS = TRAILS.map(({ id, name, difficulty, description }) => ({ id, name, difficulty, description, ...TRAIL_STATS[id] }));
+export const KITSUNE_TRAILS = TRAILS.map(({ id, name, difficulty, description, featured }) => ({ id, name, difficulty, description, featured: !!featured, ...TRAIL_STATS[id] }));
 
 registerMap({
   id: 'kitsune-peak',
@@ -52,9 +52,8 @@ registerMap({
   mountain: { id: 'kitsune-peak', name: 'Kitsune Peak', region: 'Hokkaido, Japan', blurb: 'Bottomless Japow on a volcano at dusk: pillows, birches, torii and lanterns.', accent: '#e8553a' },
   trails: KITSUNE_TRAILS,
   describe: () => 'Japow volcano at dusk · 6 trails · 1,150 m vertical',
-  load: async () => {
+  load: async ({ trail } = {}) => {
     const course = new KitsuneCourse();
-    const trail = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('trail') : null;
     if (trail) course.selectTrail(trail);
     // Props (village, torii, birches, lanterns, the gondola) need the renderer-side modules: browser only.
     const { buildKitsuneProps } = await import('./props.js');

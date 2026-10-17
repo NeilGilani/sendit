@@ -167,15 +167,15 @@ export const RIDE_LINES = {
 export const TRAILS = [
   { id: 'okama', name: 'Okama Bowl', difficulty: 'blue', start: [25, 0], finishV: 20,
     description: 'From the crater rim into the wide summit bowl: wind lips, an optional 6 m lip, then the long fast cruise through the village to the base. The way to learn the mountain.' },
-  { id: 'kazan', name: 'Kazan Rim', difficulty: 'black', start: [45, 120], finishV: 240,
+  { id: 'kazan', featured: true, name: 'Kazan Rim', difficulty: 'black', start: [45, 120], finishV: 240,
     description: 'The volcano-rim rollercoaster: a narrow ridge spine of whoops you pop off at speed, three step-down gaps, then a high-speed run past the ryokans.' },
-  { id: 'makura', name: 'Makura Pillows', difficulty: 'double-black', start: [640, -430], finishV: -60,
+  { id: 'makura', featured: true, name: 'Makura Pillows', difficulty: 'double-black', start: [640, -430], finishV: -60,
     description: 'Pillow lines on the skier\'s left: two terraced pillow stacks, the 9 m Makura Cliff between them and the Fox Ledge below. Bottomless landings, no room for doubt.' },
   { id: 'shirakaba', name: 'Shirakaba Weave', difficulty: 'black', start: [650, -100], finishV: -20,
     description: 'A tight weave through the white birch glade. Firs sit in deep tree wells; brush the trunks for close shaves.' },
   { id: 'kitsunebi', name: 'Kitsunebi Gully', difficulty: 'blue', start: [430, 520], finishV: 380,
     description: 'From the gondola top station into a natural half-pipe lit by fox-fire lanterns. Hit the walls, carve the transitions, then out past the onsen.' },
-  { id: 'senbon', name: 'Senbon Torii', difficulty: 'park', start: [1430, 40], finishV: 70,
+  { id: 'senbon', featured: true, name: 'Senbon Torii', difficulty: 'park', start: [1430, 40], finishV: 70,
     description: 'The shrine village jump line: through the Ō-torii and a tunnel of 33 vermilion gates, up the drift onto the shrine roof, then roof to roof down the ryokan row.' },
 ];
 

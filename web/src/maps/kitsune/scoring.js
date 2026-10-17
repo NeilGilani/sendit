@@ -1,10 +1,11 @@
 // Kitsune Peak: per-rider logic (headless; course.onPlayer → attachKitsune). Everything here is opt-in
 // through this map's course object, so no shared file changes:
-//   • Trails: the run starts at the selected trail (course.selectTrail / ?trail=<id>), and the trail you
-//     actually rode is recognised at the finish (drop zones, or a run that wandered onto another trail).
+//   • Trails: main.js spawns the rider at the selected trail (course.trailSpawn); the course follows the
+//     selection ('trailSelected') and recognises the trail actually ridden at the finish (drop zones, or a
+//     run that wandered onto another trail).
 //   • runCompleted { mapId, trailId, distance, time, score } on the state.js bus when a run reaches the
-//     finish (zen: 'runComplete'; challenge: 'runFinished'), for the reward-cases session's unlocks. If a
-//     generic emitter appears later (main.js), the one that fires first wins and the other is skipped.
+//     finish (zen: 'runComplete'; challenge: 'runFinished'). In the game profile/tracker.js emits it for
+//     every map, so the map emits it only headless (bots, tools) — never twice.
 //   • Senbon Torii: ride all 33 gates of the tunnel in one go (no crash) → a bonus scaled by your speed.
 //   • Kazan whoops: consecutive clean airs off the rim's whoops build a chain ("Whoop ×n").
 //   • Tree wells: grounded inside a fir's well the powder grabs you (sharp drag); the trunk is a crash.
@@ -30,15 +31,8 @@ export function attachKitsune(course, pl) {
     tunnel.next = 0; tunnel.ok = true; whoops = 0;
   };
 
-  // Start at the selected trail: the rider's spawn (respawn / reset to top) follows course.activeTrail.
-  const startRiding = pl.startRiding.bind(pl);
-  pl.startRiding = () => {
-    const id = course.activeTrail;
-    if (!id || id === course.trails[0].id) { startRiding(); return; }
-    const s = course.trailSpawn(id);
-    pl.place({ x: s.x, z: s.z }, s.heading);
-    emit('respawned');
-  };
+  // The game picks the trail (main.js: trail spawn / reset-to-top); keep the course's idea of it in step.
+  const offTrail = on('trailSelected', (e) => { if (e?.mapId === course.id) course.selectTrail(e.trailId); });
 
   // The per-step layer: run clock and distance, the tunnel, the wells.
   const step = pl.step.bind(pl);
@@ -103,6 +97,7 @@ export function attachKitsune(course, pl) {
     on('runCompleted', (e) => { if (e?.mapId === course.id) lastEmit = performanceNow(); }),
     on('runComplete', () => complete(null)),
     on('runFinished', (res) => complete(res)),
+    offTrail,
   ];
   course._riderOffs = () => { for (const o of offs) o(); course._riderOffs = null; };
   void FIR_WELL;
@@ -113,6 +108,9 @@ export function attachKitsune(course, pl) {
     run.done = true;
     const now = performanceNow();
     if (now - lastEmit < 2000) return;    // someone else already announced this finish
+    // In the game the ride tracker (profile/tracker.js) announces every finished run; the map only
+    // announces it where no tracker runs (headless bots, tools).
+    if (globalThis.__sendit?.activities) return;
     const trailId = recogniseTrail();
     lastEmit = now;
     emit('runCompleted', {
