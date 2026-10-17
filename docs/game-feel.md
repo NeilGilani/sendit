@@ -71,7 +71,7 @@ The HUD regions, from top to bottom:
 - **Streak call-outs.** STOMP STREAK ×n appears from 3 stomped or perfect landings in a row. n CLEAN IN A ROW appears every 5 named tricks landed without a crash.
 - **Banners.** `COMBO ×3 +1,240` (MONSTER COMBO from ×4), with a gold edge glow from ×2.5. Line goals on flow maps also show here.
 - **Rolling score, top right.** It counts up toward the ride's score and bumps gold when a chunk of 100 or more lands. The snowflake counter moves under it.
-- **Toasts, right side.** Achievements, finished dailies, the daily halfway mark and personal bests.
+- **Toasts, top left.** Achievements, finished dailies, the daily halfway mark and personal bests. They sit on the left because the reward-cases notifications stack at the top right.
 - **Flash.** A white flash on STOMPED (0.26) and PERFECT (0.18) landings, with rumble.
 
 Grades (`gradeOf(e)`) work on every map:

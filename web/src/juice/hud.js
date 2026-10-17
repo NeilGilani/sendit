@@ -113,10 +113,11 @@ const CSS = /* css */`
 @keyframes jhScore { 0% { transform: scale(1); } 40% { transform: scale(1.22); } 100% { transform: scale(1); } }
 #flakesHud { top: 66px !important; }
 /* toasts */
-#juiceHud .ts { position: absolute; right: 26px; top: 120px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+/* left side: the reward-cases notifications (lobby/cases/notify.js) stack top right */
+#juiceHud .ts { position: absolute; left: 26px; top: 110px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 #juiceHud .tt { display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: 360px; padding: 10px 16px 10px 12px; border-radius: 12px; font-style: normal;
   background: rgba(12,16,30,.72); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.16); box-shadow: 0 10px 34px rgba(0,0,0,.35);
-  transform: translateX(120%); opacity: 0; transition: transform .45s cubic-bezier(.2,1.3,.4,1), opacity .3s; font-family: "Inter", "Segoe UI", sans-serif; }
+  transform: translateX(-120%); opacity: 0; transition: transform .45s cubic-bezier(.2,1.3,.4,1), opacity .3s; font-family: "Inter", "Segoe UI", sans-serif; }
 #juiceHud .tt.on { transform: none; opacity: 1; }
 #juiceHud .tt .ic { flex: none; width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; font-size: 20px; background: linear-gradient(135deg, var(--c1, #2ff5d6), var(--c2, #7a5cff)); color: #1b1446; font-family: "Arial Black", Impact, sans-serif; }
 #juiceHud .tt b { display: block; font-size: 11px; letter-spacing: .24em; color: var(--c1, #2ff5d6); font-weight: 800; }
