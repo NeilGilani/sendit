@@ -192,6 +192,7 @@ export class LoadingScene {
   setupPost() {
     const renderer = this.renderer, camera = this.camera;
     this.low = this.opts.q === 'low';
+    this.high = this.opts.q === 'high';   // ?loadq=high: + real depth of field (costs boot time on laptops)
     // No MSAA: on a laptop GPU that is also compiling and warming the game, 4× MSAA on an HDR target
     // (plus DOF) cost ~3 s of boot time; SMAA keeps the edges crisp for a fraction of it.
     const composer = this.composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
@@ -360,7 +361,9 @@ export class LoadingScene {
       this.dofPass.enabled = true;
     } else this.dofPass.enabled = false;
     // Depth of field only while the game isn't in its GPU-heavy last stretch (lobby, compile, prewarm).
-    if (this.low || this.stageP >= 0.88) this.dofPass.enabled = false;
+    // Real DOF only on request: it measurably slowed the boot on a laptop GPU; the snowflake bokeh and
+    // the long-lens framing carry the shallow-focus look by default.
+    if (!this.high || this.stageP >= 0.88) this.dofPass.enabled = false;
     // Sun glare position for the grade.
     const sp = this.sunDir.clone().multiplyScalar(1000).add(cam.position).project(cam);
     const fwd = cam.getWorldDirection(new THREE.Vector3());
