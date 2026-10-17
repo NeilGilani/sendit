@@ -122,6 +122,7 @@ add('bumps', { seconds: 5, frames: frames(5, (t) => ({ speed: 12, ...carve(t, 2.
 add('roof-landing', { seconds: 3, solo: 'fxBus', frames: frames(3, () => ({ speed: 0 })), events: [{ t: 0.3, name: 'landed', d: { impact: 7 } }, { t: 0.3, name: 'landingGrade', d: { roof: 'Lift station', rawImpact: 7 } }] });
 add('lodge', { seconds: 6, lodgeAt: { x: 0, y: 0, z: -15 }, frames: frames(6, () => ({ speed: 0 })) });
 add('stumble-and-bail', { seconds: 4, solo: 'fxBus', frames: frames(4, () => ({ speed: 0 })), events: [{ t: 0.3, name: 'stumble' }, { t: 1.5, name: 'grindStart', d: { kind: 'rail' } }, { t: 2.2, name: 'grindEnd', d: { reason: 'bail', kind: 'rail' } }] });
+add('fjord-splash', { seconds: 3, solo: 'fxBus', frames: frames(3, () => ({ speed: 0 })), events: [{ t: 0.3, name: 'fjordSplash', d: { speed: 14 } }] });
 if (traceDir) for (const type of ['ski', 'snowboard', 'bigmountain']) {
   const f = join(traceDir, `trace-${type}.json`);
   if (!existsSync(f)) continue;

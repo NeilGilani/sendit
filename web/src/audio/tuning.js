@@ -130,6 +130,7 @@ export const AUDIO = {
     treePass: { gain: 0.3, radius: 6, minSpeed: 6, minGap: 0.15 },   // any tree / rock passing within 6 m: a softer whoosh
     hardBrake: { gain: 0.5 },
     patter: { gain: 0.3 },
+    splash: { gain: 0.8 },              // into the fjord (fjordline's fjordSplash): slap, spray, bubbles
     stumble: { gain: 0.5 },             // an edge catching: clatter / slap, scrape, spray
     roof: { gain: 0.6 },                // landing on a roof: hollow timber boom, creak, snow off the eaves
     bump: { gain: 0.45, from: 0.25, rise: 0.12, full: 1.2, minGap: 0.25 },   // compression (m/s into the snow) rising fast: a whump

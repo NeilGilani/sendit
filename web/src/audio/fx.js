@@ -156,6 +156,21 @@ export class FX {
     this.noise(when + 0.03, { f: 2000, q: 0.9, gain: G * 0.25, attack: 0.02, decay: 0.08 });   // cloth
   }
 
+  /** Into the water (Fjordline's fjord): the slap of the surface, a sheet of spray, then bubbling as you go under. */
+  splash(when, speed = 10) {
+    const G = this.T.splash.gain * clamp(speed / 12, 0.5, 1.4);
+    this.thump(when, { f: 85, f2: 45, gain: G * 0.8, decay: 0.2 });
+    this.noise(when, { buf: 'brown', type: 'lowpass', f: 900, q: 0.7, gain: G, attack: 0.003, decay: 0.3 });
+    this.noise(when + 0.02, { buf: 'pink', f: 2200, f2: 900, q: 0.5, gain: G * 0.8, attack: 0.03, hold: 0.15, decay: 0.9 });
+    for (let i = 0; i < 26; i++) {   // bubbles: tiny rising pings (resonant blips whose pitch climbs as they grow)
+      const t = when + 0.25 + Math.pow(Math.random(), 1.3) * 1.6, f = rnd(300, 1400);
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * rnd(1.3, 1.8), t + 0.04);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(G * rnd(0.04, 0.12) * Math.exp(-(t - when) / 1.2), t + 0.004); g.gain.setTargetAtTime(0, t + 0.004, 0.012);
+      o.connect(g); g.connect(this.dest(rnd(-0.4, 0.4))); o.start(t); o.stop(t + 0.08);
+    }
+  }
+
   /** Face shot: deep powder flying up over the goggles and jacket — a soft whump and a fizz of flakes. */
   faceShot(when, k = 1) {
     const G = this.T.faceShot.gain * k;

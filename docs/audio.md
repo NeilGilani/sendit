@@ -107,6 +107,7 @@ mountain drops in pitch with time.
 | Roof landing | `landingGrade` with a `roof` (Ravenspire's lift station and shacks; the village roofs on the Kitsune and Fjordline branches): the hollow timber structure booms (78–390 Hz modes), creaks, and snow slides off the eaves |
 | Stumble | `stumble`: an edge catches. Skis clatter (or the board slaps), with a quick scrape, cloth and a short spray; the old cue plays softer under it. |
 | Rail bail | `grindEnd` with reason `bail`: the rail clangs and the body lands beside it |
+| Fjord splash | `fjordSplash` (Fjordline branch): the slap of the surface, a sheet of spray, then bubbling as the rider goes under; the music dips as for a crash |
 | Crash tumble | `crashed`: 4–6 decaying impacts, cloth, a long slide, and a 'yard sale': skis and poles clattering, or the board slapping |
 | Tree / rock pass | Any tree or rock passing within 6 m above 6 m/s (`player.scatter.nearest`, read-only): the near-miss sound at a softer level |
 | Near miss | `nearMiss`: pink band sweeping 2.6 kHz → 650 Hz (Doppler) with a 4 → 9 → 4 ms comb sweep, panned to the obstacle's side from the travel direction; trees add needle rustle |
