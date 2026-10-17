@@ -230,7 +230,7 @@ export function mountJuiceHud({ player, combo, input, camera }) {
   on('juiceComboLost', ({ pts }) => { if (pts >= 60) banner(`COMBO LOST  −${fmt(pts)}`, '#ff6bb0', true); });
   // Line goals on flow maps (their own banner is hidden with the rest of the flow chain HUD).
   on('lineGoalStep', ({ name, step, of }) => callout(`${name.toUpperCase()}  ${step} / ${of}`));
-  on('lineGoal', ({ name, bonus }) => { banner(`LINE COMPLETE · ${name.toUpperCase()}  +${fmt(bonus)}`); edge('rgba(47,245,214,.45)'); });
+  on('lineGoal', ({ name, bonus }) => { callout(`LINE COMPLETE · ${name.toUpperCase()}  +${fmt(bonus)}`, '#ffe14d'); edge('rgba(47,245,214,.45)'); });   // the chain is still live: not over its panel
 
   // ------------------------------------------------------------------ announcer
   let annT = 0;
