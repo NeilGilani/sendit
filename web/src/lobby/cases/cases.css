@@ -92,7 +92,7 @@
   background: radial-gradient(circle, color-mix(in srgb, var(--rc) 75%, transparent) 0%, color-mix(in srgb, var(--rc) 25%, transparent) 35%, transparent 65%);
   animation: crAura 2.4s ease-in-out infinite; }
 @keyframes crAura { 50% { transform: scale(1.12); opacity: .75; } }
-.rv-gold .cr-dim { background: radial-gradient(ellipse at 50% 45%, rgba(90, 64, 10, .82), rgba(10, 6, 0, .96) 70%); }
+.cr-overlay.revealed.rv-gold .cr-dim { background: radial-gradient(ellipse at 50% 45%, rgba(90, 64, 10, .82), rgba(10, 6, 0, .96) 70%); }
 .rv-gold .cr-rtext h2 { background: linear-gradient(100deg, #fff6c8, #ffd24a 40%, #fff 55%, #e4ae39 70%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: crShine 2.2s linear infinite; }
 
 /* ---------------------------------------------------------------- reveal */
