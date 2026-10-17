@@ -118,6 +118,7 @@ Tunables (`JUICE_HUD`):
 | Close shave | FOV +3.2° and a roll of 2.2° away from the obstacle. |
 | Combo bank | FOV +3° × mult/2. |
 | Popped take-off | FOV +1.6°. |
+| Challenge GO! | FOV +5°, plus a burst of rush lines. |
 
 **Measured in the real game.** `node web/scripts/juice-impactcheck.mjs <url> 2` rides a scripted Safety grab off Valcrest kicker 2 (1.8 s air, PERFECT, impact about 11 m/s) and logs each frame after touchdown:
 
@@ -132,7 +133,7 @@ These are separate from the existing trauma shake, which is unchanged.
 
 **Combo ticks.** Each multiplier step plays `combo_tick` a little higher (rate 0.85 + 0.07 × mult). It only ticks for moves under 60 points, because audio.js already ticks the bigger ones.
 
-**Rumble.** Added on top of main.js's own: a stomp (0.35/0.8, 120 ms), a huge landing (0.8/1, 260 ms), a combo bank (0.25/0.6, 140 ms), a level-up (0.6/1, 420 ms), a rail lock-in (0.15/0.45, 90 ms) and each rail kink (0.3/0.5, 70 ms).
+**Rumble.** Added on top of main.js's own: a stomp (0.35/0.8, 120 ms), a huge landing (0.8/1, 260 ms), a combo bank (0.25/0.6, 140 ms), a level-up (0.6/1, 420 ms), a rail lock-in (0.15/0.45, 90 ms), each rail kink (0.3/0.5, 70 ms), and achievements or finished dailies (0.3/0.6, 140 ms).
 
 **Settings.** `juice/settings.js` adds three rows to the shared settings grid (`#settings .grid`), which the lobby's Settings tab and the pause menu both show:
 
