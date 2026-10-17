@@ -131,6 +131,7 @@ export class AudioEngine {
       if (this.loadBuffer) await Promise.all([['ski', 'tex_snow_ski.mp3'], ['board', 'tex_snow_board.mp3'], ['skid', 'tex_snow_skid.mp3']].map(async ([k, n]) => {
         const b = this.buffers[n] || await this.loadBuffer(n).catch(() => null);
         if (b && b.length > 4096) this.snow.port.postMessage({ tex: k, data: prepTexture(b, this.T.snow.tex.rms) });
+        if (k === 'ski' && b && b.length > 4096) this.texSkiBuf = b;
       }));
       if (this.loadBuffer) {
         const w = this.buffers['tex_wind.mp3'] || await this.loadBuffer('tex_wind.mp3').catch(() => null);
@@ -146,6 +147,7 @@ export class AudioEngine {
     this.lift = new LiftVoice(c, this.ambBus, this.fx, this.T.fx.lift);
     this.breath = new BreathVoice(c, this.fxBus, this.fx, this.T.fx.breath);
     this.others = new OtherRiders(c, this.fxBus, this.fx, this.T.others);
+    if (this.texSkiBuf) this.others.useTexture(this.texSkiBuf);   // other skiers sound like the real carve recording
     this.amb.setMap(this.mapId);
     return this;
   }

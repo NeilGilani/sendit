@@ -18,7 +18,7 @@ the numbers and the comparisons with real recordings are in `docs/audio-research
 | `web/src/audio/grind.js` | Rail and box grind: a modal metal scrape plus the `grind_loop` sample, lock-on clang, kink ticks and pop-off. |
 | `web/src/audio/ambience.js` | Per-map beds: forest soughing and creaks, park crowd babble, cheers and a distant PA announcer. The distant wind lives in the wind worklet. |
 | `web/src/audio/lift.js` | Chairlift: rope hum and cable sing, chair creaks, and the grip rattling over each tower's sheaves. |
-| `web/src/audio/others.js` | The other skiers on the run (`life.js`): the nearest three each get a positional (HRTF) snow voice that follows their speed and edge, Doppler-shifted by their radial speed. |
+| `web/src/audio/others.js` | The other skiers on the run (`life.js`): the nearest three each get a positional (HRTF) snow voice that follows their speed and edge, Doppler-shifted by their radial speed. The voice is the real CC0 carve recording, looped from a random point per voice. |
 | `web/src/audio/breath.js` | The rider's breathing: an exertion meter, catching breath after hard runs, and huffs on crashes. |
 | `web/src/audio/tuning.js` | Every parameter, in one place. |
 | `web/src/audio/harness.{html,js}` | Offline render and analysis harness for the tests. Dev only; nothing imports it. |

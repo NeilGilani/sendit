@@ -146,7 +146,7 @@ export const AUDIO = {
   },
 
   // ---------------------------------------------------------------- other skiers on the run (life.js), 3D
-  others: { voices: 3, gain: 0.55, range: 70, refDistance: 5, maxDistance: 150, rolloff: 1.3 },
+  others: { voices: 3, gain: 0.95, range: 70, refDistance: 5, maxDistance: 150, rolloff: 1.3 },
 
   // ---------------------------------------------------------------- per-map ambience (by map id)
   maps: {

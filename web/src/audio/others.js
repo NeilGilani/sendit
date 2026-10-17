@@ -16,8 +16,19 @@ export class OtherRiders {
       pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.refDistance = T.refDistance; pan.maxDistance = T.maxDistance; pan.rolloffFactor = T.rolloff;
       src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(pan); pan.connect(out);
       src.start(0, Math.random() * 1.5);
-      return { src, lp, g, pan, who: null, on: false };
+      return { src, hp, lp, g, pan, who: null, on: false };
     });
+  }
+
+  /** Swap the noise for the real carve recording (tex_snow_ski), looped from a random point per voice. */
+  useTexture(buf) {
+    if (!buf) return;
+    for (const v of this.voices) {
+      const s = this.ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.playbackRate.value = 0.94 + Math.random() * 0.12;
+      s.connect(v.hp); s.start(0, Math.random() * buf.duration);
+      try { v.src.stop(); v.src.disconnect(); } catch { /* already stopped */ }
+      v.src = s;
+    }
   }
 
   /** Per frame. skiers: life.skiers ([{ mesh, speed, roll }]); at: listener position. */
