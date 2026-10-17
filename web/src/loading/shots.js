@@ -70,8 +70,9 @@ export function planMove(kind, shot, sun, r, H) {
       m.b = m.a.clone().add(V(-side * r.range(4, 10), 0, 0));
       m.fov = r.range(7, 9.5);
       m.pos = (s) => m.a.clone().lerp(m.b, s);
-      m.look = (s, com) => com.clone().lerp(M, 0.35);
-      m.lag = 2.6; m.sway = 0.04;
+      m.look = (s, com) => com.clone().add(V(0, 0.4, 0));   // at 7–9° any offset loses the rider
+      m.lag = 5.5; m.sway = 0.04;
+      m.endAfterLanding = 0.7;             // from up the shoulder the touchdown is behind the lip: cut on it
       break;
     }
     case 'reveal': {
@@ -101,7 +102,9 @@ export function planMove(kind, shot, sun, r, H) {
   }
   // Clearance + line of sight: lift the whole move until the camera clears the snow and sees the
   // apex, the touchdown and the lip at its key positions (one constant lift keeps the move smooth).
-  const targets = m.targets || [A, M, Lp.clone().add(V(0, 0.5, 0)), shot.com(shot.Ta * 0.25, V(0, 0, 0))];
+  // Default targets: the arc, the touchdown and the ride-out (convex terrain can hide the slash).
+  const ro = (f) => { const o = shot.out[Math.floor((shot.out.length - 1) * f)]; return V(o.x, H(o.x, o.z) + 1, o.z); };
+  const targets = m.targets || [A, M, Lp.clone().add(V(0, 0.5, 0)), shot.com(shot.Ta * 0.25, V(0, 0, 0)), ro(0.3), ro(0.55)];
   let lift = 0;
   for (let k = 0; k < 24; k++) {
     let ok = true;
@@ -157,7 +160,13 @@ export class CameraRig {
     const minP = (m.minPitch ?? -13) * Math.PI / 180;
     const dir = this.look.clone().sub(cam.position);
     const pitch = Math.atan2(dir.y, Math.hypot(dir.x, dir.z));
-    if (!m.free && pitch < minP) cam.lookAt(cam.position.clone().add(V(dir.x, Math.tan(minP) * Math.hypot(dir.x, dir.z), dir.z)));
+    if (!m.free && pitch < minP) {
+      // …but never so far that the rider drops out of the bottom of the frame.
+      const toR = com.clone().sub(cam.position);
+      const pr = Math.atan2(toR.y, Math.hypot(toR.x, toR.z));
+      const L = Math.min(minP, pr + 0.24 * cam.fov * Math.PI / 180);
+      if (L > pitch) cam.lookAt(cam.position.clone().add(V(dir.x, Math.tan(L) * Math.hypot(dir.x, dir.z), dir.z)));
+    }
     let fov = m.fov1 ? m.fov + (m.fov1 - m.fov) * ease(s) : m.fov;
     // Portrait screens: widen the vertical FOV so the horizontal framing survives (rider + range).
     if (cam.aspect < 1.2) fov = (2 * Math.atan(Math.tan((fov * Math.PI) / 360) * Math.min(2.2, 1.2 / cam.aspect)) * 180) / Math.PI;

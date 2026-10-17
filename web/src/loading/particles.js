@@ -15,7 +15,7 @@ attribute vec2 corner;
 attribute vec3 aOrigin; attribute vec3 aVel; attribute vec4 aLife;   // birth, life, kind, seed
 attribute vec2 aSize;
 uniform float uTime; uniform vec3 uWindP;
-varying vec2 vUv; varying float vA; varying float vKind; varying vec3 vWp; varying float vSeed; varying float vT;
+varying vec2 vUv; varying float vA; varying float vKind; varying vec3 vWp; varying float vSeed; varying float vT; varying float vUp;
 void main() {
   float t = uTime - aLife.x;
   float kind = aLife.z;
@@ -36,6 +36,7 @@ void main() {
   mv.xy += c * s;
   vWp = p;
   vUv = corner;
+  vUp = corner.y;                         // screen-up across the puff (unrotated): lit top, shaded belly
   // Fade in fast, out slow; clumps fade as they break up.
   vA = smoothstep(0.0, 0.06, life) * (1.0 - smoothstep(kind < 0.5 ? 0.35 : 0.6, 1.0, life));
   gl_Position = projectionMatrix * mv;
@@ -43,7 +44,7 @@ void main() {
 
 const POWDER_FRAG = /* glsl */`
 uniform sampler2D noiseTex; uniform vec3 uSunCol; uniform vec3 uSkyAmb; uniform vec3 uSunDirA; uniform float uOpacity;
-varying vec2 vUv; varying float vA; varying float vKind; varying vec3 vWp; varying float vSeed; varying float vT;
+varying vec2 vUv; varying float vA; varying float vKind; varying vec3 vWp; varying float vSeed; varying float vT; varying float vUp;
 void main() {
   float r = length(vUv);
   if (r > 1.0 || vA <= 0.0) discard;
@@ -56,9 +57,11 @@ void main() {
   if (vKind < 0.5) {
     // Mist puff: cauliflower edge from noise, denser core.
     float n = texture2D(noiseTex, vUv * 0.22 + vSeed * 3.7 + vT * 0.05).r * 0.65 + texture2D(noiseTex, vUv * 0.5 + vSeed * 1.3).g * 0.35;
-    a = smoothstep(1.0, 0.15, r + (n - 0.5) * 1.1) * 0.26 * smoothstep(0.25, 0.75, n + 0.15);
-    // Backlit mist glows, but a cloud of it must not pile up into a white disc: soft forward lobe.
-    col = uSkyAmb * 0.9 + uSunCol * (0.3 + min(hg * 3.2, 0.9));
+    a = smoothstep(1.0, 0.15, r + (n - 0.5) * 1.1) * 0.36 * smoothstep(0.25, 0.75, n + 0.15);
+    // Self-shadowed volume: sunlit cauliflower tops, a cool sky-lit belly (that contrast is what makes
+    // powder read against sunlit snow). Backlit mist glows, capped so a cloud never piles into a disc.
+    float lit = smoothstep(-0.7, 0.8, vUp + (n - 0.5) * 0.9);
+    col = uSkyAmb * (0.55 + 0.35 * lit) + uSunCol * (0.06 + 0.42 * lit + min(hg * 3.2, 0.9) * (0.4 + 0.6 * lit));
   } else if (vKind < 1.5) {
     a = smoothstep(1.0, 0.55, r) * 0.9;
     col = uSkyAmb * 0.8 + uSunCol * (0.5 + min(hg * 2.5, 0.8));

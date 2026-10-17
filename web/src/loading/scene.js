@@ -276,6 +276,7 @@ export class LoadingScene {
     const shot = this.shot = new Shot({ H: this.height.H, line: this.height.line, trick, gear: v.gear, r });
     this.move = planMove(cam, shot, this.sunDir, r, this.height.H);
     if (this.move.t0 != null) shot.tStart = Math.max(shot.tStart, this.move.t0);
+    if (this.move.endAfterLanding != null) shot.tEnd = Math.min(shot.tEnd, shot.Ta + this.move.endAfterLanding);
     this.simT = shot.tStart;
     this.shotScreen = 0;
     this.shotLen = shot.screenLength();
