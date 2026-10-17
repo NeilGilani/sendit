@@ -39,10 +39,12 @@ export async function prewarm({ renderer, scene, camera, post, scatter, terrain,
   }
   for (const im of scatter.cells || []) { const v = im.visible; im.visible = true; restore.push(() => { im.visible = v; }); }
   for (const im of scatter.trees.cells || []) { const v = im.visible; im.visible = true; restore.push(() => { im.visible = v; }); }
-  // Shadow casters outside the shadow box get their depth programs now too (three's shared depth
-  // material takes each textured caster's map, so flags / banners / riders each need a variant).
+  // Everything drawable is drawn in the warm frames, in view or not: renderer.compile() builds the
+  // canvas variant of each program, but the game draws into the post stack's render target (another
+  // output colour space -> other programs), so only real frames warm the real programs (e.g. lift
+  // cables out of view at load). Shadow casters outside the shadow box get their depth programs too.
   scene.traverse((o) => {
-    if (!o.castShadow || !o.frustumCulled) return;
+    if (!(o.isMesh || o.isPoints || o.isLine || o.isSprite) || !o.frustumCulled) return;
     o.frustumCulled = false;
     restore.push(() => { o.frustumCulled = true; });
   });
@@ -68,7 +70,7 @@ export async function prewarm({ renderer, scene, camera, post, scatter, terrain,
   for (const pool of scatter.trees.pools || []) { const a = pool.im.instanceMatrix; a.clearUpdateRanges(); a.needsUpdate = true; }
   scatter.trees.last.set(1e9, 0, 0);
   warmShadowVariants(renderer, scene, post);
-  compileHidden(renderer, scene, camera);
+  warmHidden(renderer, scene, post);
   // Let the driver finish (a 1-pixel read waits for the GPU) so the cost lands behind the loading screen.
   const gl = renderer.getContext();
   gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
@@ -106,11 +108,13 @@ function warmShadowVariants(renderer, scene, post) {
 }
 
 /**
- * renderer.compile only walks visible objects. Meshes hidden at load (e.g. lift parts or props shown
- * by distance later) get proxies in a temporary scene, compiled against the game scene's lights / fog.
+ * Meshes hidden at load (props shown by distance or mode later) get plain proxies (no onBeforeRender
+ * hooks of their own) drawn for one frame through the post stack in the game scene, so their real
+ * programs exist before they first appear.
  */
-function compileHidden(renderer, scene, camera) {
-  const temp = new THREE.Scene();
+function warmHidden(renderer, scene, post) {
+  const temp = new THREE.Group();
+  temp.name = 'warmHidden';
   const seen = new Set();
   const visibleChain = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
   scene.traverse((o) => {
@@ -120,11 +124,15 @@ function compileHidden(renderer, scene, camera) {
       if (seen.has(key) || o.isSkinnedMesh) continue;
       seen.add(key);
       const proxy = o.isInstancedMesh ? new THREE.InstancedMesh(o.geometry, m, 1) : o.isPoints ? new THREE.Points(o.geometry, m) : o.isLine ? new THREE.Line(o.geometry, m) : new THREE.Mesh(o.geometry, m);
-      proxy.receiveShadow = o.receiveShadow; proxy.castShadow = o.castShadow;
+      proxy.receiveShadow = o.receiveShadow; proxy.castShadow = o.castShadow; proxy.frustumCulled = false;
       temp.add(proxy);
     }
   });
-  if (temp.children.length) renderer.compile(temp, camera, scene);
+  if (temp.children.length) {
+    scene.add(temp);
+    post.composer.render(1 / 60);
+    scene.remove(temp);
+  }
   for (const x of temp.children) if (x.isInstancedMesh) x.dispose();
 }
 
