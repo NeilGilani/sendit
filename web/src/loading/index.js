@@ -19,8 +19,11 @@ const params = new URLSearchParams(typeof location !== 'undefined' ? location.se
 const T0 = performance.now();
 
 // Boot stage weights: ui.loading() reports main.js's own fractions; these map them onto measured wall
-// time (median of GPU runs, docs/loading-screen.md) so the line moves at an even pace. [reported, shown]
-const PACE = [[0, 0], [0.02, 0.03], [0.45, 0.3], [0.5, 0.36], [0.62, 0.42], [0.75, 0.47], [0.8, 0.52], [0.88, 0.6], [0.92, 0.66], [0.95, 0.72], [1, 1]];
+// time (docs/loading-screen.md: terrain ≈ 55–65 % of a warm boot, the final compile + prewarm ≈ 15 % warm
+// but ≈ 55 % on a cold shader cache) so the line moves at a fairly even pace. [reported, shown]. Between
+// reports the line creeps toward the next knot on the compositor (it keeps moving through long tasks).
+const PACE = [[0, 0], [0.02, 0.05], [0.45, 0.55], [0.5, 0.58], [0.62, 0.63], [0.75, 0.66], [0.8, 0.68], [0.88, 0.72], [0.92, 0.76], [1, 1]];
+const nextKnot = (p) => (PACE.find(([a]) => a > p + 1e-6) || PACE[PACE.length - 1])[1];
 const pace = (p) => {
   for (let i = 1; i < PACE.length; i++) {
     const [a, A] = PACE[i - 1], [b, B] = PACE[i];
@@ -122,7 +125,22 @@ class LoadingScreen {
     if (!this.root || this.done) return;
     this.p = Math.max(this.p, p);
     this.stages.push([Math.round(performance.now() - T0), p, msg || '']);
-    if (this.bar) this.bar.style.transform = `scaleX(${pace(this.p).toFixed(4)})`;
+    if (this.bar) {
+      // Never backwards: a report can land below where the creep has already carried the line.
+      const m = /matrix\(([^,]+)/.exec(getComputedStyle(this.bar).transform || '');
+      const shown = Math.max(pace(this.p), m ? Number(m[1]) || 0 : 0);
+      this.bar.style.transition = 'transform .9s cubic-bezier(.2,.7,.2,1)';
+      this.bar.style.transform = `scaleX(${shown.toFixed(4)})`;
+      clearTimeout(this._creep);
+      if (this.p < 1) {
+        const target = shown + (nextKnot(this.p) - shown) * 0.85;
+        this._creep = setTimeout(() => {
+          if (this.done) return;
+          this.bar.style.transition = 'transform 16s cubic-bezier(.1,.5,.3,1)';
+          this.bar.style.transform = `scaleX(${target.toFixed(4)})`;
+        }, 950);
+      }
+    }
     this.worker?.postMessage({ type: 'stage', p: this.p });   // the scene leans out while the game compiles
     if (msg && this.msg) this.msg.textContent = msg;
   }
@@ -136,7 +154,8 @@ class LoadingScreen {
     if (params.has('loadhold')) { this.progress(1, 'Ready (held by ?loadhold)'); return Promise.resolve(); }
     this.done = true;
     this.readyAt = performance.now() - T0;
-    if (this.bar) this.bar.style.transform = 'scaleX(1)';
+    clearTimeout(this._creep);
+    if (this.bar) { this.bar.style.transition = 'transform .5s ease-out'; this.bar.style.transform = 'scaleX(1)'; }
     const quick = !this.firstFrameAt || this.readyAt < 1200;
     const dur = quick ? 450 : 1300;
     // The game's fade curtain would add a black dip: the lobby is revealed straight through the dissolve.

@@ -3,7 +3,7 @@
 // booting the game). Messages in: init {canvas, width, height, dpr, opts}, resize, visible, outro.
 // Messages out: frame (first frame shown), shot {info}, stats, log, error.
 const T0 = performance.now();
-let scene = null, running = false, last = 0, visible = true, sentFrame = false;
+let scene = null, running = false, last = 0, due = 0, visible = true, sentFrame = false;
 const post = (type, payload = {}) => self.postMessage({ type, ...payload });
 
 self.addEventListener('error', (e) => post('error', { message: e.message || 'error' }));
@@ -13,6 +13,10 @@ function loop(now) {
   if (!running) return;
   self.requestAnimationFrame(loop);
   if (!visible) { last = now; return; }
+  // ~60 fps cap: a 120 Hz display would otherwise double the GPU load while the game boots. A due-time
+  // budget (not a fixed gate) keeps 75 / 90 / 144 Hz displays near 60 too.
+  if (last && now < due - 4) return;
+  due = Math.max(due + 1000 / 60, now);
   const dt = last ? (now - last) / 1000 : 1 / 60;
   if (last) scene.adapt(now - last);
   last = now;
