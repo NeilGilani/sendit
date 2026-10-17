@@ -9,7 +9,7 @@ export class OtherRiders {
     this.ctx = ctx; this.T = T;
     this.voices = Array.from({ length: T.voices }, () => {
       const c = ctx, src = c.createBufferSource(); src.buffer = fx.pink; src.loop = true;
-      const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 350;
+      const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 550;   // CC0 pass-bys are flat 1–8 kHz
       const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5000;
       const g = c.createGain(); g.gain.value = 0;
       const pan = c.createPanner();
@@ -51,7 +51,7 @@ export class OtherRiders {
       v.fresh = false;
       const lvl = T.gain * Math.pow(clamp(k.speed / 12, 0, 1.5), 1.15) * (0.45 + 0.55 * edge);
       v.g.gain.setTargetAtTime(lvl, when, v.on ? 0.08 : 0.3);
-      v.lp.frequency.setTargetAtTime(3500 * Math.pow(Math.max(k.speed, 1) / 5, 0.45) * (0.7 + 0.3 * edge), when, 0.1);
+      v.lp.frequency.setTargetAtTime(Math.min(14000, 7500 * Math.pow(Math.max(k.speed, 1) / 5, 0.45) * (0.7 + 0.3 * edge)), when, 0.1);
       v.on = true;
     }
   }

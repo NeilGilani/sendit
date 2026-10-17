@@ -89,6 +89,7 @@ levels in dB relative to the loudest band, for the loudest 15 % of seconds.
 | Our rider wind at 30 m/s (tuned) | −4 | −3 | 0 | −1 | −4 | −7 | −11 | −12 | −19 | 0.7 kHz |
 | Skiers passing a recordist (Selector #680075) | −5 | 0 | −3 | −7 | −5 | −4 | −4 | −4 | −11 | 1.8 kHz |
 | Our other-skier pass (first build) | −33 | −14 | −3 | 0 | −3 | −6 | −9 | −18 | −36 | 0.9 kHz, too dark |
+| Our other-skier pass (tuned) | −35 | −20 | −8 | 0 | 0 | −4 | −6 | −7 | −17 | 1.8 kHz |
 
 **What changed because of the comparison:**
 - The glide hiss became pink noise between a rising high-pass and low-pass. Pink noise is flat in octave bands,
