@@ -142,8 +142,11 @@ program's link status and reports a failure as a console error (`[loading] shade
 program that fails to link otherwise just draws nothing (this caught a far-terrain regression).
 
 ### Resolution and frame rate
-Render size = CSS size × min(devicePixelRatio, 2), capped at 2560×1440 rendered pixels, HDR half-float
-target, SMAA (high) for crisp edges, ~60 fps cap at any refresh rate (120 Hz would double the load).
+Render size = CSS size × min(devicePixelRatio, 2), capped at ~2.1 MP (1920×1100) rendered, HDR half-float
+target, SMAA (high) for crisp edges, ~60 fps cap at any refresh rate (120 Hz would double the load). The
+scaler drops resolution 15 % at a time when frames run long; rather than go below 0.72 it switches to a
+locked 30 fps at a higher resolution (the GPU is shared with the booting game), and it renders at 30 fps
+anyway during the game's compile + prewarm stage.
 Real depth of field (postprocessing DOF at half resolution) only with `?loadq=high`: on a laptop GPU it
 cost seconds of boot time; by default the shallow-focus look comes from the snowflake bokeh and long
 lenses. Portrait screens drop the bars, add scrims and widen the vertical FOV. The worker watches its own frame intervals and scales
@@ -188,7 +191,15 @@ worker's startup work, not its frames: module evaluation, terrain build, the rid
 sessions keep at 100 %. On an unloaded machine a worker core is mostly idle capacity, so the cost should be
 lower there; it could not be measured tonight.
 
-**What cost what (earlier A/B rounds):**
+**High-DPI laptop screen (1440×960 CSS @ 2×, `VIEW=1440x960@2`), the realistic case for this machine:**
+
+| version | static | live | paired delta | scene fps |
+|---|---|---|---|---|
+| before the high-DPI pass (4.0 MP render cap, far Voronoi rock) | 6.02 s | 10.04 s | ≈ +4 s | 27–31 |
+| ~2.1 MP cap, cheap far rock, faster scaler, 30 fps in the compile stage | 6.53 s | 8.09 s | ≈ +1.2 s | 30–40 (scale fell to 0.6) |
+| **+ locked-30 fallback instead of dropping below 0.72 scale (shipped)** | **5.60 s** | **6.29 s** | **≈ +0.6 s** | **42–51**, 0.85–1.0 scale |
+
+**What cost what (earlier A/B rounds, 1280×720 @ 1×):**
 
 | variant | median boot, live vs static | scene fps |
 |---|---|---|

@@ -424,10 +424,14 @@ export class LoadingScene {
     this.ft.length = 0;
     let next = this.scale;
     const mean = s.reduce((a, b) => a + b, 0) / s.length;
-    if (med > 19 || p90 > 30 || mean > 22) next = Math.max(0.5, this.scale * 0.85);
-    else if (med < 17.8 && this.scale < 1) next = Math.min(1, this.scale * 1.06);   // at vsync: creep back up
+    // Budget per frame: 60 fps, or a locked 30 once holding 60 would cost too much resolution (the GPU is
+    // shared with the booting game; steady 30 fps slow motion at a crisp size beats a soft, jittery 40).
+    const T = this.fps30 ? 1000 / 30 : 1000 / 60;
+    if (med > T + 2.5 || p90 > T * 1.8 || mean > T * 1.3) next = Math.max(0.5, this.scale * 0.85);
+    else if (med < T + 1.2 && this.scale < 1) next = Math.min(1, this.scale * 1.06);   // at budget: creep back up
+    if (!this.fps30 && next < 0.72) { this.fps30 = true; next = Math.min(1, next * 1.45); }
     if (Math.abs(next - this.scale) > 0.01) { this.scale = next; this.resize(this.size); }
-    this.post('stats', { stats: { medMs: +med.toFixed(1), scale: +this.scale.toFixed(2), ratio: +this.ratio.toFixed(2), frames: this.frames, build: this.stats.build, compile: this.stats.compile, fps: +(1000 * P.n / P.sum).toFixed(1), over25: P.over25, over50: P.over50, maxMs: Math.round(P.max), px: `${Math.round(this.size.width * this.ratio)}x${Math.round(this.size.height * this.ratio)}` } });
+    this.post('stats', { stats: { medMs: +med.toFixed(1), scale: +this.scale.toFixed(2), ratio: +this.ratio.toFixed(2), frames: this.frames, build: this.stats.build, compile: this.stats.compile, fps: +(1000 * P.n / P.sum).toFixed(1), fps30: !!this.fps30, over25: P.over25, over50: P.over50, maxMs: Math.round(P.max), px: `${Math.round(this.size.width * this.ratio)}x${Math.round(this.size.height * this.ratio)}` } });
   }
 }
 
