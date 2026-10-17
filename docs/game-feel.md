@@ -67,6 +67,7 @@ The HUD regions, from top to bottom:
 - **Combo tiers.** Under the multiplier a tier word pops in as each tier is reached: NICE from ×2, SICK ×3, INSANE ×4, UNREAL ×5, GODLIKE ×6 (`TIERS`).
 - **Live air, at 33 % of the height.** Air and announcer never show together. The number heats up with the rotation: white, then cyan from 360, gold from 720, orange from 1080. Once the air passes 0.45 s, the rotation shows in 180° steps and bumps on each new 180. It also shows flips (`FLIP`, `2× FLIP`) and the grab being held.
 - **Call-outs, below centre.** CLOSE SHAVE, then ×n for a streak within 2.6 s (gold from ×3). RAZOR CLOSE! appears under 0.8 m. RAIL LOST and line-goal steps also show here.
+- **Streak call-outs.** STOMP STREAK ×n appears from 3 stomped or perfect landings in a row. n CLEAN IN A ROW appears every 5 named tricks landed without a crash.
 - **Banners.** `COMBO ×3 +1,240` (MONSTER COMBO from ×4), with a gold edge glow from ×2.5. Line goals on flow maps also show here.
 - **Rolling score, top right.** It counts up toward the ride's score and bumps gold when a chunk of 100 or more lands. The snowflake counter moves under it.
 - **Toasts, right side.** Achievements, finished dailies, the daily halfway mark and personal bests.

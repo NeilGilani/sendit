@@ -237,6 +237,36 @@ export async function run(test, assert) {
     offs.forEach((o) => o()); sp.dispose();
   });
 
+  await test('juice music: energy lifts the upbeat track with hysteresis, hooks win, drops play stingers', async () => {
+    const { MusicEnergy, JUICE_MUSIC } = await import('../src/juice/music.js');
+    const { game, Mode } = await import('../src/state.js');
+    const shots = [];
+    const sound = { ctx: {}, flowOn: false, oneShot: (n) => { shots.push(n); return Promise.resolve(); } };
+    const pl = { speedRatio: 1, state: 1 };
+    let chain = { mult: 4 };
+    const m = new MusicEnergy({ sound, player: pl, combo: { state: () => chain } });
+    const mode0 = game.mode;
+    game.mode = Mode.RIDING;
+    for (let i = 0; i < 120; i++) m.update(1 / 30);
+    assert.ok(m.level > JUICE_MUSIC.liftOn, `energy ${m.level}`);
+    assert.equal(sound.flowOn, true, 'high energy lifts the upbeat track');
+    pl.speedRatio = 0; chain = null;
+    for (let i = 0; i < 30; i++) m.update(1 / 30);
+    assert.equal(sound.flowOn, true, 'held for the minimum time');
+    for (let i = 0; i < 900; i++) m.update(1 / 30);
+    assert.equal(sound.flowOn, false, 'released once energy falls');
+    emit('juiceComboBanked', { mult: 5, bonus: 900 });
+    assert.deepEqual(shots, ['whoosh_slow'], 'drop stinger (boost follows 90 ms later)');
+    const hooked = { ctx: {}, setMusicEnergy: (x) => { hooked.e = x; }, musicDrop: (k) => { hooked.k = k; } };
+    const m2 = new MusicEnergy({ sound: hooked, player: pl, combo: null });
+    m2.update(0.1);
+    assert.equal(typeof hooked.e, 'number', 'setMusicEnergy hook is used when present');
+    emit('juiceLevelUp', { level: 3 });
+    assert.equal(hooked.k, 'levelUp');
+    m.dispose(); m2.dispose();
+    game.mode = mode0;
+  });
+
   await test('juice time warp: hit-stop freezes, eases back to real time, respects cooldown', () => {
     const w = new TimeWarp();
     assert.equal(w.scale(0.016), 1);

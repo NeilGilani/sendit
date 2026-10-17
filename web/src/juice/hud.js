@@ -236,6 +236,17 @@ export function mountJuiceHud({ player, combo, input }) {
     announce(grade, title, sub);
     if (grade === 'stomped' || grade === 'perfect') { flash(grade === 'stomped' ? 0.26 : 0.18); input?.rumble?.(0.35, 0.8, 120); }
   });
+  // Streaks: stomped / perfect landings in a row, and named tricks landed without a crash.
+  let stompRun = 0, cleanRun = 0;
+  on('landed', (e) => {
+    if (e.result === 'crash' || e.air < 0.5) return;
+    const g = gradeOf(e);
+    stompRun = g === 'stomped' || g === 'perfect' ? stompRun + 1 : 0;
+    cleanRun = e.clean && e.trick ? cleanRun + 1 : e.clean ? cleanRun : 0;
+    if (stompRun >= 3) setTimeout(() => callout(`STOMP STREAK ×${stompRun}`, '#ffe14d'), 450);
+    else if (cleanRun >= 5 && cleanRun % 5 === 0) setTimeout(() => callout(`${cleanRun} CLEAN IN A ROW`, '#2ff5d6'), 450);
+  });
+  on('crashed', () => { stompRun = 0; cleanRun = 0; });
   on('grindScore', ({ label, points }) => announce(/^Sketchy/.test(label) ? 'sketchy' : null, shortLabel(label).toUpperCase(), `+${fmt(points)}`));
   on('grindLost', () => callout('RAIL LOST', '#ff6bb0'));
   // Trick book (progression): the first clean landing of a trick gets a NEW TRICK ribbon on its announcement.
