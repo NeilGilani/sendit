@@ -50,27 +50,26 @@
 .cr-overlay.reel .cr-reel { opacity: 1; transform: none; }
 .cr-overlay.revealed .cr-reel { opacity: 0; transform: scale(.96); transition-duration: .3s; }
 .cr-window { position: absolute; inset: 0; overflow: hidden; background: linear-gradient(180deg, rgba(0,0,0,.55), rgba(20,22,40,.55) 50%, rgba(0,0,0,.55));
-  border-top: 1px solid rgba(255,255,255,.12); border-bottom: 1px solid rgba(255,255,255,.12);
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%); mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%); }
+  border-top: 1px solid rgba(255,255,255,.12); border-bottom: 1px solid rgba(255,255,255,.12); }
+/* Edge fades as plain overlays (a mask-image here made the browser re-raster every card each frame). */
+.cr-reel::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(90deg, rgba(5, 6, 16, 1) 0%, rgba(5, 6, 16, 0) 17%, rgba(5, 6, 16, 0) 83%, rgba(5, 6, 16, 1) 100%); }
 .cr-strip { position: absolute; left: 0; top: 1.1em; bottom: 1.1em; display: flex; gap: .45em; will-change: transform; contain: layout paint; }
 /* Speed streaks instead of a blur filter: cheap, and they fade as the reel slows (--spd 0..1). */
-.cr-window::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: var(--spd, 0);
+.cr-window::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: var(--spd, 0); will-change: opacity;
   background: repeating-linear-gradient(180deg, rgba(255,255,255,.07) 0 2px, transparent 2px 9px), linear-gradient(90deg, rgba(8,10,24,.55), rgba(8,10,24,.15) 50%, rgba(8,10,24,.55)); }
 .cr-strip .cr-card { width: 9.2em; height: 100%; flex: none; }
 /* The lens: a brighter, sharper strip around the marker (CS2 draws the centre sharp over a dimmer reel). */
 .cr-reel::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 11em; margin-left: -5.5em; pointer-events: none;
   background: linear-gradient(90deg, transparent, rgba(255, 245, 200, .07) 30%, rgba(255, 245, 200, .1) 50%, rgba(255, 245, 200, .07) 70%, transparent); }
-.cr-marker { position: absolute; left: 50%; top: -0.6em; bottom: -0.6em; width: 0; pointer-events: none; }
+.cr-marker { position: absolute; left: 50%; top: -0.6em; bottom: -0.6em; width: 0; pointer-events: none; z-index: 2; }
 .cr-marker::before { content: ''; position: absolute; left: -2px; top: 0; bottom: 0; width: 4px; background: #e8d84a; border-radius: 2px; box-shadow: 0 0 10px #ffe55a, 0 0 24px rgba(255, 229, 90, .6); }
 .cr-marker::after, .cr-marker i { content: ''; position: absolute; left: -0.6em; border: .6em solid transparent; }
 .cr-marker::after { top: 0; border-top-color: #ffe55a; }
 .cr-marker i { bottom: 0; border-bottom-color: #ffe55a; }
-.cr-marker.tk::before { animation: crTick .09s ease-out; }
-@keyframes crHot { 0% { background: var(--mk); box-shadow: 0 0 22px var(--mk), 0 0 50px var(--mk); } }
 /* The crawl: the marker breathes while the reel decides. */
 .cr-overlay.tense:not(.landed) .cr-marker::before { animation: crTense .7s ease-in-out infinite; }
 @keyframes crTense { 50% { box-shadow: 0 0 18px #fff3a0, 0 0 46px rgba(255, 229, 90, .9); } }
-@keyframes crTick { from { box-shadow: 0 0 16px #fff, 0 0 34px #ffe55a; } }
 .cr-overlay.landed .cr-strip .cr-card:not(.win) { filter: brightness(.45) saturate(.6); transition: filter .4s; }
 .cr-card.win { animation: crWin .6s ease-out forwards; z-index: 2; }
 @keyframes crWin { 40% { transform: scale(1.09); } 100% { transform: scale(1.05); box-shadow: 0 0 0 2px var(--rc), 0 0 30px var(--rc); } }
@@ -235,8 +234,6 @@
 .cn-text small { display: block; color: rgba(255,255,255,.7); font-size: .8em; line-height: 1.3; }
 .cn .cs-bar { margin-top: .35em; height: .45em; }
 .cn-xp { font-weight: 900; color: #7dffc8; font-size: 1.1em; flex: none; }
-/* After the crawl's breathing rule, so a passing red / gold card still flashes the marker. */
-.cr-overlay.reel .cr-marker.hot::before { animation: crHot .6s ease-out; }
 @media (prefers-reduced-motion: reduce) {
   .cr-case, .cr-overlay.lid .cb-lid, .cr-rays, .cr-rcard, .cs-hero .cb, .cs-open.pulse, .lb-tab .cs-badge { animation: none !important; }
 }

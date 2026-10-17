@@ -110,6 +110,7 @@ class Opener {
     this.strip = el.querySelector('.cr-strip');
     this.win = el.querySelector('.cr-window');
     this.cards = [...this.strip.children];
+    this.marker = el.querySelector('.cr-marker');
     this.fx = el.querySelector('.cr-fx');
     el.querySelector('.cr-skip').addEventListener('click', () => this.skip());
     requestAnimationFrame(() => el.classList.add('on'));
@@ -156,16 +157,15 @@ class Opener {
           if (k > 0.35) this.rumble(0, 0.12, 25);   // a light buzz per card once the reel is readable
           this.lastTick = t;
           this.ticks.push(+t.toFixed(3));
-          this.el.querySelector('.cr-marker').classList.remove('tk'); void this.el.offsetWidth; this.el.querySelector('.cr-marker').classList.add('tk');
+          this.marker.animate?.([{ filter: 'brightness(1.8)' }, { filter: 'brightness(1)' }], { duration: 90 });   // no reflow per tick
         }
         // A red or ★ card sliding under the marker in the slow part: the marker flashes its colour and
         // a soft shimmer plays (the near-miss teaser next to the winner gets the same treatment).
         const under = this.result.reel.cards[cell];
         if (under && k > 0.25 && cell !== this.result.reel.winAt && (under.rarity === 'legendary' || under.rarity === 'gold')) {
           caseSfx.tease();
-          const m = this.el.querySelector('.cr-marker');
-          m.style.setProperty('--mk', rarityOf(under.rarity).color);
-          m.classList.remove('hot'); void m.offsetWidth; m.classList.add('hot');
+          const c = rarityOf(under.rarity).color;
+          this.marker.animate?.([{ filter: `drop-shadow(0 0 10px ${c}) drop-shadow(0 0 22px ${c}) brightness(1.6)` }, { filter: 'none' }], { duration: 600, easing: 'ease-out' });
         }
         this.lastCell = cell;
       }
