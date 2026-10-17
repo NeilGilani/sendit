@@ -136,10 +136,13 @@ export class FX {
    * clack (two skis), and the snow burst — fluffy and long in powder, short and bright on hardpack.
    */
   landing(when, impact, o = {}) {
+    // Shaped on CC0 snow-impact recordings: a short broadband crack (100 Hz–10 kHz at once), a body thud
+    // around 120–200 Hz (not a sub boom), then a scatter of crunchy debris grains thinning out over ~0.5 s.
     const T = this.T.landing, k = clamp(impact / 8, 0.12, 1.5), powder = clamp(o.powder ?? 0, 0, 1), hard = 1 - powder;
     const G = T.gain;
-    this.thump(when, { f: rnd(62, 78), f2: 38, gain: G * T.thump * k * (0.6 + 0.4 * hard), decay: 0.16 + 0.1 * k });
-    this.noise(when, { buf: 'brown', type: 'lowpass', f: 380, q: 0.7, gain: G * T.thump * k * 0.9, attack: 0.004, decay: 0.12 + 0.12 * k });
+    this.noise(when, { type: 'highpass', f: 140, q: 0.7, gain: G * T.crack * k * (0.35 + 0.65 * hard), attack: 0.001, decay: 0.02 + 0.015 * k, type2: 'lowpass', ff2: 9000 - 5500 * powder });
+    this.noise(when, { buf: 'pink', f: rnd(120, 170), q: 0.9, gain: G * T.thump * k * 1.6, attack: 0.003, decay: 0.1 + 0.08 * k });
+    this.thump(when, { f: rnd(95, 115), f2: 55, gain: G * T.thump * k * 0.25 * (0.6 + 0.4 * hard), decay: 0.09 + 0.05 * k });
     if (o.board) {
       this.noise(when, { f: rnd(900, 1300), q: 0.8, gain: G * T.slap * k * hard, attack: 0.001, decay: 0.045 });
     } else {
@@ -147,10 +150,16 @@ export class FX {
       this.noise(when, { f: rnd(2200, 2900), q: 1.6, gain: G * T.slap * k * 0.7 * hard, decay: 0.03 });
       this.noise(when + gap, { f: rnd(2000, 2700), q: 1.6, gain: G * T.slap * k * 0.6 * hard, decay: 0.03 });
     }
-    // the snow burst
-    this.noise(when + 0.006, { buf: 'pink', f: rnd(1700, 2300) * (1 - 0.45 * powder), f2: 700, q: 0.6, gain: G * T.spray * k * (0.55 + 0.25 * hard),
-      attack: 0.01, decay: 0.18 + 0.25 * k + 0.35 * powder });
-    if (powder > 0.2) this.noise(when, { buf: 'brown', type: 'lowpass', f: 600, f2: 250, q: 0.5, gain: G * T.spray * k * powder * 1.3, attack: 0.025, decay: 0.45 + 0.3 * k });
+    // debris: crunchy grains, denser and longer for harder hits; softer and lower in powder
+    const n = Math.round(T.debris * (0.4 + 0.6 * k) * (1 - 0.5 * powder));
+    for (let i = 0; i < n; i++) {
+      const t = when + 0.01 + Math.pow(Math.random(), 1.8) * (0.25 + 0.3 * k);
+      this.noise(t, { f: rnd(700, 4500) * (1 - 0.5 * powder), q: rnd(0.8, 1.6), gain: G * T.crunch * k * rnd(0.25, 1) * Math.exp(-(t - when) / 0.25), decay: rnd(0.005, 0.02) });
+    }
+    // the snow thrown up
+    this.noise(when + 0.006, { buf: 'pink', f: rnd(1700, 2300) * (1 - 0.45 * powder), f2: 700, q: 0.6, gain: G * T.spray * k * (0.4 + 0.2 * hard),
+      attack: 0.01, decay: 0.15 + 0.2 * k + 0.35 * powder });
+    if (powder > 0.2) this.noise(when, { buf: 'pink', type: 'lowpass', f: 900, f2: 300, q: 0.5, gain: G * T.spray * k * powder * 1.2, attack: 0.025, decay: 0.45 + 0.3 * k });
   }
 
   /** Jacket nylon swish as the hand goes for the grab (or lets go). */

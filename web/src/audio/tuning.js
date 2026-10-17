@@ -103,7 +103,7 @@ export const AUDIO = {
     edgeChange: { gain: 0.35, minSpeed: 4, minGap: 0.35 },
     slash: { gain: 0.55, minSpeed: 6, edge: 0.6, skid: 0.12, minGap: 0.6 },
     takeoff: { gain: 0.45 },
-    landing: { gain: 0.9, thump: 0.8, spray: 0.7, slap: 0.6 },
+    landing: { gain: 1.1, crack: 0.9, thump: 0.6, crunch: 0.45, debris: 22, spray: 0.6, slap: 0.6 },   // shaped on CC0 snow impacts
     grab: { gain: 0.28 },
     crash: { gain: 0.8 },
     nearMiss: { gain: 0.55 },

@@ -107,6 +107,9 @@ add('powder-faceshot-fp', { seconds: 8, view: 'fp', frames: frames(8, (t) => ({ 
 add('slalom-gates', { seconds: 6, frames: frames(6, (t) => ({ speed: 14, ...carve(t, 1.6, 0.9, 14) })), events: [0.8, 1.6, 2.4, 3.2, 4.0, 4.8].map((t) => ({ t, name: 'gate', d: { pass: true } })) });
 add('skier-passes', { seconds: 8, solo: 'fxBus', frames: frames(8, () => ({ speed: 0 })), others: [{ x: 3, z: -50, vz: 12, speed: 12, wig: 2 }, { x: -6, z: -120, vz: 14, speed: 14, wig: 3 }] });
 add('fallback-no-worklet', { seconds: 6, noWorklet: true, frames: frames(6, (t) => ({ speed: ramp(t, 0, 3, 4, 15), ...carve(t, 2.6, 1.0, 15) })) });
+// landings only (no ride around them): skis 3 / 7 / 11 m/s on groomed, a board at 8, then powder at 8 — 1.5 s apart
+add('landings', { seconds: 9, solo: 'fxBus', frames: frames(9, (t) => (t < 4.5 ? { speed: 0, board: t > 4.4 ? 1 : 0 } : t < 6 ? { speed: 0, board: 1 } : { speed: 0, board: 0, groomed: 0, powder: 1, deep: 1 })),
+  events: [[0.5, 3], [2, 7], [3.5, 11], [5, 8], [6.5, 8], [8, 12]].map(([t, impact]) => ({ t, name: 'landed', d: { impact, rawImpact: impact } })) });
 if (traceDir) for (const type of ['ski', 'snowboard', 'bigmountain']) {
   const f = join(traceDir, `trace-${type}.json`);
   if (!existsSync(f)) continue;
