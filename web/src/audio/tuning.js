@@ -124,7 +124,7 @@ export const AUDIO = {
     grab: { gain: 0.28 },
     crash: { gain: 0.8 },
     nearMiss: { gain: 0.55 },
-    treePass: { gain: 0.3, radius: 6, minSpeed: 6 },   // any tree / rock passing within 6 m: a softer whoosh
+    treePass: { gain: 0.3, radius: 6, minSpeed: 6, minGap: 0.15 },   // any tree / rock passing within 6 m: a softer whoosh
     hardBrake: { gain: 0.5 },
     patter: { gain: 0.3 },
     push: { gain: 0.35, period: 0.65 },  // pushing on the flat: double-pole strokes (skis) / back-foot kicks (board)              // sprayed snow falling back after a slash / hockey stop

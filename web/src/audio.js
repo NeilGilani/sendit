@@ -105,6 +105,8 @@ export class SoundScape {
     if (!n || n.o === this.lastTree) return;
     this.lastTree = n.o;
     if (s.speed >= 11 && n.dist < 3.2) return;   // that one is a scored near miss (its own, louder whoosh)
+    if (when - (this.lastTreeT ?? -9) < P.minGap) return;   // dense forest: no storm of whooshes
+    this.lastTreeT = when;
     this.engine.event('treePass', { pan: this.sideOf(n.o[0], n.o[1]), dist: n.dist, kind: n.o[3], speed: s.speed }, when);
   }
 
