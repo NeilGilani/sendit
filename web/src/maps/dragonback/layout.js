@@ -58,12 +58,12 @@ export const RIDGES = [
     steps: [[330, 6], [500, 7]] },
   { id: 'blade', name: 'The Blade', top: 2.4, p: 1.7, asym: 1.15, rise: 70, end: 'fade', seed: 2,
     knots: [[90, -206, 26, 40], [300, -244, 34, 44], [480, -240, 38, 46], [640, -232, 32, 44], [790, -224, 18, 40]],
-    steps: [[270, 6], [420, 7]], gaps: [[620, 14, 6, 5]] },
+    steps: [[250, 6], [330, 7]], gaps: [[620, 14, 6, 5]] },
   { id: 'shard', name: 'The Shard', top: 3, p: 1.6, rise: 50, end: 'prow', seed: 8,
     knots: [[470, -200, 8, 22], [560, -197, 12, 24], [660, -193, 14, 24], [730, -190, 12, 22]] },
   { id: 'spine', name: "Dragon's Spine", top: 5, p: 1.9, rise: 70, end: 'fade', seed: 3,
     knots: [[86, -96, 28, 52], [300, -84, 38, 58], [500, -70, 42, 62], [700, -58, 38, 60], [880, -50, 30, 56], [1010, -44, 18, 50]],
-    steps: [[230, 6], [430, 7]], gaps: [[560, 16, 6, 5, 'The Little Gap'], [790, 22, 10, 7, "The Spine's Gap"]] },
+    steps: [[170, 6], [430, 7]], gaps: [[560, 16, 6, 5, 'The Little Gap'], [790, 22, 10, 7, "The Spine's Gap"]] },
   { id: 'scale', name: 'The Scales', top: 3, p: 1.6, rise: 60, end: 'prow', seed: 9,
     knots: [[300, -40, 8, 22], [390, -36, 12, 24], [520, -30, 16, 26], [600, -26, 14, 24]] },
   { id: 'twinL', name: 'Left Twin', top: 3, p: 1.6, rise: 50, end: 'prow', seed: 4,
@@ -74,7 +74,7 @@ export const RIDGES = [
     knots: [[420, 164, 8, 22], [500, 166, 12, 24], [600, 168, 14, 24], [680, 170, 12, 22]] },
   { id: 'keel', name: 'The Keel', top: 9, p: 2.0, asym: 0.85, rise: 70, end: 'prow', seed: 6,
     knots: [[90, 180, 24, 60], [300, 212, 32, 64], [520, 220, 36, 66], [730, 228, 30, 62]],
-    steps: [[360, 7], [610, 8]] },
+    steps: [[280, 7], [610, 8]] },
   { id: 'eastfin', name: 'East Fin', top: 4, p: 1.8, asym: 1.2, rise: 70, end: 'prow', seed: 7,
     knots: [[90, 286, 24, 46], [320, 358, 32, 50], [500, 366, 30, 50], [600, 370, 26, 46]],
     steps: [[360, 6]] },
@@ -123,19 +123,19 @@ export const RIDGES = [
     steps: [[1450, 8]], lips: [[1300, 1, 2.4]] },
 ];
 
-// Ridge-to-ridge hops: a spur (a short side arête) peels off the crest of `from` `len` (50) m above u and runs
+// Ridge-to-ridge hops: a spur (a short side arête) peels off the crest of `from` `len` (90) m above u and runs
 // straight at the crest of `to` at `land`, ending at u in a wind-lip kicker over the gully (course.buildHops).
 // The target is laid out lower than the kicker, so the 2–3 s flight comes down on its crest or upper flanks.
 // The spur takes the hop's name, so line goals can ask for it. Options: len, h (kick m), H (spur end height).
 export const HOPS = [
-  { name: 'Scale Jump', from: 'spine', to: 'scale', u: 330, land: 395, over: -3 },
+  { name: 'Scale Jump', from: 'spine', to: 'scale', u: 330, land: 395, over: -3, len: 75 },
   { name: 'Twin Hop', from: 'twinL', to: 'twinR', u: 300, land: 365 },
   { name: 'Twin Hop Back', from: 'twinR', to: 'twinL', u: 560, land: 625 },
   { name: 'Blade Leap', from: 'blade', to: 'shard', u: 500, land: 575 },
   { name: 'Keel Leap', from: 'keel', to: 'splinter', u: 460, land: 530 },
-  { name: 'Stair Hop 1', from: 'stair1', to: 'stair2', u: 950, land: 1005 },
-  { name: 'Stair Hop 2', from: 'stair2', to: 'stair3', u: 1080, land: 1135 },
-  { name: 'Stair Hop 3', from: 'stair3', to: 'stair4', u: 1210, land: 1265 },
+  { name: 'Stair Hop 1', from: 'stair1', to: 'stair2', u: 950, land: 1005, len: 60, over: 8 },
+  { name: 'Stair Hop 2', from: 'stair2', to: 'stair3', u: 1080, land: 1135, len: 60, over: 8 },
+  { name: 'Stair Hop 3', from: 'stair3', to: 'stair4', u: 1210, land: 1265, len: 60, over: 8 },
   { name: 'Wyrm Leap', from: 'wyrm', to: 'knife', u: 1320, land: 1385, over: 14 },
 ];
 
@@ -196,7 +196,7 @@ export const RIDE_LINES = {
   scales: { name: 'Scale Jump → the Tail → Wyrm Leap → the Knife', pts: [[0, -30], [60, -70], [100, '@spine'], '>Scale Jump', [400, '@scale'], [600, '@scale'], [800, -10], [880, '@tail'], [1130, '@tail'], [1170, 64], [1200, '@wyrm'], '>Wyrm Leap', [1395, '@knife'], [1600, '@knife'], [1700, 170], [2000, 120], [2400, 60]] },
   blade: { name: 'The Blade → Blade Leap → the Shard', pts: [[0, -30], [60, -150], [100, '@blade'], '>Blade Leap', [580, '@shard'], [730, '@shard'], [900, -260], [1140, -200], [1650, -200], [1800, -230], [2400, -100]] },
   twins: { name: 'Twin Hop, back again → the Staircase', pts: [[0, -30], [60, 10], [140, '@twinL'], '>Twin Hop', [370, '@twinR'], '>Twin Hop Back', [630, '@twinL'], [680, '@twinL'], [720, 62], [750, 90], [790, '@stair1'], '>Stair Hop 1', [1010, '@stair2'], '>Stair Hop 2', [1140, '@stair3'], '>Stair Hop 3', [1270, '@stair4'], [1370, '@stair4'], [1500, 220], [1800, 140], [2400, 60]] },
-  keel: { name: 'The Keel → Keel Leap → the Sentinel', pts: [[0, -30], [60, 120], [100, '@keel'], '>Keel Leap', [535, '@splinter'], [680, '@splinter'], [720, 300], [780, '@sentinel'], [1120, '@sentinel'], [1260, 300], [1390, '@eastwall'], [1630, '@eastwall'], [1720, 282], [1850, 210], [2400, 80]] },
+  keel: { name: 'The Keel → Keel Leap → the Sentinel', pts: [[0, -30], [60, 120], [100, '@keel'], '>Keel Leap', [535, '@splinter'], [680, '@splinter'], [720, 300], [780, '@sentinel'], [1120, '@sentinel'], [1200, 374], [1330, 330], [1440, '@eastwall'], [1630, '@eastwall'], [1720, 282], [1850, 210], [2400, 80]] },
   wishbone: { name: 'West Fin → the Wishbone → West Buttress', pts: [[0, -30], [60, -200], [100, '@westfin'], [640, '@westfin'], [760, -360], [920, '@wishR'], [1130, '@wishR'], [1180, '@westwall'], [1660, '@westwall'], [1730, -446], [1820, -380], [2400, -150]] },
   gully: { name: 'The gullies (the low line)', pts: [[0, -30], [60, -130], [130, -150], [600, -150], [800, -140], [1000, -50], [1150, -30], [1300, -10], [1600, 0], [1700, 0], [2400, 20]] },
   slot: { name: 'The Slot (couloir)', pts: [[0, -30], [60, 200], [140, 275], [700, 290], [1000, 300], [1300, 305], [1420, 215], [1600, 213], [1800, 180], [2400, 80]] },

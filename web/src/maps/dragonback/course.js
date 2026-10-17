@@ -141,15 +141,16 @@ export class DragonbackCourse {
   buildHops() {
     this.hops = HOPS.map((h, i) => {
       const from = this.ridgeById[h.from], to = this.ridgeById[h.to];
-      const L = h.len ?? 60, u0 = h.u - L;
+      const L = h.len ?? 90, u0 = h.u - L;
       const vc = from.crestAt(u0), H0 = from.heightAt(u0);
       // Aim a little past the target's crest: a flight that comes up short still lands on its crest.
       const side = Math.sign(to.crestAt(h.land) - vc);
       const target = [h.land, to.crestAt(h.land) + side * (h.over ?? 5)];
       // The spur leaves the crest tangentially and curves out to its line (a rider following the crest at
       // 30 m/s is steered onto it, never thrown off the main crest's convex top), then runs straight at the
-      // landing for its last 60 %: g(t) = t² / 2a below a, t − a / 2 above.
-      const a = 0.4, g = (t) => (t < a ? (t * t) / (2 * a) : t - a / 2);
+      // landing for its second half: g(t) = t² / 2a below a, t − a / 2 above. Over 90 m the curve-in is a
+      // ~65 m radius: ~1.4 g at 30 m/s, inside what skis and boards can carve at that speed.
+      const a = 0.5, g = (t) => (t < a ? (t * t) / (2 * a) : t - a / 2);
       const slope = (target[1] - vc) / (target[0] - u0);         // the straight line's heading from the root…
       const dEnd = slope * L * 1.15;                             // …steepened so the straight part points at the landing
       const knots = [];

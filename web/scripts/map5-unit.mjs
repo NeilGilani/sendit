@@ -58,6 +58,13 @@ for (const h of c.hops) {
     `kicker ${(sp.heightAt(sp.u1 - 1) + sp.kick).toFixed(0)} m, target ${to.heightAt(h.land).toFixed(0)} m`);
 }
 ok('every hop in the layout is built', c.hops.length === HOPS.length);
+// A step or gap launches you ~40–70 m down the crest: none may end within 70 m above a spur's root, or riders
+// fly straight over the turn-off.
+for (const h of c.hops) {
+  const r = h.fromRidge, root = h.spur.u0;
+  const near = [...r.steps.map((s) => s.u), ...r.gaps.map((g) => g.u)].filter((u) => u < root && u > root - 70);
+  ok(`${h.name}: no step or gap in the 70 m above the spur's root`, near.length === 0, near.join(', '));
+}
 
 // ------------------------------------------------------------------ names behind the line goals
 {
