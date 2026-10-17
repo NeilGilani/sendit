@@ -249,12 +249,18 @@ export class Rider {
     const leanT = grind ? THREE.MathUtils.clamp(p.gRoll * 0.5, -0.6, 0.6) : THREE.MathUtils.clamp(Math.atan2(lat, PHYSICS.gravity), -ANIM.maxLean, ANIM.maxLean);
     // Steer let go: the body comes back up faster than it tips into a turn.
     const released = Math.abs(pl._ctrl?.steer || 0) < 0.05;
-    p.lean += (leanT - p.lean) * k(released && Math.abs(leanT) < Math.abs(p.lean) ? ANIM.rollRelease : ANIM.rollResponse);
+    // Just after touching down the gear snaps onto the slope, so the lean that keeps the body plumb on a
+    // steep face has to catch up quickly too (spring.t = time since the landing), or the rider lies across the slope.
+    const landed = ground && this.spring.t < ANIM.landLeanTime;
+    p.lean += (leanT - p.lean) * k(landed ? ANIM.landLeanResponse : released && Math.abs(leanT) < Math.abs(p.lean) ? ANIM.rollRelease : ANIM.rollResponse);
     // The body's roll from vertical (+ = toward the nose's right): the lean plus the slope's own roll
     // under the gear. On a traverse the two cancel (plumb), so the head only levels real tilt.
     p.worldRoll = p.lean - Math.asin(THREE.MathUtils.clamp(_v1.set(1, 0, 0).applyQuaternion(pl.renderOrient).y, -1, 1));
     const edgeNose = ground ? pl.edgeAngle * pl.travelSign : 0;
-    const edgeT = THREE.MathUtils.clamp(edgeNose, -ANIM.maxGearEdge, ANIM.maxGearEdge);
+    // The gear can only roll so far from the body (knees / hips / ankles, ANIM.maxAngulation): on a steep
+    // cross-slope the physics edge can point against the lean (carving uphill), which used to fold the
+    // legs 70–80° under the body; the drawn edge stays within reach of the lean.
+    const edgeT = THREE.MathUtils.clamp(THREE.MathUtils.clamp(edgeNose, p.lean - ANIM.maxAngulation, p.lean + ANIM.maxAngulation), -ANIM.maxGearEdge, ANIM.maxGearEdge);
     p.edge += (edgeT - p.edge) * k(14);
     // Snowboard: which edge is down (toe = +1 side of the nose frame for regular).
     const toeX = this.equip.stance === 'goofy' ? -1 : 1;

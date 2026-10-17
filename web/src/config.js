@@ -206,6 +206,7 @@ export const ANIM = {
   skiStance: 0.13,            // metres from centre to each ski
   rollResponse: 10,
   rollRelease: 15,            // 1/s the lean eases back up once the steer is let go (rollResponse tipping in)
+  landLeanTime: 0.35, landLeanResponse: 30,   // s after a landing the lean catches up at this rate (1/s): plumb at once on a steep face
   leadRelease: 10,            // 1/s the upper-body turn lead eases back to neutral once the steer is let go (6 leading in)
   squatMax: 0.25,             // pre-jump Y compression (25%)
   squatXZ: 0.12,              // X/Z expansion while squatting (volume preservation)
@@ -224,6 +225,7 @@ export const ANIM = {
   // the gear itself rolls to the physics edge angle, the difference is angulation (hips / knees).
   maxLean: 0.9,               // rad body inclination cap (52°: high-g carves at speed read aggressive)
   maxGearEdge: 1.05,          // rad visual edge angle cap
+  maxAngulation: 0.7,         // rad the drawn edge may differ from the body's lean (40°: how far knees and hips can angulate)
   angulation: 0.75,           // share of (edge − lean) the ski rider takes up in the spine (upright upper body)
   angulationReverse: 0,       // … share kept when the edge is below the lean or already on the other side (cross-slopes, letting go, edge changes)
   crossover: 0.2,             // rad the upper body leads into the new turn while the lean still points into the old one (skis)
