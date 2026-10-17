@@ -61,7 +61,7 @@ export class SoundScape {
     on('comboBanked', ({ mult }) => this.oneShot('combo_bank', 0.5, 0.9 + Math.min(mult, 5) * 0.06));
     on('comboLost', () => this.oneShot('combo_lost', 0.45, 1));
     on('runFinished', ({ medal }) => { this.oneShot('medal', 0.8, medal === 'gold' ? 1.12 : medal === 'silver' ? 1 : 0.9); });
-    on('treePlop', () => this.plop());
+    on('treePlop', (p) => this.plop(p));
     on('uiMove', () => this.oneShot('ui_click', 0.25, 1.1));
     on('landed', ({ perfect }) => { if (perfect) this.oneShot('perfect', 0.5, 1); });
     on('flowState', ({ on: st }) => { this.flowOn = st; if (st) { this.oneShot('boost', 0.6, 1); this.oneShot('whoosh_slow', 0.45, 1.3); } });
@@ -231,15 +231,20 @@ export class SoundScape {
     src.start(t); lfo.start(t); src.stop(t + 11.5); lfo.stop(t + 11.5);
   }
 
-  /** Snow clump sliding off a branch: a soft low thud. */
-  plop() {
-    const c = this.ctx, t = c.currentTime, sr = c.sampleRate;
+  /** Snow clump sliding off a branch: it sifts down through the needles (a CC0 recording shows a 1–2 s hiss at
+   *  2–10 kHz), then lands with a soft low thud — placed toward the tree. */
+  plop(p) {
+    const c = this.ctx, sr = c.sampleRate, pan = p && this.skier ? this.sideOf(p.x, p.z) * 0.7 : 0;
+    this.engine.fx.noise(c.currentTime, { buf: 'pink', type: 'highpass', f: 2200, q: 0.6, gain: 0.07, attack: 0.25, hold: 0.2, decay: 0.9, pan, out: this.engine.ambBus });
+    const t = c.currentTime + 0.35 + Math.random() * 0.25;
     const b = c.createBuffer(1, Math.floor(sr * 0.4), sr), d = b.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (sr * 0.07));
     const src = c.createBufferSource(); src.buffer = b;
     const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 520;
     const g = c.createGain(); g.gain.value = 0.55;
-    src.connect(lp); lp.connect(g); g.connect(this.engine.ambBus); src.start(t);
+    const dst = c.createStereoPanner ? c.createStereoPanner() : null;
+    if (dst) { dst.pan.value = pan; dst.connect(this.engine.ambBus); }
+    src.connect(lp); lp.connect(g); g.connect(dst || this.engine.ambBus); src.start(t);
   }
 
   update(dt, camera) {

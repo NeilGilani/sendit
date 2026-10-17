@@ -124,7 +124,7 @@ mountain drops in pitch with time.
 | Map | Character |
 |---|---|
 | Valcrest | Gentle alpine air, birds, an occasional creak |
-| Blackspruce | Wind soughing in the conifers (gusty mid band), trunks creaking (stick-slip pulses through woody resonances), birds, tree plops |
+| Blackspruce | Wind soughing in the conifers (gusty mid band), trunks creaking (stick-slip pulses through woody resonances), birds, and tree plops: snow sifting down through the needles (a 1–2 s hiss at 2–10 kHz, from a CC0 recording) then a soft thud, panned toward the tree |
 | Ravenspire | Strong, gusty high-altitude wind, ravens, cold snow (squeakier grains when slow), the heli |
 | Voltage Park | Calmer wind, a crowd (procedural voiced babble of 24 "voices", looped on two decorrelated players), cheers on clean landings, and a far-off PA announcer every 25–50 s. The announcer is unintelligible on purpose: one formant voice through a 400 Hz–3 kHz horn band with 90 / 190 / 310 ms stadium slaps. |
 | Dragonback (map 5 branch) | Exposed ridges: strong, very gusty wind, cold snow, a long open reverb tail |
