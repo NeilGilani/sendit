@@ -1,5 +1,5 @@
 // Rail sparks and box snow (browser only). physics/grind.js emits 'railSpark' { kind, v, b, x, y, z, dx, dz } every
-// physics step on a rail; this turns it into particles in one additive Points cloud:
+// physics step on a rail; this turns it into particles in one Points cloud (normal blending, see the material):
 //   • metal (rails, tubes): hot orange-white sparks thrown back and to the sides at foot level, falling fast —
 //     bright and short-lived, so they read at a distance but never fog the rider;
 //   • boxes and ledges: a light dusting of snow off the edges, low and dim (a few at a time).
