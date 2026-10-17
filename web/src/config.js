@@ -96,6 +96,9 @@ export const PHYSICS = {
     latG: 1.8,                // sustained lateral g before the edges let go
     speedRadius: 0.6, speedRadiusV: [8, 18],  // effective sidecut ×(1+0.6) from 8 → 18 m/s (long arcs at speed)
     carveAssist: 0.85,        // share of over-demand (beyond grip) that just widens the arc instead of skidding
+    carveInput: 1,            // 0..1: the held share of the max edge picks that share of the grip-limited curvature (even stick feel at speed)
+    pivotGrip: 1.15,          // at speed the rotary pivot asks at most this × the grip-limited carve rate (full lock carves, not washes out)
+    washMax: 0.2,             // over-demand that skids is capped at this × the grip curvature (no wash-out at 50–70 mph)
     gripRate: 11,             // 1/s lateral velocity decay on an engaged edge
     flatGrip: 0.35,           // share of grip with a flat base (sideslips)
     carveEff: 0.985,          // share of redirected lateral energy kept in a clean carve
@@ -164,7 +167,7 @@ export const PHYSICS = {
     latGToe: 1.6, latGHeel: 1.45,
     sidecutToe: 1.0, sidecutHeel: 0.95,     // × spec sidecut (heel side bends a touch tighter)
     speedRadius: 1.5, speedRadiusV: [6, 16],
-    carveAssist: 0.85,
+    carveAssist: 0.85, carveInput: 1, pivotGrip: 1.15, washMax: 0.2,   // see PHYSICS.ski
     gripRate: 10, flatGrip: 0.25,
     carveEff: 0.985, skidEff: 0.75, skidMu: 0.34, carvePump: 0.05,
     trackBeta: [7, 30],
