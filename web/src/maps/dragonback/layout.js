@@ -74,7 +74,7 @@ export const RIDGES = [
     knots: [[420, 164, 8, 22], [500, 166, 12, 24], [600, 168, 14, 24], [680, 170, 12, 22]] },
   { id: 'keel', name: 'The Keel', top: 9, p: 2.0, asym: 0.85, rise: 70, end: 'prow', seed: 6,
     knots: [[90, 180, 24, 60], [300, 212, 32, 64], [520, 220, 36, 66], [730, 228, 30, 62]],
-    steps: [[280, 7], [610, 8]] },
+    steps: [[280, 7], [610, 8]], lips: [[200, -1, 2.4], [530, 1, 2.6]] },
   { id: 'eastfin', name: 'East Fin', top: 4, p: 1.8, asym: 1.2, rise: 70, end: 'prow', seed: 7,
     knots: [[90, 286, 24, 46], [320, 358, 32, 50], [500, 366, 30, 50], [600, 370, 26, 46]],
     steps: [[360, 6]] },
@@ -89,7 +89,7 @@ export const RIDGES = [
   // ---- the Sentinel: a tall lone ridge down the right side, a notch in its middle
   { id: 'sentinel', name: 'The Sentinel', top: 4, p: 1.9, asym: 1.1, rise: 60, end: 'prow', seed: 17,
     knots: [[640, 352, 18, 46], [760, 356, 32, 52], [900, 362, 36, 54], [1040, 368, 30, 50], [1120, 372, 26, 46]],
-    steps: [[800, 6]], gaps: [[960, 16, 6, 5, 'The Sentinel Notch']] },
+    steps: [[800, 6]], gaps: [[960, 16, 6, 5, 'The Sentinel Notch']], lips: [[880, -1, 2.4]] },
   // ---- the Wishbone: two ridges in the lower Hollow that converge and merge into one
   { id: 'wishL', name: 'The Wishbone', top: 4, p: 1.8, rise: 60, end: 'fade', seed: 18,
     knots: [[900, -440, 12, 34], [1000, -420, 20, 38], [1080, -392, 22, 40], [1130, -382, 18, 40]] },
@@ -117,7 +117,7 @@ export const RIDGES = [
     steps: [[1440, 6]] },
   { id: 'eastwall', name: 'East Wall', top: 6, p: 2.0, asym: 1.2, rise: 60, end: 'prow', seed: 22,
     knots: [[1380, 262, 22, 52], [1480, 266, 34, 58], [1630, 274, 30, 56]],
-    steps: [[1540, 7]] },
+    steps: [[1540, 7]], lips: [[1480, -1, 2.4]] },
   { id: 'westwall', name: 'West Buttress', top: 6, p: 1.9, asym: 0.8, rise: 50, end: 'prow', seed: 23,
     knots: [[1150, -430, 22, 50], [1350, -436, 32, 56], [1560, -440, 30, 54], [1660, -444, 24, 50]],
     steps: [[1450, 8]], lips: [[1300, 1, 2.4]] },
@@ -155,9 +155,13 @@ export const HITS = [
   [2060, -240, 30, 2.6, 'lip'],
 ];
 
-// Pillow tongues below the Organ Pipes (the same terraced pillows as Ravenspire's stacks).
+// Pillow stacks (Ravenspire's terraced pillows: a rolling top, a ~4 m rounded drop every `step` m, lobes across):
+// below the Organ Pipes, under West Fin's prow, under the Sentinel's prow. All are "Pillow Stacks" to the scoring
+// (a clean landing off pillow after pillow chains a "Pillow line ×N", player.js).
 export const PILLOWS = [
-  { u0: 1660, u1: 1860, v0: -330, v1: -150, step: 9, terrace: 0.6, top: 0.7, lobe: 9, seed: 41 },
+  { name: 'Pillow Stacks', u0: 1660, u1: 1860, v0: -330, v1: -150, step: 9, terrace: 0.6, top: 0.7, lobe: 9, seed: 41 },
+  { name: 'Pillow Stacks', u0: 700, u1: 840, v0: -440, v1: -320, step: 8, terrace: 0.6, top: 0.7, lobe: 8, seed: 42 },
+  { name: 'Pillow Stacks', u0: 1190, u1: 1330, v0: 330, v1: 440, step: 8, terrace: 0.6, top: 0.7, lobe: 8, seed: 43 },
 ];
 
 // Drop zones (Steep-style): keys 1–9 or the d-pad ◀ ▶. [name, u, v]; everyone faces down the fall line.
@@ -186,6 +190,7 @@ export const LINE_GOALS = [
   ['Keel Over', 1800, 'Keel Leap', 'The Splinter Prow'],
   ['Sentinel', 1800, 'The Sentinel', 'The Sentinel Notch', 'The Sentinel Prow'],
   ['Organ Grinder', 1800, 'The Organ Pipes', 'The Organ Pipes', 'The Organ Pipes', 'The Organ Pipes'],
+  ['Fin and Pillows', 1600, 'West Fin Prow', 'Pillow Stacks', 'Pillow Stacks', 'The Wishbone'],
 ];
 
 // The canonical lines as (u, v) waypoints: the bots ride them (scripts/map5-ride.mjs), and the course keeps

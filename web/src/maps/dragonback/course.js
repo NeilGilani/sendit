@@ -353,7 +353,7 @@ export class DragonbackCourse {
     }
     const S = SPINE_FIELD;
     if (u > S.u0 && u < S.u1 + 20 && v > S.v0 && v < S.v1) return 'The Organ Pipes';
-    for (const F of PILLOWS) if (u > F.u0 && u < F.u1 && v > F.v0 && v < F.v1) return 'Pillow Tongues';
+    for (const F of PILLOWS) if (u > F.u0 && u < F.u1 && v > F.v0 && v < F.v1) return F.name;
     for (const [hu, hv, L, , kind] of HITS) if (Math.abs(u - hu) < 20 && Math.abs(v - hv) < L) return kind === 'lip' ? 'Wind Lip' : 'Roller';
     if (u < 60) return 'The Col';
     return null;
@@ -494,7 +494,7 @@ export class DragonbackCourse {
       gap('knife', 0),                 // over the Knife's Notch
       crest('knife', 1500),            // the Knife's crest, low down
       crest('eastwall', 1610, 1.2),    // the East Wall's prow
-      on(1720, -240),                  // the pillow tongues
+      on(1720, -240),                  // the pillow stacks below the Organ Pipes
     ];
   }
 
