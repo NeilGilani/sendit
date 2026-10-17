@@ -72,7 +72,9 @@ export function planMove(kind, shot, sun, r, H) {
       m.pos = (s) => m.a.clone().lerp(m.b, s);
       m.look = (s, com) => com.clone().add(V(0, 0.4, 0));   // at 7–9° any offset loses the rider
       m.lag = 5.5; m.sway = 0.04;
-      m.endAfterLanding = 0.7;             // from up the shoulder the touchdown is behind the lip: cut on it
+      m.endAfterLanding = 0.7;
+      m.maxLift = 40;                      // far up the shoulder the in-run crest can sit in the way
+      m.targets = [A, M, shot.com(shot.Ta * 0.25, V(0, 0, 0)), shot.com(shot.Ta * 0.75, V(0, 0, 0)), Lp.clone().add(V(0, 1, 0))];             // from up the shoulder the touchdown is behind the lip: cut on it
       break;
     }
     case 'reveal': {
@@ -107,7 +109,7 @@ export function planMove(kind, shot, sun, r, H) {
   const ro = (f) => { const o = shot.out[Math.floor((shot.out.length - 1) * f)]; return V(o.x, H(o.x, o.z) + 1, o.z); };
   const targets = m.targets || [A, M, Lp.clone().add(V(0, 0.5, 0)), shot.com(shot.Ta * 0.25, V(0, 0, 0)), ro(0.3), ro(0.55)];
   let lift = 0;
-  for (let k = 0; k < 24; k++) {
+  for (let k = 0; k < (m.maxLift ?? 24) / 0.8; k++) {
     let ok = true;
     for (const s of [0, 0.25, 0.5, 0.75, 1]) {
       const p = m.pos(s, A, 0).add(V(0, lift, 0));
