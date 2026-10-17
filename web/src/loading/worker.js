@@ -42,6 +42,8 @@ self.onmessage = async (e) => {
     }
   } else if (m.type === 'resize') {
     scene?.resize(m);
+  } else if (m.type === 'stage') {
+    if (scene) scene.stageP = m.p;
   } else if (m.type === 'visible') {
     visible = m.visible;
   } else if (m.type === 'outro') {

@@ -70,6 +70,13 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await countFrames(page);
   let s = await state(page);
   ok(s.mode === 0 && s.lobby, 'boots into the lobby');
+  // Loading screen (src/loading/): dissolves into the lobby, then the overlay + worker canvas are gone.
+  await page.waitForFunction(() => document.getElementById('loading')?.classList.contains('hidden'), null, { timeout: 20000 }).catch(() => {});
+  const ld = await page.evaluate(() => ({ hidden: document.getElementById('loading').classList.contains('hidden'), canvas: !!document.getElementById('loadcanvas'), st: window.__loading?.stats(), curtain: getComputedStyle(document.getElementById('fade')).opacity }));
+  ok(ld.hidden && !ld.canvas, 'loading screen handed off (overlay hidden, worker canvas removed)');
+  ok(Number(ld.curtain) === 0, 'no black curtain left over the lobby');
+  ok(ld.st?.stages?.length > 3 && ld.st.stages.at(-1)[1] === 1, 'loading progress followed the boot stages to 100 %');
+  if (process.env.GPU) ok(ld.st?.firstFrameMs > 0 || ld.st?.readyMs < 1500, 'live loading scene rendered (or the load beat it)');
   ok(s.equipment === 'skis' && s.gear === 'native', 'default equipment is skis (native rider gear)');
   ok(s.stored?.version === 1, 'profile v1 written to localStorage');
   ok(/lb-ride/.test(s.focus), 'Ride button has focus');

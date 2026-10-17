@@ -14,8 +14,8 @@
 //                  ?loadseed=<n> (pick the variant) · ?loadtrick=<id> · ?loadcam=<id> · ?loadtod=<id>
 import { TIPS } from './tips.js';
 
-const $ = (id) => document.getElementById(id);
-const params = new URLSearchParams(location.search);
+const $ = (id) => (typeof document !== 'undefined' ? document.getElementById(id) : null);
+const params = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
 const T0 = performance.now();
 
 // Boot stage weights: ui.loading() reports main.js's own fractions; these map them onto measured wall
@@ -71,7 +71,7 @@ class LoadingScreen {
       this.workerAt = performance.now();
       this.worker.onerror = (e) => { e.preventDefault?.(); this.fail(e.message || 'worker error'); };
       const opts = {};
-      for (const k of ['loadseed', 'loadtrick', 'loadcam', 'loadtod', 'loadgear', 'loadmtn', 'loaddebug']) if (params.has(k)) opts[k.slice(4)] = params.get(k);
+      for (const k of ['loadseed', 'loadtrick', 'loadcam', 'loadtod', 'loadgear', 'loadmtn', 'loaddebug', 'loadq']) if (params.has(k)) opts[k.slice(4)] = params.get(k);
       this.worker.postMessage({ type: 'init', canvas: off, ...this.size(), opts }, [off]);
       addEventListener('resize', () => this.worker?.postMessage({ type: 'resize', ...this.size() }));
       document.addEventListener('visibilitychange', () => this.worker?.postMessage({ type: 'visible', visible: !document.hidden }));
@@ -123,6 +123,7 @@ class LoadingScreen {
     this.p = Math.max(this.p, p);
     this.stages.push([Math.round(performance.now() - T0), p, msg || '']);
     if (this.bar) this.bar.style.transform = `scaleX(${pace(this.p).toFixed(4)})`;
+    this.worker?.postMessage({ type: 'stage', p: this.p });   // the scene leans out while the game compiles
     if (msg && this.msg) this.msg.textContent = msg;
   }
 
@@ -140,7 +141,7 @@ class LoadingScreen {
     const dur = quick ? 450 : 1300;
     // The game's fade curtain would add a black dip: the lobby is revealed straight through the dissolve.
     const curtain = $('fade');
-    if (curtain) { curtain.style.transitionDuration = '0s'; curtain.style.opacity = '0'; }
+    if (curtain) { curtain.style.transitionDuration = '0s'; curtain.style.opacity = '0'; void curtain.offsetWidth; }   // flush: ui.fade() right after must not animate it
     this.worker?.postMessage({ type: 'outro', duration: dur / 1000 });
     return new Promise((res) => {
       // Two frames so the lobby has rendered under us before it shows through.
@@ -164,4 +165,4 @@ class LoadingScreen {
 }
 
 export const loadingScreen = new LoadingScreen();
-window.__loading = loadingScreen;   // debug / test handle
+if (typeof window !== 'undefined') window.__loading = loadingScreen;   // debug / test handle

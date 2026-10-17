@@ -9,7 +9,7 @@
 // The render scale adapts to hold 60 fps (the game is loading on the same GPU).
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { EffectComposer, RenderPass, EffectPass, BloomEffect, DepthOfFieldEffect, NoiseEffect, BlendFunction } from 'postprocessing';
+import { EffectComposer, RenderPass, EffectPass, BloomEffect, DepthOfFieldEffect, NoiseEffect, BlendFunction, SMAAEffect, SMAAPreset } from 'postprocessing';
 import { GradeEffect, POST } from '../gfx/post.js';
 import { patchShaderChunks, globals, makeNoiseTexture } from '../world.js';
 import { PHYSICS } from '../config.js';
@@ -36,6 +36,7 @@ export class LoadingScene {
     this.frames = 0;
     this.ft = [];
     this.scale = 1;
+    this.stageP = 0;
     this.simT = 0;
     this.screenT = 0;
   }
@@ -190,7 +191,10 @@ export class LoadingScene {
 
   setupPost() {
     const renderer = this.renderer, camera = this.camera;
-    const composer = this.composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 4 });
+    this.low = this.opts.q === 'low';
+    // No MSAA: on a laptop GPU that is also compiling and warming the game, 4× MSAA on an HDR target
+    // (plus DOF) cost ~3 s of boot time; SMAA keeps the edges crisp for a fraction of it.
+    const composer = this.composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
     this.renderPass = new RenderPass(this.scene, camera);
     composer.addPass(this.renderPass);
     this.dof = new DepthOfFieldEffect(camera, { worldFocusDistance: 10, worldFocusRange: 6, bokehScale: 1.6, resolutionScale: 0.5 });
@@ -205,12 +209,13 @@ export class LoadingScene {
     this.grain = new NoiseEffect({ blendFunction: BlendFunction.SOFT_LIGHT, premultiply: false });
     this.grain.blendMode.opacity.value = 0.12;
     composer.addPass(new EffectPass(camera, this.bloom, this.grade, this.grain));
+    composer.addPass(new EffectPass(camera, new SMAAEffect({ preset: this.low ? SMAAPreset.LOW : SMAAPreset.HIGH })));
   }
 
   resize({ width, height, dpr }) {
     this.size = { width, height, dpr };
     const base = Math.min(dpr, 2);
-    const fit = Math.sqrt(PIXEL_BUDGET / Math.max(1, width * height));
+    const fit = Math.sqrt((this.low ? 1280 * 720 : PIXEL_BUDGET) / Math.max(1, width * height));
     this.ratio = Math.max(0.5, Math.min(base, fit) * this.scale);
     this.renderer.setPixelRatio(this.ratio);
     this.renderer.setSize(width, height, false);
@@ -352,6 +357,8 @@ export class LoadingScene {
       this.dof.cocMaterial.worldFocusRange = Math.max(3, dist * (cam.fov < 20 ? 0.25 : 0.9));
       this.dofPass.enabled = true;
     } else this.dofPass.enabled = false;
+    // Depth of field only while the game isn't in its GPU-heavy last stretch (lobby, compile, prewarm).
+    if (this.low || this.stageP >= 0.88) this.dofPass.enabled = false;
     // Sun glare position for the grade.
     const sp = this.sunDir.clone().multiplyScalar(1000).add(cam.position).project(cam);
     const fwd = cam.getWorldDirection(new THREE.Vector3());
@@ -366,16 +373,21 @@ export class LoadingScene {
 
   /** Adaptive resolution: hold ~60 fps while the game loads on the same GPU. */
   adapt(frameMs) {
+    // Pacing since the first frame (reported to the page: loadtime.mjs prints it).
+    const P = this.pace || (this.pace = { n: 0, over25: 0, over50: 0, max: 0, sum: 0 });
+    P.n++; P.sum += frameMs; P.max = Math.max(P.max, frameMs);
+    if (frameMs > 25) P.over25++;
+    if (frameMs > 50) P.over50++;
     this.ft.push(frameMs);
-    if (this.ft.length < 45) return;
+    if (this.ft.length < 30) return;
     const s = [...this.ft].sort((a, b) => a - b);
-    const med = s[Math.floor(s.length * 0.5)];
+    const med = s[Math.floor(s.length * 0.5)], p90 = s[Math.floor(s.length * 0.9)];
     this.ft.length = 0;
     let next = this.scale;
-    if (med > 19) next = Math.max(0.45, this.scale * 0.85);
+    if (med > 19 || p90 > 30) next = Math.max(0.5, this.scale * 0.88);
     else if (med < 17.8 && this.scale < 1) next = Math.min(1, this.scale * 1.06);   // at vsync: creep back up
     if (Math.abs(next - this.scale) > 0.01) { this.scale = next; this.resize(this.size); }
-    this.post('stats', { stats: { medMs: +med.toFixed(1), scale: +this.scale.toFixed(2), ratio: +this.ratio.toFixed(2), frames: this.frames, build: this.stats.build } });
+    this.post('stats', { stats: { medMs: +med.toFixed(1), scale: +this.scale.toFixed(2), ratio: +this.ratio.toFixed(2), frames: this.frames, build: this.stats.build, compile: this.stats.compile, fps: +(1000 * P.n / P.sum).toFixed(1), over25: P.over25, over50: P.over50, maxMs: Math.round(P.max), px: `${Math.round(this.size.width * this.ratio)}x${Math.round(this.size.height * this.ratio)}` } });
   }
 }
 
