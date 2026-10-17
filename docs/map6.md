@@ -189,11 +189,19 @@ Ravenspire's base tuning was adapted for deep light powder and a gentler mountai
   each emits a correct `runCompleted` (mapId, trailId, distance and time).
 - The control style (scrubbing above 17–23 m/s) runs at 51–67 km/h averages.
 
+- Trick style (a 360 on every air over 1 s): all the trails finish clean on both gear (5.9–6.6k points on Kazan,
+  4.9k in the gully, 26k on the Senbon roofs on the board, 50k on the Makura pillows on the board). The exceptions:
+  - Makura on skis crashes: spinning every pillow drop at 1–2.7 s of air lands sideways on the next pillow.
+  - Senbon on skis has 1 crash.
+
+  Pick your spins there.
+
 ### Fuzz, units
 - map6-fuzz 40 × 40 s (96k frames): no NaN, never below the snow or a roof, never stuck, never over 45 m/s (max
   26.5).
 - map6-unit: 87/87.
-- The shared suite on the merged tree passes: unittest 52/52, physics-fuzz, physics-tricks, jumps-valcrest
+- The shared suite on the merged tree passes: GPU lobbytest (all checks; one earlier run had a single flaky failure under
+  GPU contention that did not reproduce), unittest 52/52, physics-fuzz, physics-tricks, jumps-valcrest
   --check, map3-unit 32/32, map3-fuzz, map4-unit 15/15 and map2-bot --verify.
 
 ### Performance (merged tree, dev server, other sessions sharing the GPU: quietest pass counts)
