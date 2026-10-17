@@ -153,6 +153,7 @@ class Opener {
       if (cell !== this.lastCell) {
         if (t - this.lastTick >= T.tickGap) {
           caseSfx.tick(Math.min(1, Math.abs(v) / 6000));
+          if (k > 0.35) this.rumble(0, 0.12, 25);   // a light buzz per card once the reel is readable
           this.lastTick = t;
           this.ticks.push(+t.toFixed(3));
           this.el.querySelector('.cr-marker').classList.remove('tk'); void this.el.offsetWidth; this.el.querySelector('.cr-marker').classList.add('tk');
@@ -171,12 +172,16 @@ class Opener {
     if (this.particles) this.drawFx(now);
   }
 
+  /** Gamepad rumble through the lobby's input (no-op without a pad). */
+  rumble(strong, weak, ms) { try { this.lobby?.input?.rumble?.(strong, weak, ms); } catch { /* no pad */ } }
+
   /** Capture helper: hold the show at time t (seconds since the click); null resumes. */
   seek(t) { this.frozen = t; }
 
   land() {
     this.stopRiser?.();
     caseSfx.land();
+    this.rumble(0.25, 0.4, 120);
     this.win.style.setProperty('--spd', 0);
     this.cards[this.result.reel.winAt].classList.add('win');
     this.el.classList.add('landed');
@@ -223,6 +228,7 @@ class Opener {
     rv.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => this.act(b.dataset.act)));
     rv.querySelector('.cr-btn')?.focus({ preventScroll: true });
     caseSfx.reveal(res.rarity);
+    this.rumble(Math.min(1, 0.15 * r.rank + 0.1), Math.min(1, 0.2 * r.rank + 0.3), 180 + r.rank * 90);
     if (r.rank >= 3 && !reduced()) this.el.classList.add('shake');
     this.burst(r);
   }
