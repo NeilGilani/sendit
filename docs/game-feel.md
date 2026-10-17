@@ -63,6 +63,7 @@ Bus events:
 The HUD regions, from top to bottom:
 
 - **Combo panel.** It appears from ×1.5 and shows ×mult (cyan, then gold from ×2.5, then blazing orange from ×4), the points, the last three moves and a timer bar. The multiplier bumps on every increase.
+- **At risk.** While a chain of ×3 or more rides on an air or a rail, the screen edge pulses pink at 0.55 s to show the stakes. It is off with reduced motion.
 - **Announcer, at 37 % of the height**, under the combo panel and above the rider. A grade badge sits over the trick name in big slanted type, with +points and extras (drop height, SWITCH) below. It slams in at 1.9× scale with blur and settles in about 0.2 s.
 - **Combo tiers.** Under the multiplier a tier word pops in as each tier is reached: NICE from ×2, SICK ×3, INSANE ×4, UNREAL ×5, GODLIKE ×6 (`TIERS`).
 - **Live air, at 33 % of the height.** Air and announcer never show together. A straight air with no spin, flip or grab shows its hang time ticking ("1.4s") from 1 s, and the height above the snow once it passes 4 m. The number heats up with the rotation: white, then cyan from 360, gold from 720, orange from 1080. Once the air passes 0.45 s, the rotation shows in 180° steps and bumps on each new 180. It also shows flips (`FLIP`, `2× FLIP`) and the grab being held.
@@ -71,7 +72,7 @@ The HUD regions, from top to bottom:
 - **Streak call-outs.** STOMP STREAK ×n appears from 3 stomped or perfect landings in a row. n CLEAN IN A ROW appears every 5 named tricks landed without a crash.
 - **Banners.** `COMBO ×3 +1,240` (MONSTER COMBO from ×4), with a gold edge glow from ×2.5. Line goals on flow maps also show here.
 - **Rolling score, top right.** It counts up toward the ride's score and bumps gold when a chunk of 100 or more lands. The snowflake counter moves under it.
-- **Toasts, top left.** Achievements, finished dailies, the daily halfway mark and personal bests. They sit on the left because the reward-cases notifications stack at the top right.
+- **Toasts, top left.** Achievements, finished dailies, the daily halfway mark, "one to go!" for counted dailies, and personal bests. They sit on the left because the reward-cases notifications stack at the top right.
 - **Flash.** A white flash on STOMPED (0.26) and PERFECT (0.18) landings, with rumble.
 
 Grades (`gradeOf(e)`) work on every map:

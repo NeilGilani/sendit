@@ -114,10 +114,15 @@ export function mountProgressionUi({ juice }) {
     toast({ kind: 'New personal best', title: pb.text, sub: `was ${pb.was}`, icon: 'PB', c1: '#ff5fb0', c2: '#7a5cff', hold: 3.2 });
     if (pb.stat === 'score') juice?.hud?.callout('NEW BEST SCORE!', '#ffe14d');
   });
-  // Daily progress: a quiet nudge at the halfway mark of each one.
-  const half = new Set();
+  // Daily progress: a quiet nudge at the halfway mark of each one, and one more when a single step is left.
+  const half = new Set(), last = new Set();
   on('progressXp', () => {
     for (const c of progression.getChallenges()) {
+      if (!c.done && c.goal > 2 && !c.unit && c.value === c.goal - 1 && !last.has(c.id)) {
+        last.add(c.id); half.add(c.id);
+        toast({ kind: 'Daily · one to go!', title: c.title, sub: `${fmtVal(c, c.value)} / ${fmtVal(c, c.goal)}`, icon: '!', c1: '#ffe14d', c2: '#2ff5d6', progress: c.value / c.goal, hold: 2.6 });
+        continue;
+      }
       if (c.done || c.goal <= 1 || half.has(c.id) || c.value < c.goal / 2) continue;
       half.add(c.id);
       toast({ kind: 'Daily', title: c.title, sub: `${fmtVal(c, c.value)} / ${fmtVal(c, c.goal)}`, icon: '◔', c1: '#2ff5d6', c2: '#2a7bff', progress: c.value / c.goal, hold: 2.8 });

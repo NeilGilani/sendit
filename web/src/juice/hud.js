@@ -20,6 +20,7 @@ export const JUICE_HUD = {
   announceHold: 1.35,        // s the trick name stays up
   liveAirFrom: 0.45,         // s of air before the live rotation read-out appears
   hangFrom: 1.0,             // s of air before a straight air shows its hang time
+  riskVignetteFrom: 3,       // combo multiplier from which an airborne chain pulses a pink edge
   nearStreakWindow: 2.6,     // s between close shaves that still count as a streak
   stompedImpact: 0.55,       // × PHYSICS.hardLanding: a perfect landing this soft is STOMPED
 };
@@ -99,6 +100,10 @@ const CSS = /* css */`
 #juiceHud .fp { position: absolute; left: 0; top: 0; font-size: 20px; white-space: nowrap; -webkit-text-stroke: 1.2px #1b1446; paint-order: stroke fill; color: #2ff5d6; pointer-events: none; animation: jhFloat .95s ease-out forwards; }
 #juiceHud .fp small { font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 900; font-size: 11px; letter-spacing: .14em; margin-left: 5px; color: #fffaf0; -webkit-text-stroke: 0; text-shadow: 0 1px 3px #1b1446; }
 @keyframes jhFloat { 0% { opacity: 0; transform: translate(var(--x), var(--y)) scale(.6); } 15% { opacity: 1; transform: translate(var(--x), calc(var(--y) - 10px)) scale(1.1); } 100% { opacity: 0; transform: translate(calc(var(--x) + var(--dx)), calc(var(--y) - 70px)) scale(.95); } }
+/* at risk: a big chain riding on an air or a rail */
+#juiceHud .rv { position: absolute; inset: 0; opacity: 0; transition: opacity .25s; box-shadow: inset 0 0 120px 26px rgba(255,61,154,.32); }
+#juiceHud.atrisk .rv { opacity: 1; animation: jhRisk .55s ease-in-out infinite alternate; }
+@keyframes jhRisk { from { opacity: .45; } to { opacity: 1; } }
 /* flash + edge glow */
 #juiceHud .fl { position: absolute; inset: 0; background: #fff; opacity: 0; }
 #juiceHud .fl.show { animation: jhFlash .28s ease-out forwards; }
@@ -148,7 +153,7 @@ export function mountJuiceHud({ player, combo, input, camera }) {
   const root = document.createElement('div');
   root.id = 'juiceHud';
   root.innerHTML = `
-    <div class="eg"></div><div class="fl"></div>
+    <div class="rv"></div><div class="eg"></div><div class="fl"></div>
     <div class="cb"><div><span class="m stroke">×1</span><span class="p stroke">0</span></div><div class="tr"></div><div class="it"></div><div class="tm"><i></i></div><div class="rk">LAND IT</div></div>
     <div class="sp"><span></span><small>SPLIT</small></div>
     <div class="an"><div class="g"><span></span></div><div class="t"></div><div class="s"></div><div class="nw">NEW TRICK</div></div>
@@ -336,8 +341,9 @@ export function mountJuiceHud({ player, combo, input, camera }) {
       cbTm.style.transform = `scaleX(${s.left.toFixed(3)})`;
       const atRisk = (player.state === 2 || player.state === 5) && s.mult >= 1.5;
       cb.classList.toggle('risk', atRisk);
+      root.classList.toggle('atrisk', atRisk && s.mult >= JUICE_HUD.riskVignetteFrom && !reducedMotion());
       cb.classList.add('on');
-    } else cb.classList.remove('on', 'risk');
+    } else { cb.classList.remove('on', 'risk'); root.classList.remove('atrisk'); }
     // Live air: rotation in 180s, flips, grab.
     const inAir = player.state === 2 && player.airTime > JUICE_HUD.liveAirFrom && riding();
     const spin = Math.abs(player._spinTotal || 0);
