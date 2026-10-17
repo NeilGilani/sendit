@@ -66,7 +66,6 @@
 .cr-marker::after { top: 0; border-top-color: #ffe55a; }
 .cr-marker i { bottom: 0; border-bottom-color: #ffe55a; }
 .cr-marker.tk::before { animation: crTick .09s ease-out; }
-.cr-marker.hot::before { animation: crHot .6s ease-out; }
 @keyframes crHot { 0% { background: var(--mk); box-shadow: 0 0 22px var(--mk), 0 0 50px var(--mk); } }
 /* The crawl: the marker breathes while the reel decides. */
 .cr-overlay.tense:not(.landed) .cr-marker::before { animation: crTense .7s ease-in-out infinite; }
@@ -236,6 +235,8 @@
 .cn-text small { display: block; color: rgba(255,255,255,.7); font-size: .8em; line-height: 1.3; }
 .cn .cs-bar { margin-top: .35em; height: .45em; }
 .cn-xp { font-weight: 900; color: #7dffc8; font-size: 1.1em; flex: none; }
+/* After the crawl's breathing rule, so a passing red / gold card still flashes the marker. */
+.cr-overlay.reel .cr-marker.hot::before { animation: crHot .6s ease-out; }
 @media (prefers-reduced-motion: reduce) {
   .cr-case, .cr-overlay.lid .cb-lid, .cr-rays, .cr-rcard, .cs-hero .cb, .cs-open.pulse, .lb-tab .cs-badge { animation: none !important; }
 }
