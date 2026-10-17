@@ -20,6 +20,7 @@ import { OtherRiders } from './others.js';
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const dbToGain = (db) => Math.pow(10, db / 20);
+const lerpN = (a, b, t) => a + (b - a) * clamp(t, 0, 1);
 /** tanh soft clip: linear below `knee`, saturating toward `ceil` (−1 dBFS) above it. Inputs beyond ±1 are
  *  held at the curve's ends by the WaveShaper, so the ceiling holds whatever arrives. */
 function softClipCurve(knee = 0.75, ceil = 0.89) {
@@ -218,7 +219,7 @@ export class AudioEngine {
     const spin = air ? Math.abs(r.spin) + Math.abs(r.flip) : 0;
     const windParams = {
       v: quiet ? 0 : r.speed, air, buffet: persp.buffet, whistle: persp.whistle, flap: persp.flap, rush: 1, spin, tuck: r.tuck,
-      ambient: (o.menu ? 0.6 : 1) * map.wind, ambF: map.windF, gusty: map.gustiness, howl: map.howl ?? 0, rate, gain: persp.wind * (o.paused ? 0.5 : 1),
+      ambient: (o.menu ? 0.6 : 1) * map.wind * lerpN(T.exposure.low, T.exposure.high, o.exposure ?? 0.5), ambF: map.windF, gusty: map.gustiness, howl: map.howl ?? 0, rate, gain: persp.wind * (o.paused ? 0.5 : 1),
     };
     if (this.worklet) {
       for (const k in snowParams) this.setP(this.sp, 's' + k, k, snowParams[k], when);

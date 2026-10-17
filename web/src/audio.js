@@ -279,7 +279,10 @@ export class SoundScape {
     const paused = game.mode === Mode.PAUSED, menu = game.mode === Mode.MENU;
     if (settings.view !== this.engine.view && (settings.view === 'fp') !== (this.engine.view === 'fp')) this.engine.setView(settings.view);
     const camDist = camera.position.distanceTo(s.renderPos ?? s.position);
-    this.engine.frame(readRider(s, { menu }), c.currentTime, dt, { paused, menu, slow: this.slow ?? 1, camDist });
+    // exposure: how high the rider is between the lowest and highest points seen (summits are windier)
+    if (!menu && s.position) { this.yHi = Math.max(this.yHi ?? -1e9, s.position.y); this.yLo = Math.min(this.yLo ?? 1e9, s.position.y); }
+    const exposure = this.yHi - this.yLo > 80 ? (s.position.y - this.yLo) / (this.yHi - this.yLo) : 0.5;
+    this.engine.frame(readRider(s, { menu }), c.currentTime, dt, { paused, menu, slow: this.slow ?? 1, camDist, exposure });
     this.liftTowers(s, c.currentTime);
     this.drawDebug(dt);
     if (!menu && !paused) this.treePasses(s, c.currentTime);

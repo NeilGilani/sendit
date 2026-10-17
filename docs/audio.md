@@ -135,6 +135,7 @@ mountain drops in pitch with time.
 | Kitsune Peak (map 6 branch) | A powder volcano at dusk: calm air, cold dry snow, birch creaks, and a distant temple bell every 40–80 s (bronze modal partials with 2–9 s decays) |
 | Fjordline (map 7 branch) | Ski to sea: waves rolling in and washing out far below (swell, break, recede, every 7–11 s) and gull cries over the water |
 | Every map | Riding a chairlift: rope hum and tower rattles |
+| Every map | Exposure: the map wind is ×0.7 at the lowest point the rider has been this session and ×1.3 at the highest (once there is more than 80 m of vertical), so summits are windier than the sheltered bottom |
 | Maps with a lodge (`life.js`) | Après-ski chatter heard through the walls (10 babble voices low-passed at 700 Hz) and the odd clink of glasses, in 3D at the lodge, fading with distance |
 
 **The place (reverb):** a per-map convolution send on the one-shots, the ambience and a little of the snow. Its
