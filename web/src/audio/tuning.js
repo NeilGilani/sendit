@@ -79,7 +79,7 @@ export const AUDIO = {
     // field textures: grains of short CC0 recordings (tex_snow_*.mp3) mixed under the synthesis for the
     // organic detail noise lacks — ski carve (Lydmakeren #567839), board glide and board skid (Nox_Sound #667729)
     tex: { ski: 3.0, board: 3.5, skid: 3.0, powder: 0.25, rate0: 0.85, rateV: 0.3, rms: 0.12 },
-    width: { ski: 0.75, board: 0.25, outside: 0.22 },   // stereo spread (two skis vs one board); outside: the loaded ski's lean
+    width: { ski: 0.5, board: 0.25, outside: 0.22 },   // stereo spread (two skis vs one board); outside: the loaded ski's lean
     out: 0.25,            // internal output level: peaks stay well under the worklet's safety limiter (audio-dsp.mjs)
   },
 
