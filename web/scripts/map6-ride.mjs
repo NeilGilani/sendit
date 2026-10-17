@@ -74,7 +74,7 @@ function sampler(pts) {
 /** Per-trail bot settings: speed target for 'control' and when to pop. */
 export const TRAIL_BOT = {
   okama: { target: 23 }, kazan: { target: 21 }, makura: { target: 19, popDrop: 4 }, shirakaba: { target: 18, look: 0.7 },
-  kitsunebi: { target: 20 }, senbon: { target: 17, popDrop: 3 },
+  kitsunebi: { target: 20, popDrop: 2.5, look: 0.6 }, senbon: { target: 17, popDrop: 3 },
 };
 
 export function ride(type, trail, style, opts = {}) {

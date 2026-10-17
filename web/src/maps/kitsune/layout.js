@@ -60,7 +60,7 @@ export const GULLY = {
   floor: (u) => 6 + 3 * sstep(430, 700, u),
   depth: (u) => 13 * sstep(430, 560, u) * (1 - sstep(1420, 1560, u)),
   wall: 15,
-  ledges: [[760, 3], [1040, 4], [1290, 3.5]],   // [u, drop m]: step-downs in the gully floor (the fox-fire drops)
+  ledges: [[760, 3], [1040, 4], [1290, 6, 'Fox Fire Drop']],   // [u, drop m, name?]: step-downs in the gully floor
 };
 
 // Cliff bands. uc = lip position (u), [v0, v1] lateral extent, h = height (m), var = ± variation,
@@ -185,7 +185,7 @@ export const LINE_GOALS = [
   ['Pillow Talk', 1800, 'Makura Pillows', 'Makura Cliff', 'Makura Stacks'],
   ['Pilgrimage', 2400, 'Senbon Torii', 'Kitsune Shrine', 'Ryokan Kiku'],
   ['Roof Hopper', 2000, 'Ryokan Kiku', 'Ryokan Tsuki', 'Ryokan Yuki'],
-  ['Fox Fire', 1500, 'Kitsunebi Gully', 'Shrine Lip'],
+  ['Fox Fire', 1500, 'Kitsunebi Gully', 'Fox Fire Drop'],
   ['Summit to Shrine', 1600, 'Okama Lip', 'Fox Ledge', 'Kitsune Shrine'],
 ];
 

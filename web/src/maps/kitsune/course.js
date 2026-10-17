@@ -501,7 +501,10 @@ export class KitsuneCourse {
       for (let i = 0; i < KAZAN.gaps.length; i++) if (u > KAZAN.gaps[i][0] - 30 && u < KAZAN.gaps[i][0] + 6) return `Kazan Gap ${i + 1}`;
       return 'Kazan Rim';
     }
-    if (u > GULLY.u0 && u < GULLY.u1 && this.tab(this.gl.d, u) > 4 && Math.abs(v - this.gullyCentre(u)) < this.tab(this.gl.f, u) + GULLY.wall + 4) return 'Kitsunebi Gully';
+    if (u > GULLY.u0 && u < GULLY.u1 && this.tab(this.gl.d, u) > 4 && Math.abs(v - this.gullyCentre(u)) < this.tab(this.gl.f, u) + GULLY.wall + 4) {
+      for (const [lu, h, name] of GULLY.ledges) if (name && u > lu - h * BENCH_PER_M && u < lu + 6) return name;
+      return 'Kitsunebi Gully';
+    }
     for (const F of PILLOWS) if (u > F.u0 && u < F.u1 && v > F.v0 && v < F.v1) return F.name;
     for (const [hu, hv, L, , kind, name] of HITS) if (Math.abs(u - hu) < 20 && Math.abs(v - hv) < L) return name || (kind === 'lip' ? 'Wind Lip' : 'Roller');
     if (u > WEAVE.u0 && u < WEAVE.u1 && v > -300 && v < 180) return 'Shirakaba';
