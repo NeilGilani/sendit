@@ -247,10 +247,13 @@ export class KitsuneCourse {
     const av = Math.abs(v), a = av / W;
     if (a <= 1) e += Rh * Math.pow(a, FACE.bowlPower);
     else {
-      // Past the crest: a rounded flank into the neighbouring drainage, then the next soft ridges.
+      // Past the crest: a rounded flank into the neighbouring drainage, then up the next ridge. The ground
+      // climbs again toward the tile edge so the playable tile's skirt is never seen from the face.
       const d = av - W;
-      e += Rh - d * 0.55 * (1 - 0.5 * sstep(0, 600, d)) + 60 * (vnoise(d / 160 + 3.7, u / 280 + sd * 9) - 0.5) * sstep(0, 220, d);
+      e += Rh - 130 * smooth(d / 280) + 300 * sstep(330, 1050, d) + 60 * (vnoise(d / 160 + 3.7, u / 280 + sd * 9) - 0.5) * sstep(0, 220, d);
     }
+    // Past the base the valley climbs into a wooded bowl (same reason: the east tile edge sits uphill).
+    e += 120 * sstep(2560, 3400, u) * (1 - sstep(4200, 5200, u));
     // The volcano: a cone around the crater (≈33°), merged with the face by a smooth max, and the crater cut in.
     const cx = START_X + CRATER.u, cz = CRATER.v;
     const dx = x - cx, dz = z - cz, r = Math.hypot(dx, dz);
@@ -498,7 +501,10 @@ export class KitsuneCourse {
       for (let i = 0; i < KAZAN.gaps.length; i++) if (u > KAZAN.gaps[i][0] - 30 && u < KAZAN.gaps[i][0] + 6) return `Kazan Gap ${i + 1}`;
       return 'Kazan Rim';
     }
-    if (u > GULLY.u0 && u < GULLY.u1 && this.tab(this.gl.d, u) > 4 && Math.abs(v - this.gullyCentre(u)) < this.tab(this.gl.f, u) + GULLY.wall + 4) return 'Kitsunebi Gully';
+    if (u > GULLY.u0 && u < GULLY.u1 && this.tab(this.gl.d, u) > 4 && Math.abs(v - this.gullyCentre(u)) < this.tab(this.gl.f, u) + GULLY.wall + 4) {
+      for (const [lu, h, name] of GULLY.ledges) if (name && u > lu - h * BENCH_PER_M && u < lu + 6) return name;
+      return 'Kitsunebi Gully';
+    }
     for (const F of PILLOWS) if (u > F.u0 && u < F.u1 && v > F.v0 && v < F.v1) return F.name;
     for (const [hu, hv, L, , kind, name] of HITS) if (Math.abs(u - hu) < 20 && Math.abs(v - hv) < L) return name || (kind === 'lip' ? 'Wind Lip' : 'Roller');
     if (u > WEAVE.u0 && u < WEAVE.u1 && v > -300 && v < 180) return 'Shirakaba';
@@ -599,10 +605,10 @@ export class KitsuneCourse {
     return { x: START_X + u, z: v, heading: Math.atan2(-40, -(ahead - v)) };
   }
 
-  /** Where a trail ends: the finish line across the base at its own spot. { x, z, u, width, heading }. */
+  /** Where a trail ends: the finish line across the base, FINISH_U down the fall line. { progress }. */
   trailFinish(trailId) {
-    const t = this.trails.find((k) => k.id === trailId) || this.trails[0];
-    return { x: START_X + FINISH_U, z: t.finishV, u: FINISH_U, width: 120, heading: -Math.PI / 2 };
+    void trailId;   // every trail ends on the same line across the base (registry.trailFinishFor: { progress })
+    return { progress: FINISH_U };
   }
 
   /** The trail whose line is nearest (u, v): used to name a run that started from a drop zone. */
@@ -638,7 +644,7 @@ export class KitsuneCourse {
   lobbySpot() { return { x: START_X + 22, z: -14, heading: -Math.PI / 2 - 0.12 }; }
 
   /**
-   * Golden snowflakes (activities.js `course.challenge.flakes`): one or two on every trail, on the lips,
+   * Golden snowflakes (activities.js `course.challenge.flakes`, which uses 12): one or two on every trail, on the lips,
    * roofs and walls you'd hit anyway. [{ x, z, y above the snow }]
    */
   placeFlakes() {
@@ -662,7 +668,6 @@ export class KitsuneCourse {
       return on(u, c + side * w, 1.4);
     };
     return [
-      on(330, -40),                          // Okama Bowl
       lip(600, -60, 12),                     // Okama Lip
       on(700, this.kazanCrest(700), 1.6),    // Kazan Rim crest
       lip(KAZAN.gaps[1][0], this.kazanCrest(KAZAN.gaps[1][0]), 10),   // Kazan Gap 2
@@ -673,7 +678,6 @@ export class KitsuneCourse {
       on(TUNNEL.u1 - 20, TUNNEL.centre(TUNNEL.u1 - 20), 1.0),   // inside the torii tunnel
       roof('haiden'), roof('tsuki'),
       lip(1355, -372, 12),                   // Fox Ledge (on the Makura line)
-      on(2150, 300, 1.5),                    // a fir lip
     ];
   }
 

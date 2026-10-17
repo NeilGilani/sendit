@@ -72,17 +72,19 @@ export const KITSUNE_CAMERA = {
   landTrauma: 0.045,
 };
 
-// The dusk look (the graphics session's course.atmosphere hook): the sun has just slipped behind the
-// volcano (WSW, 4° up), so the face sits in blue hour under a deep indigo zenith with a peach-magenta band
-// on the western horizon; the lanterns carry the warm light. Bearings are degrees from north (−z), like
-// scene.js LIGHTING.sunBearing; colours are sRGB.
+// The dusk look (gfx/atmosphere.js, course.atmosphere): a low sun in the south-south-west (9° up) behind the
+// volcano's shoulder, so the face sits in blue-violet shade under an indigo zenith while the summits and far
+// ranges catch peach alpenglow; the lanterns carry the warm light lower down. Bearings are degrees from north
+// (−z), like scene.js LIGHTING.sunBearing; colours are sRGB. Tuned on the real GPU with ?atmo={...}.
 export const KITSUNE_ATMOSPHERE = {
-  sunElevation: 4,
-  sunBearing: 255,
-  skyZenith: '#1c2550',
-  skyHorizon: '#f0a07c',
-  fogColor: '#8d86ad',
-  fogDensity: 1.25,          // × the default aerial extinction (a little thicker: dusk haze)
-  exposure: 1.15,
-  ambientScale: 0.75,
+  sunElevation: 9,
+  sunBearing: 215,
+  skyZenith: '#2f4f9e',
+  skyHorizon: '#e9b394',
+  fogColor: '#a7b6dc',
+  fogDensity: 1.2,           // × the default aerial extinction (a little thicker: dusk haze)
+  exposure: 1.0,
+  ambientScale: 1.25,
+  sunIntensity: 0.7,
+  sunTint: '#ffae7a',
 };

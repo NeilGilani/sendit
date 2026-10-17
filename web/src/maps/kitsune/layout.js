@@ -9,7 +9,7 @@
 //                       fir gullies → the base village and the finish torii (u 2440)
 
 export const TILE = { size: 3072, res: 2049, farSize: 30000, farRes: 512 };
-export const START_X = -1250;          // world x of the crater-rim saddle (u = 0)
+export const START_X = -1150;          // world x of the crater-rim saddle (u = 0): the whole crater fits in the tile
 export const TOP = 3000;               // m elevation at the start (base ≈ 1850 m: just above the engine's valley mist)
 export const FINISH_U = 2440;          // "run complete" (metres down the fall line)
 
@@ -30,7 +30,7 @@ export const BEHIND = [[22, 4], [9000, -24]];   // behind the start (the cone's 
 
 // The volcano. The crater's centre is behind the start; its rim is lowest on the face side (the saddle
 // you drop from) and rises toward the back. Outside the face the cone falls away radially (~33°).
-export const CRATER = { u: -250, v: 10, R: 225, floor: 95, rimRise: 190, coneSlope: 0.66 };
+export const CRATER = { u: -178, v: 10, R: 165, floor: 85, rimRise: 175, coneSlope: 0.66 };
 
 // Face width: ridge crest distance from the centre line, and the ridge height above the centre.
 export const FACE = {
@@ -60,7 +60,7 @@ export const GULLY = {
   floor: (u) => 6 + 3 * sstep(430, 700, u),
   depth: (u) => 13 * sstep(430, 560, u) * (1 - sstep(1420, 1560, u)),
   wall: 15,
-  ledges: [[760, 3], [1040, 4], [1290, 3.5]],   // [u, drop m]: step-downs in the gully floor (the fox-fire drops)
+  ledges: [[760, 3], [1040, 4], [1290, 6, 'Fox Fire Drop']],   // [u, drop m, name?]: step-downs in the gully floor
 };
 
 // Cliff bands. uc = lip position (u), [v0, v1] lateral extent, h = height (m), var = ± variation,
@@ -68,7 +68,7 @@ export const GULLY = {
 export const BANDS = [
   { name: 'Okama Lip', uc: 600, v0: -170, v1: 60, h: 6, var: 1.5, bench: 30, wob: 6, seed: 1, gaps: [[20, 16]] },
   { name: 'Makura Cliff', uc: 990, v0: -560, v1: -380, h: 9, var: 2.5, bench: 36, wob: 5, seed: 2, gaps: [[-505, 12]] },
-  { name: 'Fox Ledge', uc: 1355, v0: -360, v1: -150, h: 8, var: 2, bench: 34, wob: 6, seed: 3, gaps: [[-200, 14]] },
+  { name: 'Fox Ledge', uc: 1355, v0: -440, v1: -150, h: 8, var: 2, bench: 34, wob: 6, seed: 3, gaps: [[-200, 14]] },
   { name: 'Ash Steps', uc: 760, v0: -660, v1: -560, h: 7, var: 2, bench: 30, wob: 6, seed: 4, gaps: [] },
 ];
 
@@ -85,6 +85,8 @@ export const PILLOWS = [
 export const HITS = [
   [230, -110, 26, 2.4, 'lip', 'Okama Wind Lip'],
   [360, 40, 30, 2.6, 'lip', 'Okama Wind Lip'],
+  [285, -32, 22, 2.6, 'lip', 'Okama Wind Lip'],
+  [455, -52, 22, 2.8, 'lip', 'Okama Wind Lip'],
   [470, -190, 22, 2.2, 'lip', 'Okama Wind Lip'],
   [560, 100, 50, 1.8, 'roller'],
   // Birch hits: small lips on the Shirakaba Weave's apexes (where the line runs down the fall line).
@@ -104,17 +106,17 @@ export const HITS = [
 // The shrine village.
 // Buildings: u, v = centre; yaw: long axis away from the fall line (rad); L = length along it, W = width
 // across; roof 'sori' = a curved Japanese gable (ridge across the fall line, upturned eaves: the downhill
-// eave is a natural kicker), pitch at the ridge, eave = wall height; drift = how high the uphill drift
-// climbs toward the ridge (≥ 1 rides straight onto the roof). Rideable through features.heightAt.
+// eave is a natural kicker), pitch at the ridge, eave = wall height
+// at the downhill wall; drift = how far the uphill drift climbs toward the uphill eave (1 = onto the roof). Rideable through features.heightAt.
 export const BUILDINGS = [
-  { id: 'haiden', name: 'Kitsune Shrine', u: 1765, v: 40, L: 18, W: 24, roof: 'sori', pitch: 30, eave: 4.2, drift: 1.05, colour: 'shrine' },
-  { id: 'kiku', name: 'Ryokan Kiku', u: 1852, v: 46, L: 16, W: 20, roof: 'sori', pitch: 27, eave: 4.6, drift: 1.0, colour: 'ryokan' },
-  { id: 'tsuki', name: 'Ryokan Tsuki', u: 1918, v: 50, L: 14, W: 18, roof: 'sori', pitch: 27, eave: 4.0, drift: 0.9, colour: 'ryokan' },
-  { id: 'yuki', name: 'Ryokan Yuki', u: 1984, v: 56, L: 14, W: 18, roof: 'sori', pitch: 27, eave: 4.0, drift: 0.9, colour: 'ryokan' },
-  { id: 'tea', name: 'Tea House', u: 1640, v: -150, L: 10, W: 12, roof: 'sori', pitch: 28, eave: 3.4, drift: 1.0, colour: 'ryokan' },
-  { id: 'topstation', name: 'Gondola Top Station', u: 395, v: 575, L: 16, W: 14, roof: 'sori', pitch: 24, eave: 5.0, drift: 1.0, colour: 'station' },
-  { id: 'basestation', name: 'Gondola Base Station', u: 2470, v: 520, L: 20, W: 16, roof: 'sori', pitch: 24, eave: 5.5, drift: 0.6, colour: 'station' },
-  { id: 'lodge', name: 'Base Lodge', u: 2500, v: 240, L: 18, W: 26, roof: 'sori', pitch: 26, eave: 5, drift: 0.5, colour: 'ryokan' },
+  { id: 'haiden', name: 'Kitsune Shrine', u: 1765, v: 40, L: 18, W: 24, roof: 'sori', pitch: 30, eave: 6.2, drift: 1.05, colour: 'shrine' },
+  { id: 'kiku', name: 'Ryokan Kiku', u: 1852, v: 46, L: 16, W: 20, roof: 'sori', pitch: 27, eave: 6.8, drift: 1.0, colour: 'ryokan' },
+  { id: 'tsuki', name: 'Ryokan Tsuki', u: 1918, v: 50, L: 14, W: 18, roof: 'sori', pitch: 27, eave: 6.4, drift: 0.9, colour: 'ryokan' },
+  { id: 'yuki', name: 'Ryokan Yuki', u: 1984, v: 56, L: 14, W: 18, roof: 'sori', pitch: 27, eave: 6.4, drift: 0.9, colour: 'ryokan' },
+  { id: 'tea', name: 'Tea House', u: 1640, v: -150, L: 10, W: 12, roof: 'sori', pitch: 28, eave: 4.6, drift: 1.0, colour: 'ryokan' },
+  { id: 'topstation', name: 'Gondola Top Station', u: 395, v: 575, L: 16, W: 14, roof: 'sori', pitch: 24, eave: 6.5, drift: 1.0, colour: 'station' },
+  { id: 'basestation', name: 'Gondola Base Station', u: 2470, v: 520, L: 20, W: 16, roof: 'sori', pitch: 24, eave: 6.5, drift: 0.6, colour: 'station' },
+  { id: 'lodge', name: 'Base Lodge', u: 2500, v: 240, L: 18, W: 26, roof: 'sori', pitch: 26, eave: 6.5, drift: 0.5, colour: 'ryokan' },
 ];
 
 // The five-storey pagoda: a landmark (solid, not rideable). Square plan, tiers of curved roofs.
@@ -148,7 +150,7 @@ export const DROP_ZONES = [
   ['Kitsunebi Gully', 445, 470],
   ['Senbon Torii', 1460, 40],
   ['Shrine Village', 1720, -50],
-  ['Fir Gullies', 1960, 40],
+  ['Fir Gullies', 2040, -40],
 ];
 
 // The canonical lines, as (u, v) waypoints ('gully' = the gully's centre line, 'weave' = the glade weave):
@@ -157,7 +159,7 @@ export const WEAVE = { u0: 700, u1: 1460, v: -55, amp: 42, wave: 110 };
 export const RIDE_LINES = {
   okama: { name: 'Okama Bowl', pts: [[0, 0], [150, -20], [400, -55], [620, 20], [800, -40], [1100, -20], [1400, -70], [1550, -80], [1700, -60], [1900, -40], [2150, -10], [2500, 20]] },
   kazan: { name: 'Kazan Rim', pts: [[0, 0], [40, 110], 'crest', [1480, 228], [1600, 250], [1750, 270], [2000, 300], [2250, 260], [2500, 240]] },
-  makura: { name: 'Makura Pillows', pts: [[0, 0], [200, -130], [500, -300], [640, -430], [960, -440], [1030, -420], [1320, -400], [1450, -300], [1600, -210], [1800, -190], [2100, -120], [2500, -60]] },
+  makura: { name: 'Makura Pillows', pts: [[0, 0], [200, -130], [500, -300], [640, -430], [960, -440], [1030, -420], [1320, -395], [1460, -380], [1600, -250], [1800, -190], [2100, -120], [2500, -60]] },
   shirakaba: { name: 'Shirakaba Weave', pts: [[0, 0], [300, -60], [560, -90], [650, -100], 'weave', [1520, -30], [1700, -60], [2000, -60], [2500, -20]] },
   kitsunebi: { name: 'Kitsunebi Gully', pts: [[405, 545], [440, 500], 'gully', [1640, 400], [1800, 415], [2000, 420], [2250, 400], [2500, 380]] },
   senbon: { name: 'Senbon Torii', pts: [[1430, 40], [1545, 40], 'tunnel', [1740, 40], [1800, 43], [1852, 46], [1918, 50], [1984, 56], [2100, 60], [2300, 64], [2500, 70]] },
@@ -167,15 +169,15 @@ export const RIDE_LINES = {
 export const TRAILS = [
   { id: 'okama', name: 'Okama Bowl', difficulty: 'blue', start: [25, 0], finishV: 20,
     description: 'From the crater rim into the wide summit bowl: wind lips, an optional 6 m lip, then the long fast cruise through the village to the base. The way to learn the mountain.' },
-  { id: 'kazan', name: 'Kazan Rim', difficulty: 'black', start: [45, 120], finishV: 240,
+  { id: 'kazan', featured: true, name: 'Kazan Rim', difficulty: 'black', start: [45, 120], finishV: 240,
     description: 'The volcano-rim rollercoaster: a narrow ridge spine of whoops you pop off at speed, three step-down gaps, then a high-speed run past the ryokans.' },
-  { id: 'makura', name: 'Makura Pillows', difficulty: 'double-black', start: [640, -430], finishV: -60,
+  { id: 'makura', featured: true, name: 'Makura Pillows', difficulty: 'double-black', start: [640, -430], finishV: -60,
     description: 'Pillow lines on the skier\'s left: two terraced pillow stacks, the 9 m Makura Cliff between them and the Fox Ledge below. Bottomless landings, no room for doubt.' },
   { id: 'shirakaba', name: 'Shirakaba Weave', difficulty: 'black', start: [650, -100], finishV: -20,
     description: 'A tight weave through the white birch glade. Firs sit in deep tree wells; brush the trunks for close shaves.' },
   { id: 'kitsunebi', name: 'Kitsunebi Gully', difficulty: 'blue', start: [430, 520], finishV: 380,
     description: 'From the gondola top station into a natural half-pipe lit by fox-fire lanterns. Hit the walls, carve the transitions, then out past the onsen.' },
-  { id: 'senbon', name: 'Senbon Torii', difficulty: 'park', start: [1430, 40], finishV: 70,
+  { id: 'senbon', featured: true, name: 'Senbon Torii', difficulty: 'park', start: [1430, 40], finishV: 70,
     description: 'The shrine village jump line: through the Ō-torii and a tunnel of 33 vermilion gates, up the drift onto the shrine roof, then roof to roof down the ryokan row.' },
 ];
 
@@ -183,9 +185,9 @@ export const TRAILS = [
 export const LINE_GOALS = [
   ['Rim Rider', 2200, 'Kazan Gap 1', 'Kazan Gap 2', 'Kazan Gap 3'],
   ['Pillow Talk', 1800, 'Makura Pillows', 'Makura Cliff', 'Makura Stacks'],
-  ['Pilgrimage', 2400, 'Senbon Torii', 'Kitsune Shrine', 'Ryokan Kiku'],
+  ['Pilgrimage', 2400, 'Torii Exit', 'Kitsune Shrine', 'Ryokan Kiku'],
   ['Roof Hopper', 2000, 'Ryokan Kiku', 'Ryokan Tsuki', 'Ryokan Yuki'],
-  ['Fox Fire', 1500, 'Kitsunebi Gully', 'Shrine Lip'],
+  ['Fox Fire', 1500, 'Kitsunebi Gully', 'Fox Fire Drop'],
   ['Summit to Shrine', 1600, 'Okama Lip', 'Fox Ledge', 'Kitsune Shrine'],
 ];
 
