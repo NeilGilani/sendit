@@ -2,7 +2,7 @@
 // input sequence and capture frames at fixed times from a chosen camera, plus per-frame pose numbers.
 // Usage: GPU=1 node web/scripts/rider-seq.mjs <url> <out.png> [equip] [cam] [map] [script]
 //   cam:   chase (the game camera) | rear | side | front  (rider-relative, ~3.5 m away)
-//   script: turns (W 2.5 s, then D 1 s, A 1 s, D 1 s, release 1 s) | straight | <json [[t, steer, up], …]>
+//   script: turns (W 2.5 s, then D 1 s, A 1 s, D 1 s, release 1 s) | straight | stop (brake 1.5 s, + steer 1 s) | <json [[t, steer, up, brake?], …]>
 // Env AT = x,z[,heading] start (default the spawn), V0 = start speed (m/s, default 12) along the spawn heading. Frames every 0.25 s from t = 2.25 s; the sheet is 5 columns wide, one row per second.
 import { chromium } from '@playwright/test';
 import fs from 'node:fs';
@@ -10,6 +10,7 @@ const [url = 'http://localhost:5186/', out = 'seq.png', equip = 'ski', cam = 're
 const SCRIPTS = {
   turns: [[0, 0, 1], [2.5, 1, 0], [3.5, -1, 0], [4.5, 1, 0], [5.5, 0, 0], [6.5, 0, 0]],
   straight: [[0, 0, 1], [6.5, 0, 1]],
+  stop: [[0, 0, 1], [2.5, 0, 0, 1], [4.0, 0.6, 0, 1], [5.0, 0, 0, 0], [6.5, 0, 0, 0]],
 };
 const script = SCRIPTS[scr] || JSON.parse(scr);
 const end = script.at(-1)[0];
@@ -36,7 +37,7 @@ await page.evaluate(({ end, script, cam, v0, at }) => {
     if (t >= next - 1e-6) { next += 0.25; window.__cap = t; pl.debugFreeze = true; R.update = () => {}; }
     let row = script[0];
     for (const r of script) if (r[0] <= t) row = r;
-    c.steer = row[1]; c.up = row[2];
+    c.steer = row[1]; c.up = row[2]; c.brake = row[3] || 0;
   };
   if (cam !== 'chase') {
     const d = { rear: [0, 1.5, 2.6], side: [2.8, 1.0, 0], front: [0, 1.3, -2.6] }[cam];

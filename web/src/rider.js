@@ -580,7 +580,10 @@ export class Rider {
     // Head: steadied against the body's roll (eyes nearer level, ANIM.headLevel) and looking along the
     // path, a little into the turn (ANIM.headLook), not down the skis.
     const headRoll = -((p.worldRoll ?? p.lean) + spineRoll) * ANIM.headLevel * (1 - p.air) * ns;
-    const headYaw = -counter * 0.6 - p.lean * ANIM.headLook * (1 - p.air) * ns + back * 1.15 + gT * 0.35;
+    // The trunk turns by `counter`; the head takes that back out and looks along the path instead (the
+    // skid angle: down the slope in a hockey stop, nearly the skis' line in a carve).
+    const pathLook = (pl.state === State.GROUNDED ? pl.skidAngle : 0) * ANIM.skiSkidLook;
+    const headYaw = pathLook - counter - p.lean * ANIM.headLook * (1 - p.air) * ns + back * 1.15 + gT * 0.35;
     this.trunk(off, twist * 0.45 + counter * 0.3 + back * 0.25 + gT * 0.25, hipPitch * 0.55 + p.hip * 0.5, bend + p.hip * 0.6, twist * 0.55 + counter * 0.7 + back * 0.6 + gT * 0.55, spineRoll,
       headYaw, -(hipPitch * 0.55 + bend) * 0.95 * (1 - back * 0.6), headRoll);
     for (const side of [1, -1]) {
@@ -609,7 +612,7 @@ export class Rider {
     // The whole body already rolls onto the edge (visual lean), so toe side keeps the torso tall
     // (knees and hips drive forward) and heel side sits down without folding. Crouching (speed, W)
     // mostly bends the knees: the hips fold only a little, so a straight run doesn't hunch over the toes.
-    const hipPitch = (0.12 + p.crouch * BA.crouchHinge - p.toe * 0.06 + p.heel * 0.05 + p.grab * 0.22) * ns;
+    const hipPitch = (0.12 + p.crouch * BA.crouchHinge - p.toe * BA.toeTall + p.heel * 0.05 + p.grab * 0.22) * ns;
     const wob = p.stumble * Math.sin(p.t * 9) * 0.25;
     // Shoulders open toward the nose, rotation leads the turn; in the air the spin leads.
     const lead = p.lead * BA.turnLead;
@@ -617,17 +620,21 @@ export class Rider {
     off.x += nx * 0.08 * sk;                                  // weight over the front foot while skating
     const spineTwist = (nx * (BA.shoulderOpen - BA.hipOpen) + lead + nx * 0.45 * sk) * ns;
     // A preloaded backflip arches the chest up and back (the shoulders throw first).
-    const bend = (0.1 + p.crouch * BA.crouchHinge * 0.8 - p.toe * 0.04 + p.heel * 0.12 + p.grab * 0.26) * ns - p.flipLoad * ANIM.flipLoadArch - (p.tweak || 0) * 0.3;
+    const bend = (0.1 + p.crouch * BA.crouchHinge * 0.8 - p.toe * BA.toeTall * 0.7 + p.heel * 0.12 + p.grab * 0.26) * ns - p.flipLoad * ANIM.flipLoadArch - (p.tweak || 0) * 0.3;
     // Head: look down the direction of travel (nose, or over the back shoulder when switch).
     // Boardslide / lipslide: the head (and a little of the shoulders) look down the rail instead of over the nose.
     const gT = p.gTravel || 0, gS = Math.min(1, Math.abs(gT) / 1.2);
     const headYaw = (nx * p.look * BA.headTurn - nx * BA.shoulderOpen - lead - nx * 0.5 * sk) * ns * (1 - gS) + gS * (gT - nx * BA.shoulderOpen) * 0.85;
+    // Sliding (a slide stop, a skidded turn): the board turns across the path, the head keeps looking
+    // down it (+ skid = board rotated right of the path → look back left; + yaw = left).
+    const skidLook = (pl.state === State.GROUNDED ? pl.skidAngle : 0) * BA.skidLook * ns * (1 - gS);
     // Head steadied against the body's roll: a board leans about its long axis, which runs through the
     // hips, so for the body that is a toe / heel tilt and the head levels it with a pitch (+ X = toward the
     // toes; toeSide = which side of travel the toes are on).
     const toeSide = nx * (p.look >= 0 ? 1 : -1);
-    const level = -(p.worldRoll ?? p.lean) * toeSide * ANIM.headLevel * (1 - p.air) * ns;
-    this.trunk(off, hipYaw + nx * 0.3 * sk, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist + gT * 0.2, wob - p.lean * 0.15, headYaw, -(hipPitch + bend) * 0.6 + level);
+    // (+ BA.headTilt: the head turned down the nose sat a few degrees toward the heels riding straight.)
+    const level = (-(p.worldRoll ?? p.lean) * toeSide * ANIM.headLevel * (1 - p.air) + BA.headTilt) * ns;
+    this.trunk(off, hipYaw + nx * 0.3 * sk, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist + gT * 0.2 + skidLook * 0.3, wob - p.lean * 0.15, headYaw + skidLook * 0.7, -(hipPitch + bend) * 0.6 + level);
     // Legs: feet in the bindings across the board, knees toward the toe edge and a little duck.
     const w = st.width / 2;
     const feet = [[nx, st.front], [-nx, st.back]];   // [armature x sign, binding angle]
