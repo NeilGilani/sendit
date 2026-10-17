@@ -258,6 +258,7 @@ export class AudioEngine {
       case 'liftTower': this.lift.tower(when, d.k ?? 1); break;
       case 'gate': if (d.pass && !board) this.fx.gateClack(when, d.side ?? 0); break;
       case 'nearMiss': this.fx.nearMiss(when, { pan: d.pan ?? 0, speed: r?.speed ?? 12, dist: d.dist, kind: d.kind }); break;
+      case 'treePass': this.fx.nearMiss(when, { pan: d.pan ?? 0, speed: d.speed ?? r?.speed ?? 10, dist: d.dist, kind: d.kind, gain: this.T.fx.treePass.gain }); break;
       case 'hardBrake': this.fx.hardBrake(when, typeof d === 'number' ? d : d.speed ?? 12, board, powder); break;
       case 'grindStart': this.grind.setKind(d.kind, when, true); this.grind.clank(when, d.kind, 1); break;
       case 'grindKink': this.grind.tick(when, clamp((d.kink ?? 10) / 20, 0.3, 1)); break;

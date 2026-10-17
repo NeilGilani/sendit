@@ -84,7 +84,7 @@ add('crash', { seconds: 5, musicTone: true,
   events: [{ t: 1.5, name: 'crashed' }] });
 add('near-miss-trees', { seconds: 6, map: 'blackspruce',
   frames: frames(6, (t) => ({ speed: 15, ...carve(t, 2.4, 0.5, 15) })),
-  events: [{ t: 1.2, name: 'nearMiss', d: { pan: -0.8, dist: 1.4, kind: 'tree' } }, { t: 2.6, name: 'nearMiss', d: { pan: 0.8, dist: 1.0, kind: 'tree' } }, { t: 4.2, name: 'nearMiss', d: { pan: 0.4, dist: 2, kind: 'rock' } }] });
+  events: [{ t: 0.6, name: 'treePass', d: { pan: 0.6, dist: 4.5, kind: 'tree', speed: 15 } }, { t: 3.4, name: 'treePass', d: { pan: -0.5, dist: 5.5, kind: 'tree', speed: 15 } }, { t: 1.2, name: 'nearMiss', d: { pan: -0.8, dist: 1.4, kind: 'tree' } }, { t: 2.6, name: 'nearMiss', d: { pan: 0.8, dist: 1.0, kind: 'tree' } }, { t: 4.2, name: 'nearMiss', d: { pan: 0.4, dist: 2, kind: 'rock' } }] });
 add('rail-grind-board', { seconds: 6, map: 'voltage-park',
   frames: frames(6, (t) => (t < 1.5 ? { board: 1, speed: 8 } : t < 4 ? { board: 1, st: 5, speed: 8, grindV: 8 - (t - 1.5), grindKind: 'rail' } : { board: 1, speed: 6 })),
   events: [{ t: 1.5, name: 'grindStart', d: { kind: 'rail' } }, { t: 2.6, name: 'grindKink', d: { kink: 14 } }, { t: 4, name: 'grindEnd', d: { reason: 'end' } }, { t: 4.1, name: 'landed', d: { impact: 3 } }] });

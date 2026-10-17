@@ -93,6 +93,20 @@ export class SoundScape {
     return Math.max(-1, Math.min(1, ((-v.z / l) * dx + (v.x / l) * dz) / d));
   }
 
+  /**
+   * Trees and rocks passing within a few metres (scatter.nearest, read-only): a soft pass-by whoosh, so riding
+   * through the forest sounds like it. Closer, faster shaves are the scored 'nearMiss' (louder).
+   */
+  treePasses(s, when) {
+    const P = this.engine.T.fx.treePass;
+    if (!s.scatter?.nearest || s.state !== 1 || s.speed < P.minSpeed) return;
+    const n = s.scatter.nearest(s.position, P.radius);
+    if (!n || n.o === this.lastTree) return;
+    this.lastTree = n.o;
+    if (s.speed >= 11 && n.dist < 3.2) return;   // that one is a scored near miss (its own, louder whoosh)
+    this.engine.event('treePass', { pan: this.sideOf(n.o[0], n.o[1]), dist: n.dist, kind: n.o[3], speed: s.speed }, when);
+  }
+
   /** Riding a lift: a sheave-train rattle each time the chair passes a tower (lifts.js supports). */
   liftTowers(s, when) {
     const L = s.state === 4 ? s._lift : null;
@@ -211,6 +225,7 @@ export class SoundScape {
     if (settings.view !== this.engine.view && (settings.view === 'fp') !== (this.engine.view === 'fp')) this.engine.setView(settings.view);
     this.engine.frame(readRider(s, { menu }), c.currentTime, dt, { paused, menu, slow: this.slow ?? 1 });
     this.liftTowers(s, c.currentTime);
+    if (!menu && !paused) this.treePasses(s, c.currentTime);
     this.engine.others.update(c.currentTime, window.__sendit?.life?.skiers, camera.position, !menu && !paused);   // other skiers swishing by
 
     // Music: seamless loop that sometimes rests quietly between passes.

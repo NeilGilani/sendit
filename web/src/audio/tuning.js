@@ -110,6 +110,7 @@ export const AUDIO = {
     grab: { gain: 0.28 },
     crash: { gain: 0.8 },
     nearMiss: { gain: 0.55 },
+    treePass: { gain: 0.3, radius: 6, minSpeed: 6 },   // any tree / rock passing within 6 m: a softer whoosh
     hardBrake: { gain: 0.5 },
     grind: { gain: 0.5, sample: 0.55, scrape: 0.5, clank: 0.5 },
     faceShot: { gain: 0.4, powder: 0.55, sink: 0.08, minSpeed: 7, minGap: 1.2 },   // powder thrown into the face at a turn

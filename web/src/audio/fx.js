@@ -190,7 +190,7 @@ export class FX {
    * peaks at the pass, panned to the obstacle's side. Trees add a needle rustle.
    */
   nearMiss(when, o = {}) {
-    const G = this.T.nearMiss.gain * clamp((o.speed ?? 12) / 14, 0.4, 1.4) * clamp(2.2 / Math.max(0.6, o.dist ?? 2), 0.5, 1.4);
+    const G = (o.gain ?? this.T.nearMiss.gain) * clamp((o.speed ?? 12) / 14, 0.4, 1.4) * clamp(2.2 / Math.max(0.6, o.dist ?? 2), 0.3, 1.4);
     const pan = clamp(o.pan ?? 0, -0.9, 0.9), tree = o.kind !== 'rock';
     const g = this.noise(when, { buf: 'pink', f: 2600, f2: 650, q: 1.1, gain: G, attack: 0.16, decay: 0.32, pan });
     // comb: a 4 → 9 → 4 ms swept delay mixed in (the 'jet' flange of air rushing past an object)
