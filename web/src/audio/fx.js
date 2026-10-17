@@ -105,6 +105,17 @@ export class FX {
     const G = this.T.slash.gain * clamp(k, 0.3, 1.5), f = (board ? 1700 : 2400) * (1 - 0.45 * powder);
     this.noise(when, { buf: 'pink', f: f * 1.3, f2: f * 0.45, q: 0.7, gain: G, attack: 0.04, hold: 0.06, decay: 0.35 + 0.25 * powder, pan: -0.25 * side });
     for (let i = 0; i < 5; i++) this.noise(when + 0.03 + i * rnd(0.03, 0.07), { f: rnd(2500, 5000) * (1 - 0.4 * powder), q: 1.2, gain: G * 0.25, decay: 0.04, pan: -0.3 * side });
+    this.patter(when, k * 0.8, powder, -0.4 * side);
+  }
+
+  /** The thrown snow pattering back down: a soft fizz of tiny landings, starting a beat after the spray. */
+  patter(when, k = 1, powder = 0, pan = 0) {
+    const G = this.T.patter.gain * clamp(k, 0.3, 1.5), n = Math.round(14 + 20 * k);
+    this.noise(when + 0.2, { buf: 'pink', f: 3800 * (1 - 0.4 * powder), q: 0.6, gain: G * 0.5, attack: 0.15, decay: 0.5, pan });
+    for (let i = 0; i < n; i++) {
+      const t = when + 0.18 + Math.pow(Math.random(), 0.8) * 0.7;
+      this.noise(t, { f: rnd(2500, 7000) * (1 - 0.4 * powder), q: 1.5, gain: G * rnd(0.15, 0.5), decay: rnd(0.004, 0.012), pan: pan + rnd(-0.3, 0.3) });
+    }
   }
 
   /** Face shot: deep powder flying up over the goggles and jacket — a soft whump and a fizz of flakes. */
@@ -242,6 +253,7 @@ export class FX {
     const G = this.T.hardBrake.gain * clamp(speed / 14, 0.5, 1.3);
     this.noise(when, { buf: 'pink', f: board ? 1500 : 2100, f2: 1100, q: 0.6, gain: G, attack: 0.05, hold: 0.12, decay: 0.45 + powder * 0.3 });
     for (let i = 0; i < 6; i++) this.noise(when + i * rnd(0.04, 0.08), { f: rnd(2500, 4500) * (1 - 0.4 * powder), q: 1.4, gain: G * 0.35, decay: 0.04 });
+    this.patter(when + 0.3, clamp(speed / 14, 0.5, 1.3), powder, 0);
   }
 
   /** A trunk creaking in the wind: stick-slip pulses through woody resonances, placed in the stereo field. */
