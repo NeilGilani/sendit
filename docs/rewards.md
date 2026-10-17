@@ -73,7 +73,8 @@ you see them all. Sources (`EARN` in rewards.js):
 | source | XP |
 |---|---|
 | distance on skis or a snowboard | 40 per km |
-| a finished run (the finish line, or the bottom in Challenge) | 65 |
+| a finished run (the finish line, or the bottom in Challenge) of at least 500 m | 65 |
+| the first such run each day | 100 |
 | Challenge medal | bronze 20, silver 40, gold 60 |
 | first finished run on each map | 250 (once per map) |
 | first finish of each trail | 120 (once per trail) |
@@ -81,12 +82,14 @@ you see them all. Sources (`EARN` in rewards.js):
 | duplicates | see the grade table |
 | a new rank in the game-feel progression (levels 5, 10, 20, 35, 60; bus event `juiceLevelUp` with `rankUp`) | a whole case |
 
-**Pacing** (unittest simulates it minute by minute over 3 hours): a typical rider (0.7 km per minute, a
-finished run every 3 minutes, a second map after 90 minutes) gets the **first case at 13 minutes** (the
-first-run and first-km bonuses front-load it) and then **one every ~16 minutes** on average, a little
-faster around the distance milestones. A slow rider (0.45 km/min, a run every 4 minutes) gets the
-first case at 19 minutes and then one every ~24 minutes; a fast one (1 km/min, a run every 2 minutes)
-at 9 minutes and then every ~12. Map speeds for reference: 7–18 m/s average (docs/map2.md).
+**Pacing** (unittest simulates it minute by minute over 3 hours, crediting distance with each finished
+run like the tracker does): a typical rider (0.7 km per minute, a finished run every 3 minutes, a second
+map after 90 minutes) gets the **first case at 12 minutes** (the first-run, first-km and first-today
+bonuses front-load it) and then **one every ~16 minutes**, a little faster around the distance
+milestones. A slow rider (0.45 km/min, a run every 4 minutes) gets the first case at 16 minutes and then
+one every ~24; a fast one (1 km/min, a run every 2 minutes) at 8 minutes and then every ~12. A run must
+cover 500 m for its finish bonuses, so dropping in next to the finish (drop zones) earns only distance.
+Map speeds for reference: 7–18 m/s average (docs/map2.md).
 
 The progress bar, the last ride's gains, the next milestone and "about N km and M runs to go" are in the
 Cases tab. After every finished run a small card shows `+XP` and the bar; when a case drops, a

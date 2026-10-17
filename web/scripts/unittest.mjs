@@ -347,13 +347,17 @@ await test('reel: winner at winAt, whole ladder visible, gold hidden, near misse
 
 await test('progression: first case in 10–15 min, then one every 15–25 min of riding', () => {
   // A typical rider: 0.7 km per minute, a finished run every 3 minutes, the first run on two maps.
+  // Like the tracker: distance builds up and is credited with each finished run (one session, one day).
   const sim = (kmPerMin, runEvery, mins, maps = ['valcrest-gully', 'blackspruce']) => {
     const p = schema.defaultProfile();
     const at = [];
+    let dist = 0;
     for (let t = 1; t <= mins; t++) {
-      const fin = t % runEvery === 0;
+      dist += kmPerMin * 1000;
+      if (t % runEvery) continue;
       const mapId = t < mins / 2 ? maps[0] : maps[1];
-      const r = rewards.creditRun(p, { mapId, trailId: mapId, distance: kmPerMin * 1000, finished: fin, equipment: 'skis' });
+      const r = rewards.creditRun(p, { mapId, trailId: mapId, distance: dist, finished: true, equipment: 'skis' }, Date.UTC(2026, 9, 17, 9, t));
+      dist = 0;
       for (let k = 0; k < r.cases.length; k++) at.push(t);
     }
     return at;
@@ -373,8 +377,16 @@ await test('progression: milestones and first-run bonuses pay once; dupes become
   const a = rewards.creditRun(p, { mapId: 'm1', trailId: 'm1.0', distance: 1200, finished: true });
   assert.ok(a.gains.some((g) => g.label === 'First kilometre') && a.gains.some((g) => g.label.startsWith('First run')));
   assert.ok(a.gains.some((g) => g.label === 'New trail finished'));
+  assert.ok(a.gains.some((g) => g.label === 'First run today'));
   const b = rewards.creditRun(p, { mapId: 'm1', trailId: 'm1.0', distance: 1200, finished: true });
   assert.ok(!b.gains.some((g) => g.milestone), 'no second bonus');
+  // A "run" from a drop zone next to the finish earns its distance but no finish bonus.
+  const c = rewards.creditRun(p, { mapId: 'm2', trailId: 'm2.0', distance: 120, finished: true });
+  assert.ok(!c.gains.some((g) => g.label === 'Run complete' || g.label.startsWith('First run')), 'no bonus for a 120 m run');
+  assert.ok(Math.abs(c.xp - 0.12 * rewards.EARN.perKm) < 1e-9);
+  // The next day pays the daily bonus again.
+  const d = rewards.creditRun(p, { mapId: 'm1', distance: 900, finished: true }, Date.now() + 86400000);
+  assert.ok(d.gains.some((g) => g.label === 'First run today'));
   // Open 300 cases with a seeded RNG: duplicates convert to XP (and so to more cases).
   const rng = rewards.seeded(7);
   for (let i = 0; i < 300; i++) rewards.grantCase(p, 'test');
@@ -430,7 +442,8 @@ await test('tracker: finished runs emit runCompleted and earn case XP; leaving c
   assert.ok(typeof runs[0].time === 'number' && runs[0].time >= 0);
   const r = profileStore.rewards;
   assert.equal(Math.round(r.distance), 3400, 'all 3.4 km credited once');
-  const want = 3.4 * rewards.EARN.perKm + 2 * rewards.EARN.finish + rewards.EARN.medal.gold + rewards.EARN.firstMap + rewards.EARN.firstTrail + 50;   // + the first-km milestone
+  // 1.8 km run (finish, first map, first trail, first today, first km) + 1.2 km run (finish, gold) + 0.4 km at the end.
+  const want = 3.4 * rewards.EARN.perKm + 2 * rewards.EARN.finish + rewards.EARN.medal.gold + rewards.EARN.firstMap + rewards.EARN.firstTrail + rewards.EARN.firstToday + 50;
   assert.ok(Math.abs(r.xpTotal - want) < 1e-6, `xp ${r.xpTotal} vs ${want}`);
   assert.equal(profileStore.profile.stats.runsCompleted, 2);
   // A rank-up in the game-feel progression (bus event juiceLevelUp) is a milestone case; a plain level-up is not.

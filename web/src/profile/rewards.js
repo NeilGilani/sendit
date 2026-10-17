@@ -20,6 +20,8 @@ export const EARN = {
   medal: { bronze: 20, silver: 40, gold: 60 },
   firstMap: 250,
   firstTrail: 120,
+  firstToday: 100,          // the first finished run of each calendar day
+  minRun: 500,              // metres a run must cover for its finish bonuses (no farming from a drop zone near the finish)
 };
 /** Distance milestones (metres) and their XP. Past the table: one whole case every 100 km. */
 export const DISTANCE_MILESTONES = [
@@ -48,6 +50,7 @@ export function defaultRewards() {
     distanceBy: { skis: 0, snowboard: 0 },
     milestone: 0,               // metres of the last distance milestone paid
     maps: [], trails: [],       // first-run bonuses paid
+    lastDay: null,              // 'YYYY-MM-DD' of the last first-run-of-the-day bonus
     history: [],                // last openings: [{ at, key, rarity, dupe }]
     best: null,                 // rarest pull: { key, rarity, at }
     dupeXp: 0,
@@ -69,6 +72,7 @@ export function sanitizeRewards(r) {
   out.trails = (Array.isArray(r.trails) ? r.trails : []).filter((x) => typeof x === 'string');
   out.history = (Array.isArray(r.history) ? r.history : []).filter((h) => h && typeof h.key === 'string').slice(-HISTORY);
   out.best = r.best && typeof r.best.key === 'string' ? r.best : null;
+  out.lastDay = typeof r.lastDay === 'string' ? r.lastDay : null;
   return out;
 }
 
@@ -216,8 +220,11 @@ export function creditRun(p, run, now = Date.now()) {
     r.distanceBy[eq] += dist;
     gains.push({ xp: (dist / 1000) * EARN.perKm, label: `${(dist / 1000).toFixed(1)} km ridden` });
   }
-  if (run.finished) {
+  // Finish bonuses need a real run: at least EARN.minRun metres since the last credit.
+  if (run.finished && dist >= EARN.minRun) {
     gains.push({ xp: EARN.finish, label: 'Run complete' });
+    const day = new Date(now).toISOString().slice(0, 10);
+    if (r.lastDay !== day) { r.lastDay = day; gains.push({ xp: EARN.firstToday, label: 'First run today', milestone: true }); }
     if (run.medal && EARN.medal[run.medal]) gains.push({ xp: EARN.medal[run.medal], label: `${run.medal[0].toUpperCase()}${run.medal.slice(1)} medal` });
     if (run.mapId && !r.maps.includes(run.mapId)) { r.maps.push(run.mapId); gains.push({ xp: EARN.firstMap, label: `First run on ${run.mapName || run.mapId}`, milestone: true }); }
     if (run.trailId && run.trailId !== run.mapId && !r.trails.includes(run.trailId)) { r.trails.push(run.trailId); gains.push({ xp: EARN.firstTrail, label: 'New trail finished', milestone: true }); }
