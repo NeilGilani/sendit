@@ -279,12 +279,12 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
   - `carveCrouch`: extra crouch at full lean (a lower, athletic stance in hard carves).
   - `angulation`, `angulationReverse` (the share kept when the edge is below the lean or already on the other side, 0), `crossover` (the upper body leading into the new turn at an edge change), `polePlantTime`.
   - Skis: `skiCounter` (counter-rotation per rad of lean), `skiStanceCarve` (wider stance in deep carves), `skiTipLead` (the inside ski runs up to 8 cm ahead in a carve).
-  - Head: `headLevel` (share of the body's world roll the head takes back out), `headLook` (head turn into the carve per rad of lean).
+  - Head: `headLevel` (share of the body's world roll the head takes back out), `headLook` (head turn into the carve per rad of lean), `skiSkidLook` (the ski head looks along the path, down the slope in a hockey stop).
   - Letting go: `rollRelease` (the lean eases back up, 15 vs `rollResponse` 10) and `leadRelease` (the upper-body turn lead, 10 vs 6), used only while the steer is released and the value is heading back to neutral.
   - Skis: `skiPressPitch`, `skiPressShift`, `skiPopSnap`.
   - Flips: `flipPivot` (centre of mass height), `flipTuckLift`, `flipLoadArch`. In the air the drawn tuck follows the physics tuck (`player.flipTuck`); a flip turning open is drawn as a layout (body long, arms out), and spins wrap the arms in (`player.spinTuck` > 0) or fling them wide (< 0) — `Rider.armSpin`.
   - `gearSinkVisual`: the share of the physics powder sink that is drawn (0.15). The course reads as packed snow, so the gear rides on top instead of disappearing.
-  - `ANIM.board`: crouch, `crouchHinge` (hip fold per unit crouch), shoulder and hip opening, head turn, turn lead, heel sit, toe drive, press shift and pitch, air and grab tuck, `handDragEdge`.
+  - `ANIM.board`: crouch, `crouchHinge` (hip fold per unit crouch), `toeTall` (hips unfold on toe-side carves), `skidLook` (head and shoulders look back down the path in a slide stop), `headTilt` (levels the head turned down the nose), shoulder and hip opening, head turn, turn lead, heel sit, toe drive, press shift and pitch, air and grab tuck, `handDragEdge`.
 
 ## Adding a ski or board model
 
@@ -330,6 +330,7 @@ At runtime, `registerVariant(type, spec)` adds a model (for DLC or user presets)
   - Hips and shoulders open toward the nose; the head turns toward the travel direction (`headTurn` 1.5 rad: about 8° off it riding straight), over the back shoulder when switch.
   - The upper body leads the turn, and comes back square at `leadRelease` once the steer is let go.
   - Toe side: knees drive and the torso stays tall. Heel side: sits down with the arms forward.
+  - Slide stops: the board turns about 85° across the path while the head and shoulders keep looking down it (`skidLook`). Before, the head tracked the nose and looked 75° off the direction of travel; now it is about 10° off. The ski hockey stop does the same, 70° → 3–17°.
   - Crouching (speed, W) mostly bends the knees; the hips fold `crouchHinge` (0.19 rad) per unit crouch. A straight run holding W leans the torso about 28° over the toes (it was 33°, which read as a sideways lean from the chase camera).
   - Pressing shifts the pelvis to the pressed end and flexes the board up at the other end. The ollie crouch loads the tail.
   - A wind-up counter-rotates the shoulders against the coming spin; in the air the shoulders lead the spin.
