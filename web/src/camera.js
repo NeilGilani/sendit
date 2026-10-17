@@ -223,7 +223,7 @@ export class CameraController {
     // Trauma shake: offset = noise · trauma²
     // Continuous speed shake on the snow (CAMERA.speedShake, 0 by default) on top of the trauma.
     const ss = s.state === State.GROUNDED ? C.speedShake * smoothstep(C.speedShakeFrom, 1, r) * (0.7 + 0.3 * noise1(this.t * 0.7, 5.5)) : 0;
-    const tr2 = this.trauma * this.trauma + ss * ss;
+    const tr2 = (this.trauma * this.trauma + ss * ss) * (settings.juiceShake ?? 1);   // settings slider (juice/settings.js)
     if (tr2 > 1e-4) {
       const f = this.t * C.shakeFreq;
       const nx = noise1(f, 1.3), ny = noise1(f, 7.1), nz = noise1(f, 3.7);

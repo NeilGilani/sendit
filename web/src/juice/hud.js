@@ -47,7 +47,7 @@ const CSS = /* css */`
 @keyframes jhBlink { from { opacity: .45; } to { opacity: 1; } }
 @keyframes jhBump { 0% { transform: scale(1); } 35% { transform: scale(1.38) rotate(-5deg); } 100% { transform: scale(1); } }
 /* announcer */
-#juiceHud .an { position: absolute; left: 50%; top: 27%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; opacity: 0; }
+#juiceHud .an { position: absolute; left: 50%; top: 37%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; opacity: 0; }
 #juiceHud .an.show { animation: jhSlam var(--hold, 1.6s) cubic-bezier(.2,.9,.3,1) forwards; }
 #juiceHud .an .g { display: inline-block; font-size: 22px; letter-spacing: .28em; padding: 3px 14px 3px 18px; border-radius: 3px; transform: skewX(-12deg); color: #1b1446; margin-bottom: 6px; }
 #juiceHud .an .g span { display: inline-block; transform: skewX(12deg); }
@@ -63,7 +63,7 @@ const CSS = /* css */`
   100% { opacity: 0; transform: translate(-50%, -70%) scale(.92) rotate(-3deg); }
 }
 /* live air */
-#juiceHud .air { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity .18s; white-space: nowrap; }
+#juiceHud .air { position: absolute; left: 50%; top: 33%; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity .18s; white-space: nowrap; }
 #juiceHud .air.on { opacity: 1; }
 #juiceHud .air .d { font-size: 46px; line-height: 1; display: inline-block; -webkit-text-stroke: 2px #1b1446; paint-order: stroke fill; text-shadow: 0 0 20px rgba(47,245,214,.5); }
 #juiceHud .air .d.tick { animation: jhBump .26s cubic-bezier(.2,1.8,.4,1); }
@@ -106,7 +106,7 @@ const CSS = /* css */`
 /* the other HUDs' versions of these give way to ours */
 #flowHud .ch, #flowHud .gr, #flowHud .bank { display: none !important; }
 #chal #comboHud { display: none; }
-body.fp #juiceHud .an { top: 24%; }
+body.fp #juiceHud .an { top: 34%; }
 `;
 
 /**
@@ -154,7 +154,7 @@ export function mountJuiceHud({ player, combo, input }) {
   let lastMult = 1, chainOn = false;
   on('juiceCombo', (s) => {
     chainOn = !!s;
-    cb.classList.toggle('on', chainOn && riding());
+    cb.classList.toggle('on', chainOn && riding() && s?.mult > 1.01);
     if (!s) { lastMult = 1; return; }
     cbM.textContent = `×${trim(s.mult)}`;
     cbP.textContent = fmt(s.pts);
@@ -245,7 +245,7 @@ export function mountJuiceHud({ player, combo, input }) {
       scB.textContent = fmt(shown);
     }
     const s = combo.state();
-    if (s && riding()) {
+    if (s && riding() && s.mult > 1.01) {
       cbTm.style.transform = `scaleX(${s.left.toFixed(3)})`;
       const atRisk = (player.state === 2 || player.state === 5) && s.mult >= 1.5;
       cb.classList.toggle('risk', atRisk);
@@ -267,10 +267,11 @@ export function mountJuiceHud({ player, combo, input }) {
       if (airX.textContent !== x) airX.textContent = x;
     }
     lastHalf = inAir ? halves : 0;
-    void annT;
   };
 
-  return { root, toast, banner, callout, flash, edge, announce, update };
+  /** True while a trick is being announced or the rider is in the air (big celebrations wait). */
+  const busy = () => (riding() && player.state === 2) || performance.now() - annT < (JUICE_HUD.announceHold + 0.3) * 1000;
+  return { root, toast, banner, callout, flash, edge, announce, update, busy };
 }
 
 /** Landing grade for any map: flow maps grade the landing themselves (e.grade), others from perfect / clean. */

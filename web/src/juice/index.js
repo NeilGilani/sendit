@@ -11,6 +11,7 @@ import { mountJuiceHud, gradeOf } from './hud.js';
 import { TimeWarp, installImpact } from './impact.js';
 import { installSpeedFx } from './speedfx.js';
 import { MusicEnergy } from './music.js';
+import { mountJuiceSettings } from './settings.js';
 import { game, Mode, on } from '../state.js';
 
 export function installJuice({ player, cam, sound, input, post, camera, fx }) {
@@ -21,6 +22,7 @@ export function installJuice({ player, cam, sound, input, post, camera, fx }) {
   let speedfx = null;
   try { if (post) speedfx = installSpeedFx({ post, camera }); } catch (e) { console.warn('[juice] speed fx off', e); }
   const music = new MusicEnergy({ sound, player, combo });
+  mountJuiceSettings();
   const juice = {
     combo, warp, hud, speedfx, music,
     /** Physics time scale for this frame (hit-stop / micro slow-mo); 1 = real time. */

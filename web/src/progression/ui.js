@@ -72,10 +72,14 @@ export function mountProgressionUi({ juice }) {
   // Level-ups queue (several at once play one after another).
   const queue = [];
   let playing = false;
+  let waited = 0;
   const play = () => {
-    const e = queue.shift();
-    if (!e) { playing = false; return; }
+    if (!queue.length) { playing = false; return; }
     playing = true;
+    // Let a trick announcement (or the air it comes from) finish first, up to 4 s.
+    if (juice?.hud?.busy?.() && waited < 4000) { waited += 250; setTimeout(play, 250); return; }
+    waited = 0;
+    const e = queue.shift();
     lv.style.setProperty('--rc', e.rank.color);
     lv.querySelector('.n').textContent = e.level;
     lv.querySelector('.rk').textContent = e.rankUp ? `NEW RANK · ${e.rank.name.toUpperCase()}` : e.rank.name.toUpperCase();
