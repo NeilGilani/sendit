@@ -138,13 +138,16 @@ export class UI {
     $('resTime').textContent = r.judged ? `${r.judged.total.toFixed(2)} / 100` : fmtTime(r.time);
     const T = r.targets;
     // A judged run (course.challenge.judge, e.g. a slopestyle final) brings its own rows.
-    const rows = r.judged?.rows ?? [
+    let rows = r.judged?.rows ?? [
       ['Best time', fmtTime(r.best.time), r.isBestTime],
       ['Gates', `${r.gates}/${r.gateTotal}${r.penalty ? `  (+${r.penalty}s)` : ''}`],
       ['Style score', `${r.score}`, r.isBestScore],
       ['Snowflakes', `${r.flakes}/${r.flakeTotal}`],
       ['Gold · Silver · Bronze', `${fmtTime(T.gold)} · ${fmtTime(T.silver)} · ${fmtTime(T.bronze)}`],
     ];
+    // Progression: the XP this ride earned so far and the level (progression/index.js).
+    const ride = progression.core.ride, lv = progression.getProgress();
+    if (ride) rows = [...rows, ['XP this ride', `+${Math.round(ride.xp).toLocaleString('en-US')} · level ${lv.level}${lv.level > progression.levelFor(ride.xpStart).level ? ' ▲' : ''}`]];
     $('resRows').innerHTML = rows.map(([k, v, n]) => `<div class="k">${k}</div><div class="v${n ? ' new' : ''}">${v}${n ? '  NEW!' : ''}</div>`).join('');
     this.openModal('results');
   }
