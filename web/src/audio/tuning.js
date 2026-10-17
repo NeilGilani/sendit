@@ -116,6 +116,9 @@ export const AUDIO = {
     breath: { gain: 0.3, fill: 0.09, drain: 0.035, from: 0.35, slowBelow: 3.5 },
   },
 
+  // ---------------------------------------------------------------- other skiers on the run (life.js), 3D
+  others: { voices: 3, gain: 0.55, range: 70, refDistance: 5, maxDistance: 150, rolloff: 1.3 },
+
   // ---------------------------------------------------------------- per-map ambience (by map id)
   maps: {
     default: { wind: 0.35, windF: 650, birds: 1, trees: 0, crowd: 0, cold: 0.2, gustiness: 1 },

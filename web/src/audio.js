@@ -82,6 +82,7 @@ export class SoundScape {
     E('takeoff'); E('landed'); E('crashed'); E('hardBrake'); E('parkLanding');
     E('grindStart'); E('grindKink'); E('grindHop'); E('grindEnd'); E('grindClip');
     E('nearMiss', (d) => ({ ...d, pan: this.sideOf(d.x, d.z) }));
+    E('gate');
     on('crashed', () => this.oneShot('crash', 0.3, 1, this.engine.fxBus));
     this.ready = true;
   }
@@ -91,6 +92,15 @@ export class SoundScape {
     const s = this.skier, v = s.velocity, l = Math.hypot(v.x, v.z) || 1, dx = x - s.position.x, dz = z - s.position.z;
     const d = Math.hypot(dx, dz) || 1;
     return Math.max(-1, Math.min(1, ((-v.z / l) * dx + (v.x / l) * dz) / d));
+  }
+
+  /** Riding a lift: a sheave-train rattle each time the chair passes a tower (lifts.js supports). */
+  liftTowers(s, when) {
+    const L = s.state === 4 ? s._lift : null;
+    if (!L || L !== this.lastLift) { this.lastLift = L; this.lastLiftD = s._liftD ?? 0; return; }
+    const d = s._liftD ?? 0;
+    for (const sup of L.supports || []) if (!sup.station && sup.d > this.lastLiftD && sup.d <= d) this.engine.event('liftTower', {}, when);
+    this.lastLiftD = d;
   }
 
   async load(name) {
@@ -201,6 +211,8 @@ export class SoundScape {
     const paused = game.mode === Mode.PAUSED, menu = game.mode === Mode.MENU;
     if (settings.view !== this.engine.view && (settings.view === 'fp') !== (this.engine.view === 'fp')) this.engine.setView(settings.view);
     this.engine.frame(readRider(s, { menu }), c.currentTime, dt, { paused, menu, slow: this.slow ?? 1 });
+    this.liftTowers(s, c.currentTime);
+    this.engine.others.update(c.currentTime, window.__sendit?.life?.skiers, camera.position, !menu && !paused);   // other skiers swishing by
 
     // Music: seamless loop that sometimes rests quietly between passes.
     const dur = this.buf.music_golden_hour.duration;

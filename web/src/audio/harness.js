@@ -23,6 +23,8 @@ window.renderScenario = async function renderScenario(spec) {
   try { return await render(spec, sr, secs); } finally { restore(AUDIO, saved); }
 };
 
+function othersAt(o, t) { return { x: o.x + (o.vx || 0) * t + Math.sin(t * 2.4) * (o.wig || 0), y: o.y || 0, z: o.z + (o.vz || 0) * t, speed: o.speed, roll: Math.sin(t * 2.4) * 0.35 }; }
+
 function merge(dst, src) { for (const k in src) { if (src[k] && typeof src[k] === 'object' && !Array.isArray(src[k])) merge(dst[k] ||= {}, src[k]); else dst[k] = src[k]; } }
 function restore(dst, src) { for (const k in src) { if (src[k] && typeof src[k] === 'object' && !Array.isArray(src[k])) restore(dst[k], src[k]); else dst[k] = src[k]; } }
 
@@ -46,6 +48,8 @@ async function render(spec, sr, secs) {
     if (t >= secs) break;
     while (ei < evs.length && evs[ei].t <= t) { eng.event(evs[ei].name, evs[ei].d || {}, Math.max(t, evs[ei].t)); ei++; }
     eng.frame(frames[i], t, dt, spec.opts || {});
+    // spec.others: other skiers as functions of time → { x, y, z, speed, roll } (listener at the origin, facing −Z)
+    if (spec.others) eng.others.update(t, spec.others.map((o) => { const s = othersAt(o, t); return { mesh: { visible: true, position: s }, speed: s.speed, roll: s.roll }; }), { x: 0, y: 0, z: 0 }, true);
   }
   const buf = await ctx.startRendering();
   const L = buf.getChannelData(0), R = buf.getChannelData(1);

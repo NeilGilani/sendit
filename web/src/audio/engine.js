@@ -15,6 +15,7 @@ import { Grind } from './grind.js';
 import { Ambience } from './ambience.js';
 import { LiftVoice } from './lift.js';
 import { BreathVoice } from './breath.js';
+import { OtherRiders } from './others.js';
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
@@ -95,6 +96,7 @@ export class AudioEngine {
     this.amb = new Ambience(c, this.ambBus, this.fx, this.T.ambience, this.T.maps);
     this.lift = new LiftVoice(c, this.ambBus, this.fx, this.T.fx.lift);
     this.breath = new BreathVoice(c, this.fxBus, this.fx, this.T.fx.breath);
+    this.others = new OtherRiders(c, this.fxBus, this.fx, this.T.others);
     this.amb.setMap(this.mapId);
     return this;
   }

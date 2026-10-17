@@ -105,6 +105,7 @@ add('breath-after-run', { seconds: 26, view: 'fp',
   frames: frames(26, (t) => (t < 16 ? { speed: 16, ...carve(t, 2.4, 1.0, 16), load: 1.9 } : { speed: Math.max(0, 16 - (t - 16) * 8), stop: t < 18 ? 1 : 0, skid: t < 18 ? 1.3 : 0 })) });
 add('powder-faceshot-fp', { seconds: 8, view: 'fp', frames: frames(8, (t) => ({ groomed: 0, powder: 1, deep: 1, sink: 0.22, speed: 11, ...carve(t, 2.2, 0.7, 11) })) });
 add('slalom-gates', { seconds: 6, frames: frames(6, (t) => ({ speed: 14, ...carve(t, 1.6, 0.9, 14) })), events: [0.8, 1.6, 2.4, 3.2, 4.0, 4.8].map((t) => ({ t, name: 'gate', d: { pass: true } })) });
+add('skier-passes', { seconds: 8, solo: 'fxBus', frames: frames(8, () => ({ speed: 0 })), others: [{ x: 3, z: -50, vz: 12, speed: 12, wig: 2 }, { x: -6, z: -120, vz: 14, speed: 14, wig: 3 }] });
 if (traceDir) for (const type of ['ski', 'snowboard', 'bigmountain']) {
   const f = join(traceDir, `trace-${type}.json`);
   if (!existsSync(f)) continue;
@@ -159,6 +160,7 @@ if (has('lift-ride')) expect(Math.max(...R['lift-ride'].pk.slice(20, 30)) > Math
 if (has('breath-after-run')) expect((R['breath-after-run'].events.breath || 0) >= 3 && !R['groomed-carve-ski']?.events.breath, 'the rider catches their breath after a hard run');
 if (has('powder-faceshot-fp')) expect((R['powder-faceshot-fp'].events.faceShot || 0) >= 2, 'deep powder turns throw face shots');
 if (has('park-pa')) expect((R['park-pa'].events.pa || 0) >= 2, 'the park PA speaks up');
+if (has('skier-passes')) { const p = R['skier-passes'].rms; expect(Math.max(...p.slice(30, 50)) > Math.max(...p.slice(0, 10)) * 3, 'another skier swishes past and fades'); }
 if (has('park-crowd')) expect(lvl('park-crowd', 3.2, 5) > lvl('park-crowd', 0.5, 2.5) * 1.5, 'a clean park landing gets a cheer');
 await browser.close();
 if (errors.length) { console.log('page errors:', errors.slice(0, 5)); fails++; }
