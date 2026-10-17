@@ -92,7 +92,7 @@ export class FjordlineCourse {
     for (let i = 0; i < face.length; i++) face[i] += off;
     this.e0 = face;
     this.top = face[-U_MIN];
-    const sh = integrate(SHOULDER.profile, [[30, 6], [300, -30], [9000, -12]]);
+    const sh = integrate(SHOULDER.profile, SHOULDER.behind);
     const shFlat = SHOULDER.profile.slice(0, -1).reduce((a, [l]) => a + l, 0) + 20;
     const off2 = SEA + BEACH - sh[shFlat - U_MIN];
     for (let i = 0; i < sh.length; i++) sh[i] += off2;
@@ -131,7 +131,8 @@ export class FjordlineCourse {
 
   /** The cirque's cross-section (m above the centre-line profile) at (u, v). */
   bowl(u, v) {
-    const a = Math.abs(v - VC) / VW;
+    // The rims wander (no ruler-straight ridges) and carry rock towers near the top.
+    const a = Math.abs(v - VC + 40 * (noise1(u / 230, v < VC ? 11 : 12) - 0.5)) / VW;
     const Rh = CIRQUE.ridgeHeight(u) * (0.88 + 0.24 * noise1(u / 260, v < VC ? 7 : 8));
     if (a <= 1) {
       let e = Rh * Math.pow(a, CIRQUE.power);
@@ -141,7 +142,8 @@ export class FjordlineCourse {
     }
     // Past the ridge: on the left a steep rock wall down to the shoulder, on the right a rocky flank.
     const d = (a - 1) * VW;
-    const fall = v < VC ? 1.6 * Math.min(d, 260) + 0.6 * Math.max(0, d - 260) : d * 0.75 * (1 - 0.45 * sstep(0, 600, d));
+    // Left: a steep rocky flank down to the shoulder (it has to lose the col's height to the shoulder's in ~300 m).
+    const fall = v < VC ? d * (1.3 - 0.6 * sstep(300, 1200, u)) * (1 - 0.3 * sstep(200, 700, d)) : d * 0.75 * (1 - 0.45 * sstep(0, 600, d));
     return Rh + CIRQUE.wallHeight(u) - fall;
   }
 
@@ -227,9 +229,10 @@ export class FjordlineCourse {
       e += k * ((900 + 500 * far) * Math.pow(ridged(x / 2500 + 1.3, z / 2500 - 2.7, 5), 1.3) + 200 * (fbm(x / 800, z / 800, 3) - 0.5)) + far * 700;
     }
     // Skarvtinden: the summit pyramid behind the col (Slogen-style), its shoulder, a sharp tooth on the right.
-    e = horn(e, x, z, START_X - 250, 60, this.top + 300, 1.55, 0.4);
-    e = horn(e, x, z, START_X - 330, -330, this.top + 170, 1.35, 1.1);
-    e = horn(e, x, z, START_X - 60, 560, this.top + 60, 1.4, 0.7);
+    e = horn(e, x, z, START_X - 260, 60, this.top + 470, 1.6, 0.4);
+    e = horn(e, x, z, START_X - 330, -420, this.top + 260, 1.4, 1.1);   // its north shoulder, over the spines
+    e = horn(e, x, z, START_X - 40, 600, this.top + 170, 1.45, 0.7);    // Kvaltinden, the headland's root
+    e = horn(e, x, z, START_X + 240, -770, this.top - 40, 1.7, 0.2);    // a tooth on the left rim
     // Land never dips under the sea inland (no lagoons); the coast cuts it, the fjord floor shelves away.
     e = Math.max(e, SEA + BEACH + 0.3 * (vnoise(x / 40, z / 40) - 0.5));
     e = this.coastCut(u, v, e, coastU(v) + (Math.abs(v) > 1300 ? 380 * (fbm(v / 1900, 3.3, 2) - 0.5) : 0));
@@ -287,13 +290,17 @@ export class FjordlineCourse {
     const onFace = sstep(40, 140, u) * (1 - sstep(1300, 1700, u)) * (1 - sstep(-760, -680, -v)) * (1 - sstep(380, 470, v));
     if (onFace > 0) {
       const calm = 1 - 0.65 * sstep(560, 640, u) * (1 - sstep(1100, 1200, u)) * (1 - sstep(220, 300, Math.abs(v + 20)));
-      const big = rib1(v / 140 + 0.9 * noise1(u / 650, 31) + 2.1, 41) * (0.6 + 0.4 * noise1(u / 420, 32));
+      const big = rib1(v / 150 + 0.9 * noise1(u / 650, 31) + 2.1, 41) * (0.6 + 0.4 * noise1(u / 420, 32));
       const small = rib1(v / 44 + 0.7 * noise1(u / 260, 33) + 1.1, 42) * (0.5 + 0.5 * noise1(u / 200, 34));
-      e += onFace * (calm * (big - 0.42) * 24 + (small - 0.45) * 5.5);
+      e += onFace * (calm * (big - 0.42) * 34 + (small - 0.45) * 5.5);
     }
     // Lower mountain: broad lateral undulations (natural banks between the lines).
     const low = sstep(1350, 1600, u) * (1 - sstep(2050, 2250, u)) * land;
     if (low > 0) e += low * (fbm(u / 260 + 4, v / 120, 2) - 0.5) * 14;
+    // Big buttresses and bowls across the whole mountain (seen from the fjord it must not read as a plane).
+    const wide = sstep(60, 300, u) * (1 - sstep(1900, 2200, u)) * land;
+    if (wide > 0) e += wide * (fbm(u / 700 + 1.3, v / 230 + 8.1, 3) - 0.5) * 44 * (1 - 0.6 * Math.exp(-((this.lineDistFast(u, v) / 40) ** 2)));
+    if (u > 130 && u < 1750) e += this.outcrops(u, v);
     e += this.spines(u, v);
     e += this.bands(u, v);
     e += this.hits(u, v) * land;
@@ -307,6 +314,40 @@ export class FjordlineCourse {
     const B = this.driftBox;
     if (this.structures && x > B[0] && x < B[1] && z > B[2] && z < B[3]) for (const s of this.structures) e += s.driftAt(x, z, e);
     return e;
+  }
+
+  /**
+   * Rock islands: knobs of rock poking out of the face on a 55 m hashed grid (about one cell in five), 3–8 m tall
+   * with steep sides, a snow ramp up their uphill side (natural kickers off the lines), kept 45 m off the canonical
+   * lines and off the couloir, the spines, the cliff lips and the drop zones.
+   */
+  outcrops(u, v) {
+    const C = 55;
+    const ci = Math.floor(u / C), cj = Math.floor(v / C);
+    let add = 0;
+    for (let di = -1; di <= 0; di++) for (let dj = -1; dj <= 0; dj++) {
+      const i = ci + di + (u - ci * C > C / 2 ? 1 : 0), j = cj + dj + (v - cj * C > C / 2 ? 1 : 0);
+      if (hash1(i * 7919 + j * 104729 + 23) < 0.8) continue;
+      const ou = (i + 0.2 + 0.6 * hash1(i * 31 + j * 7 + 3)) * C, ov = (j + 0.2 + 0.6 * hash1(i * 13 + j * 29 + 5)) * C;
+      if (!this.outcropOk(ou, ov)) continue;
+      const R = 7 + 9 * hash1(i * 3 + j * 11 + 9), H = 3 + 5 * hash1(i * 17 + j * 5 + 1);
+      const du = (u - ou) / (u < ou ? R * 3 : R * 0.9), dv = (v - ov) / R;
+      const q = du * du + dv * dv;
+      if (q < 1) add += H * Math.pow(1 - q, 0.55);
+    }
+    return add;
+  }
+
+  outcropOk(u, v) {
+    if (u < 140 || u > 1700) return false;
+    if (this.lineDistFast(u, v) < 45) return false;
+    if (u < COULOIR.u1 + 30 && Math.abs(v - COULOIR.centre(Math.max(u, COULOIR.u0))) < COULOIR.halfWidth(Math.max(u, COULOIR.u0)) + 20) return false;
+    if (u > SPINES.u0 - 20 && u < SPINES.u1 + 20 && v > SPINES.v0 - 20 && v < SPINES.v1 + 20) return false;
+    for (const B of BANDS) if (Math.abs(u - B.uc) < 45 && v > B.v0 - 30 && v < B.v1 + 30) return false;
+    for (const [hu, hv, L] of HITS) if (Math.abs(u - hu) < 40 && Math.abs(v - hv) < L + 20) return false;
+    if (Math.abs(v - HEADLAND.crest(u)) < 60 || Math.abs(v - SHOULDER.crest(u)) < 70) return false;
+    for (const [, zu, zv] of DROP_ZONES) if (typeof zv === 'number' && Math.hypot(u - zu, v - zv) < 60) return false;
+    return true;
   }
 
   spines(u, v) {
@@ -359,7 +400,7 @@ export class FjordlineCourse {
     if (dv > R.half + 10) return 0;
     const lat = 1 - sstep(R.half - 50, R.half + 10, dv);
     let add = 0;
-    for (const ur of R.us) { const t = (u - ur) / 14; if (Math.abs(t) < 4) add += R.h * Math.exp(-t * t); }
+    for (const ur of R.us) { const t = (u - ur) / R.width; if (Math.abs(t) < 3.5) add += R.h * Math.exp(-t * t); }
     return add * lat;
   }
 
@@ -450,7 +491,7 @@ export class FjordlineCourse {
     const n = fbm(x / 140, z / 140, 3);
     const band = sstep(1700, 1950, u) * (1 - sstep(2150, 2300, u));
     const village = 1 - sstep(-260, -200, -Math.abs(z + 20)) * sstep(2050, 2150, u);   // the village keeps open
-    return Math.min(1, band * village * sstep(0.5, 0.7, n) * 0.8 + band * 0.06);
+    return Math.min(1, band * village * sstep(0.52, 0.72, n) * 0.85);
   }
 
   pisteAt(x, z) {
@@ -487,6 +528,19 @@ export class FjordlineCourse {
       else pts.push([p[0], p[1] === 'headland' ? HEADLAND.crest(p[0]) : p[1] === 'shoulder' ? SHOULDER.crest(p[0]) : p[1]]);
     }
     return pts;
+  }
+
+  /** lineDist() from a precomputed 8 m grid (bilinear; capped at 200 m): cheap enough for the height function. */
+  lineDistFast(u, v) {
+    const G = 8, U0 = -240, V0 = -1560, NU = 400, NV = 392;
+    if (!this._ldGrid) {
+      const g = new Float32Array(NU * NV);
+      for (let j = 0; j < NV; j++) for (let i = 0; i < NU; i++) g[j * NU + i] = Math.min(200, this.lineDist(U0 + i * G, V0 + j * G));
+      this._ldGrid = g;
+    }
+    const fi = Math.min(Math.max((u - U0) / G, 0), NU - 1.001), fj = Math.min(Math.max((v - V0) / G, 0), NV - 1.001);
+    const i = fi | 0, j = fj | 0, ti = fi - i, tj = fj - j, g = this._ldGrid, k = j * NU + i;
+    return (g[k] * (1 - ti) + g[k + 1] * ti) * (1 - tj) + (g[k + NU] * (1 - ti) + g[k + NU + 1] * ti) * tj;
   }
 
   /** Distance (m) to the nearest canonical line, or to line `key` only. */

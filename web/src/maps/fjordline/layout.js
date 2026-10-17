@@ -18,21 +18,22 @@ export const FINISH_U = 2430;          // run complete (progress, metres of u, n
 export const PROFILE = [
   [18, 12],     // the summit col (the cairn)
   [42, 30],     // rollover into the cirque
-  [480, 43],    // upper cirque: Skaret couloir (right), open face, Sølvryggene spines (left)
+  [480, 42],    // upper cirque: Skaret couloir (right), open face, Sølvryggene spines (left)
   [380, 38],    // mid face: Ørneredet band, Kråkesteget
-  [440, 33],    // lower face: Hammaren band, wind lips
-  [420, 26],    // the apron: the big rollers (Bølgene)
+  [440, 32],    // lower face: Hammaren band, wind lips
+  [420, 25],    // the apron: the big rollers (Bølgene)
   [360, 18],    // birch line: Bjørkehoppet
-  [180, 10],    // the village slope
-  [70, 3],      // down to the beach
+  [180, 11],    // the village slope
+  [70, 5],      // down to the beach
   [9000, 0],    // the beach / quay flats (the coast cut takes it under the sea)
 ];
 export const BEHIND = [[22, 4], [200, -34], [9000, -12]];   // behind the col (negative = falling away backward)
 
 // The long shoulder on the left (the blue cruiser): its own, gentler fall-line profile; it lands on the beach too.
 export const SHOULDER = {
-  profile: [[24, 7], [50, 20], [1420, 26.5], [480, 21], [300, 13], [180, 5], [9000, 0]],
-  crest: (u) => -1080 + 30 * Math.sin(u / 310) + 560 * smoothRange(u, 1250, 2350),   // crest v(u): swings into the bay
+  profile: [[24, 7], [50, 20], [1420, 29], [480, 23], [300, 14], [180, 5], [9000, 0]],
+  behind: [[260, 31], [9000, 14]],   // rising behind its top into the summit massif (a ridge, not a wall)
+  crest: (u) => -1080 + 30 * Math.sin(u / 310) * (1 - smoothRange(u, 1500, 1900)) + 440 * smoothRange(u, 1500, 2400),   // crest v(u): swings into the bay
   width: 270,          // m from the crest where the crown has fallen `crown` metres
   crown: 55,
 };
@@ -64,6 +65,10 @@ export const BANDS = [
   { name: 'Kråkesteget', uc: 880, v0: -640, v1: -390, h: 8, var: 2.5, bench: 36, wob: 6, seed: 2, gaps: [[-560, 14]] },
   { name: 'Hammaren', uc: 1075, v0: -300, v1: 220, h: 12, var: 3, bench: 52, wob: 5, seed: 3, gaps: [[-245, 18], [150, 16]], peak: [-30, 8, 36] },
   { name: 'Sjøsteget', uc: 1330, v0: 60, v1: 330, h: 7, var: 2, bench: 32, wob: 6, seed: 4, gaps: [[200, 14]] },
+  // Off the lines: rock steps that break up the face (and are there for anyone who goes looking).
+  { name: 'Ytre Hammaren', uc: 760, v0: 250, v1: 420, h: 11, var: 4, bench: 44, wob: 7, seed: 5, gaps: [] },
+  { name: 'Trollveggen', uc: 1240, v0: -700, v1: -540, h: 14, var: 5, bench: 56, wob: 8, seed: 6, gaps: [[-610, 12]] },
+  { name: 'Ramnaberget', uc: 470, v0: -330, v1: -120, h: 9, var: 3, bench: 40, wob: 6, seed: 7, gaps: [[-230, 16]] },
 ];
 
 // Spine field on the left of the upper cirque (Sølvryggene, "the silver spines"): absolute v.
@@ -88,11 +93,10 @@ export const HITS = [
   [1960, -60, 16, 2.8, 'kicker', 'Bjørkehoppet'],
   [1990, 170, 16, 2.6, 'lip'],
   // The boathouse gap: a kicker the village kids shovel up in front of the naust.
-  [2382, -110, 8, 3.4, 'kicker', 'Naustgapet'],
 ];
 
 // Shoulder rollers: along the shoulder's crest (u list), half-length across, height.
-export const SHOULDER_ROLLERS = { us: [520, 640, 760, 880, 1000, 1120, 1240, 1360, 1500, 1640, 1780, 1920], half: 170, h: 4.6 };
+export const SHOULDER_ROLLERS = { us: [520, 640, 760, 880, 1000, 1120, 1240, 1360, 1500, 1640, 1780, 1920], half: 170, h: 4.4, width: 16 };
 
 // Kvalneset: the headland ridge closing the bay on the right. Its crest runs from the cirque's right ridge out to
 // a lighthouse on the point; crest elevation = a fall-line profile (scaled so the point sits `tipAbove` m above
@@ -136,23 +140,23 @@ export const FJORD = { farShore: 6400, depth: 60, shelf: 0.9 };
 export const BUILDINGS = [
   // The roof-hop row on the jump line (Brygga): long axis down the fall line, ridge across it.
   // Each roof is a kicker: ride the drift up the uphill slab, air off the ridge, land on the downhill slab or past the eave.
-  { id: 'hus1', name: 'Kjøpmannshuset', u: 2205, v: -112, L: 13, W: 10, roof: 'gable', pitch: 27, eave: 3.6, drift: 0.62, driftSlope: 0.05, colour: 'white', chimney: [0.25, 0.62] },
-  { id: 'hus2', name: 'Bakeriet', u: 2262, v: -108, L: 12, W: 9, roof: 'gable', pitch: 28, eave: 3.4, drift: 0.62, driftSlope: 0.05, colour: 'ochre', chimney: null },
-  { id: 'hus3', name: 'Postkontoret', u: 2318, v: -106, L: 12, W: 9.5, roof: 'gable', pitch: 26, eave: 3.4, drift: 0.62, driftSlope: 0.05, colour: 'red', chimney: [-0.3, -0.62] },
+  { id: 'hus1', name: 'Kjøpmannshuset', u: 2205, v: -112, L: 13, W: 10, roof: 'gable', pitch: 27, eave: 3.6, drift: 0.62, driftSlope: 0.05, ramp: 3.2, colour: 'white', chimney: [0.25, 0.62] },
+  { id: 'hus2', name: 'Bakeriet', u: 2262, v: -108, L: 12, W: 9, roof: 'gable', pitch: 28, eave: 3.4, drift: 0.62, driftSlope: 0.05, ramp: 3.2, colour: 'ochre', chimney: null },
+  { id: 'hus3', name: 'Postkontoret', u: 2318, v: -106, L: 12, W: 9.5, roof: 'gable', pitch: 26, eave: 3.4, drift: 0.62, driftSlope: 0.05, ramp: 3.2, colour: 'red', chimney: [-0.3, -0.62] },
   // Naust: the boathouse at the top of the beach (jump it: Naustgapet).
-  { id: 'naust', name: 'Naustet', u: 2404, v: -110, L: 10, W: 7, roof: 'gable', pitch: 32, eave: 2.2, drift: 0, colour: 'tar', chimney: null, yaw: 0 },
+  { id: 'naust', name: 'Naustgapet', u: 2400, v: -110, L: 8, W: 7, roof: 'gable', pitch: 32, eave: 2.4, drift: 0.92, driftSlope: 0.04, ramp: 3, colour: 'tar', chimney: null, yaw: 0 },
   // Village houses off the line.
-  { id: 'hus4', name: 'Skolen', u: 2240, v: 40, L: 18, W: 10, roof: 'gable', pitch: 32, eave: 5.2, drift: 0.45, driftSlope: 0.05, colour: 'white', yaw: Math.PI / 2 },
-  { id: 'hus5', name: 'Bedehuset', u: 2300, v: -300, L: 14, W: 9, roof: 'gable', pitch: 40, eave: 4.6, drift: 0.45, driftSlope: 0.05, colour: 'white', yaw: Math.PI / 2 },
-  { id: 'hus6', name: 'Gamle Smia', u: 2335, v: 110, L: 9, W: 7, roof: 'gable', pitch: 36, eave: 3.2, drift: 0.45, driftSlope: 0.05, colour: 'red', chimney: [0, 0.4] },
-  { id: 'hus7', name: 'Fiskarheimen', u: 2195, v: 180, L: 11, W: 9, roof: 'gable', pitch: 34, eave: 4.0, drift: 0.45, driftSlope: 0.05, colour: 'ochre' },
+  { id: 'hus4', name: 'Skolen', u: 2240, v: 40, L: 18, W: 10, roof: 'gable', pitch: 32, eave: 5.2, drift: 0, driftSlope: 0.05, colour: 'white', yaw: Math.PI / 2 },
+  { id: 'hus5', name: 'Bedehuset', u: 2300, v: -300, L: 14, W: 9, roof: 'gable', pitch: 40, eave: 4.6, drift: 0, driftSlope: 0.05, colour: 'white', yaw: Math.PI / 2 },
+  { id: 'hus6', name: 'Gamle Smia', u: 2335, v: 110, L: 9, W: 7, roof: 'gable', pitch: 36, eave: 3.2, drift: 0, driftSlope: 0.05, colour: 'red', chimney: [0, 0.4] },
+  { id: 'hus7', name: 'Fiskarheimen', u: 2195, v: 180, L: 11, W: 9, roof: 'gable', pitch: 34, eave: 4.0, drift: 0, driftSlope: 0.05, colour: 'ochre' },
   // Rorbuer on stilts at the water's edge, right of the pier (gable ends to the sea).
-  { id: 'rorbu1', name: 'Rorbu', u: 2462, v: 48, L: 10, W: 7, roof: 'gable', pitch: 38, eave: 3.4, drift: 0.4, driftSlope: 0.05, colour: 'red', stilts: 2.2 },
-  { id: 'rorbu2', name: 'Rorbu', u: 2464, v: 74, L: 10, W: 7, roof: 'gable', pitch: 38, eave: 3.4, drift: 0.4, driftSlope: 0.05, colour: 'red', stilts: 2.2 },
-  { id: 'rorbu3', name: 'Rorbu', u: 2460, v: 100, L: 10, W: 7, roof: 'gable', pitch: 38, eave: 3.4, drift: 0.4, driftSlope: 0.05, colour: 'ochre', stilts: 2.2 },
-  { id: 'rorbu4', name: 'Rorbu', u: 2466, v: 128, L: 11, W: 7.5, roof: 'gable', pitch: 38, eave: 3.4, drift: 0.4, driftSlope: 0.05, colour: 'red', stilts: 2.2 },
-  { id: 'rorbu5', name: 'Rorbu', u: 2461, v: 156, L: 10, W: 7, roof: 'gable', pitch: 38, eave: 3.4, drift: 0.4, driftSlope: 0.05, colour: 'red', stilts: 2.2 },
-  { id: 'sjohus', name: 'Sjøhuset', u: 2452, v: 200, L: 16, W: 10, roof: 'gable', pitch: 36, eave: 4.6, drift: 0.4, driftSlope: 0.05, colour: 'ochre', stilts: 2.2, yaw: Math.PI / 2 },
+  { id: 'rorbu1', name: 'Rorbu', u: 2462, v: 48, L: 10, W: 7, roof: 'gable', pitch: 38, eave: 3.4, drift: 0, driftSlope: 0.05, colour: 'red', stilts: 2.2 },
+  { id: 'rorbu2', name: 'Rorbu', u: 2464, v: 74, L: 10, W: 7, roof: 'gable', pitch: 38, eave: 3.4, drift: 0, driftSlope: 0.05, colour: 'red', stilts: 2.2 },
+  { id: 'rorbu3', name: 'Rorbu', u: 2460, v: 100, L: 10, W: 7, roof: 'gable', pitch: 38, eave: 3.4, drift: 0, driftSlope: 0.05, colour: 'ochre', stilts: 2.2 },
+  { id: 'rorbu4', name: 'Rorbu', u: 2466, v: 128, L: 11, W: 7.5, roof: 'gable', pitch: 38, eave: 3.4, drift: 0, driftSlope: 0.05, colour: 'red', stilts: 2.2 },
+  { id: 'rorbu5', name: 'Rorbu', u: 2461, v: 156, L: 10, W: 7, roof: 'gable', pitch: 38, eave: 3.4, drift: 0, driftSlope: 0.05, colour: 'red', stilts: 2.2 },
+  { id: 'sjohus', name: 'Sjøhuset', u: 2452, v: 200, L: 16, W: 10, roof: 'gable', pitch: 36, eave: 4.6, drift: 0, driftSlope: 0.05, colour: 'ochre', stilts: 2.2, yaw: Math.PI / 2 },
 ];
 
 // The harbour: a timber quay along the shore and a pier into the fjord (rideable decks), all at QUAY m above the sea.
@@ -193,7 +197,7 @@ export const TRAILS = [
 
 // Line goals (Steep "Mountain Stories" style): named features in order in one clean run. [name, bonus, ...features]
 export const LINE_GOALS = [
-  ['Skarvtind Classic', 2600, 'Skaret', 'Chokestone', 'Ørneredet', 'Hammaren'],
+  ['Skarvtind Classic', 2600, 'Skaret', 'Ørneredet', 'Hammaren'],
   ['Stairway to the Sea', 2600, 'Trappa I', 'Trappa II', 'Trappa III', 'Neskanten'],
   ['Silver Lining', 1600, 'Sølvryggene', 'Kråkesteget', 'Bjørkehoppet'],
   ['Rorbu Hopper', 1800, 'Kjøpmannshuset', 'Bakeriet', 'Postkontoret'],

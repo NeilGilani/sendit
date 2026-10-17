@@ -147,12 +147,14 @@ export class Structure {
     // the slope (a smooth ramp onto the roof). Gable / A-frame: snow piled against the uphill slab, flat
     // inside the footprint up to where the slab rises out of it (never past the ridge).
     if (up < (mono ? -0.6 : -this.hl) || up > 26) return 0;
-    const side = 1 - smooth((Math.abs(b) - this.rw) / 13);   // wide flanks: under ~40°, so they stay snow (no rock)
+    // Fjordline: a shovelled ramp (def.ramp = its half-width) instead of a drift across the whole wall, so the
+    // painted walls show on both sides of it; without `ramp`, Ravenspire's wide flanks.
+    const side = this.ramp ? 1 - smooth((Math.abs(b) - this.ramp) / 3.5) : 1 - smooth((Math.abs(b) - this.rw) / 13);
     if (side <= 0) return 0;
     let t = 1 - smooth(Math.max(0, up - 14) / 12);
     // Beside the building (outside its side walls) the drift tapers off toward the downhill wall instead
     // of ending in a vertical cut (which showed as a block of bare rock).
-    if (!mono) t *= 1 - smooth((Math.abs(b) - this.hw + 1) / 2) * (1 - smooth((up + this.hl) / 10));
+    if (!mono && !this.ramp) t *= 1 - smooth((Math.abs(b) - this.hw + 1) / 2) * (1 - smooth((up + this.hl) / 10));
     const want = this.driftTop - 0.12 + Math.max(0, up) * (mono ? this.tp : (this.driftSlope ?? 0.35));   // gentle village slopes: a lower slope (no snow mounds)
     return Math.max(0, (want - ground) * t * side);
   }

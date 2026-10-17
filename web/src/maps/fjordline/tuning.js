@@ -15,7 +15,7 @@ export const FJORDLINE_PHYSICS = {
     landSpeedCap: 34,
     flow: { enabled: true },      // line chains, flow meter, SEND IT, judged run summary (physics/flow.js)
     slowmo: { minAir: 2.8, minDrop: 10, scale: 0.7, easeIn: 0.2, hold: 0.3, easeOut: 0.3, cooldown: 6 },
-    softCapDrag: 0.055,
+    softCapDrag: 0.065,
     airDrag: 0.0028,              // sea-level air is denser than Ravenspire's (ρ ≈ 1.25 vs 0.9), but riders tuck lower
     // Spring snow by the sea: settled powder up high, faster wind-packed and corn snow lower down.
     powderDepth: 0.45,
@@ -37,8 +37,8 @@ export const FJORDLINE_PHYSICS = {
     stumbleTime: 0.8,
   },
   ski: {
-    maxVelocity: 27,
-    dragUpright: 0.0092, dragTuck: 0.0044,
+    maxVelocity: 26,
+    dragUpright: 0.0095, dragTuck: 0.0047,
     speedRadius: 1.2, speedRadiusV: [8, 29],
     latG: 2.05,
     turnRateFast: 1.15,
@@ -48,8 +48,8 @@ export const FJORDLINE_PHYSICS = {
     powderFloat: 1.1,
   },
   snowboard: {
-    maxVelocity: 26.5,
-    dragUpright: 0.0095, dragTuck: 0.0061,
+    maxVelocity: 25.5,
+    dragUpright: 0.0098, dragTuck: 0.0064,
     speedRadius: 2.1, speedRadiusV: [6, 27],
     latGToe: 1.8, latGHeel: 1.65,
     turnRateFast: 1.25,
