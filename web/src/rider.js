@@ -21,6 +21,7 @@ import { createEquipmentModel, disposeEquipmentModel, poleGeometry } from './equ
 import { getEquipmentSpec, normalizeType } from './equipment/registry.js';
 import { dressRider, HEAD_SCALE, OUTFIT_SLOTS } from './character/index.js';
 import { outfitSlotsFromProfile } from './character/profile.js';
+import { proportionRig } from './character/body.js';
 
 const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4(), _v1 = new THREE.Vector3();
@@ -98,6 +99,7 @@ export class Rider {
     const hr = this.restLocal.get(this.bones.Head);
     hr.s.setScalar(HEAD_SCALE);
     hr.m.compose(hr.p, hr.q, hr.s);
+    proportionRig(this.bones, this.restLocal);   // limb / head proportions (character/body.js)
     this.restGlobal = new Map();
     const walk = (b, parentM) => {
       const m = parentM.clone().multiply(this.restLocal.get(b).m);

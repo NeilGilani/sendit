@@ -177,3 +177,34 @@ export class BodyInfo {
     return true;
   }
 }
+
+/**
+ * Rig proportions on top of the Quaternius model, nearer a real adult skier (and Steep / Riders
+ * Republic riders) than the model's superhero cut. Measured on the bind pose (1.81 m tall): the head
+ * was ≈ 20 % too wide for the body (0.18 m vs ≈ 0.155 m), and the arm span was 1.65 m against a
+ * height of 1.81 m (real arm span ≈ height), with the shortfall in the upper arm (0.25 m shoulder →
+ * elbow vs ≈ 0.30 m). Bones are moved, not vertices, so the body, the outfit and the helmet (all
+ * skinned or parented to these bones) follow, and the pose code just sees longer arms.
+ *   head       × scale of the head bone (helmet and goggle included)
+ *   upperArm   m added shoulder → elbow
+ *   foreArm    m added elbow → wrist
+ *   hand       × scale of the hand bones (the mitts are cut generously)
+ */
+export const PROPORTIONS = { head: 0.94, upperArm: 0.045, foreArm: 0.015, hand: 0.92 };
+
+/** Apply PROPORTIONS to a rider's rest pose: `restLocal` maps bone → { p, q, s, m } (local, edited in place). */
+export function proportionRig(bones, restLocal, P = PROPORTIONS) {
+  const edit = (name, f) => {
+    const r = bones[name] && restLocal.get(bones[name]);
+    if (!r) return;
+    f(r);
+    r.m.compose(r.p, r.q, r.s);
+  };
+  const lengthen = (d) => (r) => { const l = r.p.length(); if (l > 1e-6) r.p.multiplyScalar((l + d) / l); };
+  edit('Head', (r) => r.s.multiplyScalar(P.head));
+  for (const s of ['_l', '_r']) {
+    edit('lowerarm' + s, lengthen(P.upperArm));
+    edit('hand' + s, lengthen(P.foreArm));
+    edit('hand' + s, (r) => r.s.multiplyScalar(P.hand));
+  }
+}
