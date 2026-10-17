@@ -342,6 +342,8 @@ The progression state never touches the profile files (web/src/profile/). It has
   - The combo bank and the speed rush.
   - A level-up, the toasts, the lobby badge and the Progress tab.
 
+**After a merge**, run `GPU=1 node web/scripts/juice-smoke.mjs <url>`. It makes 11 checks: the Progress tab, the TODAY strip, the chip badge, the HUD, the combo chain, the announcer, the speed rush, the level-up, the ride recap, and no console errors. It exits 1 on any failure.
+
 The other scripts (all real GPU; screenshots go outside the repo):
 
 | Script | What it checks |
