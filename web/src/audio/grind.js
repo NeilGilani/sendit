@@ -8,23 +8,30 @@ export class Grind {
   constructor(ctx, out, fx, T, sample) {
     this.ctx = ctx; this.fx = fx; this.T = T;
     const c = ctx;
-    this.out = c.createGain(); this.out.gain.value = 0; this.out.connect(out);
+    // the contact is under the rider: little above ~5 kHz reaches the ears (the reference falls 15 dB by 8 kHz)
+    this.tone = c.createBiquadFilter(); this.tone.type = 'lowpass'; this.tone.frequency.value = 4500; this.tone.Q.value = 0.6;
+    this.tone.connect(out);
+    this.out = c.createGain(); this.out.gain.value = 0; this.out.connect(this.tone);
     this.src = c.createBufferSource(); this.src.buffer = fx.white; this.src.loop = true;
     // stick-slip roughness: the scrape level wobbles fast and irregularly
     this.rough = c.createGain(); this.rough.gain.value = 0.6;
     const lfoSrc = c.createBufferSource(); lfoSrc.buffer = fx.brown; lfoSrc.loop = true; lfoSrc.playbackRate.value = 0.5;
     const lfoF = c.createBiquadFilter(); lfoF.type = 'lowpass'; lfoF.frequency.value = 60;
-    const lfoG = c.createGain(); lfoG.gain.value = 0.9;
+    const lfoG = c.createGain(); lfoG.gain.value = 1.6;   // deep stick-slip
     lfoSrc.connect(lfoF); lfoF.connect(lfoG); lfoG.connect(this.rough.gain);
     this.src.connect(this.rough);
     this.bands = MODES.rail.map((f, i) => {
-      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 60 + i * 10;   // steel rings: narrow modes
-      const g = c.createGain(); g.gain.value = [1.0, 0.7, 0.45, 0.3][i] * 5;
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 22 + i * 6;   // the rail's modes, smeared by the moving contact (the skate-grind reference shows fuzzy ridges)
+      const g = c.createGain(); g.gain.value = [1.0, 0.7, 0.45, 0.3][i] * 3;
       this.rough.connect(bp); bp.connect(g); g.connect(this.out);
       return bp;
     });
-    this.hiss = c.createBiquadFilter(); this.hiss.type = 'highpass'; this.hiss.frequency.value = 3000;
-    this.hissG = c.createGain(); this.hissG.gain.value = T.scrape * 0.5;
+    // scrape body: broadband 150 Hz–3 kHz (where the reference grind carries its energy)
+    this.body = c.createBiquadFilter(); this.body.type = 'bandpass'; this.body.frequency.value = 450; this.body.Q.value = 0.4;
+    this.bodyG = c.createGain(); this.bodyG.gain.value = T.scrape * 1.4;
+    this.rough.connect(this.body); this.body.connect(this.bodyG); this.bodyG.connect(this.out);
+    this.hiss = c.createBiquadFilter(); this.hiss.type = 'bandpass'; this.hiss.frequency.value = 3200; this.hiss.Q.value = 0.7;
+    this.hissG = c.createGain(); this.hissG.gain.value = T.scrape * 0.2;
     this.rough.connect(this.hiss); this.hiss.connect(this.hissG); this.hissG.connect(this.out);
     this.dull = c.createBiquadFilter(); this.dull.type = 'lowpass'; this.dull.frequency.value = 900;
     this.dullG = c.createGain(); this.dullG.gain.value = 0;
@@ -43,7 +50,8 @@ export class Grind {
     this.tune = jitter ? 0.97 + Math.random() * 0.06 : this.tune || 1;
     MODES[k].forEach((f, i) => this.bands[i].frequency.setValueAtTime(f * this.tune, when));
     this.dullG.gain.setValueAtTime(k === 'box' ? this.T.scrape * 1.2 : 0, when);
-    this.hissG.gain.setValueAtTime(this.T.scrape * (k === 'box' ? 0.15 : 0.5), when);
+    this.hissG.gain.setValueAtTime(this.T.scrape * (k === 'box' ? 0.08 : 0.2), when);
+    this.bodyG.gain.setValueAtTime(this.T.scrape * (k === 'box' ? 0.6 : 1.4), when);
   }
 
   /** Per frame: v = grind speed m/s (0 = off), hop = popped up mid-rail. */
@@ -54,6 +62,8 @@ export class Grind {
     const lvl = on ? this.T.gain * Math.min(1, 0.35 + v / 12) : 0;
     this.out.gain.setTargetAtTime(lvl, when, on ? 0.02 : 0.06);
     this.sampleG.gain.setTargetAtTime(on ? this.T.sample * (this.kind === 'box' ? 0.5 : 1) : 0, when, 0.03);
+    // the modes glide with speed: faster contact excites them a little higher
+    MODES[this.kind].forEach((f, i) => this.bands[i].frequency.setTargetAtTime(f * (this.tune || 1) * (0.88 + 0.016 * Math.min(v, 15)), when, 0.15));
     if (this.smp) this.smp.playbackRate.setTargetAtTime((this.kind === 'rail' ? 1 : 0.8) * (board ? 0.92 : 1.05) + v * 0.02, when, 0.1);
     this.on = on;
   }

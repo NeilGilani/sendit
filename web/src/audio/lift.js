@@ -17,7 +17,12 @@ export class LiftVoice {
     const sing = c.createBiquadFilter(); sing.type = 'bandpass'; sing.frequency.value = 640; sing.Q.value = 22;
     const sg = c.createGain(); sg.gain.value = 0.35;
     w.connect(sing); sing.connect(sg); sg.connect(this.out);
-    b.start(0, Math.random()); w.start(0, Math.random());
+    // rope and sheaves whirring: a broad mid band (the chairlift reference has most of its bed at 300 Hz–3 kHz)
+    const p = c.createBufferSource(); p.buffer = fx.pink; p.loop = true; p.playbackRate.value = 0.9;
+    const whirr = c.createBiquadFilter(); whirr.type = 'bandpass'; whirr.frequency.value = 900; whirr.Q.value = 0.45;
+    const wg = c.createGain(); wg.gain.value = 0.9;
+    p.connect(whirr); whirr.connect(wg); wg.connect(this.out);
+    b.start(0, Math.random()); w.start(0, Math.random()); p.start(0, Math.random());
     this.on = false; this.creakT = rnd(2, 5);
   }
 
@@ -33,13 +38,15 @@ export class LiftVoice {
 
   /** The grip running over a tower's sheave train: a quick run of roller thunks. */
   tower(when, k = 1) {
-    const n = 6 + Math.floor(Math.random() * 4), G = this.T.tower * k;
+    // the grip crosses a train of sheaves: a 2–3 s rattle of rapid clicks (≈ 10–14 / s), loudest mid-train,
+    // broadband (the tower reference streaks from 500 Hz to 8 kHz), with a few heavier thunks
+    const n = 18 + Math.floor(Math.random() * 10), G = this.T.tower * k;
     let t = when;
     for (let i = 0; i < n; i++) {
-      const a = G * (0.6 + 0.4 * Math.sin((i / (n - 1)) * Math.PI));   // louder in the middle of the train
-      this.fx.thump(t, { f: rnd(95, 125), f2: 60, gain: a * 0.8, decay: 0.06 });
-      this.fx.noise(t, { f: rnd(1300, 1900), q: 1.5, gain: a * 0.35, decay: 0.025 });
-      t += rnd(0.07, 0.1);
+      const a = G * (0.25 + 0.75 * Math.sin((i / (n - 1)) * Math.PI) ** 1.5);
+      this.fx.noise(t, { f: rnd(1800, 4500), q: 1.2, gain: a * 0.5, decay: rnd(0.012, 0.03) });
+      if (i % 3 === 0) this.fx.thump(t, { f: rnd(95, 140), f2: 60, gain: a * 0.6, decay: 0.05 });
+      t += rnd(0.06, 0.11);
     }
     this.fx.modal(when + 0.05, [[180, 0.5, 0.5], [455, 0.35, 0.35], [910, 0.2, 0.2]], G * 0.15);
   }
