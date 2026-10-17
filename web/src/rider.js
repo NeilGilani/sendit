@@ -609,7 +609,7 @@ export class Rider {
     // The whole body already rolls onto the edge (visual lean), so toe side keeps the torso tall
     // (knees and hips drive forward) and heel side sits down without folding. Crouching (speed, W)
     // mostly bends the knees: the hips fold only a little, so a straight run doesn't hunch over the toes.
-    const hipPitch = (0.12 + p.crouch * BA.crouchHinge - p.toe * 0.06 + p.heel * 0.05 + p.grab * 0.22) * ns;
+    const hipPitch = (0.12 + p.crouch * BA.crouchHinge - p.toe * BA.toeTall + p.heel * 0.05 + p.grab * 0.22) * ns;
     const wob = p.stumble * Math.sin(p.t * 9) * 0.25;
     // Shoulders open toward the nose, rotation leads the turn; in the air the spin leads.
     const lead = p.lead * BA.turnLead;
@@ -617,7 +617,7 @@ export class Rider {
     off.x += nx * 0.08 * sk;                                  // weight over the front foot while skating
     const spineTwist = (nx * (BA.shoulderOpen - BA.hipOpen) + lead + nx * 0.45 * sk) * ns;
     // A preloaded backflip arches the chest up and back (the shoulders throw first).
-    const bend = (0.1 + p.crouch * BA.crouchHinge * 0.8 - p.toe * 0.04 + p.heel * 0.12 + p.grab * 0.26) * ns - p.flipLoad * ANIM.flipLoadArch - (p.tweak || 0) * 0.3;
+    const bend = (0.1 + p.crouch * BA.crouchHinge * 0.8 - p.toe * BA.toeTall * 0.7 + p.heel * 0.12 + p.grab * 0.26) * ns - p.flipLoad * ANIM.flipLoadArch - (p.tweak || 0) * 0.3;
     // Head: look down the direction of travel (nose, or over the back shoulder when switch).
     // Boardslide / lipslide: the head (and a little of the shoulders) look down the rail instead of over the nose.
     const gT = p.gTravel || 0, gS = Math.min(1, Math.abs(gT) / 1.2);
