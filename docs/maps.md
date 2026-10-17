@@ -88,8 +88,8 @@ class DragonbackCourse {
   shows the trail's name and difficulty.
 - **Switching trail on the loaded map is instant** (no reload). Switching map, or a trail whose `variant`
   differs from the loaded one, saves the choice and reloads with `?map=&trail=`.
-- **Leaderboards:** each trail has its own local board: `trailBoardId(mapId, trailId)` = the map id for the
-  default trail (so existing scores stay), `<mapId>/<trailId>` otherwise.
+- **Leaderboards:** every ride lands on the map's board (`<mapId>`, the Leaderboards tab) and on its trail's
+  board, `trailBoardId(mapId, trailId)` = `<mapId>/<trailId>` (the trail list's best score).
 
 ### Registry helpers (maps/registry.js)
 

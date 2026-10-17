@@ -27,7 +27,8 @@ import { UI } from './ui.js';
 import { Input } from './input.js';
 import { game, Mode, setMode, on, settings, setSetting, resetScore, emit, scoreSnapshot } from './state.js';
 import './maps/builtin.js';
-import { resolveMapSelection, loadMap, describeSelection, lobbySpot } from './maps/registry.js';
+import { resolveMapSelection, loadMap, describeSelection, lobbySpot, getTrail, defaultTrail, needsReload, selectionQuery, trailSpawnFor, trailFinishFor, trailBoardId } from './maps/registry.js';
+import { showTrailToast, hideTrailToast } from './maps/trailhud.js';
 import { profileStore } from './profile/store.js';
 import { installRideTracker } from './profile/tracker.js';
 import { services } from './services/index.js';
@@ -65,9 +66,14 @@ const ui = new UI({
 
 let activities, life;
 let course, snowfall, terrain, sky, scatter, lifts, features, player, rider, cam, fx, sound, composer, post;
-let currentMap = null;          // { map, variant, course } from the map registry
+let currentMap = null;          // { map, variant, trail, course } from the map registry
+let defaultSpawn = null;        // the course's own spawn (terrain.meta.spawn before any trail moved it)
+let pinnedSpawn = false;        // ?at / ?kicker debug starts win over trails
 let stage = null, lobby = null, stageReady = null;
-installRideTracker({ getMapId: () => currentMap?.map.id ?? 'unknown' });
+installRideTracker({
+  getMapId: () => currentMap?.map.id ?? 'unknown',
+  getTrailBoard: () => (currentMap ? trailBoardId(currentMap.map.id, currentMap.trail) : null),   // per-trail board (docs/maps.md)
+});
 
 async function boot() {
   const loader = new GLTFLoader();
@@ -79,6 +85,8 @@ async function boot() {
   course = currentMap.course;
   await terrain.generate(course, (p) => ui.loading(p * 0.45, course.meta ? `Shaping ${course.name}…` : 'Carving the gully…'));
   globals.uWater.value = course.water ?? -1e5;
+  defaultSpawn = { position: [...terrain.meta.spawn.position], heading: terrain.meta.spawn.heading };
+  pinnedSpawn = params.has('at') || params.has('kicker');
   if (params.has('at')) {
     const [x, z, h] = params.get('at').split(',').map(Number);
     terrain.meta.spawn = { position: [x, 0, z], heading: h || 0 };
@@ -111,6 +119,7 @@ async function boot() {
     const p0 = k.o.clone().addScaledVector(k.f, -40);
     terrain.meta.spawn = { position: [p0.x, 0, p0.y], heading: Math.atan2(-k.f.x, -k.f.y) };
   }
+  applyTrailSpawn(currentMap.trail);   // the selected trail's top becomes the spawn (docs/maps.md)
   lifts = new Lifts(terrain);
   lifts.build(course.lifts || []);   // real mountains have their real lifts; the gully has none
   scene.add(lifts.group);
@@ -146,10 +155,11 @@ async function boot() {
     stage,
     input,
     onRide: (mode) => startRide(false, mode),
+    onTrail: (mapId, trailId, opts) => selectTrail(mapId, trailId, opts),
     ui: { showCredits: () => ui.showCredits() },
     sfx,
   });
-  lobby.setMapInfo({ ...currentMap, description: describeSelection(currentMap.map, currentMap.variant, course) });
+  updateLobbyMapInfo();
   ui.attach({ lobby, input });
   if (!params.has('ride')) {
     ui.loading(0.92, 'Setting up the lobby…');
@@ -184,8 +194,48 @@ async function boot() {
   window.__sendit = {
     activities, life,
     fx, course, player, rider, terrain, camera, game, scene, renderer, features, scatter,
-    lobby, stage, profile: profileStore, services, map: currentMap, ui,
+    lobby, stage, profile: profileStore, services, map: currentMap, ui, selectTrail,
   };
+}
+
+// ---------------------------------------------------------------- trails (docs/maps.md)
+/** Make trail `trailId`'s top the spawn (start, reset-to-top, respawn fallback). */
+function applyTrailSpawn(trailId) {
+  if (pinnedSpawn || !defaultSpawn) return;
+  const fb = { position: { x: defaultSpawn.position[0], z: defaultSpawn.position[2] }, heading: defaultSpawn.heading };
+  const s = trailSpawnFor(course, trailId, fb, getTrail(currentMap.map, trailId));
+  terrain.meta.spawn = s.fallback ? { position: [...defaultSpawn.position], heading: defaultSpawn.heading } : { position: [s.x, 0, s.z], heading: s.heading };
+}
+
+function updateLobbyMapInfo() {
+  const { map, variant, trail } = currentMap;
+  lobby?.setMapInfo({ ...currentMap, trail: getTrail(map, trail) ?? defaultTrail(map), description: describeSelection(map, variant, course) });
+}
+
+/**
+ * The lobby picked a trail. Same map (and variant): switch in place, no reload. Otherwise save the
+ * choice and reload into ?map=&trail=. Resolves true when switched in place. `ride: true` rides it.
+ */
+async function selectTrail(mapId, trailId, { ride = false, mode } = {}) {
+  const t = getTrail(mapId, trailId);
+  if (!t) return false;
+  if (needsReload(currentMap, mapId, trailId)) {
+    profileStore.setMap(mapId, t.variant ?? null, t.id);
+    const q = selectionQuery(mapId, t.id, location.search);
+    if (ride) q.set('ride', '');
+    location.search = q.toString();
+    return false;
+  }
+  currentMap.trail = t.id;
+  profileStore.setMap(mapId, currentMap.variant ?? null, t.id);
+  history.replaceState(null, '', `${location.pathname}?${selectionQuery(mapId, t.id, location.search)}${location.hash}`);
+  applyTrailSpawn(t.id);
+  const s = terrain.getSpawn();
+  if (game.mode === Mode.MENU) player.place(s.position, s.heading);
+  updateLobbyMapInfo();
+  emit('trailSelected', { mapId, trailId: t.id });
+  if (ride) startRide(false, mode ?? lobby?.mode ?? 'zen');
+  return true;
 }
 
 /**
@@ -280,15 +330,35 @@ async function startRide(instant = false, mode = 'zen') {
   }
   applyGameEquipment(profileStore.equipment);
   resetScore();
+  applyTrailSpawn(currentMap.trail);
+  if (!instant) terrain.update(terrain.getSpawn().position, 24);   // a head start on the trail top's detail
   player.startRiding();
   setMode(Mode.RIDING);
-  if (!instant) cam.startIntro(); else cam.snap();
+  if (!instant) { aerialAboveTrail(); cam.startIntro(); } else cam.snap();
   ui.refresh();
   activities.start(mode);
   finishing = false;
-  emit('rideStarted', { mapId: currentMap.map.id, equipment: profileStore.equipment });
+  emit('rideStarted', { mapId: currentMap.map.id, trailId: currentMap.trail, equipment: profileStore.equipment });
   if (!instant) ui.fade(false, 0.9);
+  const trail = getTrail(currentMap.map, currentMap.trail);
+  if (trail) setTimeout(() => { if (game.mode === Mode.RIDING) showTrailToast(currentMap.map, trail); }, instant ? 150 : 650);
   busy = false;
+}
+
+/**
+ * Drop-in for a trail far from where the camera is (the lobby): cut, under the fade, to a high shot
+ * behind and above the trail's top, so the intro sweeps down onto it instead of flying through the
+ * mountain. Near the camera the usual sweep from the lobby stays.
+ */
+const AERIAL = { far: 160, back: 70, up: 42 };
+function aerialAboveTrail() {
+  const s = terrain.getSpawn();
+  if (Math.hypot(camera.position.x - s.position.x, camera.position.z - s.position.z) < AERIAL.far) return;
+  const fx = -Math.sin(s.heading), fz = -Math.cos(s.heading);
+  const x = s.position.x - fx * AERIAL.back, z = s.position.z - fz * AERIAL.back;
+  camera.position.set(x, Math.max(terrain.getHeight(x, z), s.position.y) + AERIAL.up, z);
+  camera.lookAt(s.position.x + fx * 30, s.position.y, s.position.z + fz * 30);
+  camera.updateMatrixWorld();
 }
 
 function pause() {
@@ -313,6 +383,7 @@ async function toMenu() {
   busy = true;
   input.unlock();
   emit('rideEnded', scoreSnapshot());
+  hideTrailToast();
   await Promise.all([ui.fade(true, 0.5), ensureStage()]);
   player.state = State.FROZEN;
   setMode(Mode.MENU);
@@ -344,7 +415,9 @@ function rumbleCarve(dt) {
 let finishing = false;
 function checkFinish() {
   if (finishing || game.mode !== Mode.RIDING || player.state === State.FROZEN) return;
-  if (course.progress(player.position.x, player.position.z) < course.finishAt) return;
+  const tf = trailFinishFor(course, currentMap.trail);
+  if (tf?.radius) { if (Math.hypot(player.position.x - tf.x, player.position.z - tf.z) > tf.radius) return; }
+  else if (course.progress(player.position.x, player.position.z) < (tf?.progress ?? course.finishAt)) return;
   finishing = true;
   if (activities.mode === 'challenge') {
     const res = activities.finish();

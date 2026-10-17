@@ -1,0 +1,140 @@
+/* =====================================================================================
+   Maps tab — the mountain browser (tabs/maps.js). Mountain cards → one mountain's trails.
+   Per-mountain accent: --acc (registry mountain.accent); art: --art (the map thumbnail).
+   ===================================================================================== */
+
+/* A wider panel while the browser is open (the rider moves right; Lobby.layout() reframes). */
+#lobby:has(> .lb-panel.mt-panel) { grid-template-columns: minmax(20em, 36em) 1fr; }
+.lb-panel.mt-panel { padding-top: 1.2em; }
+.lb-panel.mt-enter > * { animation: mtIn .34s cubic-bezier(.2, .9, .3, 1) both; }
+.lb-panel.mt-enter > *:nth-child(2) { animation-delay: .03s; }
+.lb-panel.mt-enter > *:nth-child(3) { animation-delay: .06s; }
+@keyframes mtIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ---------------------------------------------------------------- difficulty colours */
+.d-green { --d: #2fb562; } .d-blue { --d: #2f7cf0; } .d-black { --d: #e9edf5; } .d-double-black { --d: #9aa3b8; } .d-park { --d: #f2801b; }
+.tr-badge { display: inline-block; vertical-align: -0.18em; }
+/* Small badges sit on a white sign plate, like real trail signs (the black diamonds stay readable on the dark glass). */
+.mt-spread .tr-badge, .mt-feat .tr-badge, .tr-filters .tr-badge, .lb-map-badge { background: #f4f6fa; border-radius: 0.28em; padding: 0.1em; box-sizing: content-box;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+
+/* ---------------------------------------------------------------- mountain cards */
+.mt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14.5em, 1fr)); gap: 0.75em; }
+#lobby .mt-card { position: relative; display: flex; flex-direction: column; border-radius: 1em; overflow: hidden; text-align: left; color: #fff;
+  background: rgba(10, 14, 34, 0.42); border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 6px 22px rgba(6, 8, 24, 0.22); transition: transform .22s cubic-bezier(.2, .9, .3, 1.3), border-color .2s, box-shadow .25s; }
+#lobby .mt-card:hover, #lobby .mt-card:focus-visible { transform: translateY(-3px); border-color: color-mix(in srgb, var(--acc) 70%, white);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--acc) 50%, transparent), 0 14px 34px color-mix(in srgb, var(--acc) 30%, transparent); }
+#lobby .mt-card:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+#lobby .mt-card.here { border-color: color-mix(in srgb, var(--acc) 55%, transparent); }
+.mt-art { position: relative; display: block; aspect-ratio: 16 / 7.2; background: var(--art, none) center 62% / cover no-repeat, #6f93c2;
+  transition: background-size .5s ease; }
+.mt-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, rgba(10, 14, 34, 0.75) 100%),
+  linear-gradient(120deg, color-mix(in srgb, var(--acc) 26%, transparent), transparent 55%); }
+#lobby .mt-card:hover .mt-art, #lobby .mt-card:focus-visible .mt-art { background-size: 112%; }
+.mt-region { position: absolute; left: 0.75em; bottom: 0.5em; z-index: 1; font-size: 0.68em; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+  text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+.mt-here, .mt-exp { position: absolute; top: 0.6em; z-index: 1; font-size: 0.6em; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 0.35em 0.7em; border-radius: 999px; }
+.mt-here { left: 0.6em; color: var(--lb-navy); background: var(--lb-cyan); box-shadow: 0 0 12px rgba(47,245,214,.6); }
+.mt-exp { right: 0.6em; color: #fff; background: rgba(10,14,34,.55); border: 1px solid rgba(255,255,255,.25); }
+.mt-body { display: flex; flex-direction: column; gap: 0.45em; padding: 0.7em 0.85em 0.8em; }
+.mt-name { font-size: 1.3em; font-weight: 900; font-style: italic; line-height: 1; letter-spacing: 0.01em; }
+.mt-blurb { font-size: 0.78em; line-height: 1.38; color: var(--lb-dim); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mt-bar { display: flex; height: 0.32em; border-radius: 999px; overflow: hidden; gap: 2px; background: rgba(255,255,255,0.06); }
+.mt-bar i { display: block; min-width: 0.4em; background: var(--d); }
+.mt-spread { display: flex; flex-wrap: wrap; gap: 0.25em 0.7em; font-size: 0.84em; }
+.mt-spread span { display: inline-flex; align-items: center; gap: 0.3em; }
+.mt-spread b { font-weight: 800; font-variant-numeric: tabular-nums; }
+.mt-feat { display: flex; flex-direction: column; gap: 0.15em; font-size: 0.76em; color: rgba(250,248,243,0.86); }
+.mt-feat span { display: flex; align-items: center; gap: 0.4em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mt-go { margin-top: 0.15em; align-self: flex-end; font-size: 0.78em; font-weight: 800; font-style: italic; color: color-mix(in srgb, var(--acc) 60%, white); }
+.mt-go span { display: inline-block; font-size: 1.3em; line-height: 0; transform: translateY(0.06em); transition: transform .2s; }
+#lobby .mt-card:hover .mt-go span, #lobby .mt-card:focus-visible .mt-go span { transform: translate(0.2em, 0.06em); }
+
+/* ---------------------------------------------------------------- mountain header (trail view) */
+.mt-head { position: relative; margin: -0.2em -0.3em 0.9em; border-radius: 1em; overflow: hidden; padding: 0.7em 0.9em 0.85em;
+  background: linear-gradient(180deg, rgba(10,14,34,0.2) 0%, rgba(10,14,34,0.82) 78%), var(--art, none) center 60% / cover no-repeat, #6f93c2;
+  border: 1px solid color-mix(in srgb, var(--acc) 45%, transparent); }
+.mt-head::before { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, color-mix(in srgb, var(--acc) 30%, transparent), transparent 60%); pointer-events: none; }
+#lobby .mt-back { position: relative; display: inline-flex; align-items: center; gap: 0.35em; padding: 0.35em 0.75em 0.35em 0.45em; border-radius: 999px;
+  font-size: 0.8em; font-weight: 800; font-style: italic; background: rgba(10,14,34,0.5); border: 1px solid rgba(255,255,255,0.22); backdrop-filter: blur(6px); }
+#lobby .mt-back:hover, #lobby .mt-back:focus-visible { background: rgba(10,14,34,0.75); border-color: #fff; }
+#lobby .mt-back kbd { font-size: 0.75em; margin-left: 0.25em; }
+.mt-hero { position: relative; margin-top: 2.4em; }
+.mt-hero small { font-size: 0.68em; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.85); }
+.mt-hero small b { color: var(--lb-cyan); }
+.mt-hero h2 { margin: 0.1em 0 0.2em; font-size: 2em; font-weight: 900; font-style: italic; line-height: 1; text-shadow: 0 2px 10px rgba(0,0,0,.35); }
+.mt-hero p { margin: 0 0 0.6em; font-size: 0.82em; line-height: 1.4; color: rgba(250,248,243,0.88); max-width: 34em; }
+.mt-hero .mt-bar { max-width: 18em; margin-bottom: 0.45em; }
+
+/* ---------------------------------------------------------------- filters */
+.tr-filters { display: flex; flex-wrap: wrap; gap: 0.35em; margin: 0 0 0.75em; }
+#lobby .tr-filters button { display: inline-flex; align-items: center; gap: 0.35em; padding: 0.35em 0.75em; border-radius: 999px; font-size: 0.84em; font-weight: 800;
+  color: var(--lb-dim); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); }
+#lobby .tr-filters button:hover { color: #fff; background: rgba(255,255,255,0.12); }
+#lobby .tr-filters button[aria-checked="true"] { color: var(--lb-navy); background: #fff; border-color: #fff; }
+.tr-filters b { font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- trail rows */
+.tr-list { display: grid; gap: 0.4em; }
+.tr-group { margin: 0.7em 0 0.1em; font-size: 0.7em; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lb-dim); }
+.tr-group:first-child { margin-top: 0; }
+.tr-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; border-radius: 0.85em;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); transition: background .2s, border-color .2s, box-shadow .2s; }
+.tr-row:hover { background: rgba(255,255,255,0.09); }
+.tr-row:focus-within { border-color: rgba(255,255,255,0.4); }
+.tr-row.on { background: linear-gradient(100deg, color-mix(in srgb, var(--lb-cyan) 22%, transparent), rgba(255,255,255,0.04) 70%);
+  border-color: color-mix(in srgb, var(--lb-cyan) 65%, transparent); box-shadow: 0 0 0 1px rgba(47,245,214,0.18), 0 8px 26px rgba(47,245,214,0.1); }
+#lobby .tr-pick { display: grid; grid-template-columns: 2.1em minmax(0, 1fr) auto; align-items: center; gap: 0.75em; padding: 0.6em 0.4em 0.6em 0.7em; text-align: left; min-width: 0; border-radius: 0.85em 0 0 0.85em; }
+#lobby .tr-pick:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+.tr-sign { display: grid; place-items: center; width: 2.1em; height: 2.1em; border-radius: 0.55em; background: rgba(255,255,255,0.92); box-shadow: 0 2px 8px rgba(0,0,0,0.25); }
+.tr-sign .tr-badge { width: 1.55em; height: 1.55em; }
+.tr-main { display: flex; flex-direction: column; gap: 0.12em; min-width: 0; }
+.tr-name { display: flex; align-items: center; gap: 0.4em; font-weight: 900; font-style: italic; font-size: 1.02em; line-height: 1.15; }
+.tr-star { color: var(--lb-gold); flex: none; filter: drop-shadow(0 0 4px rgba(255,211,77,.5)); }
+.tr-level { font-style: normal; font-size: 0.6em; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; padding: 0.2em 0.55em; border-radius: 999px;
+  background: rgba(255,255,255,0.12); color: var(--lb-dim); }
+.tr-desc { font-size: 0.78em; line-height: 1.35; color: var(--lb-dim); }
+.tr-meta { display: flex; flex-wrap: wrap; gap: 0.2em 0.9em; font-size: 0.74em; font-weight: 700; color: rgba(250,248,243,0.82); margin-top: 0.15em; }
+.tr-pb { color: var(--lb-gold); }
+.tr-none { color: rgba(250,248,243,0.45); font-weight: 600; }
+.tr-cur { align-self: start; font-size: 0.6em; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; padding: 0.35em 0.7em; border-radius: 999px;
+  color: var(--lb-navy); background: var(--lb-cyan); }
+#lobby .tr-ride { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.2em; min-width: 4.4em; padding: 0.4em 0.7em; border-radius: 0 0.85em 0.85em 0;
+  font-size: 0.78em; font-weight: 900; font-style: italic; text-transform: uppercase; letter-spacing: 0.04em; color: rgba(255,255,255,0.75);
+  border-left: 1px solid rgba(255,255,255,0.08); }
+#lobby .tr-ride:hover, #lobby .tr-ride:focus-visible { color: var(--lb-navy); background: linear-gradient(160deg, #2ff5d6, #b5fff3); }
+#lobby .tr-ride:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+#lobby .tr-row.on .tr-ride { color: var(--lb-navy); background: linear-gradient(160deg, #2ff5d6, #b5fff3); }
+#lobby .tr-ride.reload span { font-size: 0.82em; white-space: nowrap; }
+.tr-hint { display: flex; justify-content: center; text-align: center; }
+.tr-hint kbd { font-size: 0.85em; }
+
+/* ---------------------------------------------------------------- map card next to Ride */
+#lobby .lb-map { border-color: color-mix(in srgb, var(--acc, #ffffff) 35%, rgba(255,255,255,0.12)); }
+.lb-map-name { display: flex; align-items: center; gap: 0.35em; }
+.lb-map-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-map-badge { flex: none; width: 1em; height: 1em; }
+.lb-map-mtn { color: color-mix(in srgb, var(--acc, #2ff5d6) 70%, white) !important; }
+
+/* ---------------------------------------------------------------- small screens */
+@media (max-width: 760px), (max-aspect-ratio: 4/5) {
+  #lobby:has(> .lb-panel.mt-panel) { grid-template-columns: minmax(0, 1fr); }
+  .lb-panel.mt-panel { max-height: 52vh; }
+  .mt-grid { grid-template-columns: repeat(auto-fill, minmax(12em, 1fr)); }
+  .mt-feat, .mt-blurb { display: none; }
+  .mt-hero { margin-top: 1.2em; }
+  .mt-hero p { display: none; }
+  .tr-desc { display: none; }
+}
+@media (max-height: 560px) and (min-aspect-ratio: 4/5) {
+  .mt-feat { display: none; }
+  .mt-art { aspect-ratio: 16 / 5; }
+  .mt-hero { margin-top: 0.8em; }
+  .mt-hero p, .tr-desc { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lb-panel.mt-enter > * { animation: none; }
+  #lobby .mt-card { transition: none; }
+}

@@ -206,7 +206,8 @@ await test('map registry: trail selection from URL, profile and variants', () =>
   assert.equal(registry.needsReload(cur, 't-peak', 'top'), true);
   assert.equal(registry.needsReload({ map: registry.getMap('t-peak'), variant: null }, 't-peak', 'kids'), false);
   assert.equal(registry.selectionQuery('t-peak', 'kids', 'ride&at=1,2&quality=2').toString(), 'quality=2&map=t-peak&trail=kids');
-  assert.equal(registry.trailBoardId('t-peak', 'top'), 't-peak', 'default trail keeps the map board');
+  assert.equal(registry.trailBoardId('t-peak', 'top'), 't-peak/top');
+  assert.equal(registry.trailBoardId('t-peak', null), 't-peak/top', 'no trail: the default trail');
   assert.equal(registry.trailBoardId('t-peak', 'kids'), 't-peak/kids');
 });
 

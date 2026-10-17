@@ -234,10 +234,13 @@ export function trailFinishFor(course, trailId) {
   return null;
 }
 
-/** Leaderboard board id for a trail: the map id for its default trail, `<map>/<trail>` otherwise. */
+/**
+ * Leaderboard board id for a trail: `<map>/<trail>`. Every ride also lands on the map's own board
+ * (`<map>`, the Leaderboards tab), so this one holds only that trail's rides.
+ */
 export function trailBoardId(mapId, trailId) {
-  const def = defaultTrail(mapId);
-  return !trailId || trailId === def?.id ? mapId : `${mapId}/${trailId}`;
+  const t = getTrail(mapId, trailId) ?? defaultTrail(mapId);
+  return t ? `${mapId}/${t.id}` : mapId;
 }
 
 /**
