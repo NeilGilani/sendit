@@ -81,10 +81,10 @@ export const KITSUNE_ATMOSPHERE = {
   sunBearing: 215,
   skyZenith: '#2f4f9e',
   skyHorizon: '#e9b394',
-  fogColor: '#a7b6dc',
+  fogColor: '#b4b0d6',
   fogDensity: 1.2,           // × the default aerial extinction (a little thicker: dusk haze)
-  exposure: 1.0,
-  ambientScale: 1.25,
+  exposure: 1.7,             // brighter dusk so the face reads (integration tuning, graphics-session values)
+  ambientScale: 1.3,
   sunIntensity: 0.7,
   sunTint: '#ffae7a',
 };
