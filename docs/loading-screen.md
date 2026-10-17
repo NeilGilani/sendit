@@ -218,7 +218,7 @@ the game's noise texture generator and post grade.
 ## Tests and tools
 - `node scripts/loading-unit.mjs`: choreography + camera checks (24 variants × both gears × every trick ×
   every move: lands past the band, upright, forward or switch as expected, flips go inverted, feet never
-  under the snow, speed ramp, cameras clear the snow). 7080 checks.
+  under the snow, speed ramp, cameras clear the snow). 8232 checks.
 - `GPU=1 node scripts/lobbytest.mjs <url>`: the lobby flow plus the loading hand-off (overlay gone, worker
   canvas removed, no curtain left, progress reached 100 %, a live frame was shown).
 - `node scripts/loadingshot.mjs <url | …/loading.html> <outDir> "<q1>;<q2>" "<t1,t2>" WxH`: frame captures.
