@@ -35,6 +35,10 @@ import { installRideTracker } from './profile/tracker.js';
 import { services } from './services/index.js';
 import { Lobby, LobbyStage, applyEquipment } from './lobby/index.js';
 import { normalizeType } from './equipment/registry.js';
+import { installJuice } from './juice/index.js';
+import { trackProgression } from './progression/index.js';
+import { mountProgressionUi } from './progression/ui.js';
+import './progression/lobby.js';
 
 patchShaderChunks();
 profileStore.load();
@@ -183,6 +187,9 @@ async function boot() {
   sound = new SoundScape(player, terrain);
 
   setupPost();
+  juice = installJuice({ player, cam, sound, input, post, camera, fx, activities, scene });
+  progressUpdate = trackProgression({ player, getMapId: () => currentMap?.map.id ?? 'unknown' });
+  mountProgressionUi({ juice });
   applyQuality();
   on('settings', ({ key }) => { if (key === 'quality') applyQuality(); });
   addEventListener('resize', onResize);
@@ -425,6 +432,9 @@ on('nearMiss', () => input.rumble(0, 0.55, 70));
 on('jumped', () => input.rumble(0.15, 0.3, 60));
 on('hardBrake', () => input.rumble(0.3, 0.6, 200));
 let rumbleT = 0;
+
+// Game feel (juice/index.js: hit-stop, announcer, punches…) and progression (progression/index.js), set up in boot().
+let juice = null, progressUpdate = null;
 function rumbleCarve(dt) {
   rumbleT -= dt;
   if (rumbleT > 0 || game.mode !== Mode.RIDING || player.state !== State.GROUNDED) return;
@@ -483,7 +493,7 @@ function frame(now) {
   const paused = game.mode === Mode.PAUSED;
   if (!paused) {
     time += dt;
-    acc += dt;
+    acc += dt * (juice ? juice.timeScale(dt) : 1);   // hit-stop / micro slow-mo on big moments (juice/impact.js)
     let n = 0;
     while (acc >= STEP && n < 8) { player.step(STEP); acc -= STEP; n++; }
     if (n === 8) acc = 0;
@@ -498,7 +508,7 @@ function frame(now) {
   lifts.update(time, camera.position);
   life.update(paused ? 0 : dt, time, player, camera.position);
   snowfall.update(camera, time, innerHeight);
-  if (!paused) { fx.update(dt, camera); activities.update(dt); }
+  if (!paused) { fx.update(dt, camera); activities.update(dt * (juice?.warp.k ?? 1)); }
   ui.updateActivity(activities.hud());
   sound.update(dt, camera);
   ui.update(dt, player);
@@ -508,6 +518,8 @@ function frame(now) {
   const riding = game.mode === Mode.RIDING;
   const wantWind = riding ? THREE.MathUtils.smoothstep(player.speedRatio, HUD.windStreakFrom, HUD.windStreakFull) : 0;
   post.update(dt, time, wantWind);
+  juice?.update(paused ? 0 : dt, time);
+  progressUpdate?.(dt);
   input.endFrame();
   composer.render(dt);
 }

@@ -22,6 +22,9 @@ async function test(name, fn) {
   try { await fn(); passed++; console.log(`PASS  ${name}`); } catch (e) { failed++; console.log(`FAIL  ${name}\n      ${e.message}`); }
 }
 
+// Progression + juice (game-feel): scripts/progression-unit.mjs (own storage key, runs first).
+await (await import('./progression-unit.mjs')).run(test, assert);
+
 // ---------------------------------------------------------------- schema
 await test('default profile is valid with a full loadout', () => {
   const p = schema.defaultProfile();

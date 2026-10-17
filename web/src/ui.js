@@ -5,6 +5,7 @@
 // The lobby (lobby/Lobby.js) is the "lobby" screen; UI only shows/hides it and routes input to it.
 import { game, Mode, on, settings, setSetting } from './state.js';
 import { State } from './player.js';
+import { progression } from './progression/index.js';   // level + dailies on the pause screen
 import { HUD } from './config.js';
 import { moveFocus, focusFirst, handleArrowKey, nudgeRange } from './lobby/nav.js';
 import { fmtTime } from './activities.js';
@@ -37,14 +38,12 @@ export class UI {
     on('hint', (t) => this.hint(t));
     on('liftBoarded', (name) => { $('liftlabel').textContent = `${name}  ·  hold W / RT to hurry`; });
     on('mode', () => this.refresh());
-    on('landed', ({ perfect }) => { if (perfect) this.pop('PERFECT!', 'gold'); });
+    // Landing grades, close shaves and combo banks are announced by the juice HUD (juice/hud.js).
     on('landed', ({ air, clean }) => this.trickTip(air, clean));
-    on('stumble', () => this.pop('WOBBLE!', 'pink'));
-    on('nearMiss', () => this.pop('CLOSE SHAVE', 'cyan', true));
+    on('stumble', (kind) => { if (kind !== 'stumble' && kind !== 'slide') this.pop('WOBBLE!', 'pink'); });   // a sketchy landing is graded instead
     on('countdown', (n) => this.pop(n > 0 ? String(n) : 'GO!', n > 0 ? 'cyan' : 'gold'));
     on('gate', ({ pass }) => { if (!pass) this.pop('MISSED GATE  +2s', 'pink', true); });
     on('flake', ({ found, total }) => this.pop(`❄ ${found} / ${total}`, 'gold', true));
-    on('comboBanked', ({ banked, mult }) => { if (mult > 1) this.pop(`+${banked}  ×${trimNum(mult)}`, 'cyan', true); });
     on('combo', () => { const c = $('comboHud'); c.classList.remove('pulse'); void c.offsetWidth; c.classList.add('pulse'); setTimeout(() => c.classList.remove('pulse'), 150); });
     on('crashed', (kind) => this.pop(['YARD SALE!', 'SNOW ANGEL!', 'FACEPLANT!', 'TREE HUGGER!'][kind === 'tree' ? 3 : Math.floor(Math.random() * 3)], 'pink'));
   }
@@ -140,13 +139,16 @@ export class UI {
     $('resTime').textContent = r.judged ? `${r.judged.total.toFixed(2)} / 100` : fmtTime(r.time);
     const T = r.targets;
     // A judged run (course.challenge.judge, e.g. a slopestyle final) brings its own rows.
-    const rows = r.judged?.rows ?? [
+    let rows = r.judged?.rows ?? [
       ['Best time', fmtTime(r.best.time), r.isBestTime],
       ['Gates', `${r.gates}/${r.gateTotal}${r.penalty ? `  (+${r.penalty}s)` : ''}`],
       ['Style score', `${r.score}`, r.isBestScore],
       ['Snowflakes', `${r.flakes}/${r.flakeTotal}`],
       ['Gold · Silver · Bronze', `${fmtTime(T.gold)} · ${fmtTime(T.silver)} · ${fmtTime(T.bronze)}`],
     ];
+    // Progression: the XP this ride earned so far and the level (progression/index.js).
+    const ride = progression.core.ride, lv = progression.getProgress();
+    if (ride) rows = [...rows, ['XP this ride', `+${Math.round(ride.xp).toLocaleString('en-US')} · level ${lv.level}${lv.level > progression.levelFor(ride.xpStart).level ? ' ▲' : ''}`]];
     $('resRows').innerHTML = rows.map(([k, v, n]) => `<div class="k">${k}</div><div class="v${n ? ' new' : ''}">${v}${n ? '  NEW!' : ''}</div>`).join('');
     this.openModal('results');
   }
@@ -156,6 +158,9 @@ export class UI {
     else if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) this.showBase(null);
     else if (game.mode === Mode.PAUSED) {
       $('stats').textContent = `${(game.distance / 1000).toFixed(1)} km ridden · ${game.smoothTurns} smooth turns · ${game.airTotal.toFixed(0)} s of air · score ${game.score}`;
+      $('stats').style.whiteSpace = 'pre-line';
+      const p = progression.getProgress(), left = progression.getChallenges().filter((c) => !c.done);
+      $('stats').textContent += `\nLevel ${p.level} ${p.rank.name} · ${p.need - p.into} XP to ${p.level + 1} · ${left.length ? `dailies: ${left.map((c) => c.title).join(', ')}` : 'all dailies done'}`;
       this.showBase('pause');
     }
   }
