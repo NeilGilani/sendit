@@ -14,7 +14,7 @@ import {
   TILE, START_X, TOP, FINISH_U, PARK_HALF, PROFILE, BEHIND, JIBS, JUMPS, LANES, LANE_JUMPS, STEPS, HIPS, QUARTERPIPES,
   ROLLERS, LANE_JIBS, GRID_JIBS, PIPE, BIG_AIR, DROP_ZONES, LINE_GOALS, GAPS, SPINES, START_RAMPS, TRAILS,
 } from './layout.js';
-import { VOLTAGE_PHYSICS, VOLTAGE_CAMERA } from './tuning.js';
+import { VOLTAGE_PHYSICS, VOLTAGE_CAMERA, VOLTAGE_ATMOSPHERE } from './tuning.js';
 import { attachPark } from './park.js';
 import { SlopeJudge } from './scoring.js';
 
@@ -49,6 +49,7 @@ export class VoltageCourse {
     this.spawn = { rockClusterChance: 0, treeStep: 8, treeMax: 7000, fenceFrom: 0, fenceTo: 0, ridgeFenceMax: 0, runCorridor: 12 };
     this.physics = VOLTAGE_PHYSICS;
     this.camera = VOLTAGE_CAMERA;
+    this.atmosphere = VOLTAGE_ATMOSPHERE;            // the night final (sky, key light, haze, exposure)
     this.water = -1e5;
     this.edgeHint = 'Edge of the park — head back to the features';
     this.lifts = [];

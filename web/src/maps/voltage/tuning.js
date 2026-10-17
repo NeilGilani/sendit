@@ -46,3 +46,12 @@ export const VOLTAGE_CAMERA = {
   flowFov: 8,
   landTrauma: 0.05,
 };
+
+// The night final (course.atmosphere: world.js applyMapAtmosphere, docs/graphics.md "Per-map atmosphere"): the
+// night preset with a brighter, white-blue key light (the floodlights) high from the east-south-east, down the
+// run, and a violet event glow on the horizon. Landings stay readable; the neon, the lamp heads and the banners
+// carry the colour. Preview others with ?atmo={...}.
+export const VOLTAGE_ATMOSPHERE = {
+  preset: 'night', sunElevation: 32, sunBearing: 110, sunIntensity: 0.15, sunTint: '#c8d6ff',
+  skyHorizon: '#26204c', fogColor: '#8a8fd0', exposure: 2.2, ambientScale: 3.6,
+};
