@@ -29,7 +29,7 @@ export const AUDIO = {
     grindDb: -3,
     landDb: -5,                 // short duck on hard landings (impact > 4 m/s), 0.35 s
     airLp: 1200, airLpAfter: 0.4, crashLp: 400, lpRelease: 0.5,   // music low-pass in big air / on a bail
-    calmLp: 5000, calmFrom: 0.1, calmFull: 0.6,                  // music energy: low-passed at 5 kHz when calm, open by 0.6
+    calmLp: 9000, calmFrom: 0.1, calmFull: 0.6,                  // music energy: a gentle 9 kHz low-pass when calm, open by 0.6 (calm Zen rides keep a clear mix)
     dropDb: -6, dropTime: 0.33, pushDb: 2, pushTime: 0.6,        // a music drop: dip under the riser, then a +2 dB push
     attack: 0.25, release: 1.6,
   },
