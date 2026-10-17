@@ -34,6 +34,47 @@ Compared screenshots against the round-2 research addendum in `docs/graphics-res
 
 Spray contact API: unchanged. `main.js` already calls `fx.setContactSource(() => rider.getContactPoints())`. Skis and the board both emit through it (checked with `?equip=snowboard`).
 
+## Per-map atmosphere (`course.atmosphere`)
+
+A map gives itself its own light by exposing `atmosphere` on its Course-compatible object. Any subset
+of the fields works; maps without it, and fields left out, get the defaults (`LIGHTING` / `ATMOSPHERE` in
+`scene.js`, `POST.exposure`).
+
+```js
+course.atmosphere = {
+  sunElevation: 9,          // degrees above the horizon (default 32)
+  sunBearing: 245,          // degrees from north, clockwise (default 163, SSE)
+  skyZenith: '#4a78c0',     // sky colour straight up, as it should look on screen (sRGB hex or [r, g, b] 0..1)
+  skyHorizon: '#f6d2a6',    // sky colour at the horizon; the haze / aerial perspective follows it
+  fogColor: '#ffdcb4',      // tint on the haze colour (default white)
+  fogDensity: 1.25,         // multiplier on haze extinction (default 1)
+  exposure: 0.66,           // camera exposure (default 0.62)
+  ambientScale: 0.9,        // multiplier on sky + bounce light, i.e. how bright the shade is (default 1)
+  // extras
+  sunIntensity: 1,          // multiplier on the sun's light (0.1 ~ moonlight)
+  sunTint: '#ffd09a',       // colour of the sun light (replaces the physical colour)
+  preset: 'golden',         // 'golden' | 'dusk' | 'night': start from a preset, fields above override it
+};
+```
+
+How it works:
+- `main.js` calls `applyMapAtmosphere()` (`world.js`) right after the map loads, before anything is
+  built or compiled.
+- That re-bakes the sky LUT and the light colours (`gfx/atmosphere.js` `applyAtmosphere()`). Each sky row is
+  re-coloured toward the zenith / horizon targets while keeping its sun-side glow, and the ambient light and
+  haze colours are derived from the re-coloured sky.
+- It then updates `SUN_DIR`, `SUN_COLOR` and the shared lighting uniforms in place, re-patches the fog shader
+  chunk, and sets the fog tint / density and the post exposure.
+- Everything downstream follows on its own: the baked mountain shadows, the sun light and its shadows, the
+  sky dome, the spray lighting and the snowfall glints.
+
+Presets are in `ATMOSPHERE_PRESETS` (`gfx/atmosphere.js`). With a low sun, point it down the run
+(`sunBearing`): on a deep gully like Valcrest, a sun lower than about 15 deg that comes across the
+gully leaves the floor in mountain shadow.
+
+Preview without touching a map: `?atmo={"preset":"dusk","sunElevation":6}` (URL-encoded JSON, merged over
+the map's own values). `?sun=bearing,elevation` still overrides the sun.
+
 ## Where the tunables live
 
 All new tunables are in `web/src/scene.js` (the scene file). `config.js` is untouched.

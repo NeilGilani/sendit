@@ -1,7 +1,7 @@
 // Outfit data: garment cuts and colourways. Pure data (no three.js), so the item catalog
 // (profile/catalog.js) and node tests can read it.
 //
-// A rider's outfit is five catalog slots: jacket, pants, helmet, goggles, gloves. Each catalog item
+// A rider's outfit is six catalog slots: jacket, pants, helmet, goggles, gloves, face (gaiter / mask). Each catalog item
 // points at a garment here (item.model = { kind: 'outfit', ref: '<garment id>' }) and each item
 // variant is a colourway (variant.colors = the slot's colours below). To add an item: add a garment
 // entry (or reuse one) and register a catalog item for it; to add a colourway: add an entry to
@@ -57,6 +57,12 @@ export const GARMENTS = {
       shape: { width: 0.19, height: 0.098, radius: 0.112 },
     },
   },
+  face: {
+    // The face piece is the tube pulled up under the goggle (built with the jacket, garments.js). A face
+    // item only changes its look: colours and print (skull jaw, camo, flames…), see FACE colours below.
+    'tuff-gaiter': { name: 'Neck Gaiter', blurb: 'Fleece tube pulled up to the goggle.' },
+    'balaclava': { name: 'Balaclava', blurb: 'Full knit hood under the helmet, only the goggle shows.' },
+  },
   gloves: {
     'tuff-mitt': {
       name: 'Tuff Mitt',
@@ -68,6 +74,21 @@ export const GARMENTS = {
 
 GARMENTS.jacket['storm-shell'].cut = { ...GARMENTS.jacket['tuff-shell'].cut, hood: 'up' };
 
+// Reward cuts (profile/items.js). The one-piece is the shell cut a little closer; its colours dress
+// the pants too (resolveOutfit). The cargo pant and pipe glove are slimmer versions of the defaults.
+GARMENTS.jacket['retro-suit'] = {
+  name: 'Retro One-Piece', blurb: 'A 90s one-piece suit with a hem belt and colour-blocked sleeves.',
+  cut: { ...GARMENTS.jacket['tuff-shell'].cut, jacketEase: { shoulder: 0.014, chest: 0.03, hem: 0.05 } },
+};
+GARMENTS.pants['cargo-pant'] = {
+  name: 'Cargo Pant', blurb: 'Relaxed cargo pant with a slimmer leg.',
+  cut: { ...GARMENTS.pants['tuff-bib'].cut, pantsEase: { thigh: 0.03, knee: 0.034, cuff: 0.04 } },
+};
+GARMENTS.gloves['pipe-glove'] = {
+  name: 'Pipe Glove', blurb: 'Short-cuff park glove.',
+  cut: { ...GARMENTS.gloves['tuff-mitt'].cut, gauntlet: [0.64, 0.024] },
+};
+
 /**
  * Colourways. Each slot's colours are what a catalog variant carries in `colors`:
  *   jacket:  base (body), panel (yoke / side panels / hood), accent (zips, logo, lining), gaiter, style
@@ -78,6 +99,16 @@ GARMENTS.jacket['storm-shell'].cut = { ...GARMENTS.jacket['tuff-shell'].cut, hoo
  * `style` picks the jacket's panel layout: 0 = yoke + side panels, 1 = colour-blocked sleeves.
  */
 export const COLORWAYS = {
+  // The plain starter skin every new rider owns: rental-shop grey, no accents, a smoke lens.
+  basic: {
+    name: 'Rental', blurb: 'Plain grey rental kit. Earn cases to get something better.',
+    jacket: { base: '#5d6266', panel: '#55595d', accent: '#6c7175', gaiter: '#3b3e41', style: 0 },
+    pants: { base: '#2f3134', cuff: '#26282a' },
+    helmet: { base: '#c9c9c4', liner: '#2a2b2d', accent: '#9a9b98' },
+    goggles: { lens: '#8a8f96', lensBase: '#3a3d42', strap: '#2a2b2d', strapLogo: '#5a5c5f' },
+    gloves: { base: '#2c2d2f', cuff: '#202122' },
+    face: { base: '#3b3e41', pat: 'none' },
+  },
   tuff: {
     name: 'Tuff', blurb: 'Olive, tan and carob with one blaze-orange accent.',
     jacket: { base: '#5e5f45', panel: '#b9a27a', accent: '#ff5b14', gaiter: '#4a473f', style: 0 },
@@ -112,12 +143,33 @@ export const COLORWAYS = {
   },
 };
 
-export const DEFAULT_COLORWAY = 'tuff';
+// Every colourway also dresses the face slot in its gaiter colour.
+for (const cw of Object.values(COLORWAYS)) cw.face ??= { base: cw.jacket.gaiter, pat: 'topo' };
+
+export const DEFAULT_COLORWAY = 'basic';
 
 /** The garment each outfit slot uses when nothing is equipped (and for fresh profiles). */
-export const DEFAULT_GARMENTS = { jacket: 'tuff-shell', pants: 'tuff-bib', helmet: 'tuff-helmet', goggles: 'tuff-goggle', gloves: 'tuff-mitt' };
+export const DEFAULT_GARMENTS = { jacket: 'tuff-shell', pants: 'tuff-bib', helmet: 'tuff-helmet', goggles: 'tuff-goggle', gloves: 'tuff-mitt', face: 'tuff-gaiter' };
 
-export const OUTFIT_SLOTS = ['jacket', 'pants', 'helmet', 'goggles', 'gloves'];
+export const OUTFIT_SLOTS = ['jacket', 'pants', 'helmet', 'goggles', 'gloves', 'face'];
+
+/**
+ * Prints and finishes a colour set may carry (reward skins, profile/items.js). The shaders
+ * (materials.js) read them as numbers:
+ *   pat     print on the piece: jacket + sleeves + hood, pants, gaiter (face) or mitts
+ *   patA/B  the print's two colours, patScale its size (1 = default)
+ *   finish  fabric: matte | metallic | reflective | iridescent | neon (accent glows) | gloss
+ *           helmet: matte | gloss | metallic | chrome | carbon | pearl
+ *   decal   helmet decal: stripe | flames | stars | checker | bolt | tiger, decalCol its colour
+ *   frame   goggle frame (gasket) colour, iri 0..1 lens rainbow shift
+ *   onePiece (jacket) the pants take the suit's colours and print: a retro one-piece
+ */
+export const PATTERNS = {
+  none: 0, camo: 1, digital: 2, stripes: 3, band: 4, diagonal: 5, zigzag: 6, checker: 7, fade: 8,
+  flames: 9, tiedye: 10, topo: 11, skull: 12, stars: 13, tiger: 14, splatter: 15,
+};
+export const FINISHES = { matte: 0, metallic: 1, reflective: 2, iridescent: 3, neon: 4, gloss: 5, chrome: 6, carbon: 7, pearl: 8 };
+export const DECALS = { none: 0, stripe: 1, flames: 2, stars: 3, checker: 4, bolt: 5, tiger: 6 };
 
 /**
  * Resolve a loadout into what the renderer needs: { garments: {slot: garment}, colors: {slot: colours} }.
@@ -126,12 +178,16 @@ export const OUTFIT_SLOTS = ['jacket', 'pants', 'helmet', 'goggles', 'gloves'];
 export function resolveOutfit(slots = {}) {
   const garments = {}, colors = {};
   for (const slot of OUTFIT_SLOTS) {
-    const s = slots[slot] || {};
+    // No face piece given (an outfit from before the face slot): it follows the jacket's colourway.
+    const s = slots[slot] || (slot === 'face' && slots.jacket?.colorway ? { colorway: slots.jacket.colorway } : {});
     const gid = GARMENTS[slot][s.garment] ? s.garment : DEFAULT_GARMENTS[slot];
     garments[slot] = { id: gid, ...GARMENTS[slot][gid] };
     const cw = COLORWAYS[s.colorway] || COLORWAYS[DEFAULT_COLORWAY];
     colors[slot] = { ...cw[slot], ...(s.colors || {}) };
   }
+  // A one-piece suit dresses the legs too: the pants take its colours and print.
+  const j = colors.jacket;
+  if (j.onePiece) colors.pants = { ...colors.pants, base: j.base, cuff: j.panel, pat: j.pat, patA: j.patA, patB: j.patB, patScale: j.patScale, finish: j.finish };
   return { garments, colors };
 }
 

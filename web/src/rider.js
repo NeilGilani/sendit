@@ -21,6 +21,8 @@ import { createEquipmentModel, disposeEquipmentModel, poleGeometry } from './equ
 import { getEquipmentSpec, normalizeType } from './equipment/registry.js';
 import { dressRider, HEAD_SCALE, OUTFIT_SLOTS } from './character/index.js';
 import { outfitSlotsFromProfile } from './character/profile.js';
+import { proportionRig } from './character/body.js';
+import { fpSkiArm, fpPoleDir, fpProtract, fpHand, fpShadow } from './fpview.js';
 
 const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4(), _v1 = new THREE.Vector3();
@@ -98,6 +100,7 @@ export class Rider {
     const hr = this.restLocal.get(this.bones.Head);
     hr.s.setScalar(HEAD_SCALE);
     hr.m.compose(hr.p, hr.q, hr.s);
+    proportionRig(this.bones, this.restLocal);   // limb / head proportions (character/body.js)
     this.restGlobal = new Map();
     const walk = (b, parentM) => {
       const m = parentM.clone().multiply(this.restLocal.get(b).m);
@@ -209,7 +212,8 @@ export class Rider {
     const board = this.isBoard;
 
     // --- layer drivers
-    let crouchT = 0.45 + ratio * 0.15 + pl.tuck * 0.45 + pl.squat * 0.55 + pl.brake * 0.15;
+    // Deep carves sink the hips (athletic stance: more knee flex the harder the turn, ANIM.carveCrouch).
+    let crouchT = 0.45 + ratio * 0.15 + pl.tuck * 0.45 + pl.squat * 0.55 + pl.brake * 0.15 + (ground ? Math.abs(p.lean) / ANIM.maxLean * ANIM.carveCrouch : 0);
     // In the air the crouch follows the physical tuck (player.flipTuck: the faster the flip, the tighter
     // the ball); a flip turning open is a layout: body stretched long (less crouch).
     const flipTuckPhys = Math.max(0, pl.flipTuck ?? Math.min(1, Math.abs(pl.flipRate || 0) / 3.5));   // < 0 = stretched layout
@@ -247,9 +251,18 @@ export class Rider {
     const leanT = grind ? THREE.MathUtils.clamp(p.gRoll * 0.5, -0.6, 0.6) : THREE.MathUtils.clamp(Math.atan2(lat, PHYSICS.gravity), -ANIM.maxLean, ANIM.maxLean);
     // Steer let go: the body comes back up faster than it tips into a turn.
     const released = Math.abs(pl._ctrl?.steer || 0) < 0.05;
-    p.lean += (leanT - p.lean) * k(released && Math.abs(leanT) < Math.abs(p.lean) ? ANIM.rollRelease : ANIM.rollResponse);
+    // Just after touching down the gear snaps onto the slope, so the lean that keeps the body plumb on a
+    // steep face has to catch up quickly too (spring.t = time since the landing), or the rider lies across the slope.
+    const landed = ground && this.spring.t < ANIM.landLeanTime;
+    p.lean += (leanT - p.lean) * k(landed ? ANIM.landLeanResponse : released && Math.abs(leanT) < Math.abs(p.lean) ? ANIM.rollRelease : ANIM.rollResponse);
+    // The body's roll from vertical (+ = toward the nose's right): the lean plus the slope's own roll
+    // under the gear. On a traverse the two cancel (plumb), so the head only levels real tilt.
+    p.worldRoll = p.lean - Math.asin(THREE.MathUtils.clamp(_v1.set(1, 0, 0).applyQuaternion(pl.renderOrient).y, -1, 1));
     const edgeNose = ground ? pl.edgeAngle * pl.travelSign : 0;
-    const edgeT = THREE.MathUtils.clamp(edgeNose, -ANIM.maxGearEdge, ANIM.maxGearEdge);
+    // The gear can only roll so far from the body (knees / hips / ankles, ANIM.maxAngulation): on a steep
+    // cross-slope the physics edge can point against the lean (carving uphill), which used to fold the
+    // legs 70–80° under the body; the drawn edge stays within reach of the lean.
+    const edgeT = THREE.MathUtils.clamp(THREE.MathUtils.clamp(edgeNose, p.lean - ANIM.maxAngulation, p.lean + ANIM.maxAngulation), -ANIM.maxGearEdge, ANIM.maxGearEdge);
     p.edge += (edgeT - p.edge) * k(14);
     // Snowboard: which edge is down (toe = +1 side of the nose frame for regular).
     const toeX = this.equip.stance === 'goofy' ? -1 : 1;
@@ -326,9 +339,13 @@ export class Rider {
     if (p.sit > 0.01) this.gearToFeet(p.sit);
     this.placePoles(pl);
     this.root.updateMatrixWorld(true);
+    fpShadow(this);   // first person: shadow-only helmet / head (the head bone is collapsed)
     this.updateContacts(pl);
     void camera;
   }
+
+  /** m the inside ski runs ahead in a carve (signed: + = the right ski, i.e. a right turn). */
+  skiTipLead() { const p = this.p; return ANIM.skiTipLead * THREE.MathUtils.clamp(p.lean / ANIM.maxLean, -1, 1) * (1 - p.air) * (1 - p.plow) * (1 - p.sit); }
 
   placeSkis(gearRoll, pl, dt) {
     const p = this.p;
@@ -347,10 +364,12 @@ export class Rider {
     p.pitch += ((-p.press * ANIM.skiPressPitch + snap) - p.pitch) * (this.snapT < 0.5 ? 0.6 : 0.3);
     this.skiPitchLift = Math.abs(Math.sin(p.pitch)) * this.equip.spec.length * 0.4;
     const lift = 0.0 + p.air * 0.12 + p.grab * 0.1 + p.flipTuck * ANIM.flipTuckLift + this.skiPitchLift;
-    const wide = ANIM.skiStance + p.plow * 0.1;
+    const wide = ANIM.skiStance + p.plow * 0.1 + Math.abs(p.lean) / ANIM.maxLean * ANIM.skiStanceCarve * (1 - p.air);   // wider in deep carves (matches poseSki)
     const [L, R] = this.skis;
-    L.position.set(-wide, lift, 0.0); L.rotation.set(p.pitch, -p.plow * 0.28, gearRoll * -1, 'YXZ');
-    R.position.set(wide, lift, 0.0); R.rotation.set(p.pitch, p.plow * 0.28, gearRoll * -1, 'YXZ');
+    // Carving, the inside ski runs a little ahead (tip lead; + lean = right turn → the right ski, R).
+    const lead = this.skiTipLead();
+    L.position.set(-wide, lift, -Math.max(0, -lead)); L.rotation.set(p.pitch, -p.plow * 0.28, gearRoll * -1, 'YXZ');
+    R.position.set(wide, lift, -Math.max(0, lead)); R.rotation.set(p.pitch, p.plow * 0.28, gearRoll * -1, 'YXZ');
     // In the air with a grab, cross the skis a little (Japan / mute flavour).
     if (p.grab > 0.01) { L.rotation.y += p.grab * 0.25; R.rotation.y -= p.grab * 0.1; }
     // Tweaked: skis crossed hard (Japan / Mute / Safety), tips pulled up (Truck driver) or tails (Tail grab).
@@ -500,7 +519,7 @@ export class Rider {
   }
 
   /** Shared: pelvis offset/rotation, spine bend/twist/roll, neck + head. */
-  trunk(off, yaw, pitch, spineBend, spineTwist, spineRoll, headYaw, headPitch) {
+  trunk(off, yaw, pitch, spineBend, spineTwist, spineRoll, headYaw, headPitch, headRoll = 0) {
     const B = this.bones, p = this.p, id = p.idle || 0;
     if (id > 0.001) {
       const t = p.t;
@@ -522,9 +541,9 @@ export class Rider {
         .multiply(_q2.setFromAxisAngle(Z, spineRoll / 3)));
     }
     this.inherit(B.neck_01);
-    this.rotateGlobal(B.neck_01, new THREE.Quaternion().setFromAxisAngle(Y, headYaw * 0.45).multiply(_q.setFromAxisAngle(X, headPitch * 0.5)));
+    this.rotateGlobal(B.neck_01, new THREE.Quaternion().setFromAxisAngle(Y, headYaw * 0.45).multiply(_q.setFromAxisAngle(X, headPitch * 0.5)).multiply(_q2.setFromAxisAngle(Z, headRoll * 0.4)));
     this.inherit(B.Head);
-    this.rotateGlobal(B.Head, new THREE.Quaternion().setFromAxisAngle(Y, headYaw * 0.55).multiply(_q.setFromAxisAngle(X, headPitch * 0.5)));
+    this.rotateGlobal(B.Head, new THREE.Quaternion().setFromAxisAngle(Y, headYaw * 0.55).multiply(_q.setFromAxisAngle(X, headPitch * 0.5)).multiply(_q2.setFromAxisAngle(Z, headRoll * 0.6)));
     // First person (helmet cam): collapse the head (and helmet) so the camera never sees inside it.
     if (this.fp) B.Head.scale.setScalar(0.001);
   }
@@ -535,12 +554,19 @@ export class Rider {
     const drop = p.crouch * 0.38 + p.tuck * 0.1;
     const hipPitch = THREE.MathUtils.degToRad(10 + p.crouch * 22 + p.tuck * 22) * ns;
     // Angulation: hips move to the inside of the turn, upper body stays more upright than the legs.
-    // Only edge beyond the lean angulates: leaning with less edge under it (a cross-slope, a turn being
-    // let go) would otherwise roll the spine further into the lean and tip the head uphill.
+    // Only edge on the lean's side and beyond it angulates. A lean with less edge under it (a
+    // cross-slope, a turn being let go) or an edge already rolled to the other side (the edge change)
+    // would otherwise roll the spine further into the lean / the old turn (ANIM.angulationReverse of it is kept).
     const ang = p.edge - p.lean;
     const angul = ang * (ang * p.lean < 0 ? ANIM.angulationReverse : 1) * ANIM.angulation * (1 - p.air);
-    // Hockey stop / skid: upper body keeps facing down the path while the skis pivot across it.
-    const counter = (pl.state === State.GROUNDED ? pl.skidAngle : 0) * 0.75 + p.lead * 0.12;
+    // Crossover: once the input has gone to the other side, the upper body leads the hips into the new
+    // turn (−p.lead is the steer, + = right) while the lean still points into the old one.
+    const steerDir = -p.lead;
+    const cross = Math.max(0, -Math.sign(p.lean) * steerDir) * Math.min(1, Math.abs(p.lean) / 0.25) * ANIM.crossover * (1 - p.air);
+    // Counter-rotation: in a carve the skis turn under a quiet upper body, so the hips and shoulders
+    // face the outside of the turn (+ yaw = left; + lean = a right turn); a hockey stop / skid keeps the
+    // upper body facing down the path; the lead (anticipation) turns it into the next turn.
+    const counter = (pl.state === State.GROUNDED ? pl.skidAngle : 0) * 0.75 + p.lead * 0.12 + p.lean * ANIM.skiCounter * (1 - p.air);
     // Pressing shifts the hips over the pressed end (tails: back, tips: forward).
     const off = new THREE.Vector3(-angul * 0.12, -drop * ns - p.crash * 0.5, -p.crouch * 0.06 * ns - p.stop * 0.05 + p.press * ANIM.skiPressShift * ns);
     const twist = p.twist * ns;
@@ -550,12 +576,18 @@ export class Rider {
     // Riding switch (twin tips): twist the torso and look back over the shoulder down the path.
     const back = (1 - p.look) * 0.5 * ns;
     const gT = p.gTravel || 0;   // rail slide: hips stay with the skis, shoulders and head turn down the rail
-    this.trunk(off, twist * 0.45 + counter * 0.3 + back * 0.25 + gT * 0.25, hipPitch * 0.55 + p.hip * 0.5, bend + p.hip * 0.6, twist * 0.55 + counter * 0.7 + back * 0.6 + gT * 0.55, -angul * 1.3 + wob,
-      -counter * 0.6 + back * 1.15 + gT * 0.35, -(hipPitch * 0.55 + bend) * 0.95 * (1 - back * 0.6));
+    const spineRoll = -angul * 1.3 + Math.sign(steerDir) * cross + wob;
+    // Head: steadied against the body's roll (eyes nearer level, ANIM.headLevel) and looking along the
+    // path, a little into the turn (ANIM.headLook), not down the skis.
+    const headRoll = -((p.worldRoll ?? p.lean) + spineRoll) * ANIM.headLevel * (1 - p.air) * ns;
+    const headYaw = -counter * 0.6 - p.lean * ANIM.headLook * (1 - p.air) * ns + back * 1.15 + gT * 0.35;
+    this.trunk(off, twist * 0.45 + counter * 0.3 + back * 0.25 + gT * 0.25, hipPitch * 0.55 + p.hip * 0.5, bend + p.hip * 0.6, twist * 0.55 + counter * 0.7 + back * 0.6 + gT * 0.55, spineRoll,
+      headYaw, -(hipPitch * 0.55 + bend) * 0.95 * (1 - back * 0.6), headRoll);
     for (const side of [1, -1]) {
       // Armature +X is the rider's left (visual −X): match the ski's lift so the boots stay clipped in.
-      const lx = -side * (ANIM.skiStance + p.plow * 0.1);
-      const ankle = new THREE.Vector3(side * (ANIM.skiStance + p.plow * 0.1), this.ankleH + p.air * 0.12 + p.grab * 0.1 + p.flipTuck * ANIM.flipTuckLift + (this.skiPitchLift || 0) + lx * Math.tan(p.lean), 0.0);
+      const wide = ANIM.skiStance + p.plow * 0.1 + Math.abs(p.lean) / ANIM.maxLean * ANIM.skiStanceCarve * (1 - p.air);
+      const lx = -side * wide;
+      const ankle = new THREE.Vector3(side * wide, this.ankleH + p.air * 0.12 + p.grab * 0.1 + p.flipTuck * ANIM.flipTuckLift + (this.skiPitchLift || 0) + lx * Math.tan(p.lean), Math.max(0, -side * this.skiTipLead()));
       // Feet point down the skis; tips pinch together in a snowplough.
       this.leg(side, ankle, new THREE.Vector3(side * 0.12, 0, 1), -side * p.plow * 0.28);
       this.armSki(side, pl);
@@ -590,7 +622,12 @@ export class Rider {
     // Boardslide / lipslide: the head (and a little of the shoulders) look down the rail instead of over the nose.
     const gT = p.gTravel || 0, gS = Math.min(1, Math.abs(gT) / 1.2);
     const headYaw = (nx * p.look * BA.headTurn - nx * BA.shoulderOpen - lead - nx * 0.5 * sk) * ns * (1 - gS) + gS * (gT - nx * BA.shoulderOpen) * 0.85;
-    this.trunk(off, hipYaw + nx * 0.3 * sk, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist + gT * 0.2, wob - p.lean * 0.15, headYaw, -(hipPitch + bend) * 0.6);
+    // Head steadied against the body's roll: a board leans about its long axis, which runs through the
+    // hips, so for the body that is a toe / heel tilt and the head levels it with a pitch (+ X = toward the
+    // toes; toeSide = which side of travel the toes are on).
+    const toeSide = nx * (p.look >= 0 ? 1 : -1);
+    const level = -(p.worldRoll ?? p.lean) * toeSide * ANIM.headLevel * (1 - p.air) * ns;
+    this.trunk(off, hipYaw + nx * 0.3 * sk, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist + gT * 0.2, wob - p.lean * 0.15, headYaw, -(hipPitch + bend) * 0.6 + level);
     // Legs: feet in the bindings across the board, knees toward the toe edge and a little duck.
     const w = st.width / 2;
     const feet = [[nx, st.front], [-nx, st.back]];   // [armature x sign, binding angle]
@@ -649,6 +686,7 @@ export class Rider {
     const B = this.bones, s = side > 0 ? '_l' : '_r';
     const upper = B['upperarm' + s], lower = B['lowerarm' + s], hand = B['hand' + s];
     this.inherit(B['clavicle' + s]);
+    if (this.fp) fpProtract(this, side);   // first person: shoulders forward so the gloves reach into view
     this.inherit(upper);
     this.aim(upper, lower, u);
     this.inherit(lower);
@@ -701,9 +739,10 @@ export class Rider {
     this.armSpin(side, u, l, 1 - g);
     this.armGrind(side, u, l, 1 - g);
     [u, l] = this.armOverlays(side, u, l);
+    if (this.fp) [u, l] = fpSkiArm(this, side, pl, u, l);   // first person: gloves framed in view (fpview.js)
     this.armAim(side, u, l);
     // First person: turn the gloves into a pole grip (palms in, knuckles forward).
-    if (this.fp) this.rotateGlobal(this.bones['hand' + (side > 0 ? '_l' : '_r')], new THREE.Quaternion().setFromAxisAngle(Z, side * 1.35).multiply(new THREE.Quaternion().setFromAxisAngle(X, 0.5)));
+    if (this.fp) fpHand(this, side, true);
   }
 
   /**
@@ -796,14 +835,26 @@ export class Rider {
     const hand = new THREE.Vector3(), dir = new THREE.Vector3(), q = new THREE.Quaternion();
     const down = new THREE.Vector3(0, -1, 0);
     [['hand_l', -1], ['hand_r', 1]].forEach(([name, sx], i) => {
-      this.bones[name].getWorldPosition(hand);
+      if (this.fp) this.bones[name].localToWorld(hand.set(0, 0.075, 0.012));   // first person: the grip sits in the fist, not at the wrist
+      else this.bones[name].getWorldPosition(hand);
       this.visual.worldToLocal(hand);
       const plant = p.plant[i];
       dir.set(sx * 0.16, -1, 0.42 - plant * 0.9).normalize();
-      if (this.fp) dir.set(sx * 0.3, -1, -0.12 - plant * 0.5).normalize();   // first person: shafts drop away just outside the gloves
+      if (this.fp) fpPoleDir(this, i, sx, dir);   // first person: shafts angled out past the gloves (fpview.js)
       if (p.push > 0.01) { const ph = p.pushPhase || 0; dir.lerp(new THREE.Vector3(sx * 0.1, -1, ph < 0.4 ? 0.1 : 0.55 + (ph - 0.4)), p.push).normalize(); }
       dir.lerp(new THREE.Vector3(sx * 0.08, -0.3, 1).normalize(), p.tuck).normalize();
       dir.lerp(new THREE.Vector3(sx * 0.6, -0.4, 0.3).normalize(), p.air * 0.5).normalize();
+      // The tip rests on the snow, not through it: with the hand low (deep crouch, long arms) the shaft
+      // swings further back. Snow in this (lean-rolled) frame sits at y = x · tan(lean), as for the skis.
+      if (!this.fp && p.air < 0.5) {
+        const L = this.poleLen ?? (this.poleLen = (this.poles[i].geometry.computeBoundingBox(), -this.poles[i].geometry.boundingBox.min.y));
+        const snowY = (hand.x + dir.x * L) * Math.tan(p.lean) - 0.04;
+        const maxDown = (hand.y - snowY) / L;
+        if (-dir.y > maxDown && maxDown > 0.15) {
+          const h = Math.hypot(dir.x, dir.z), c = Math.sqrt(1 - maxDown * maxDown);
+          dir.set(dir.x / h * c, -maxDown, dir.z / h * c);
+        }
+      }
       this.poles[i].position.copy(hand);
       this.poles[i].quaternion.copy(q.setFromUnitVectors(down, dir));
       this.poles[i].visible = p.sit < 0.5;

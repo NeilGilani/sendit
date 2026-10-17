@@ -96,6 +96,11 @@ export const PHYSICS = {
     latG: 1.8,                // sustained lateral g before the edges let go
     speedRadius: 0.6, speedRadiusV: [8, 18],  // effective sidecut ×(1+0.6) from 8 → 18 m/s (long arcs at speed)
     carveAssist: 0.85,        // share of over-demand (beyond grip) that just widens the arc instead of skidding
+    carveInput: 1,            // 0..1: the held share of the max edge picks that share of the grip-limited curvature (even stick feel at speed)
+    carveCurve: 0.8,          // … as share^carveCurve (< 1 keeps a little more bite in small inputs)
+    carveInputV: [16, 26],    // m/s over which carveInput phases in (tree-slalom speeds keep the snappy response)
+    pivotGrip: 1.15,          // at speed the rotary pivot asks at most this × the grip-limited carve rate (full lock carves, not washes out)
+    washMax: 0.2,             // over-demand that skids is capped at this × the grip curvature (no wash-out at 50–70 mph)
     gripRate: 11,             // 1/s lateral velocity decay on an engaged edge
     flatGrip: 0.35,           // share of grip with a flat base (sideslips)
     carveEff: 0.985,          // share of redirected lateral energy kept in a clean carve
@@ -164,7 +169,7 @@ export const PHYSICS = {
     latGToe: 1.6, latGHeel: 1.45,
     sidecutToe: 1.0, sidecutHeel: 0.95,     // × spec sidecut (heel side bends a touch tighter)
     speedRadius: 1.5, speedRadiusV: [6, 16],
-    carveAssist: 0.85,
+    carveAssist: 0.85, carveInput: 1, carveCurve: 0.8, carveInputV: [16, 26], pivotGrip: 1.15, washMax: 0.2,   // see PHYSICS.ski
     gripRate: 10, flatGrip: 0.25,
     carveEff: 0.985, skidEff: 0.75, skidMu: 0.34, carvePump: 0.05,
     trackBeta: [7, 30],
@@ -201,6 +206,7 @@ export const ANIM = {
   skiStance: 0.13,            // metres from centre to each ski
   rollResponse: 10,
   rollRelease: 15,            // 1/s the lean eases back up once the steer is let go (rollResponse tipping in)
+  landLeanTime: 0.35, landLeanResponse: 30,   // s after a landing the lean catches up at this rate (1/s): plumb at once on a steep face
   leadRelease: 10,            // 1/s the upper-body turn lead eases back to neutral once the steer is let go (6 leading in)
   squatMax: 0.25,             // pre-jump Y compression (25%)
   squatXZ: 0.12,              // X/Z expansion while squatting (volume preservation)
@@ -217,10 +223,18 @@ export const ANIM = {
   flailSpeed: 14,             // arm flail oscillation speed
   // Lean = atan(lateral force / g) in the equipment frame (carves, stops), capped for readability;
   // the gear itself rolls to the physics edge angle, the difference is angulation (hips / knees).
-  maxLean: 0.8,               // rad body inclination cap
+  maxLean: 0.9,               // rad body inclination cap (52°: high-g carves at speed read aggressive)
   maxGearEdge: 1.05,          // rad visual edge angle cap
+  maxAngulation: 0.7,         // rad the drawn edge may differ from the body's lean (40°: how far knees and hips can angulate)
   angulation: 0.75,           // share of (edge − lean) the ski rider takes up in the spine (upright upper body)
-  angulationReverse: 0.25,    // … share kept when the edge is below the lean (cross-slopes, a turn being let go): no banking further in
+  angulationReverse: 0,       // … share kept when the edge is below the lean or already on the other side (cross-slopes, letting go, edge changes)
+  crossover: 0.2,             // rad the upper body leads into the new turn while the lean still points into the old one (skis)
+  skiCounter: 0.1,            // counter-rotation: hips / shoulders face the outside of a carve by this × the lean (skis)
+  skiStanceCarve: 0.035,      // m each ski moves out at full lean (wider stance in deep carves)
+  skiTipLead: 0.08,           // m the inside ski runs ahead of the outside one at full lean
+  carveCrouch: 0.2,           // extra crouch (0..1 scale) at full lean: lower, more athletic in hard carves (skis and board)
+  headLevel: 0.45,            // share of the body's roll the head takes back out (eyes nearer level)
+  headLook: 0.2,              // rad of head turn into the carve per rad of lean (looking along the path ahead)
   polePlantTime: 0.38,        // s a pole touch lasts (triggered on edge changes)
   skiPressPitch: 0.14,        // rad the skis pitch up while pressing the tails / tips (butters, ollie load)
   skiPressShift: 0.09,        // m hips over the pressed end
@@ -235,7 +249,7 @@ export const ANIM = {
     crouchHinge: 0.19,        // rad of hip fold per unit crouch (the spine bends 0.8 × this): a crouch mostly bends the knees
     shoulderOpen: 0.42,       // rad shoulders open toward the nose
     hipOpen: 0.16,            // rad hips open toward the nose
-    headTurn: 1.3,            // rad total head yaw toward the direction of travel
+    headTurn: 1.5,            // rad total head yaw toward the direction of travel (down the nose, over the front shoulder)
     turnLead: 0.35,           // rad upper-body rotation leading into the turn
     heelSit: 0.1,             // m hips back/down on the heel edge
     toeDrive: 0.07,           // m knees/hips forward on the toe edge

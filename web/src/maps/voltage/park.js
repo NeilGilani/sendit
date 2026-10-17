@@ -6,7 +6,10 @@
 //     knuckle / short / SWEET SPOT / deep / overshot — the sweet spot scores), stalls and clean rides away.
 //   • Line goals for rails: a banked grind steps the goals by rail name and section.
 //   • Run tracking for the slopestyle judge (scoring.js): every scored move with where it happened.
-import { emit, on, addScore } from '../../state.js';
+//   • Run completion: 'runCompleted' { mapId, trailId, distance, time, score } when a run reaches the finish (zen or
+//     Challenge), the trail picked by the lanes of the features ridden (course.trailFor).
+import { emit, on, addScore, game } from '../../state.js';
+import { START_X } from './layout.js';
 import { PHYSICS } from '../../config.js';
 import { pathYaw } from '../../physics/edge.js';
 import { angleDiff } from '../../physics/math.js';
@@ -100,13 +103,28 @@ export function attachPark(course, pl) {
     const r = course.rails.find((q) => q.name === g.rail);
     pl.flow.goalStep([g.rail, r?.section]);
   }));
+  // ---- run completion (reward unlocks): a run starts at the top, a drop zone or a trail spawn
+  const run = { t: 0, u0: 0, lanes: {}, done: false };
+  const startRun = () => { run.t = 0; run.u0 = pl.position.x - START_X; run.lanes = {}; run.done = false; };
+  const lane = (name) => { const n = course.named.find((q) => q.name === name); const l = n?.f?.lane ?? n?.rail?.lane ?? (n?.kind === 'pipe' ? 'pipe' : null); if (l) run.lanes[l] = (run.lanes[l] || 0) + 1; };
+  offs.push(on('rideStarted', startRun), on('resetTop', startRun), on('dropZone', startRun));
+  offs.push(on('takeoff', () => { if (mine()) { const nm = course.featureAt(pl.position.x, pl.position.z); if (nm) lane(nm); } }));
+  offs.push(on('grindStart', (g) => { if (mine()) lane(g.name ?? g.rail?.name); }));
+  const complete = (judged) => {
+    if (!mine() || run.done) return;
+    run.done = true;
+    const trailId = course.trailFor(run.lanes);
+    emit('runCompleted', { mapId: course.id, trailId, distance: Math.round(pl.position.x - START_X - run.u0), time: +run.t.toFixed(2), score: game.score, judged: judged ?? (trailId === 'slopestyle' ? course.judgeRun?.judge().total : undefined) });
+  };
+  offs.push(on('runComplete', () => complete()), on('runFinished', (res) => complete(res?.judged?.total)));
+  pl.parkRun = run;
   pl.parkOffs = offs;
   // Run tracking for the judge (average speed on the snow and the rails), and pumping the pipe.
   const step0 = pl.step.bind(pl);
   pl.step = (dt) => {
     if (mine()) wallAlign(course, pl);
     step0(dt);
-    if (mine() && pl.state !== 0) { course.judgeRun?.tick(dt, pl); pump(course, pl, dt); pipeSpot(pl, dt); }
+    if (mine() && pl.state !== 0) { course.judgeRun?.tick(dt, pl); pump(course, pl, dt); pipeSpot(pl, dt); pl.parkRun.t += dt; }
   };
 }
 
@@ -115,7 +133,7 @@ export function attachPark(course, pl) {
  * up a transition you extend your legs against it and gain speed — PUMP.auto m/s² by itself, × PUMP.timed if
  * you crouched (W) across the flat and let go as the wall starts. Without it no one gets out of a 6.7 m pipe.
  */
-export const PUMP = { auto: 5.5, timed: 1.6, minDeg: 6, maxDeg: 72 };
+export const PUMP = { auto: 5.5, timed: 1.6, minDeg: 6, maxDeg: 72, pipeCap: 21 };
 function pump(course, pl, dt) {
   const P = course.pipe;
   const st = pl._pump || (pl._pump = { crouchT: 0, armed: false });
@@ -128,6 +146,12 @@ function pump(course, pl, dt) {
       if (t <= 0) { st.crouchT = up ? st.crouchT + dt : 0; if (st.crouchT > 0.2) st.armed = true; }
       else if (t < P.tR) wall = { ang: Math.asin(Math.min(1, t / P.R)) / (Math.PI / 180), nx: Math.sign(b) * P.rx, nz: Math.sign(b) * P.rz };
     }
+  }
+  // In the pipe the snow is cut soft and the walls eat speed: above PUMP.pipeCap the same soft-cap drag the rest of
+  // the park only starts at its (much higher) top speed. Faster than that and the airs go long and low, not up.
+  if (P && pl.state === 1) {
+    const [a, b] = P.local(pl.position.x, pl.position.z), sp = pl.velocity.length();
+    if (a > 0 && a < P.length && Math.abs(b) < P.F + P.wallRun && sp > PUMP.pipeCap) pl.velocity.multiplyScalar(Math.max(0.5, 1 - PHYSICS.softCapDrag * (sp - PUMP.pipeCap) ** 2 * dt / sp));
   }
   if (!wall) return;
   // Going up the wall (velocity has a component toward it) on the curved part.

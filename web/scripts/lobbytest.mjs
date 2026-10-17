@@ -1,12 +1,18 @@
 // End-to-end check of the lobby flow in headless Chromium (software WebGL). Exits 1 on failure.
 // Usage: node scripts/lobbytest.mjs [baseUrl] [shotDir]
 //   1. boots into the lobby (default first screen)
-//   2. toggles Skis → Snowboard, reloads, checks it persisted (profile v1 in localStorage)
+//   2. toggles Skis → Snowboard, reloads, checks it persisted (profile v2 in localStorage)
 //   3. keyboard: Q/E switch tabs, arrows move focus
 //   4. mocked gamepad: RB switches tabs, Y swaps gear, d-pad + A activate, Start rides
 //   5. Ride → pause (Esc) → Back to lobby; checks the ride was recorded
 //   6. ?ride skips the lobby; pause → lobby still works (stage built lazily)
 //   7. legacy migration: old 'sendit.best' + settings.resort become a v1 profile
+//   8. mountains + trails (docs/maps.md): mountain cards -> trail list by keyboard and gamepad, picking a
+//      trail on the loaded map switches without a reload (URL, profile, map card), Ride starts at the
+//      trail's top with the trail toast; a trail on another mountain reloads into it; ?map=&trail=&ride
+//   8. mountains + trails (docs/maps.md): mountain cards -> trail list by keyboard and gamepad, picking a
+//      trail on the loaded map switches without a reload (URL, profile, map card), Ride starts at the
+//      trail's top with the trail toast; a trail on another mountain reloads into it; ?map=&trail=&ride
 // Fails on any console error / page error.
 // GPU=1 renders on the real GPU (ANGLE D3D11): the lobby shows the full world behind the rider, which
 // is very slow on SwiftShader (minutes per run), so prefer GPU=1 where a GPU is available.
@@ -70,8 +76,15 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await countFrames(page);
   let s = await state(page);
   ok(s.mode === 0 && s.lobby, 'boots into the lobby');
+  // Loading screen (src/loading/): dissolves into the lobby, then the overlay + worker canvas are gone.
+  await page.waitForFunction(() => document.getElementById('loading')?.classList.contains('hidden'), null, { timeout: 20000 }).catch(() => {});
+  const ld = await page.evaluate(() => ({ hidden: document.getElementById('loading').classList.contains('hidden'), canvas: !!document.getElementById('loadcanvas'), st: window.__loading?.stats(), curtain: getComputedStyle(document.getElementById('fade')).opacity }));
+  ok(ld.hidden && !ld.canvas, 'loading screen handed off (overlay hidden, worker canvas removed)');
+  ok(Number(ld.curtain) === 0, 'no black curtain left over the lobby');
+  ok(ld.st?.stages?.length > 3 && ld.st.stages.at(-1)[1] === 1, 'loading progress followed the boot stages to 100 %');
+  if (process.env.GPU) ok(ld.st?.firstFrameMs > 0 || ld.st?.readyMs < 1500, 'live loading scene rendered (or the load beat it)');
   ok(s.equipment === 'skis' && s.gear === 'native', 'default equipment is skis (native rider gear)');
-  ok(s.stored?.version === 1, 'profile v1 written to localStorage');
+  ok(s.stored?.version === 2, 'profile v2 written to localStorage');
   ok(/lb-ride/.test(s.focus), 'Ride button has focus');
   ok(s.stageInWorld && s.stageShown && s.stageActive && !s.riderShown, 'lobby stage stands in the world (game rider hidden)');
   ok(await page.evaluate(() => { const s = window.__sendit; return s.camera.position.distanceTo(s.stage.focusPoint) < 20; }), 'world camera frames the lobby stage');
@@ -94,7 +107,7 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   // Keyboard: Q/E tabs, arrows move focus.
   await page.keyboard.press('KeyE');
   s = await state(page);
-  ok(s.tab === 'character', 'E opens the next tab');
+  ok(s.tab === 'cases', 'E opens the next tab');
   await page.keyboard.press('KeyQ');
   s = await state(page);
   ok(s.tab === 'equipment', 'Q opens the previous tab');
@@ -109,7 +122,7 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   // Gamepad: RB next tab, LB back, Y swap gear.
   await padPress(page, 5);
   s = await state(page);
-  ok(s.tab === 'character', 'gamepad RB opens the next tab');
+  ok(s.tab === 'cases', 'gamepad RB opens the next tab');
   await padPress(page, 4);
   s = await state(page);
   ok(s.tab === 'equipment', 'gamepad LB opens the previous tab');
@@ -120,7 +133,7 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await page.evaluate(() => { window.__padOn = false; });
 
   // Every tab mounts without errors.
-  for (const id of ['character', 'maps', 'multiplayer', 'leaderboards', 'profile', 'settings', 'equipment']) {
+  for (const id of ['cases', 'locker', 'maps', 'multiplayer', 'leaderboards', 'profile', 'settings', 'equipment']) {
     await page.evaluate((t) => window.__sendit.lobby.select(t), id);
     await page.waitForTimeout(150);
     const html = await page.evaluate(() => document.querySelector('.lb-panel').innerText.length);
@@ -175,6 +188,116 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await ctx.close();
 }
 
+// ---------------------------------------------------------------- cases (docs/rewards.md)
+// 6b. a v1 profile (before cases) keeps the skins it wore and gets a welcome case
+// 6c. a new rider owns only the plain kit; a finished run earns case XP (runCompleted); a case opens
+//     (box, reel, reveal), Equip now dresses the rider, the Locker lists the pull
+{
+  const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
+  await ctx.addInitScript(() => {
+    if (sessionStorage.getItem('seeded')) return;
+    sessionStorage.setItem('seeded', '1');
+    localStorage.clear();
+    localStorage.setItem('sendit.profile', JSON.stringify({
+      version: 1, displayName: 'Old Timer', loadout: { equipment: 'skis', slots: {
+        jacket: { item: 'jacket-tuff-shell', variant: 'arcade' }, helmet: { item: 'helmet-tuff', variant: 'summit' } } },
+      map: { id: 'valcrest-gully', variant: null }, stats: { rides: 3, runsCompleted: 2, distance: 4000 }, unlocks: { items: [] },
+    }));
+  });
+  const page = await newPage(ctx);
+  await page.goto(base);
+  await lobbyReady(page);
+  const p = await page.evaluate(() => JSON.parse(localStorage.getItem('sendit.profile')));
+  ok(p.version === 2 && p.loadout.slots.jacket.variant === 'arcade' && p.inventory.items['jacket-tuff-shell:arcade'], 'v1 → v2 keeps the worn Arcade jacket as an owned skin');
+  ok(p.rewards.cases.length === 1 && p.rewards.cases[0].source === 'welcome', 'v1 → v2 adds a welcome case');
+  ok(await page.evaluate(() => window.__sendit.rider.look?.outfit?.colors?.jacket?.base === '#14a39a' || !window.__sendit.rider.look), 'the game rider still wears it');
+  await ctx.close();
+}
+
+// ---------------------------------------------------------------- 6c: cases, the reel, the locker
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const page = await newPage(ctx);
+  await page.goto(base);
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await lobbyReady(page);
+  await countFrames(page);
+  // A new rider: the plain Rental kit, stock gear, nothing else.
+  const start = await page.evaluate(() => {
+    const P = window.__sendit.profile;
+    return {
+      owned: ['jacket', 'pants', 'helmet', 'goggles', 'gloves', 'face', 'skis', 'board'].map((sl) => P.ownedIn(sl).length),
+      jacket: P.equipped('jacket').variant.id, cases: P.unopened.length, col: P.collection(),
+    };
+  });
+  ok(start.owned.every((n) => n === 1), `new rider owns exactly one item per slot (${start.owned.join(',')})`);
+  ok(start.jacket === 'basic' && start.cases === 0 && start.col.owned === 0 && start.col.total >= 70, `plain Rental kit, no cases, 0/${start.col.total} collected`);
+  await page.evaluate(() => window.__sendit.lobby.select('locker'));
+  ok(await page.evaluate(() => document.querySelectorAll('.lk-item').length) === 1, 'Locker shows only the starter jacket');
+  await page.evaluate(() => window.__sendit.lobby.select('cases'));
+  ok(await page.evaluate(() => document.querySelector('.cs-open').disabled), 'Cases: Open is disabled with no case');
+
+  // A ride with a finished run earns case XP through the tracker (runComplete → runCompleted).
+  await page.click('.lb-ride');
+  await page.waitForFunction(() => window.__sendit.game.mode === 1, null, { timeout: T });
+  await page.waitForTimeout(1500);
+  const run = await page.evaluate(async () => {
+    const st = await import('/src/state.js');
+    let got = null;
+    const off = st.on('runCompleted', (e) => { got = e; });
+    st.game.distance += 1500;
+    st.emit('runComplete');
+    off();
+    return { got, xp: window.__sendit.profile.rewards.xp, maps: window.__sendit.profile.rewards.maps };
+  });
+  ok(run.got && run.got.mapId && run.got.distance >= 1500 && typeof run.got.time === 'number', `runCompleted emitted (${JSON.stringify(run.got)?.slice(0, 120)})`);
+  ok(run.xp >= 65 + 250 + 60 && run.maps.length === 1, `finish + first run on the map + distance credited (${Math.round(run.xp)} XP)`);
+  await page.waitForFunction(() => !!document.querySelector('.cn'), null, { timeout: 10000 }).then(() => ok(true, 'run progress notification shows in the ride'), () => ok(false, 'run progress notification shows in the ride'));
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => window.__sendit.game.mode === 2, null, { timeout: T });
+  await page.click('#pause [data-act=menu]');
+  await lobbyReady(page);
+
+  // Earn a case: badge on the Cases tab, the Open button lights up.
+  await page.evaluate(() => { window.__sendit.profile.grantCase('test', 'first-chair'); window.__sendit.lobby.select('cases'); });
+  await page.waitForTimeout(300);
+  ok(await page.evaluate(() => document.querySelector('.lb-tab[data-tab=cases] .cs-badge')?.textContent === '1'), 'Cases tab shows a badge');
+  ok(await page.evaluate(() => !document.querySelector('.cs-open').disabled), 'Open is enabled');
+  ok(await page.evaluate(() => !!document.querySelector('.cn.case')), '"Case earned" notification');
+  // Open it: the case box, then the reel (60 cards), then Skip to the reveal.
+  await page.click('.cs-open');
+  await page.waitForSelector('.cr-overlay .cr-case', { timeout: 10000 });
+  ok(true, 'the case box appears');
+  await page.waitForFunction(() => document.querySelector('.cr-overlay.reel'), null, { timeout: 15000 });
+  const reel = await page.evaluate(() => ({ cards: document.querySelectorAll('.cr-strip .cr-card').length, gold: document.querySelectorAll('.cr-strip .cr-card.r-gold').length, tiers: new Set([...document.querySelectorAll('.cr-strip .cr-card')].map((c) => c.className.match(/\br-(\w+)/)[1])).size }));
+  ok(reel.cards === 60 && reel.tiers >= 4, `reel of ${reel.cards} cards in ${reel.tiers} grades`);
+  // Let it spin: the reel covers ten cards (time-based, so this holds even at a low frame rate).
+  const moved = await page.waitForFunction(() => { const o = window.__senditCases.opener; const t = o.trace; return t.length > 2 && t.at(-1).x - o.x0 > o.pitch * 10; }, null, { timeout: 30000 }).then(() => true, () => false);
+  const tr = await page.evaluate(() => window.__senditCases.opener.trace.length);
+  ok(moved, `the reel scrolls (${tr} frames)`);
+  await page.keyboard.press('Space');
+  await page.waitForSelector('.cr-reveal:not([hidden]) h2', { timeout: 10000 });
+  const rv = await page.evaluate(() => ({ name: document.querySelector('.cr-reveal h2').textContent, res: window.__senditCases.result.key, grade: document.querySelector('.cr-grade').textContent }));
+  ok(rv.name.includes('|') && rv.grade.length > 3, `reveal: ${rv.name.replace(/\s+/g, ' ').trim()} (${rv.grade})`);
+  await shot(page, 't4_reveal');
+  await page.click('.cr-btn[data-act=equip]');
+  await page.waitForFunction(() => !document.querySelector('.cr-overlay'), null, { timeout: 10000 });
+  const eq = await page.evaluate((key) => {
+    const P = window.__sendit.profile;
+    const [id, v] = key.split(':');
+    const item = window.__sendit.profile.profile.inventory.items[key];
+    const slot = Object.entries(P.profile.loadout.slots).find(([, e]) => e.item === id && e.variant === v);
+    return { owned: !!item, worn: !!slot, cases: P.unopened.length };
+  }, rv.res);
+  ok(eq.owned && eq.worn && eq.cases === 0, 'Equip now: the pull is owned and worn');
+  await page.evaluate(() => window.__sendit.lobby.select('locker'));
+  await page.waitForTimeout(200);
+  ok(await page.evaluate(() => document.querySelectorAll('.lk-item').length >= 1), 'Locker lists owned skins');
+  await shot(page, 't5_locker');
+  await ctx.close();
+}
+
 // ---------------------------------------------------------------- 7: migration from pre-lobby storage
 {
   const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
@@ -188,8 +311,98 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await page.goto(base);
   await lobbyReady(page);
   const p = await page.evaluate(() => JSON.parse(localStorage.getItem('sendit.profile')));
-  ok(p.version === 1 && p.stats.bestScore === 4321, 'legacy best score migrated into profile v1');
+  ok(p.version === 2 && p.stats.bestScore === 4321, 'legacy best score migrated into the profile');
+  ok(p.rewards.cases.length === 0 && Object.keys(p.inventory.items).length === 0, 'a first visit starts with no cases and no skins');
   ok(p.loadout.equipment === 'skis' && p.loadout.slots.board?.item === 'board-northwake-twin', 'migrated profile has a full default loadout');
+  await ctx.close();
+}
+
+// ---------------------------------------------------------------- 8: mountains + trails
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const page = await newPage(ctx);
+  await page.goto(`${base}?map=valcrest-gully`);
+  await lobbyReady(page);
+  await countFrames(page);
+  await page.evaluate(() => { window.__sameLoad = true; window.__sendit.lobby.select('maps', { focus: true }); });
+  await page.waitForTimeout(300);
+  const cards = await page.evaluate(() => [...document.querySelectorAll('.mt-card')].map((c) => ({ id: c.dataset.mountain, here: c.classList.contains('here') })));
+  ok(cards.length >= 5 && ['valcrest', 'blackspruce', 'ravenspire', 'voltage-park', 'lake-tahoe'].every((id) => cards.some((c) => c.id === id)), `mountain cards: ${cards.map((c) => c.id).join(', ')}`);
+  ok(cards.find((c) => c.here)?.id === 'valcrest', 'the loaded mountain is marked');
+  ok(await page.evaluate(() => document.activeElement?.dataset?.mountain === 'valcrest'), 'focus starts on the loaded mountain');
+  // Keyboard: Enter opens the trails, arrows move, Enter picks, Esc goes back.
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.tr-row', { timeout: T });
+  const rows = await page.evaluate(() => [...document.querySelectorAll('.tr-row')].map((r) => r.dataset.trail));
+  ok(rows.join() === 'gully,middle-drops,the-steep,lower-gully,big-drop', `Valcrest trails listed (${rows.join(', ')})`);
+  ok(await page.evaluate(() => document.querySelector('.tr-row.on')?.dataset.trail === 'gully'), 'the current trail is marked');
+  ok(await page.evaluate(() => document.querySelectorAll('.tr-row .tr-badge').length === 5), 'every trail has a difficulty badge');
+  ok(await page.evaluate(() => document.activeElement?.closest('.tr-row')?.dataset.trail === 'gully'), 'focus lands on the current trail');
+  await page.keyboard.press('ArrowDown');
+  ok(await page.evaluate(() => document.activeElement?.closest('.tr-row')?.dataset.trail === 'middle-drops'), 'ArrowDown moves to the next trail');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => window.__sendit.map.trail === 'middle-drops', null, { timeout: 30000 });
+  let t = await page.evaluate(() => ({
+    same: window.__sameLoad === true, url: location.search, prof: window.__sendit.profile.profile.map,
+    card: document.querySelector('.lb-map').innerText, on: document.querySelector('.tr-row.on')?.dataset.trail,
+  }));
+  ok(t.same, 'picking a trail on the loaded map does not reload');
+  ok(/trail=middle-drops/.test(t.url) && /map=valcrest-gully/.test(t.url), `URL carries map + trail (${t.url})`);
+  ok(t.prof.id === 'valcrest-gully' && t.prof.trail === 'middle-drops', 'profile saves map + trail');
+  ok(/Valcrest/i.test(t.card) && /The Middle Drops/.test(t.card), `map card shows mountain + trail (${t.card.split('\n').join(' / ')})`);
+  ok(t.on === 'middle-drops', 'the list marks the new trail');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('.mt-card', { timeout: T });
+  ok(await page.evaluate(() => document.activeElement?.dataset?.mountain === 'valcrest'), 'Esc goes back to the mountains (focus on the one we came from)');
+  // Gamepad: A opens, B goes back.
+  await padPress(page, 0);
+  await page.waitForSelector('.tr-row', { timeout: T });
+  ok(true, 'gamepad A opens a mountain');
+  await padPress(page, 1);
+  await page.waitForSelector('.mt-card', { timeout: T });
+  ok(true, 'gamepad B goes back to the mountains');
+  await page.evaluate(() => { window.__padOn = false; });
+  // Ride starts at the trail's top, with the trail toast.
+  await page.click('.lb-ride');
+  await page.waitForFunction(() => window.__sendit.game.mode === 1, null, { timeout: T });
+  await page.waitForFunction(() => document.getElementById('trail-toast')?.classList.contains('on'), null, { timeout: 8000 }).catch(() => {});
+  t = await page.evaluate(() => {
+    const s = window.__sendit, sp = s.course.trailSpawn('middle-drops');
+    const el = document.getElementById('trail-toast');
+    return { d: Math.hypot(s.player.position.x - sp.x, s.player.position.z - sp.z), toast: el?.innerText || '', on: !!el?.classList.contains('on') };
+  });
+  ok(t.d < 25, `ride starts at the trail's top (${t.d.toFixed(1)} m away)`);
+  ok(t.on && /The Middle Drops/.test(t.toast) && /More difficult/.test(t.toast), 'HUD toast shows the trail name and difficulty');
+  await shot(page, 't8_trail_ride');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => window.__sendit.game.mode === 2, null, { timeout: T });
+  await page.click('#pause [data-act=menu]');
+  await lobbyReady(page);
+  // A trail on another mountain: saves and reloads into it.
+  await page.evaluate(() => window.__sendit.lobby.select('maps'));
+  await page.waitForSelector('.mt-card, .tr-row', { timeout: T });
+  if (await page.$('.mt-back')) await page.click('.mt-back');
+  await page.click('.mt-card[data-mountain=blackspruce]');
+  await page.waitForSelector('.tr-row[data-trail=slot]', { timeout: T });
+  ok(await page.evaluate(() => document.querySelector('.tr-row[data-trail=slot] .tr-ride').classList.contains('reload')), 'a trail on another mountain is marked as a reload');
+  await Promise.all([page.waitForNavigation({ timeout: T }), page.click('.tr-row[data-trail=slot] .tr-pick')]);
+  await lobbyReady(page);
+  t = await page.evaluate(() => ({ map: window.__sendit.map.map.id, trail: window.__sendit.map.trail, card: document.querySelector('.lb-map').innerText }));
+  ok(t.map === 'blackspruce' && t.trail === 'slot', `reloads into the other mountain's trail (${t.map} / ${t.trail})`);
+  ok(/Blackspruce/i.test(t.card) && /SLOT/.test(t.card), 'map card shows the new mountain + trail');
+  await ctx.close();
+}
+{
+  // ?map=&trail=&ride: straight onto a drop-zone trail.
+  const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
+  const page = await newPage(ctx);
+  await page.goto(`${base}?map=ravenspire&trail=the-stacks&ride`);
+  await page.waitForFunction(() => window.__sendit?.game.mode === 1, null, { timeout: T });
+  const t = await page.evaluate(() => {
+    const s = window.__sendit, z = s.course.dropZones.find((d) => d.name === 'The Stacks');
+    return { trail: s.map.trail, d: Math.hypot(s.player.position.x - z.x, s.player.position.z - z.z) };
+  });
+  ok(t.trail === 'the-stacks' && t.d < 25, `?map=ravenspire&trail=the-stacks&ride starts at The Stacks (${t.d.toFixed(1)} m)`);
   await ctx.close();
 }
 

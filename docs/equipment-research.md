@@ -462,3 +462,20 @@ A future "designed landings" feature (landing ramps sized for the kicker) would 
 - S held while charging the pop is a **preload**: the take-off already rotates at 4.2–4.4 rad/s and commits to the flip. This mirrors Shredders and Infinite Air, and matches the research: rotation is set on the ramp, and wildcats pop off the tail.
 - With the stick released, a flip carries on to the next upright. Inside 50° of upright the rider spots the landing and settles, which is a subtle SSX-style assist.
 - Pitch tolerance is 22° for clean and 42° for a stumble. The research suggests ±15 / ±35; the game is a little more forgiving because the camera makes pitch harder to read than yaw.
+
+## 8. Round 3: steering feel at speed and the rider's body
+
+### 8.1 What games and players say about steering feel
+- **SSX / SSX Tricky.** Carving is snappy and driven by leaning, and speed reads through sound and spray as much as through motion ([Playpile](https://playpile.gg/games/ssx-tricky), [The Retrograde](https://theretrograde.substack.com/p/retrograde-1-ssx-tricky)).
+- **Steep.** The left stick steers, with a separate speed check. Previews faulted imprecise control ("tumble down the mountain rather than swiftly maneuver"); the final game was praised for its sense of speed ([Game Informer preview](https://gameinformer.com/games/steep/b/xboxone/archive/2016/06/19/ubisoft-has-steep-ambitions-but-so-far-it-misses-the-mark), [Worthplaying review](https://www.worthplaying.com/article/2016/12/8/reviews/101606-xbox-one-review-steep/), [Tom's Hardware hands-on](https://www.tomshardware.com/uk/news/steep-hands-on-ubisoft-pax,32654.html)).
+- **Racing games, speed-sensitive steering.** Players blame a speed limit that clamps *full* lock for "false understeer": a stick jammed over turns the wheels about 10% at speed. The usual answer is an exponent curve on the stick (fine control near centre) plus a speed-based limit tuned separately from the steering ratio ([GTPlanet](https://www.gtplanet.net/forum/threads/ds3-controller-settings.199716/), [Forza forums](https://forums.forza.net/t/strange-steering-input/10061), [response-curve calculator](https://west-games.com/analog-stick-response-curve-calculator/)).
+
+### 8.2 Applied
+- **Keep full lock, shape partial input.** At 30 m/s the grip limit is reached on a light edge, so 30%, 60% and full stick all gave the same turn and the rest became skid. Now the held share of the edge picks a share of the grip-limited curvature (`carveInput`, `carveCurve`). Full lock still gives the whole grip-limited turn, so there is no false understeer; partial input is graded.
+- **Phase it in with speed** (`carveInputV` 16 → 26 m/s). The tree slalom (Blackspruce, 15–21 m/s) keeps the snappy response, which a dodge needs. Applying the shaping from 16 m/s cost the slalom bot tree crashes.
+- **No wash-out at speed** (`pivotGrip`, `washMax`). Full lock at 50–70 mph is a deep carve with a little drift (about 6–7° of skid) instead of a 15–19° slide.
+- The stick curve itself (exponent 1.35 after a radial dead zone) is in input.js.
+
+### 8.3 The rider's body
+- **Proportions.** An adult's arm span is about their height, and head breadth is about 8.5% of height. The Quaternius model has a 1.65 m span on a 1.81 m body and a 0.18 m wide head, a superhero cut. Steep and Riders Republic use realistic proportions under baggy clothes. The rig now has longer upper arms and forearms and a smaller head and hands (`character/body.js`).
+- **Leaning.** Inclination follows the contact force (atan(a/g)), with angulation from the knees and hips, at most about 40° beyond the lean. Racers carve at 2–3 g with 50–60° of inclination. The upper body counter-rotates toward the outside of the turn, leads into the next turn at the edge change (crossover), and the head stays nearer level, looking along the path.

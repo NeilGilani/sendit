@@ -16,6 +16,7 @@ import { TREES } from '../scene.js';
 import { PERF, perfQ } from './perf.js';
 
 const CELL = 750;
+const TREES_LOD1_WIDEN = 1.25;   // LOD1 keeps every other frond card, a little wider
 
 // ---------------------------------------------------------------- textures
 /** Needle frond (RGBA): a twig along u with needles fanning out; alpha cut-out, tapered outline. */
@@ -132,15 +133,20 @@ function trunkGeo(h, r0, r1, sides = 6) {
   return g;
 }
 
-/** Spruce / fir crown built from whorls of frond cards. kind 0 = spruce (narrow, drooping), 1 = fir. */
+/**
+ * Spruce / fir crown built from whorls of frond cards. kind 0 = spruce (narrow, drooping), 1 = fir.
+ * LOD1 is the same tree (same seed, same cards) with every other card left out and the rest a
+ * little wider, so the two LODs look alike and their cross-fade is invisible: half the cards are
+ * identical in both, only the dropped ones dissolve.
+ */
 function crownGeometry(kind, lod, seed) {
   const rnd = mulberry32(seed);
   const H = TREES.height;
-  const parts = [trunkGeo(H * 0.92, 0.2, 0.03, lod === 0 ? 7 : 5)];
-  const whorls = lod === 0 ? 19 : 10;
-  const per = lod === 0 ? 6 : 5;
+  const parts = [trunkGeo(H * 0.92, 0.2, 0.03, 7)];
+  const whorls = 19;
+  const per = 6;
   const segs = 2;
-  const wMul = lod === 0 ? 1 : 1.45;
+  const wMul = lod === 0 ? 1 : TREES_LOD1_WIDEN;
   for (let w = 0; w < whorls; w++) {
     const t = (w + rnd() * 0.4) / whorls;
     const y = 1.0 + t * (H - 1.6);
@@ -149,19 +155,38 @@ function crownGeometry(kind, lod, seed) {
     for (let b = 0; b < per; b++) {
       const yaw = (b / per) * Math.PI * 2 + w * 0.9 + rnd() * 0.5;
       const droop = (kind === 0 ? 0.42 : 0.18) * (0.7 + 0.6 * (1 - t)) + rnd() * 0.1;
-      const card = branchGeo(L * (0.85 + rnd() * 0.3), L * 0.78 * wMul, droop, kind === 0 ? 0.12 : 0.05, segs, (w + b) % 2, lod === 0);
-      card.rotateX((rnd() - 0.5) * 0.35);
+      const len = L * (0.85 + rnd() * 0.3);
+      const rx = (rnd() - 0.5) * 0.35, rz = (rnd() - 0.5) * 0.14;   // (always drawn: LOD1 stays in step with LOD0)
+      const odd = (w + b) % 2 === 1;
+      if (lod === 1 && odd) continue;
       // Spruce: lower branches sweep down, the top ones reach up; fir branches stay level.
       const upTop = Math.max(0, (t - 0.72) / 0.28);
-      card.rotateZ((kind === 0 ? -(0.12 + 0.3 * (1 - t)) : 0.06) * (1 - upTop) + upTop * 0.75 + (rnd() - 0.5) * 0.14);
-      card.rotateY(yaw);
-      card.translate(0, y, 0);
+      const place = (g) => {
+        g.rotateX(rx);
+        g.rotateZ((kind === 0 ? -(0.12 + 0.3 * (1 - t)) : 0.06) * (1 - upTop) + upTop * 0.75 + rz);
+        g.rotateY(yaw);
+        g.translate(0, y, 0);
+        return g;
+      };
+      const width = L * 0.78 * (lod === 0 || odd ? 1 : TREES_LOD1_WIDEN);
+      const card = place(branchGeo(len, width, droop, kind === 0 ? 0.12 : 0.05, segs, (w + b) % 2, true));
+      // Geomorph target (aMorph3 = delta in object space, applied x the hand-over progress):
+      //  LOD0: odd cards retract into the trunk, even cards widen to their LOD1 width -> exactly LOD1.
+      //  LOD1: every card retracts into the trunk (the far cone is already there).
+      const pa = card.attributes.position, d = new Float32Array(pa.count * 3);
+      if (lod === 0 && !odd) {
+        const wide = place(branchGeo(len, L * 0.78 * TREES_LOD1_WIDEN, droop, kind === 0 ? 0.12 : 0.05, segs, (w + b) % 2, true)).attributes.position;
+        for (let k = 0; k < pa.count; k++) for (let c = 0; c < 3; c++) d[k * 3 + c] = wide.array[k * 3 + c] - pa.array[k * 3 + c];
+      } else {
+        for (let k = 0; k < pa.count; k++) { d[k * 3] = -pa.getX(k); d[k * 3 + 1] = y - pa.getY(k); d[k * 3 + 2] = -pa.getZ(k); }
+      }
+      card.setAttribute('aMorph3', new THREE.Float32BufferAttribute(d, 3));
       parts.push(card);
     }
   }
   {
     // Dark inner core (needle mass deep in the crown): hides the trunk, no see-through gaps.
-    const core = new THREE.ConeGeometry((kind === 0 ? 1.7 : 2.0) * (lod === 0 ? 0.62 : 1.0), H * 0.86, lod === 0 ? 9 : 7, 1, true);
+    const core = new THREE.ConeGeometry((kind === 0 ? 1.7 : 2.0) * 0.62, H * 0.86, 9, 1, true);   // same in both LODs
     core.translate(0, H * 0.43 + 0.9, 0);
     const n = core.attributes.position.count;
     core.setAttribute('aUnder', new THREE.Float32BufferAttribute(new Float32Array(n).fill(3), 1));   // 3 = core
@@ -214,7 +239,8 @@ function stripTo(g) {
   // Make every part carry the same attribute set.
   const n = g.attributes.position.count;
   if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(n * 2), 2));
-  for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv', 'aUnder', 'aAO'].includes(k)) g.deleteAttribute(k);
+  if (!g.attributes.aMorph3) g.setAttribute('aMorph3', new THREE.Float32BufferAttribute(new Float32Array(n * 3), 3));
+  for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv', 'aUnder', 'aAO', 'aMorph3'].includes(k)) g.deleteAttribute(k);
   return g;
 }
 
@@ -226,33 +252,45 @@ const LOD_PARS = /* glsl */`
 uniform vec4 uLodA; uniform vec4 uLodB; uniform vec3 uLodEye;
 varying vec2 vDither;
 `;
+const LOD_ATTR = 'attribute vec3 aMorph3;\n';   // vertex shaders only
+// Colour pass: no dither. LOD0 geomorphs into LOD1 across the near band (odd cards retract, even cards
+// widen) and swaps at the band's end where the two are identical; LOD1 retracts its cards into the
+// already-present far cone across the mid band. Shadow pass: the same morph plus a complementary
+// dither between the frond caster and the shadow cone, which the PCF filter turns into a soft blend.
 const LOD_VERT = /* glsl */`
   {
     float tD = distance(ip.xz, uLodEye.xz);
     float tN = clamp((tD - uLodA.x + 0.5 * uLodA.y) / uLodA.y, 0.0, 1.0);
     float tM = clamp((tD - uLodA.z + 0.5 * uLodA.w) / uLodA.w, 0.0, 1.0);
     float tF = clamp((tD - uLodB.x + uLodB.y) / uLodB.y, 0.0, 1.0);
+    bool tKeep = true;
+    vDither = vec2(0.0, 2.0);
     #if TREE_LOD == 0
-      vDither = vec2(tN, 2.0);
+      transformed += aMorph3 * tN;
+      tKeep = tN < 1.0;
+      #ifdef TREE_SHADOW
+        vDither = vec2(tN, 2.0);
+      #endif
     #elif TREE_LOD == 1
-      vDither = vec2(tM, tN);
+      transformed += aMorph3 * tM;
+      tKeep = tN >= 1.0 && tM < 1.0;
     #elif TREE_LOD == 2
       // Far shells stay opaque (no discard: early-z for thousands of them). Each one is complete as
-      // soon as its tree enters the mid band, inside the mid fronds that dissolve around it, and at
+      // soon as its tree enters the mid band, inside the mid fronds that retract around it, and at
       // the far end it shrinks into the snow (2-3 px at that range).
-      vDither = vec2(tF >= 1.0 ? 1.0 : 0.0, tM > 0.0 ? 2.0 : 0.0);
+      tKeep = tM > 0.0 && tF < 1.0;
       transformed *= 1.0 - tF;
     #elif TREE_LOD == 3
-      vDither = vec2(0.0, tN);   // shadow-only cone: casts where the near fronds have handed over
+      tKeep = tN > 0.0;   // shadow-only cone: casts where the near fronds hand over
+      vDither = vec2(0.0, tN);
     #endif
     #ifdef TREE_SHADOW
-      if (tD > uLodB.z) vDither = vec2(1.0, 0.0);      // beyond the shadow box: no caster
+      if (tD > uLodB.z) tKeep = false;      // beyond the shadow box: no caster
     #endif
-    if (vDither.x >= min(vDither.y, 1.0) || vDither.y <= 0.0) transformed = vec3(0.0, -1e4, 0.0);   // fully handed over: no fragments
+    if (!tKeep) transformed = vec3(0.0, -1e4, 0.0);   // not this LOD: no fragments
   }
 `;
-// Interleaved gradient noise: a stable per-pixel threshold (screen-door), so two LODs in a band
-// split the pixels between them without overlap or holes.
+// Shadow pass only: interleaved gradient noise as a stable per-pixel threshold (screen-door).
 const LOD_FRAG = /* glsl */`
   {
     float hd = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
@@ -262,7 +300,7 @@ const LOD_FRAG = /* glsl */`
 const VERT_PARS = /* glsl */`
 attribute float aUnder; attribute float aAO;
 varying float vUnder; varying float vAO; varying float vSeed; varying float vH; varying vec2 vTUv;
-` + LOD_PARS;
+` + LOD_ATTR + LOD_PARS;
 const VERT_PRE = /* glsl */`
   #ifdef USE_INSTANCING
     vec3 ip = instanceMatrix[3].xyz;
@@ -292,10 +330,6 @@ uniform vec3 uNeedle; uniform vec3 uNeedle2; uniform vec3 uBark; uniform vec3 uT
 vec3 tTreeN = vec3(0.0, 1.0, 0.0); float tTreeNW = 0.0; float tNeedle = 0.0;
 `;
 const FRAG = /* glsl */`
-#if TREE_LOD < 2
-` + LOD_FRAG + /* glsl */`
-#endif
-`+ /* glsl */`
 {
   float under = vUnder;
   #ifdef USE_MAP
@@ -391,7 +425,7 @@ function treeDepthMaterial(lodLevel, lod) {
   m.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, lod, { uTime: globals.uTime, uWind: globals.uWind });
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float uTime; uniform vec2 uWind;\n' + LOD_PARS)
+      .replace('#include <common>', '#include <common>\nuniform float uTime; uniform vec2 uWind;\n' + LOD_ATTR + LOD_PARS)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
   #ifdef USE_INSTANCING
     vec3 ip = instanceMatrix[3].xyz;
@@ -440,7 +474,7 @@ export class TreeSystem {
     };
     this.depthMats = { lod0: treeDepthMaterial(0, this.lod), shell: treeDepthMaterial(3, this.lod) };
     this.geos = [0, 1].map((k) => ({
-      lod0: crownGeometry(k, 0, 11 + k), lod1: crownGeometry(k, 1, 21 + k), lod2: farGeometry(k, 31 + k),
+      lod0: crownGeometry(k, 0, 11 + k), lod1: crownGeometry(k, 1, 11 + k), lod2: farGeometry(k, 31 + k),
     }));
   }
 

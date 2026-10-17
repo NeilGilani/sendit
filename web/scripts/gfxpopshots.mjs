@@ -6,7 +6,7 @@
 import { chromium } from '@playwright/test';
 const [base, map = 'blackspruce', f0 = '0.3', steps = '8', stepM = '1.5', outDir = '.', q = '1', suf = ''] = process.argv.slice(2);
 const browser = await chromium.launch({ args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
-const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
+const page = await browser.newPage({ viewport: { width: Number(process.env.W || 960), height: Number(process.env.H || 540) } });
 await page.goto(`${base}/?ride&quality=${q}&map=${map}`);
 await page.waitForFunction(() => window.__sendit && window.__post, null, { timeout: 300000 });
 await page.evaluate((f0) => {

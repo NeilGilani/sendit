@@ -141,7 +141,7 @@ registerLobbyTab({
   onAction(action, ctx) { return false; } // optional gamepad hook: 'alt' (X), 'alt2' (Y)
 });
 ```
-`ctx` = `{ profile, catalog, maps: { list, get, current }, services, stage, on, toast, ride, select, showCredits }`.
+`ctx` = `{ profile, catalog, maps: { list, get, mountains, current, selectTrail }, services, stage, on, toast, ride, select, showCredits, sfx }`.
 Reusable styles: `.lp-title .lp-sub .lp-h3 .lp-hint .lp-pill .lp-btn .lp-list .lp-empty` and
 `comingSoon()` in `tabs/common.js`. Tabs appear live; `unregisterLobbyTab(id)` removes one.
 
@@ -154,10 +154,13 @@ registerMap({
   load: async ({ variant, onProgress }) => new NorthBowlCourse(),   // Course-compatible object
   // optional: variants: async () => [{ id, group, name, meta, value }], describe: (variant, course) => '…'
   // optional: lobby: ({ course, terrain, spawn }) => ({ x, z, heading }),   // where the lobby plinth stands
+  mountain: { id, name, region, blurb, accent }, trails: [{ id, name, difficulty, … }],   // docs/maps.md
 });
 ```
-The Maps tab lists it. Picking it saves `profile.map` and reloads, because maps are built during
-boot. `?map=<id>` loads one directly. A map that fails to load falls back to `valcrest-gully`. The
+The Maps tab (the mountain browser) shows it under its mountain with its trails; the full mountain /
+trail contract (`trails`, `course.trailSpawn`) is in docs/maps.md. Picking a trail on another map saves
+`profile.map` (`{ id, variant, trail }`) and reloads, because maps are built during boot; a trail on the
+loaded map switches in place. `?map=<id>&trail=<trailId>` loads one directly. A map that fails to load falls back to `valcrest-gully`. The
 lobby stands on the new map automatically (see "Where the lobby stands").
 
 ### Add a catalog item
@@ -232,7 +235,7 @@ Hint glyphs follow the last-used device (`body.device-*`).
 
 - The lobby renders the full world (it costs about as much GPU as riding). The quality setting
   applies to it as in a ride.
-- Switching maps reloads the page, because maps are built at boot.
+- Switching maps reloads the page, because maps are built at boot (switching trails on the loaded map does not).
 - The lobby spot heuristic is generic. On an unusual map the view might face a wall; give that map
   a `lobby()` hook.
 - Snowboard stance (regular / goofy) is not in the profile yet. The preview and rides use the
