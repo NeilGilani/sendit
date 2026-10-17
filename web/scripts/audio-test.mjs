@@ -1,6 +1,6 @@
 // Headless audio test: renders scripted rides through the real audio engine (AudioWorklet DSP + one-shots)
 // on an OfflineAudioContext in Chromium and checks levels, clipping and NaNs; optionally writes WAVs.
-// Usage: node web/scripts/audio-test.mjs [baseUrl] [wavDir] [traceDir] [only]
+// Usage: node web/scripts/audio-test.mjs [baseUrl] [wavDir] [traceDir] [only]   (LISTEN=1: no test tone in the WAVs)
 //   baseUrl  dev server (default http://localhost:5192/)
 //   wavDir   write <scenario>.wav files there (optional)
 //   traceDir real-physics traces from scripts/audio-trace.mjs (trace-ski.json, trace-snowboard.json; optional)
@@ -139,7 +139,8 @@ const fail = (msg) => { fails++; console.log('  FAIL', msg); };
 const db = (x) => (x > 0 ? (20 * Math.log10(x)).toFixed(1) : '-inf');
 for (const s of S) {
   const t0 = Date.now();
-  const r = await page.evaluate((spec) => window.renderScenario(spec), { ...s, wav: !!wavDir, tune: [s.tune, tune].filter(Boolean) });
+  // LISTEN=1: renders for listening — no 220 Hz test tone (the ducking checks that use it are skipped)
+  const r = await page.evaluate((spec) => window.renderScenario(spec), { ...s, ...(process.env.LISTEN ? { musicTone: false } : {}), wav: !!wavDir, tune: [s.tune, tune].filter(Boolean) });
   R[s.name] = r;
   if (wavDir && r.wav) writeFileSync(join(wavDir, `${s.name}.wav`), Buffer.from(r.wav, 'base64'));
   const loud = [...r.rms].sort((a, b) => a - b)[Math.floor(r.rms.length * 0.9)] || 0;
