@@ -87,7 +87,7 @@ export const AUDIO = {
   wind: {
     vMax: 28,             // airspeed for full level (beyond it up to ×1.4 — 70 mph roars)
     exp: 1.6,             // level ∝ (v / vMax)^exp: ~10 dB / doubling (helmets measure ~15.5; loudness grows ~U^1.7)
-    floor: 0.03,          // a breath of air even when slow
+    floor: 0.01,          // a breath of air even when slow (the map wind carries the stillness)
     // helmet buffeting: < 150 Hz, fluttering
     buffet: { gain: 0.7, f: 110, flutterF: 7, flutterDepth: 0.7 },
     // the rush: two noise bands sweeping up with speed
@@ -110,7 +110,7 @@ export const AUDIO = {
     // ridge howl: the strongest ambient gusts moan through rock edges on exposed peaks (maps[id].howl)
     howl: { gain: 0.3, from: 0.6, fMin: 220, fMax: 420, q: 14 },
     // map ambience wind (independent of the rider): distant, over ridges
-    ambient: { gain: 0.35, f: 650, q: 0.5, hiss: 0.4, hissF: 1800 },   // alpine gust reference: flat to 2 kHz
+    ambient: { gain: 0.25, f: 650, q: 0.5, hiss: 0.4, hissF: 1800 },   // alpine gust reference: flat to 2 kHz
     out: 0.227,           // internal output level (×3.0 on the bus): headroom inside the worklet
   },
 
@@ -161,6 +161,7 @@ export const AUDIO = {
     creak: { gain: 0.16, every: [6, 16] },       // tree creaks (stick-slip squeal), seconds between
     crowd: { gain: 0.22, cheer: 1.6 },
     sough: { gain: 0.3 },
+    lodge: { gain: 0.18, clink: 0.015 },            // the lodge at the bottom: muffled après-ski chatter + clinks (3D)
     pa: { gain: 0.08, every: [25, 50] },
     bell: { gain: 0.05, every: [40, 80] },        // a distant temple bell (kitsune-peak)
     sea: { gain: 0.25 },                          // waves on the fjord far below (fjordline)

@@ -283,6 +283,7 @@ export class SoundScape {
     this.liftTowers(s, c.currentTime);
     this.drawDebug(dt);
     if (!menu && !paused) this.treePasses(s, c.currentTime);
+    if (!this.engine.amb.lodge) this.engine.amb.setLodge(window.__sendit?.life?.lodge?.position);
     this.engine.others.update(c.currentTime, window.__sendit?.life?.skiers, camera.position, !menu && !paused);   // other skiers swishing by
 
     // Music: seamless loop that sometimes rests quietly between passes.

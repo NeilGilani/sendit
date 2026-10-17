@@ -120,6 +120,7 @@ add('camera-pulls-away', { seconds: 6, frames: frames(6, (t) => ({ speed: 14, ..
 add('push-off', { seconds: 4, frames: frames(4, (t) => ({ speed: ramp(t, 0, 4, 0.5, 5), push: 1, board: t > 2 ? 1 : 0 })) });
 add('bumps', { seconds: 5, frames: frames(5, (t) => ({ speed: 12, ...carve(t, 2.6, 0.4, 12), comp: (t % 1) < 0.1 ? 0.9 * ((t % 1) / 0.1) : 0.9 * Math.exp(-((t % 1) - 0.1) / 0.12) })) });
 add('roof-landing', { seconds: 3, solo: 'fxBus', frames: frames(3, () => ({ speed: 0 })), events: [{ t: 0.3, name: 'landed', d: { impact: 7 } }, { t: 0.3, name: 'landingGrade', d: { roof: 'Lift station', rawImpact: 7 } }] });
+add('lodge', { seconds: 6, lodgeAt: { x: 0, y: 0, z: -15 }, frames: frames(6, () => ({ speed: 0 })) });
 if (traceDir) for (const type of ['ski', 'snowboard', 'bigmountain']) {
   const f = join(traceDir, `trace-${type}.json`);
   if (!existsSync(f)) continue;

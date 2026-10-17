@@ -38,11 +38,21 @@ export class Ambience {
 
   /** Voiced babble: two dozen 'voices' (jittered glottal pulses through moving vowel formants), 4 s, stereo. */
   buildCrowd() {
+    const b = this.babble(24);
+    this.crowd = this.ctx.createGain(); this.crowd.gain.value = 0; this.crowd.connect(this.bed);
+    for (const [rate, off] of [[1, 0], [0.955, 1.7]]) {
+      const src = this.ctx.createBufferSource(); src.buffer = b; src.loop = true; src.loopEnd = 4 - 0.25; src.playbackRate.value = rate;
+      const g = this.ctx.createGain(); g.gain.value = 0.55; src.connect(g); g.connect(this.crowd); src.start(0, off);
+    }
+  }
+
+  /** Voiced babble buffer (4 s, stereo, seamless): `voices` jittered glottal pulse trains through moving vowels. */
+  babble(voices) {
     const c = this.ctx, sr = c.sampleRate, n = sr * 4, b = c.createBuffer(2, n, sr);
     const L = b.getChannelData(0), R = b.getChannelData(1);
     const VOWELS = [[730, 1090], [270, 2290], [530, 1840], [570, 840], [300, 870], [660, 1720], [490, 1350]];
     const res = (f, bw) => { const r = Math.exp(-Math.PI * bw / sr), th = 2 * Math.PI * f / sr; return [2 * r * Math.cos(th), -r * r, 1 - r]; };
-    for (let v = 0; v < 24; v++) {
+    for (let v = 0; v < voices; v++) {
       const f0 = rnd(95, 240), pan = rnd(0.1, 0.9), amp = rnd(0.4, 1);
       let ph = 0, env = 0, on = Math.random() < 0.5, nextSyl = 0, c1 = res(500, 90), c2 = res(1500, 120);
       let y1 = 0, y2 = 0, z1 = 0, z2 = 0, vib = Math.random() * 6;
@@ -75,11 +85,24 @@ export class Ambience {
       const fade = Math.floor(sr * 0.25);
       for (let i = 0; i < fade; i++) { const t = i / fade; d[i] = d[i] * t + d[n - fade + i] * (1 - t); }
     }
-    this.crowd = c.createGain(); this.crowd.gain.value = 0; this.crowd.connect(this.bed);
-    for (const [rate, off] of [[1, 0], [0.955, 1.7]]) {
-      const src = c.createBufferSource(); src.buffer = b; src.loop = true; src.loopEnd = 4 - 0.25; src.playbackRate.value = rate;
-      const g = c.createGain(); g.gain.value = 0.55; src.connect(g); g.connect(this.crowd); src.start(0, off);
-    }
+    return b;
+  }
+
+  /**
+   * The lodge at the bottom of the run (life.js): après-ski chatter heard through the walls (babble low-passed
+   * at ~700 Hz) and the odd clink of glasses, placed in 3D at the lodge, fading with distance.
+   */
+  setLodge(pos) {
+    if (!pos || this.lodge || !this.T.lodge.gain) return;
+    const c = this.ctx, b = this.babble(10);
+    const pan = c.createPanner();
+    pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.refDistance = 10; pan.maxDistance = 200; pan.rolloffFactor = 1.4;
+    if (pan.positionX) { pan.positionX.value = pos.x; pan.positionY.value = pos.y + 2; pan.positionZ.value = pos.z; } else pan.setPosition(pos.x, pos.y + 2, pos.z);
+    const g = c.createGain(); g.gain.value = this.T.lodge.gain;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700; lp.Q.value = 0.6;
+    const src = c.createBufferSource(); src.buffer = b; src.loop = true; src.loopEnd = 3.75;
+    src.connect(lp); lp.connect(g); g.connect(pan); pan.connect(this.bed); src.start(0, Math.random() * 3);
+    this.lodge = { pan, clinkT: rnd(2, 6) };
   }
 
   /**
@@ -202,6 +225,11 @@ export class Ambience {
     if (P.gulls > 0 && o.riding !== false && (this.gullT -= dt) <= 0) {
       this.gullT = rnd(this.T.gulls.every[0], this.T.gulls.every[1]) / P.gulls;
       this.gull(when, this.T.gulls.gain * P.gulls);
+    }
+    if (this.lodge && (this.lodge.clinkT -= dt) <= 0) {   // glasses and cutlery inside
+      this.lodge.clinkT = rnd(2, 7);
+      const n = 1 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < n; i++) this.fx.modal(when + i * rnd(0.08, 0.2), [[rnd(2400, 3400), 1, 0.25], [rnd(5200, 6400), 0.5, 0.15]], this.T.lodge.clink, 0, this.lodge.pan);
     }
     if (P.trees > 0 && (this.creakT -= dt) <= 0) {
       const [a, b] = this.T.creak.every;
