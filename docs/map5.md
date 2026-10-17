@@ -239,6 +239,44 @@ drops, stomp boost, the judged FWT-style run summary and the personal best (docs
   at 20.5 / 17.5 / 14.5 m/s down the fall line: gold 111.7 s, silver 130.9 s, bronze 157.9 s. A clean bot run
   with no SEND IT is silver (124–128 s in the real game); gold needs the boost or a tighter line.
 
+### Mountain, trails, light, run completion (the overnight contracts)
+
+- **Mountain + trails** (docs/maps.md, the mountains-and-trails contract). `registerMap` declares
+  `mountain: { id: 'dragonback', name: 'Dragonback', region: 'Serrated range · wild', accent: '#ff7a1a' }` and
+  twelve trails (`layout.js TRAILS`), one per signature line. **Ride the Dragon** is first (the default start,
+  the normal spawn).
+  - `course.trailSpawn(id)` puts you on the top of the trail's first ridge, facing down its crest.
+  - `course.trailFinish()` → null: every trail ends at the valley line.
+  - `scripts/map5-trails.mjs` measures length / vertical (`--check`), and `--ride` rides every trail from its own
+    start on both gears: all 24 runs finish, 50–62 mph.
+
+  | trail | difficulty | start | length | vertical |
+  |---|---|---|---|---|
+  | `ride-the-dragon` Ride the Dragon ★ | ◆◆ | the Shoulder (spawn) | 2910 m | 1580 m |
+  | `twin-hop` Twin Hop ★ | ◆ | Left Twin u 150 | 2760 m | 1500 m |
+  | `scale-jump` Scale Jump | ◆ | the Spine u 200 | 2720 m | 1490 m |
+  | `bladerunner` Bladerunner | ◆◆ | the Blade u 110 | 2760 m | 1540 m |
+  | `the-blade` The Blade | ◆◆ | the Blade u 110 | 2740 m | 1540 m |
+  | `dragons-tooth` The Dragon's Tooth ★ | ◆◆ | the Keel u 110 | 2950 m | 1540 m |
+  | `wishbone` West Fin & Wishbone | ◆ | West Fin u 110 | 2820 m | 1540 m |
+  | `the-staircase` The Staircase | ◆ | Stair 1 u 790 | 1890 m | 980 m |
+  | `the-knife` The Knife | ◆◆ | the Knife u 1250 | 1280 m | 610 m |
+  | `organ-pipes` The Organ Pipes | ◆ | u 1130 | 1420 m | 710 m |
+  | `the-gullies` The Gullies | ■ blue | u 130 | 2690 m | 1520 m |
+  | `the-slot` The Slot | ■ blue | u 100 | 2760 m | 1550 m |
+
+  Lengths are along the line in 3-D, start to finish.
+- **Light** (`course.atmosphere`, the per-map atmosphere hook, docs/graphics.md): **first light**.
+  - A low morning sun (20°) from the east-south-east (bearing 120), down the run. The face falls east; a western
+    sun left the whole face in the summit ridge's shadow.
+  - A pale warm sun tint, a deep blue zenith, a warm horizon, exposure 0.56, shade 0.85.
+  - Ridges read lit on top and blue in their gullies. Previewed with `?atmo=` on a temporary merge of the
+    hook; inert until the hook lands.
+- **Run completion**: no map code. The ride tracker (reward-cases, `profile/tracker.js`) emits `runCompleted
+  { mapId, trailId, distance, time, score, … }` for every `runComplete` (zen: main.js at `course.finishAt`) and
+  `runFinished` (challenge). Dragonback ends every trail at its finish line, so it gets one per finished run.
+  Emitting it from the map as well would double-count.
+
 ---
 
 ## 5. Tunables (where to change what)
@@ -426,14 +464,8 @@ against Ravenspire 19.2 ms average. The ratio holds; the draws and triangles are
 
 ## 7. Known issues and ideas
 
-- **The light is the shared sun.** The lighting (`scene.js LIGHTING`) is read at module load, before a map is
-  chosen, so a per-map time of day would need a boot-order change in shared code. Dragonback's identity
-  comes instead from:
-  - the striped north/south flanks;
-  - the serrated summit ridge;
-  - the orange bivouacs and prayer flags.
-
-  `?sun=bearing,elevation` (a debug override) shows what a low evening sun would do.
+- **The light** is the map's own (`course.atmosphere`, first light from the ESE) once the per-map atmosphere
+  hook is merged; until then the shared midday sun.
 - **Line goals need a clean, ordered run.** The bot completes most of them, but not every run: a hop that
   lands 12 m off the target's crest isn't "on" it.
 - **At 32 m/s (72 mph) the short stair spurs and the Scale Jump curve are too tight to follow.** Riders fly
@@ -454,4 +486,3 @@ Ideas:
 - a timed "line challenge" built on the line goals;
 - a sluff that follows you down a gully;
 - a replay camera for the biggest ridge hop;
-- per-map light, once the boot order allows it.

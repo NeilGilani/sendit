@@ -38,6 +38,14 @@ export class DragonbackCourse {
     this.challenge = { medalSpeeds: { gold: 20.5, silver: 17.5, bronze: 14.5 } };   // m/s down the fall line (FINISH_U / time)
     this.physics = DRAGONBACK_PHYSICS;
     this.camera = DRAGONBACK_CAMERA;
+    // The map's own light (per-map atmosphere hook, docs/graphics.md): first light. A low morning sun from the
+    // east-south-east, down the run (the face falls east; a western sun leaves it in the summit ridge's
+    // shadow), so the ridges stand out lit on top and blue in their gullies; a deep blue zenith, a warm horizon.
+    this.atmosphere = {
+      sunBearing: 120, sunElevation: 20, sunTint: '#ffe6cc',
+      skyZenith: '#2f5fae', skyHorizon: '#f1d9c2', fogColor: '#ffe4cc',
+      exposure: 0.56, ambientScale: 0.85,
+    };
     this.water = -1e5;
     this.edgeHint = 'Edge of the range — head back onto the ridges';
     this.lifts = [];
