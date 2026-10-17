@@ -11,6 +11,7 @@ const VIEWS = [
   ['glade', 900, -40, 0, 0], ['gully', 700, 440, 0, 0], ['otorii', 1470, 40, 0, 0], ['tunnel', 1600, 49, 0, 0],
   ['shrine', 1700, 40, 0, 0], ['ryokan', 1840, 120, 0.3, 0], ['pagoda', 1760, -60, -0.4, 0], ['onsen', 1830, 330, 0, 0],
   ['base', 2300, 60, 0, 0], ['lookback', 1500, -80, Math.PI, 0], ['lookback2', 2350, 100, Math.PI, 0],
+  ['villageUp', 2070, 20, Math.PI, 0], ['villageSide', 1890, -70, -1.25, 0], ['shrineFront', 1800, 30, Math.PI - 0.2, 0],
 ];
 const pick = which === 'all' ? VIEWS : VIEWS.filter((v) => which.split(',').includes(v[0]));
 const browser = await chromium.launch({ args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
