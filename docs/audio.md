@@ -232,10 +232,22 @@ The test fails on:
 - non-finite samples or parameters;
 - any peak above −1 dBFS (including all volumes at 1 and extreme inputs);
 - a page error;
-- or a broken relation, such as: carving louder than standing, snow rising with speed, powder quieter and
-  darker than groomed, ice brighter than groomed, a board lower than skis, a hockey stop louder than the carve
-  before it, wind at 30 m/s much louder than at 4 m/s but not overwhelming, first person windier than the chase
-  cam, landings standing out, a forest bed, and a park cheer.
+- or a broken relation:
+  - carving is louder than standing, and snow rises with speed;
+  - powder is quieter and darker than groomed; ice is brighter than groomed;
+  - a board sounds lower than skis;
+  - a hockey stop is louder than the carve before it;
+  - wind at 30 m/s is much louder than at 4 m/s but not overwhelming, and first person is windier than the
+    chase cam;
+  - landings stand out of the air;
+  - the forest has a bed, a lift tower rattles over the rope hum, the park PA speaks and a clean park landing
+    gets a cheer;
+  - breathing comes after a hard run, deep powder throws face shots, and cold snow squeaks when slow;
+  - another skier passes and fades, and the rider fades when the camera pulls away;
+  - music energy and drops drive the music;
+  - pushing makes strokes, and bumps thump.
+
+`audio-dsp.mjs` fails on NaNs, on ordinary riding reaching the worklets' safety knee, and on blow-ups.
 
 ## Tuning tips
 
