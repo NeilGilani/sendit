@@ -8,8 +8,9 @@ colour. There is no money anywhere in this: no purchases, no keys, no trading. T
 shown before you open. Research behind the numbers: [rewards-research.md](rewards-research.md).
 
 ```
-Lobby → Cases tab      unopened cases, Open, progress to the next case, how to earn, collection %, contents and odds
-Lobby → Locker tab     everything you own per slot; click to wear it (lobby rider, rides, first person)
+Lobby → Cases tab      unopened cases, Open, progress to the next case, how to earn, collection %, best pull, contents and odds
+Lobby → Locker tab     everything you own per slot; click to wear it (lobby rider, rides, first person);
+                       "Show missing" lists the rest as silhouettes with the case and the chance per case
 node web/scripts/unittest.mjs                      odds simulation, pity, progression pacing, migration, store
 node web/scripts/cases-timing.mjs                  the opening at 60 fps: reel position, speed, ticks
 node web/scripts/rewards-table.mjs                 the case contents as markdown (the Items section below)
@@ -119,8 +120,10 @@ CS2's client waits ~2 s for the case and then scrolls 6.0 s on `cubic-bezier(0.0
 | 2.20 s | 132 | 15 of ~48.5 cards gone, 56 cards/s. |
 | 2.40 s | 144 | 24 cards, 34 cards/s; cards become readable. |
 | 3.00 s | 180 | 36 cards (74 %), 12 cards/s; streaks fade out; the red and gold cards placed in the last 14 cards scroll past. |
+| 3.80 s | 228 | A quiet tension riser starts (a sine climbing a fifth plus a rising filtered-noise swell) and runs until the landing. |
 | 4.00 s | 240 | 43.6 cards (90 %), 4.3 cards/s; ticks ~230 ms apart. |
 | 5.00 s | 300 | 46.5 cards, 1.9 cards/s; ticks ~500 ms apart. |
+| 5.30 s | 318 | The marker starts to breathe (a slow glow pulse) for the rest of the crawl. |
 | 6.00 s | 360 | 47.8 cards, 0.8 cards/s: the crawl. A rarer neighbour creeps toward or away from the marker. |
 | 7.00 s | 420 | 48.4 cards, 0.3 cards/s. On a near miss the rare card is still touching the marker; a soft high "tease" note plays as it crosses. |
 | 8.00 s | 480 | Stop. Landing thunk. The other cards dim to 45 %, the winner pops to 109 % and settles at 105 % with a rarity-coloured ring. |
@@ -141,8 +144,13 @@ CS2's client waits ~2 s for the case and then scrolls 6.0 s on `cubic-bezier(0.0
   never changes what you get.
 - **Ticks**: one per card crossing the marker, at least 55 ms apart, brighter while fast. Gaps grow
   from 67 ms to 230 ms (4 s), 450 ms and 680 ms (the last crossings).
+- **The lens**: a faintly brighter strip around the marker, like CS2's sharp centre over a dimmer reel.
 - **Skip**: Space or the Skip button jumps straight to the reveal. Esc closes the reveal. While the
   overlay is up the lobby's own keys (Q/E, A/D, Enter) are held back.
+- **Gamepad**: the opener takes the pad first (`Lobby.overlay`): A skips the spin or presses the focused
+  button, the d-pad moves between Equip now / Open next / Close, B closes.
+- **Equip now** wears the pull at once (switching skis and snowboard for gear) and closes; it is offered
+  for a duplicate too when you are not wearing it. **Open next** chains straight into the next case.
 - `prefers-reduced-motion`: no streaks, no shake, no bobbing case, no spinning rays.
 
 ## Items
@@ -274,4 +282,9 @@ Add a variant to an item in `web/src/profile/items.js`:
   (the head is under the helmet anyway).
 - Odds are per case, not per item: a grade with fewer items gives each item a higher chance (the
   contents panel shows "% each").
-- No trading, selling, inspecting in 3D or showcase yet; the Locker previews on the lobby rider.
+- No trading, selling or 3D inspect view; the Locker previews on the lobby rider and the Cases tab shows
+  your best pull.
+- A case only drops from the three series; there is no choosing which case to earn. Rank-up cases need
+  the game-feel progression branch (`juiceLevelUp`); without it that source is simply silent.
+- Headless captures on a busy GPU run the lobby at a few fps; `casesshot.mjs SEEK=1` freezes the show at
+  exact times for screenshots, and `cases-timing.mjs` gives the exact 60 fps numbers.
