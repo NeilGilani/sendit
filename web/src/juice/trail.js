@@ -24,6 +24,7 @@ export class HotTrail {
     this.n = T.segments;
     this.pts = [];            // [{x,y,z, sx, sz}] newest first
     this.k = 0;               // current intensity 0..1
+    this.warm = 20;           // frames drawn (invisibly) during loading so the shader compiles there
     const geo = new THREE.BufferGeometry();
     this.pos = new Float32Array(this.n * 2 * 3);
     this.fade = new Float32Array(this.n * 2);
@@ -52,6 +53,7 @@ export class HotTrail {
   /** dt real seconds; mult = live combo multiplier (1 when none); flow = SEND IT on. */
   update(dt, mult, flow, riding) {
     const T = JUICE_TRAIL, pl = this.pl;
+    if (this.warm > 0) { this.warm--; this.mat.uniforms.uK.value = 0; this.mesh.visible = true; return; }
     const allowed = riding && (settings.quality ?? 1) > 0 && settings.view !== 'fp' && settings.juiceSpeedFx !== false;
     const hot = mult >= T.fromMult ? T.base + (1 - T.base) * Math.min(1, (mult - T.fromMult) / (T.fullMult - T.fromMult)) : 0;
     const want = allowed ? Math.max(flow ? 1 : 0, hot) : 0;
