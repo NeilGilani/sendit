@@ -4,16 +4,17 @@
 //           'runComplete'                 → counts a finished lap
 //           'rideEnded' { score, … }      → closes the session (main.js emits it when leaving a ride)
 //           window 'pagehide'             → closes an open session so closing the tab mid-ride counts
-// Emits:    'rideRecorded' { score, distance, airTotal, runs, mapId, rank, isNewBest }
+// Emits:    'rideRecorded' { score, distance, airTotal, runs, mapId, rank, isNewBest, trailBoard, trailRank, trailNewBest }
+// getTrailBoard() (optional) names a second board the ride also lands on: the trail's (maps/registry.js trailBoardId).
 import { on, emit, game, scoreSnapshot, Mode } from '../state.js';
 import { profileStore } from './store.js';
 import { services } from '../services/index.js';
 
-export function installRideTracker({ getMapId }) {
+export function installRideTracker({ getMapId, getTrailBoard = () => null }) {
   let session = null;
 
   on('rideStarted', () => {
-    session = { t0: performance.now(), runs: 0, mapId: getMapId(), equipment: profileStore.equipment };
+    session = { t0: performance.now(), runs: 0, mapId: getMapId(), trailBoard: getTrailBoard(), equipment: profileStore.equipment };
   });
   on('runComplete', () => { if (session) session.runs += 1; });
   on('rideEnded', (snap) => finish(snap || scoreSnapshot()));
@@ -28,14 +29,17 @@ export function installRideTracker({ getMapId }) {
     const duration = (performance.now() - s.t0) / 1000;
     profileStore.recordRide({ ...snap, duration, runsCompleted: s.runs });
     const me = services.identity.current();
-    let result = { rank: null, isNewBest: false };
+    let result = { rank: null, isNewBest: false }, trail = { rank: null, isNewBest: false };
+    const entry = (mapId) => ({
+      mapId, score: snap.score, distance: snap.distance, airTime: snap.airTotal,
+      equipment: s.equipment, playerId: me.id, name: profileStore.profile.displayName,
+    });
     try {
-      result = await services.leaderboard.submit({
-        mapId: s.mapId, score: snap.score, distance: snap.distance, airTime: snap.airTotal,
-        equipment: s.equipment, playerId: me.id, name: profileStore.profile.displayName,
-      });
+      result = await services.leaderboard.submit(entry(s.mapId));
+      if (s.trailBoard && s.trailBoard !== s.mapId) trail = await services.leaderboard.submit(entry(s.trailBoard));
     } catch (e) { console.warn('[tracker] leaderboard submit failed', e); }
-    const rec = { ...snap, runs: s.runs, duration, mapId: s.mapId, rank: result.rank, isNewBest: result.isNewBest };
+    const rec = { ...snap, runs: s.runs, duration, mapId: s.mapId, rank: result.rank, isNewBest: result.isNewBest,
+      trailBoard: s.trailBoard, trailRank: trail.rank, trailNewBest: trail.isNewBest };
     emit('rideRecorded', rec);
     return rec;
   }

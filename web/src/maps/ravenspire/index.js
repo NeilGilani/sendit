@@ -35,6 +35,32 @@ registerMap({
   thumbnail: RAVENSPIRE_THUMB,
   order: 3,
   tags: ['handmade', 'freeride', 'big-mountain'],
+  // Mountain + trails (docs/maps.md): every trail starts at one of the course's drop zones (keys 1–9 in a ride).
+  mountain: {
+    id: 'ravenspire', name: 'Ravenspire', region: 'Lone horn · big-mountain freeride',
+    blurb: 'An isolated face with stacked cliff bands, spines, pillows, a deep ravine and an abandoned lift station.',
+    accent: '#9db4ff',
+  },
+  trails: [
+    { id: 'heli-drop', name: 'Heli Drop', difficulty: 'black', featured: true, dropZone: 'Heli Drop', length: 2510, vertical: 1600,
+      description: 'The full face from the heli shoulder: pick your line on the way down.' },
+    { id: 'the-stacks', name: 'The Stacks', difficulty: 'double-black', featured: true, dropZone: 'The Stacks', length: 1660, vertical: 900,
+      description: 'Cliff into cliff: The First Stack, The Throne, The Last Stack. The Classic line goal.' },
+    { id: 'spine-wall', name: 'Spine Wall', difficulty: 'double-black', dropZone: 'Spine Wall', length: 2390, vertical: 1530,
+      description: 'Sluff-carved spines, then the West Ledges and the Pillow Stacks.' },
+    { id: 'the-couloir', name: 'The Couloir', difficulty: 'double-black', dropZone: 'The Couloir', length: 2200, vertical: 1350,
+      description: 'Into the gorge: the couloir, the ravine and the Frozen Falls.' },
+    { id: 'the-hammer', name: 'The Hammer', difficulty: 'double-black', dropZone: 'The Hammer', length: 1820, vertical: 1100,
+      description: 'The biggest single cliff on the mountain. Hammer Time.' },
+    { id: 'station-cliff', name: 'Station Cliff', difficulty: 'black', dropZone: 'Station Cliff', length: 1230, vertical: 530,
+      description: 'Station to Station: the cliff, the old lift station roof and the cable drop.' },
+    { id: 'the-ravine', name: 'The Ravine', difficulty: 'black', dropZone: 'The Ravine', length: 1490, vertical: 730,
+      description: 'Halfway down the gorge: walls to slash and the Frozen Falls below.' },
+    { id: 'pillow-stacks', name: 'Pillow Stacks', difficulty: 'black', dropZone: 'Pillow Stacks', length: 1060, vertical: 420,
+      description: 'Pillow Talk: bounce down the stacked pillows on the skier’s left.' },
+    { id: 'lower-bowl', name: 'Lower Bowl', difficulty: 'blue', dropZone: 'Lower Bowl', length: 980, vertical: 350,
+      description: 'The open bowl below the cliffs: fast, wide and forgiving.' },
+  ],
   describe: () => 'Big-mountain freeride · 1,640 m vertical · cliffs, spines, ravine',
   load: async () => {
     const course = new RavenspireCourse();

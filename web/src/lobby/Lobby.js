@@ -8,7 +8,8 @@
 import { on, emit } from '../state.js';
 import { profileStore } from '../profile/store.js';
 import * as catalog from '../profile/catalog.js';
-import { listMaps, getMap } from '../maps/registry.js';
+import { listMaps, getMap, listMountains, DIFFICULTIES } from '../maps/registry.js';
+import { difficultyBadge, trailStats } from '../maps/badges.js';
 import { services } from '../services/index.js';
 import { storage } from '../services/storage.js';
 import { listLobbyTabs, getLobbyTab } from './tabs.js';
@@ -27,11 +28,12 @@ export class Lobby {
    * @param {LobbyStage}  o.stage
    * @param {Input}       o.input
    * @param {Function}    o.onRide      start a ride
+   * @param {Function}    [o.onTrail]   pick a trail: onTrail(mapId, trailId, { ride }) (main.js selectTrail)
    * @param {object}      [o.ui]        UI helpers: { showCredits() }
    * @param {Function}    [o.sfx]       play a UI sound: sfx(name, gain, rate)
    */
-  constructor({ root, stage, input, onRide, ui = {}, sfx = () => {} }) {
-    Object.assign(this, { root, stage, input, onRide, ui, sfx });
+  constructor({ root, stage, input, onRide, onTrail = null, ui = {}, sfx = () => {} }) {
+    Object.assign(this, { root, stage, input, onRide, onTrail, ui, sfx });
     this.visible = false;
     this.active = null;            // { tab, cleanup, subs }
     this.activeId = storage.get(TAB_KEY) || 'equipment';
@@ -73,7 +75,7 @@ export class Lobby {
         <div class="lb-go">
           <button class="lb-map" type="button" data-goto="maps">
             <span class="lb-map-thumb"></span>
-            <span class="lb-map-text"><small>Map</small><b class="lb-map-name">…</b><em class="lb-map-desc"></em></span>
+            <span class="lb-map-text"><small class="lb-map-mtn">Map</small><b class="lb-map-name">…</b><em class="lb-map-desc"></em></span>
           </button>
           <div class="lb-mode" role="radiogroup" aria-label="Mode">
             <div class="lb-mode-seg">
@@ -93,7 +95,7 @@ export class Lobby {
     this.el = {
       hit: q('.lb-hit'), tabs: q('.lb-tabs'), panel: q('.lb-panel'), top: q('.lb-top'), bottom: q('.lb-bottom'),
       ride: q('.lb-ride'), chip: q('.lb-chip'), toast: q('.lb-toast'),
-      mapName: q('.lb-map-name'), mapDesc: q('.lb-map-desc'), mapThumb: q('.lb-map-thumb'),
+      mapName: q('.lb-map-name'), mapDesc: q('.lb-map-desc'), mapThumb: q('.lb-map-thumb'), mapMtn: q('.lb-map-mtn'), mapBtn: q('.lb-map'),
     };
     this.el.ride.addEventListener('click', () => this.ride());
     this.el.modeInfo = q('.lb-mode-info');
@@ -147,11 +149,21 @@ export class Lobby {
     this.root.querySelector('.lb-pmeta').textContent = `${me.isGuest ? 'Guest' : me.provider} · ${services.network.statusText} · best ${p.stats.bestScore.toLocaleString()}`;
   }
 
-  /** Map shown next to the Ride button. */
-  setMapInfo({ map, variant, course, description }) {
-    this.mapInfo = { map, variant, course };
-    this.el.mapName.textContent = map.name;
-    this.el.mapDesc.textContent = description || map.description;
+  /** Mountain + trail shown next to the Ride button. `trail` = the registry trail object. */
+  setMapInfo({ map, variant, course, description, trail = null, starts = [], heightAt = null }) {
+    this.mapInfo = { map, variant, course, trail, starts, heightAt };
+    const m = map.mountain;
+    this.el.mapMtn.textContent = m?.name || 'Map';
+    if (trail) {
+      this.el.mapName.innerHTML = `${difficultyBadge(trail.difficulty, 15, 'lb-map-badge')}<span>${esc(trail.name)}</span>`;
+      const stats = trailStats(trail);
+      this.el.mapDesc.textContent = [trail.group, DIFFICULTIES[trail.difficulty]?.label, stats].filter(Boolean).join(' · ');
+    } else {
+      this.el.mapName.textContent = map.name;
+      this.el.mapDesc.textContent = description || map.description;
+    }
+    this.el.mapBtn.style.setProperty('--acc', m?.accent || '');
+    this.el.mapBtn.setAttribute('aria-label', `Trail: ${trail ? `${trail.name} on ${m?.name}` : map.name}. Change trail`);
     this.el.mapThumb.style.backgroundImage = map.thumbnail ? `url("${map.thumbnail}")` : '';
     this.renderMode();
   }
@@ -243,7 +255,11 @@ export class Lobby {
     return {
       profile: profileStore,
       catalog,
-      maps: { list: listMaps, get: getMap, current: () => this.mapInfo },
+      maps: {
+        list: listMaps, get: getMap, mountains: listMountains, current: () => this.mapInfo,
+        selectTrail: (mapId, trailId, opts = {}) => this.onTrail?.(mapId, trailId, { mode: this.mode, ...opts }),
+      },
+      sfx: (...a) => this.sfx(...a),
       services,
       stage: this.stage,
       on: (name, fn) => { const off = on(name, fn); subs.push(off); return off; },
@@ -336,7 +352,12 @@ export class Lobby {
         this.setMode(this.mode === 'zen' ? 'challenge' : 'zen');
         return true;
       }
-      case 'back': this.el.ride.focus({ preventScroll: true }); return true;
+      case 'back': {   // B: the tab first (Maps: trails → mountains), else back to the Ride button
+        const a = this.active;
+        if (a?.tab.onAction && a.tab.onAction(action, a.ctx)) return true;
+        this.el.ride.focus({ preventScroll: true });
+        return true;
+      }
       default: {
         const a = this.active;
         return !!(a?.tab.onAction && a.tab.onAction(action, a.ctx));

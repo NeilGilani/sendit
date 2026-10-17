@@ -7,6 +7,12 @@
 //   5. Ride → pause (Esc) → Back to lobby; checks the ride was recorded
 //   6. ?ride skips the lobby; pause → lobby still works (stage built lazily)
 //   7. legacy migration: old 'sendit.best' + settings.resort become a v1 profile
+//   8. mountains + trails (docs/maps.md): mountain cards -> trail list by keyboard and gamepad, picking a
+//      trail on the loaded map switches without a reload (URL, profile, map card), Ride starts at the
+//      trail's top with the trail toast; a trail on another mountain reloads into it; ?map=&trail=&ride
+//   8. mountains + trails (docs/maps.md): mountain cards -> trail list by keyboard and gamepad, picking a
+//      trail on the loaded map switches without a reload (URL, profile, map card), Ride starts at the
+//      trail's top with the trail toast; a trail on another mountain reloads into it; ?map=&trail=&ride
 // Fails on any console error / page error.
 // GPU=1 renders on the real GPU (ANGLE D3D11): the lobby shows the full world behind the rider, which
 // is very slow on SwiftShader (minutes per run), so prefer GPU=1 where a GPU is available.
@@ -190,6 +196,95 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   const p = await page.evaluate(() => JSON.parse(localStorage.getItem('sendit.profile')));
   ok(p.version === 1 && p.stats.bestScore === 4321, 'legacy best score migrated into profile v1');
   ok(p.loadout.equipment === 'skis' && p.loadout.slots.board?.item === 'board-northwake-twin', 'migrated profile has a full default loadout');
+  await ctx.close();
+}
+
+// ---------------------------------------------------------------- 8: mountains + trails
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const page = await newPage(ctx);
+  await page.goto(`${base}?map=valcrest-gully`);
+  await lobbyReady(page);
+  await countFrames(page);
+  await page.evaluate(() => { window.__sameLoad = true; window.__sendit.lobby.select('maps', { focus: true }); });
+  await page.waitForTimeout(300);
+  const cards = await page.evaluate(() => [...document.querySelectorAll('.mt-card')].map((c) => ({ id: c.dataset.mountain, here: c.classList.contains('here') })));
+  ok(cards.length >= 5 && ['valcrest', 'blackspruce', 'ravenspire', 'voltage-park', 'lake-tahoe'].every((id) => cards.some((c) => c.id === id)), `mountain cards: ${cards.map((c) => c.id).join(', ')}`);
+  ok(cards.find((c) => c.here)?.id === 'valcrest', 'the loaded mountain is marked');
+  ok(await page.evaluate(() => document.activeElement?.dataset?.mountain === 'valcrest'), 'focus starts on the loaded mountain');
+  // Keyboard: Enter opens the trails, arrows move, Enter picks, Esc goes back.
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.tr-row', { timeout: T });
+  const rows = await page.evaluate(() => [...document.querySelectorAll('.tr-row')].map((r) => r.dataset.trail));
+  ok(rows.join() === 'gully,middle-drops,the-steep,lower-gully,big-drop', `Valcrest trails listed (${rows.join(', ')})`);
+  ok(await page.evaluate(() => document.querySelector('.tr-row.on')?.dataset.trail === 'gully'), 'the current trail is marked');
+  ok(await page.evaluate(() => document.querySelectorAll('.tr-row .tr-badge').length === 5), 'every trail has a difficulty badge');
+  ok(await page.evaluate(() => document.activeElement?.closest('.tr-row')?.dataset.trail === 'gully'), 'focus lands on the current trail');
+  await page.keyboard.press('ArrowDown');
+  ok(await page.evaluate(() => document.activeElement?.closest('.tr-row')?.dataset.trail === 'middle-drops'), 'ArrowDown moves to the next trail');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => window.__sendit.map.trail === 'middle-drops', null, { timeout: 30000 });
+  let t = await page.evaluate(() => ({
+    same: window.__sameLoad === true, url: location.search, prof: window.__sendit.profile.profile.map,
+    card: document.querySelector('.lb-map').innerText, on: document.querySelector('.tr-row.on')?.dataset.trail,
+  }));
+  ok(t.same, 'picking a trail on the loaded map does not reload');
+  ok(/trail=middle-drops/.test(t.url) && /map=valcrest-gully/.test(t.url), `URL carries map + trail (${t.url})`);
+  ok(t.prof.id === 'valcrest-gully' && t.prof.trail === 'middle-drops', 'profile saves map + trail');
+  ok(/Valcrest/i.test(t.card) && /The Middle Drops/.test(t.card), `map card shows mountain + trail (${t.card.split('\n').join(' / ')})`);
+  ok(t.on === 'middle-drops', 'the list marks the new trail');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('.mt-card', { timeout: T });
+  ok(await page.evaluate(() => document.activeElement?.dataset?.mountain === 'valcrest'), 'Esc goes back to the mountains (focus on the one we came from)');
+  // Gamepad: A opens, B goes back.
+  await padPress(page, 0);
+  await page.waitForSelector('.tr-row', { timeout: T });
+  ok(true, 'gamepad A opens a mountain');
+  await padPress(page, 1);
+  await page.waitForSelector('.mt-card', { timeout: T });
+  ok(true, 'gamepad B goes back to the mountains');
+  await page.evaluate(() => { window.__padOn = false; });
+  // Ride starts at the trail's top, with the trail toast.
+  await page.click('.lb-ride');
+  await page.waitForFunction(() => window.__sendit.game.mode === 1, null, { timeout: T });
+  await page.waitForFunction(() => document.getElementById('trail-toast')?.classList.contains('on'), null, { timeout: 8000 }).catch(() => {});
+  t = await page.evaluate(() => {
+    const s = window.__sendit, sp = s.course.trailSpawn('middle-drops');
+    const el = document.getElementById('trail-toast');
+    return { d: Math.hypot(s.player.position.x - sp.x, s.player.position.z - sp.z), toast: el?.innerText || '', on: !!el?.classList.contains('on') };
+  });
+  ok(t.d < 25, `ride starts at the trail's top (${t.d.toFixed(1)} m away)`);
+  ok(t.on && /The Middle Drops/.test(t.toast) && /More difficult/.test(t.toast), 'HUD toast shows the trail name and difficulty');
+  await shot(page, 't8_trail_ride');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => window.__sendit.game.mode === 2, null, { timeout: T });
+  await page.click('#pause [data-act=menu]');
+  await lobbyReady(page);
+  // A trail on another mountain: saves and reloads into it.
+  await page.evaluate(() => window.__sendit.lobby.select('maps'));
+  await page.waitForSelector('.mt-card, .tr-row', { timeout: T });
+  if (await page.$('.mt-back')) await page.click('.mt-back');
+  await page.click('.mt-card[data-mountain=blackspruce]');
+  await page.waitForSelector('.tr-row[data-trail=slot]', { timeout: T });
+  ok(await page.evaluate(() => document.querySelector('.tr-row[data-trail=slot] .tr-ride').classList.contains('reload')), 'a trail on another mountain is marked as a reload');
+  await Promise.all([page.waitForNavigation({ timeout: T }), page.click('.tr-row[data-trail=slot] .tr-pick')]);
+  await lobbyReady(page);
+  t = await page.evaluate(() => ({ map: window.__sendit.map.map.id, trail: window.__sendit.map.trail, card: document.querySelector('.lb-map').innerText }));
+  ok(t.map === 'blackspruce' && t.trail === 'slot', `reloads into the other mountain's trail (${t.map} / ${t.trail})`);
+  ok(/Blackspruce/i.test(t.card) && /SLOT/.test(t.card), 'map card shows the new mountain + trail');
+  await ctx.close();
+}
+{
+  // ?map=&trail=&ride: straight onto a drop-zone trail.
+  const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
+  const page = await newPage(ctx);
+  await page.goto(`${base}?map=ravenspire&trail=the-stacks&ride`);
+  await page.waitForFunction(() => window.__sendit?.game.mode === 1, null, { timeout: T });
+  const t = await page.evaluate(() => {
+    const s = window.__sendit, z = s.course.dropZones.find((d) => d.name === 'The Stacks');
+    return { trail: s.map.trail, d: Math.hypot(s.player.position.x - z.x, s.player.position.z - z.z) };
+  });
+  ok(t.trail === 'the-stacks' && t.d < 25, `?map=ravenspire&trail=the-stacks&ride starts at The Stacks (${t.d.toFixed(1)} m)`);
   await ctx.close();
 }
 
