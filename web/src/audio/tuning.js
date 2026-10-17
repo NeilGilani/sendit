@@ -29,10 +29,13 @@ export const AUDIO = {
     grindDb: -3,
     landDb: -5,                 // short duck on hard landings (impact > 4 m/s), 0.35 s
     airLp: 1200, airLpAfter: 0.4, crashLp: 400, lpRelease: 0.5,   // music low-pass in big air / on a bail
-    calmLp: 5000, calmFrom: 0.1, calmFull: 0.6,                  // music energy: low-passed at 5 kHz when calm, open by 0.6
+    calmLp: 9000, calmFrom: 0.1, calmFull: 0.6,                  // music energy: a gentle 9 kHz low-pass when calm, open by 0.6 (calm Zen rides keep a clear mix)
     dropDb: -6, dropTime: 0.33, pushDb: 2, pushTime: 0.6,        // a music drop: dip under the riser, then a +2 dB push
     attack: 0.25, release: 1.6,
   },
+  // Exposure: the map wind is stronger high on the mountain than down in the sheltered bottom (× at the lowest /
+  // highest point the rider has been this session; needs > 80 m of vertical to kick in)
+  exposure: { low: 0.7, high: 1.3 },
   // Camera distance: the rider's sounds are full within `ref` m (the chase cam sits 4.7–6.9 m back), then fall
   // off as (ref / d)^exp and lose their highs (air absorption) — intro fly-ins, the heli drop, far camera angles
   distance: { ref: 8, exp: 0.9, lpExp: 0.8 },
@@ -47,8 +50,9 @@ export const AUDIO = {
     vRef: 20,             // speed where the speed curves reach 1
     vStart: 0.4,          // below this nothing slides
     scMax: 1.15,          // cap on the snow speed curve (≈ 23 m/s): above it the wind carries the speed
-    // glide hiss: pink noise band, centre rises with speed
-    // (+7 dB per speed doubling ≈ v^1.15; centre ≈ 1.6 kHz · (v / 5)^0.45 — research-real.md §3)
+    // glide hiss: pink noise between a high-pass and a low-pass that both rise as (v / 5)^0.45 (flat octave bands, like
+    // the groomed CC0 run); level +7 dB per speed doubling ≈ v^1.15; flat, unweighted skis are quieter and darker
+    // (docs/audio-research-notes/real-world-acoustics.md §3)
     hiss: { gain: 0.5, hp: 300, lp: 7000, lpMax: 11000, fExp: 0.45, white: 0.12, board: 0.38, boardGain: 0.55, flat: 0.4, flatLp: 0.7, exp: 1.15, powder: 0.18, ice: 0.8, park: 1.05 },
     // groomer corduroy: fine ridges ~2.2 cm apart → a zippy AM at v / spacing on flat bases
     corduroy: { depth: 0.22, spacing: 0.022 },
@@ -58,7 +62,7 @@ export const AUDIO = {
     // the edge "rip" of a carve: two resonant bands + board growl, wobbling slowly
     carve: { gain: 0.75, f1: 520, f2: 1700, fSpeed: 0.7, q1: 1.2, q2: 1.5, wobble: 0.12, edgeExp: 1.3, loadExp: 0.9,
       ice: 1.35, powder: 0.25, boardF: 0.5, growl: 1.2, growlF: 320 },
-    // edge chatter on hard snow: irregular AM at 16–34 Hz
+    // edge chatter on hard snow: irregular AM, skis 20–40 Hz, board 15–35 Hz
     chatter: { fMin: 20, fMax: 40, boardMin: 15, boardMax: 35, depth: 0.85 },   // ski / board bending modes
     // skid / slide / hockey stop: rough scrape + thrown spray
     skid: { gain: 0.95, f: 1700, fIce: 3800, q: 0.8, rough: 0.75, roughF: 45, spray: 0.4, sprayF: 2600, stop: 1.4, from: 0.08, full: 0.7 },
@@ -110,7 +114,7 @@ export const AUDIO = {
     // ridge howl: the strongest ambient gusts moan through rock edges on exposed peaks (maps[id].howl)
     howl: { gain: 0.3, from: 0.6, fMin: 220, fMax: 420, q: 14 },
     // map ambience wind (independent of the rider): distant, over ridges
-    ambient: { gain: 0.25, f: 650, q: 0.5, hiss: 0.4, hissF: 1800, travel: 0.35, travelTau: 3.5 },   // travel: gusts sweep across (±3 dB)   // alpine gust reference: flat to 2 kHz
+    ambient: { gain: 0.25, f: 650, q: 0.5, hiss: 0.4, hissF: 1800, travel: 0.35, travelTau: 3.5, tex: 5.0 },   // tex: CC0 gust grains under it   // travel: gusts sweep across (±3 dB)   // alpine gust reference: flat to 2 kHz
     out: 0.227,           // internal output level (×3.0 on the bus): headroom inside the worklet
   },
 
@@ -127,6 +131,7 @@ export const AUDIO = {
     treePass: { gain: 0.3, radius: 6, minSpeed: 6, minGap: 0.15 },   // any tree / rock passing within 6 m: a softer whoosh
     hardBrake: { gain: 0.5 },
     patter: { gain: 0.3 },
+    splash: { gain: 0.8 },              // into the fjord (fjordline's fjordSplash): slap, spray, bubbles
     stumble: { gain: 0.5 },             // an edge catching: clatter / slap, scrape, spray
     roof: { gain: 0.6 },                // landing on a roof: hollow timber boom, creak, snow off the eaves
     bump: { gain: 0.45, from: 0.25, rise: 0.12, full: 1.2, minGap: 0.25 },   // compression (m/s into the snow) rising fast: a whump
@@ -142,7 +147,7 @@ export const AUDIO = {
   },
 
   // ---------------------------------------------------------------- other skiers on the run (life.js), 3D
-  others: { voices: 3, gain: 0.55, range: 70, refDistance: 5, maxDistance: 150, rolloff: 1.3 },
+  others: { voices: 3, gain: 0.95, range: 70, refDistance: 5, maxDistance: 150, rolloff: 1.3 },
 
   // ---------------------------------------------------------------- per-map ambience (by map id)
   maps: {

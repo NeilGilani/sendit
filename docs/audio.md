@@ -2,7 +2,7 @@
 
 Everything the rider hears is synthesized live from the physics. The snow under the skis or board, the wind,
 spins, landings, grinds and the mountain ambience are not looped samples, so nothing repeats. The only
-recordings are three short CC0 snow textures, granulated under the synthesis. The research behind
+recordings are four short CC0 textures (three of snow, one of wind), granulated under the synthesis. The research behind
 the numbers and the comparisons with real recordings are in `docs/audio-research.md`. Every tunable lives in
 `web/src/audio/tuning.js`.
 
@@ -18,11 +18,11 @@ the numbers and the comparisons with real recordings are in `docs/audio-research
 | `web/src/audio/grind.js` | Rail and box grind: a modal metal scrape plus the `grind_loop` sample, lock-on clang, kink ticks and pop-off. |
 | `web/src/audio/ambience.js` | Per-map beds: forest soughing and creaks, park crowd babble, cheers and a distant PA announcer. The distant wind lives in the wind worklet. |
 | `web/src/audio/lift.js` | Chairlift: rope hum and cable sing, chair creaks, and the grip rattling over each tower's sheaves. |
-| `web/src/audio/others.js` | The other skiers on the run (`life.js`): the nearest three each get a positional (HRTF) snow voice that follows their speed and edge, Doppler-shifted by their radial speed. |
+| `web/src/audio/others.js` | The other skiers on the run (`life.js`): the nearest three each get a positional (HRTF) snow voice that follows their speed and edge, Doppler-shifted by their radial speed. The voice is the real CC0 carve recording, looped from a random point per voice. |
 | `web/src/audio/breath.js` | The rider's breathing: an exertion meter, catching breath after hard runs, and huffs on crashes. |
 | `web/src/audio/tuning.js` | Every parameter, in one place. |
 | `web/src/audio/harness.{html,js}` | Offline render and analysis harness for the tests. Dev only; nothing imports it. |
-| `web/scripts/audio-test.mjs` | Headless test that renders ~35 scripted rides and checks levels, clipping, NaNs and sound-design relations, optionally writing WAVs. |
+| `web/scripts/audio-test.mjs` | Headless test that renders ~45 scenarios (41 scripted plus 3 real-physics traces) and checks levels, clipping, NaNs, worklet errors and 24 sound-design relations, optionally writing WAVs. |
 | `web/scripts/audio-dsp.mjs` | Runs the worklet DSP directly in Node (AudioWorklet shim): checks raw processor output for NaNs, blow-ups and headroom (peaks must stay under the 0.7 safety knee). Takes seconds. |
 | `web/scripts/audio-trace.mjs` | Records real-physics rides (skis and board) as rider-frame traces for the test. |
 | `web/scripts/audio-compare.mjs` | Octave-band, centroid and modulation comparison of recordings and renders. |
@@ -32,8 +32,10 @@ the numbers and the comparisons with real recordings are in `docs/audio-research
 
 ```
 destination ← soft clip (tanh, ceiling 0.86) ← limiter (−2 dB, 20:1) ← master (settings.master × 0.8)
-   master ← glue (−12 dB, 1.6:1) ← sfx (settings.sfx) ← snow  · wind · ambience · fx · ui
-   master ← music (settings.music) ← low-pass (air / bail) ← duck ← Zen track + challenge track
+   master ← glue (−12 dB, 1.6:1) ← sfx (settings.sfx) ┬─ camera-distance stage (gain + low-pass) ← snow · wind · fx
+                                                      ├─ ambience · ui
+                                                      └─ reverb (per map) ← sends from fx, ambience, a little snow
+   master ← music (settings.music) ← low-pass (air / bail / calm) ← duck ← Zen track + challenge track
 ```
 
 - The bus gains are `AUDIO.mix`. The settings sliders (master, sfx, music) scale the matching nodes, so they work
@@ -87,7 +89,7 @@ carve leans up to 22 % toward the outside, loaded ski (turning right, the left s
 | Tuck | Rush −6 dB and a darker low-pass (the lee of the body) |
 | Spin / flip whoosh | In the air, by rotation rate: the ears alternate facing the airflow, so each half turn pans and swells the rush and sweeps its filter, with a whoosh pulse (up to about +7 dB and brighter) as the face swings through the wind |
 | Gusts | Ornstein–Uhlenbeck processes (2.2 s rider-relative, ~5 s ambient) modulate level and relative airspeed |
-| Map wind | Distant wind over the ridges: band-passed brown noise at the map's `windF`, plus hiss, swelling with the gusts and sweeping across the stereo field (±3 dB, as in Farnell's moving gusts). Level and tone are set per map. |
+| Map wind | Distant wind over the ridges: band-passed brown noise at the map's `windF`, plus hiss, plus grains of a CC0 Alpine-gust recording (`tex_wind.mp3`; the bed now matches that recording's profile), swelling with the gusts and sweeping across the stereo field (±3 dB, as in Farnell's moving gusts). Level and tone are set per map. |
 | Ridge howl | On exposed maps (`maps[id].howl`: Ravenspire, Dragonback) the strongest ambient gusts moan through rock edges: two narrow resonances (Q 14, a fifth apart) gliding in 220–420 Hz, rising with the gust |
 
 Slow motion (the apex slow-mo event) scales every filter and modulation rate by 0.55 + 0.45·scale, so the
@@ -107,6 +109,7 @@ mountain drops in pitch with time.
 | Roof landing | `landingGrade` with a `roof` (Ravenspire's lift station and shacks; the village roofs on the Kitsune and Fjordline branches): the hollow timber structure booms (78–390 Hz modes), creaks, and snow slides off the eaves |
 | Stumble | `stumble`: an edge catches. Skis clatter (or the board slaps), with a quick scrape, cloth and a short spray; the old cue plays softer under it. |
 | Rail bail | `grindEnd` with reason `bail`: the rail clangs and the body lands beside it |
+| Fjord splash | `fjordSplash` (Fjordline branch): the slap of the surface, a sheet of spray, then bubbling as the rider goes under; the music dips as for a crash |
 | Crash tumble | `crashed`: 4–6 decaying impacts, cloth, a long slide, and a 'yard sale': skis and poles clattering, or the board slapping |
 | Tree / rock pass | Any tree or rock passing within 6 m above 6 m/s (`player.scatter.nearest`, read-only): the near-miss sound at a softer level |
 | Near miss | `nearMiss`: pink band sweeping 2.6 kHz → 650 Hz (Doppler) with a 4 → 9 → 4 ms comb sweep, panned to the obstacle's side from the travel direction; trees add needle rustle |
@@ -135,6 +138,7 @@ mountain drops in pitch with time.
 | Kitsune Peak (map 6 branch) | A powder volcano at dusk: calm air, cold dry snow, birch creaks, and a distant temple bell every 40–80 s (bronze modal partials with 2–9 s decays) |
 | Fjordline (map 7 branch) | Ski to sea: waves rolling in and washing out far below (swell, break, recede, every 7–11 s) and gull cries over the water |
 | Every map | Riding a chairlift: rope hum and tower rattles |
+| Every map | Exposure: the map wind is ×0.7 at the lowest point the rider has been this session and ×1.3 at the highest (once there is more than 80 m of vertical), so summits are windier than the sheltered bottom |
 | Maps with a lodge (`life.js`) | Après-ski chatter heard through the walls (10 babble voices low-passed at 700 Hz) and the odd clink of glasses, in 3D at the lodge, fading with distance |
 
 **The place (reverb):** a per-map convolution send on the one-shots, the ambience and a little of the snow. Its
@@ -184,7 +188,7 @@ Tune it with `maps[id].verb`, `verbTime`, `verbPre` and `verbDark`.
 `juice/music.js` (game-feel branch) calls these optional SoundScape methods when they exist:
 - **`sound.setMusicEnergy(level 0..1)`:**
   - lifts the upbeat track above 0.62 energy and releases it below 0.4, with a minimum 8 s hold;
-  - makes the music mellow (low-passed at 5 kHz) when calm, fully open by 0.6.
+  - makes the music a little mellower (a gentle 9 kHz low-pass) when calm, fully open by 0.6.
 - **`sound.musicDrop(kind, strength)`:** a pink-noise riser over 0.33 s while the music dips 6 dB, the `boost`
   hit when it lands, then a +2 dB push for 0.6 s. There is a 2.5 s cooldown.
 
@@ -261,6 +265,11 @@ surface mix, sink, chatter, wind and spin, the music duck and low-pass, camera d
 event counts. `window.__senditAudio` is the SoundScape and `.engine` the AudioEngine.
 
 ## Tuning tips
+
+All levels, thresholds, rates, filter curves and map moods are in `tuning.js` (`AUDIO`), the one place to tune. The
+fine shape of each one-shot (the exact mode frequencies of a clang, the timing inside a landing) is written in its
+function in `fx.js`, `grind.js`, `lift.js` and `ambience.js`, with a comment saying what it imitates.
+
 
 - **Too much or too little snow:** `mix.snow`, then the per-layer `gain`s in `snow`.
 - **Brightness:** `snow.hiss.hp` / `lp` and `grains.fGroomed`.

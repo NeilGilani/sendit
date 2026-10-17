@@ -249,7 +249,7 @@ class SnowProcessor extends AudioWorkletProcessor {
       const skid = a.skid * it + g.skid * t, spray = a.spray * it + g.spray * t, powder = a.powder * it + g.powder * t;
       const base = a.base * it + g.base * t, ice = a.ice * it + g.ice * t, grainAmp = a.grainAmp * it + g.grainAmp * t;
       const squeal = (a.squeal ?? 0) * it + g.squeal * t;
-      // cold squeak: Poisson creaks — stick-slip pulse trains (40–90 Hz) through a narrow gliding resonance
+      // cold squeak: Poisson creaks — noise jerked at 40–90 Hz (stick-slip) through two gliding band-passes
       const ck = this.ck;
       let ckS = 0;
       if (!ck.on && g.squeak > 1e-4 && this.rng.u() < g.squeakRate / fs) {
@@ -275,7 +275,7 @@ class SnowProcessor extends AudioWorkletProcessor {
       this.cordPh += cordInc * this.cordJit;
       if (this.cordPh >= 1) { this.cordPh -= 1; this.cordJit = 0.85 + this.rng.u() * 0.3; }
       const cordAM = 1 - cord * (0.5 + 0.5 * Math.sin(TAU * this.cordPh));
-      // chatter: irregular AM at 16–34 Hz, each cycle a new depth
+      // chatter: irregular AM (skis 20–40 Hz, board 15–35 Hz), each cycle a new depth
       this.chPh += this.chF * g.chF / fs;
       if (this.chPh >= 1) { this.chPh -= 1; this.chF = lerp(g.chMin, g.chMax, this.rng.u()); this.chAmp = 0.4 + 0.6 * this.rng.u(); }
       const chatAM = 1 - chat * this.chAmp * (0.5 + 0.5 * Math.cos(TAU * this.chPh));
@@ -348,6 +348,9 @@ class WindProcessor extends AudioWorkletProcessor {
     this.rng = new Rng(777);
     this.ch = [0, 1].map((c) => ({ rng: new Rng(99991 + c * 31337), pink: new Pink(), brown: 0, rush: new SVF(), bump: new SVF(), hp: new SVF(), hi: new SVF(), w1: new SVF(), w2: new SVF(), amb: new SVF(), ambH: new SVF(), howl: new SVF(), howl2: new SVF() }));
     this.howlF = 300; this.howlTgt = 300; this.howlT = 0;
+    // a real wind texture (tex_wind.mp3, CC0 Alpine gusts) granulated under the synthetic map wind
+    this.tex = new Granular(55);
+    this.port.onmessage = (e) => { if (e.data?.tex === 'wind') this.tex.set(e.data.data); };
     this.buf = new SVF(); this.flut = new SVF(); this.bBrown = 0; this.flapF = new SVF(); this.flapPh = 0; this.flapA = 1; this.flapPk = new Pink(); this.flapRng = new Rng(4242);
     this.g1 = 0; this.g2 = 0; this.g3 = 0; this.g4 = 0; this.sqPh = 0; this.sqA = 0; this.sqT = 0; this.lock1 = 0; this.lock2 = 0; this.lockT1 = 0; this.lockT2 = 0; this.lt1 = 0; this.lt2 = 0;
     this.ph = 0;
@@ -420,6 +423,7 @@ class WindProcessor extends AudioWorkletProcessor {
       const buffet = a.buffet * it + g.buffet * t, rush = a.rush * it + g.rush * t, hi = a.hi * it + g.hi * t;
       const howl = (a.howl ?? 0) * it + g.howl * t;
       const wh1 = a.wh1 * it + g.wh1 * t, wh2 = a.wh2 * it + g.wh2 * t, amb = a.amb * it + g.amb * t, ambHi = a.ambHi * it + g.ambHi * t;
+      this.tex.tick(amb * T.ambient.tex, (0.92 + 0.08 * this.g2) * r, fs, 0.8);
       const spin = a.spin * it + g.spin * t, outG = a.out * it + g.out * t, flap = a.flap * it + g.flap * t;
       // jacket flapping: irregular pulses at 8–25 Hz through a 200–600 Hz band
       this.flapPh += flapInc * (0.85 + 0.3 * this.flapA);
@@ -449,7 +453,7 @@ class WindProcessor extends AudioWorkletProcessor {
         const hiS = c.hi.bp(pk);   // one tick per sample (both uses share it)
         s += hiS * hi * 2.2 * ear * (ci === 0 ? earL : earR) * (1 + (whoosh - 1) * 1.5) + hiS * T.spin.air * spin * pz * 2.2;
         s += (c.w1.bp(w) * wh1 + c.w2.bp(w) * wh2) * 6;
-        s += (c.amb.bp(c.brown * 3.5) * amb * 2.2 + c.ambH.bp(pk) * ambHi) * (ci === 0 ? ambL : ambR);
+        s += (c.amb.bp(c.brown * 3.5) * amb * 2.2 + c.ambH.bp(pk) * ambHi + (ci === 0 ? this.tex.l : this.tex.r)) * (ci === 0 ? ambL : ambR);
         if (howl > 1e-5) s += (c.howl.bp(pk) + c.howl2.bp(pk) * 0.35) * howl * 4;
         const o = safe(s * outG);
         if (ci === 0) L[i] = o; else if (R !== L) R[i] = o;

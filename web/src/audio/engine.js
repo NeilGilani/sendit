@@ -20,6 +20,7 @@ import { OtherRiders } from './others.js';
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const dbToGain = (db) => Math.pow(10, db / 20);
+const lerpN = (a, b, t) => a + (b - a) * clamp(t, 0, 1);
 /** tanh soft clip: linear below `knee`, saturating toward `ceil` (−1 dBFS) above it. Inputs beyond ±1 are
  *  held at the curve's ends by the WaveShaper, so the ceiling holds whatever arrives. */
 function softClipCurve(knee = 0.75, ceil = 0.89) {
@@ -130,7 +131,12 @@ export class AudioEngine {
       if (this.loadBuffer) await Promise.all([['ski', 'tex_snow_ski.mp3'], ['board', 'tex_snow_board.mp3'], ['skid', 'tex_snow_skid.mp3']].map(async ([k, n]) => {
         const b = this.buffers[n] || await this.loadBuffer(n).catch(() => null);
         if (b && b.length > 4096) this.snow.port.postMessage({ tex: k, data: prepTexture(b, this.T.snow.tex.rms) });
+        if (k === 'ski' && b && b.length > 4096) this.texSkiBuf = b;
       }));
+      if (this.loadBuffer) {
+        const w = this.buffers['tex_wind.mp3'] || await this.loadBuffer('tex_wind.mp3').catch(() => null);
+        if (w && w.length > 4096) this.wind.port.postMessage({ tex: 'wind', data: prepTexture(w, this.T.snow.tex.rms) });
+      }
     } catch (e) {
       console.warn('[audio] worklet unavailable, using sample loops', e);
       this.worklet = false;
@@ -141,6 +147,7 @@ export class AudioEngine {
     this.lift = new LiftVoice(c, this.ambBus, this.fx, this.T.fx.lift);
     this.breath = new BreathVoice(c, this.fxBus, this.fx, this.T.fx.breath);
     this.others = new OtherRiders(c, this.fxBus, this.fx, this.T.others);
+    if (this.texSkiBuf) this.others.useTexture(this.texSkiBuf);   // other skiers sound like the real carve recording
     this.amb.setMap(this.mapId);
     return this;
   }
@@ -218,7 +225,7 @@ export class AudioEngine {
     const spin = air ? Math.abs(r.spin) + Math.abs(r.flip) : 0;
     const windParams = {
       v: quiet ? 0 : r.speed, air, buffet: persp.buffet, whistle: persp.whistle, flap: persp.flap, rush: 1, spin, tuck: r.tuck,
-      ambient: (o.menu ? 0.6 : 1) * map.wind, ambF: map.windF, gusty: map.gustiness, howl: map.howl ?? 0, rate, gain: persp.wind * (o.paused ? 0.5 : 1),
+      ambient: (o.menu ? 0.6 : 1) * map.wind * lerpN(T.exposure.low, T.exposure.high, o.exposure ?? 0.5), ambF: map.windF, gusty: map.gustiness, howl: map.howl ?? 0, rate, gain: persp.wind * (o.paused ? 0.5 : 1),
     };
     if (this.worklet) {
       for (const k in snowParams) this.setP(this.sp, 's' + k, k, snowParams[k], when);
@@ -341,6 +348,7 @@ export class AudioEngine {
       }
       case 'landingGrade': if (d.roof) { this.fx.roof(when, d.rawImpact ?? d.impact ?? 6); this.count('roof'); } break;
       case 'stumble': this.fx.stumble(when, board, powder); break;
+      case 'fjordSplash': this.fx.splash(when, d.speed ?? 10); this.crashT = this.T.duck.crashHold; break;
       case 'parkLanding': if (d.clean) this.amb.cheer(when + 0.2, clamp((d.dist ?? 15) / 20, 0.6, 1.3)); break;
       case 'crashed': this.fx.crash(when, 1, powder, board); this.crashT = this.T.duck.crashHold; this.breath.jolt(0.35); this.breath.huff(when + 0.03, this.T.fx.breath.gain * this.T.perspective[this.view].breath); break;
       case 'musicEnergy': this.setMusicEnergy(d.level ?? 0); break;   // (SoundScape calls these directly; the test drives them as events)

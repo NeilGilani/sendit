@@ -41,7 +41,7 @@ export class FX {
    */
   noise(when, o) {
     const c = this.ctx, src = c.createBufferSource();
-    src.buffer = this[o.buf || 'white'];
+    src.buffer = this[o.buf || 'white']; src.loop = true;   // looped: a long sound never runs off the 2 s buffer
     const dur = (o.attack ?? 0.002) + (o.hold ?? 0) + (o.decay ?? 0.1);
     const f = c.createBiquadFilter(); f.type = o.type || 'bandpass'; f.Q.value = o.q ?? 1;
     f.frequency.setValueAtTime(o.f ?? 1000, when);
@@ -55,7 +55,7 @@ export class FX {
     if (o.type2) { const f2 = c.createBiquadFilter(); f2.type = o.type2; f2.frequency.value = o.ff2 ?? 4000; f2.Q.value = o.q2 ?? 0.7; f.connect(f2); node = f2; }
     src.connect(f); node.connect(g); g.connect(this.dest(o.pan, o.out));
     src.start(when, Math.random() * 1.5);
-    src.stop(when + dur + 0.05);
+    src.stop(when + dur + (o.decay ?? 0.1) * 0.8 + 0.05);   // stop once the tail is ~−60 dB (no click)
     return g;
   }
 
@@ -80,7 +80,7 @@ export class FX {
       o.frequency.value = f * rnd(0.985, 1.015);
       g.gain.setValueAtTime(0, when); g.gain.linearRampToValueAtTime(gain * a, when + 0.002);
       g.gain.setTargetAtTime(0, when + 0.002, dec / 4);
-      o.connect(g); g.connect(d); o.start(when); o.stop(when + dec + 0.05);
+      o.connect(g); g.connect(d); o.start(when); o.stop(when + dec * 1.6 + 0.05);   // tail at ~−55 dB before the stop
     }
   }
 
@@ -154,6 +154,21 @@ export class FX {
     else { this.modal(when, [[rnd(1000, 1300), 1, 0.05], [rnd(2600, 3200), 0.5, 0.03]], G * 0.3 * (1 - 0.7 * powder)); this.modal(when + rnd(0.04, 0.09), [[rnd(950, 1250), 1, 0.05]], G * 0.2 * (1 - 0.7 * powder)); }
     this.noise(when + 0.01, { buf: 'pink', f: rnd(1800, 2600) * (1 - 0.4 * powder), f2: 1100, q: 0.7, gain: G * 0.6, attack: 0.02, decay: 0.25 });
     this.noise(when + 0.03, { f: 2000, q: 0.9, gain: G * 0.25, attack: 0.02, decay: 0.08 });   // cloth
+  }
+
+  /** Into the water (Fjordline's fjord): the slap of the surface, a sheet of spray, then bubbling as you go under. */
+  splash(when, speed = 10) {
+    const G = this.T.splash.gain * clamp(speed / 12, 0.5, 1.4);
+    this.thump(when, { f: 85, f2: 45, gain: G * 0.8, decay: 0.2 });
+    this.noise(when, { buf: 'brown', type: 'lowpass', f: 900, q: 0.7, gain: G, attack: 0.003, decay: 0.3 });
+    this.noise(when + 0.02, { buf: 'pink', f: 2200, f2: 900, q: 0.5, gain: G * 0.8, attack: 0.03, hold: 0.15, decay: 0.9 });
+    for (let i = 0; i < 26; i++) {   // bubbles: tiny rising pings (resonant blips whose pitch climbs as they grow)
+      const t = when + 0.25 + Math.pow(Math.random(), 1.3) * 1.6, f = rnd(300, 1400);
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * rnd(1.3, 1.8), t + 0.04);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(G * rnd(0.04, 0.12) * Math.exp(-(t - when) / 1.2), t + 0.004); g.gain.setTargetAtTime(0, t + 0.004, 0.012);
+      o.connect(g); g.connect(this.dest(rnd(-0.4, 0.4))); o.start(t); o.stop(t + 0.08);
+    }
   }
 
   /** Face shot: deep powder flying up over the goggles and jacket — a soft whump and a fizz of flakes. */

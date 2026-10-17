@@ -17,7 +17,7 @@ post-mortems, Farnell's *Designing Sound*, mixing and WebAudio practice). No acc
 | Powder | Quiet, soft, muffled "pfff"; fresh snow swallows the highs | Absorption ≈ 0.25 at 100 Hz → 0.75 at 2 kHz [measured]; low-pass ≈ 600 + 40·v Hz, edge hiss −12…−18 dB |
 | Snowboard vs skis | One wide base: lower, rumbling, a growl on edge, a flat-base slap on landings; two skis: higher, two contacts, a double clack | Board bending 16 / 37 / 65 Hz, torsion 30 / 54 / 86 Hz; the CC0 board-on-ice recording (Nox_Sound #667729) peaks at **250 Hz**, centroid ≈ 930 Hz [measured by us] |
 | Cold snow | Squeaks and crunches below about −10 °C (dominant ≈ 1 kHz, harder friction 1.5–3.5 kHz) | At riding speed the contact patch reaches 0 °C even on −3.5 °C snow (tribometer, 5–25 m/s) → squeak only when slow |
-| Landing | Body thud (60–90 Hz), the base slapping, a burst of snow; in powder a soft whoomp | Thud 60–90 Hz, ~80–150 ms; powder burst low-passed ≈ 1.5 kHz |
+| Landing | A body thud, the base slapping, a burst of snow; in powder a soft whoomp | The notes suggested a 60–90 Hz thud, but CC0 snow impacts (#675895, #683789) show a broadband crack, a body at 125–250 Hz and scattered crunchy debris [measured by us]. The landings follow the recordings. |
 | Pole plant | A tick as the tip punches in, a crunch, a soft basket thud | Short bursts 3–4 kHz / 1.5–2 kHz + ~150 Hz |
 
 ## 2. Wind
@@ -90,6 +90,8 @@ levels in dB relative to the loudest band, for the loudest 15 % of seconds.
 | Skiers passing a recordist (Selector #680075) | −5 | 0 | −3 | −7 | −5 | −4 | −4 | −4 | −11 | 1.8 kHz |
 | Our other-skier pass (first build) | −33 | −14 | −3 | 0 | −3 | −6 | −9 | −18 | −36 | 0.9 kHz, too dark |
 | Our other-skier pass (tuned) | −35 | −20 | −8 | 0 | 0 | −4 | −6 | −7 | −17 | 1.8 kHz |
+| Our standing-still bed, synthetic only | — | — | — | — | — | — | — | — | — | 0.5 kHz, too dark |
+| Our standing-still bed + CC0 gust grains | −15 | −8 | −5 | −3 | 0 | −4 | −13 | −23 | −35 | 1.0 kHz (the Alpine gusts reference: 1.1 kHz) |
 
 **What changed because of the comparison:**
 - The glide hiss became pink noise between a rising high-pass and low-pass. Pink noise is flat in octave bands,
@@ -112,11 +114,11 @@ levels in dB relative to the loudest band, for the loudest 15 % of seconds.
   - **Creaky snow under a board (facemusic #39082):** a stream of short creaks, formant-like blobs at
     300 Hz–1.2 kHz. This became the cold-snow squeak, which is noise jerked at 40–90 Hz through two band-passes.
     The first attempt used a pure pulse train, which buzzed.
-- **Field textures:** three of these CC0 recordings are excerpted (14 s in total) and granulated under the
-  synthesis:
+- **Field textures:** four CC0 excerpts (20 s in total) are granulated under the synthesis:
   - the groomed run;
   - the board glide;
-  - the board skid.
+  - the board skid;
+  - 6 s of the Alpine gusts, for the map wind.
 
   With them, the board render's profile matches its reference within ~3 dB from 125 Hz to 2 kHz.
 
