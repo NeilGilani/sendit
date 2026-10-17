@@ -185,7 +185,8 @@ class SnowProcessor extends AudioWorkletProcessor {
     // glide hiss: pink noise between a high-pass and a low-pass that both rise with speed (≈ flat octave
     // bands 500 Hz – 8 kHz like the groomed reference); a board's base keeps it darker
     const hb = Math.pow(Math.max(speed, 1) / 5, T.hiss.fExp) * (1 - 0.4 * wP) * lerp(1, T.hiss.board, board) * r;
-    g.fHiss = T.hiss.hp * hb; g.fHissLP = Math.min(T.hiss.lpMax, T.hiss.lp * hb);
+    // a loaded edge is brighter as well as louder (the groomed reference's swells reach ~10 kHz, the transitions don't)
+    g.fHiss = T.hiss.hp * hb; g.fHissLP = Math.min(T.hiss.lpMax, T.hiss.lp * hb * lerp(T.hiss.flatLp, 1.15, (weight - T.hiss.flat) / (1 - T.hiss.flat)));
     const bf = lerp(1, T.carve.boardF, board);
     g.f1 = T.carve.f1 * (1 + T.carve.fSpeed * Math.min(1, s01)) * bf * (1 + 0.15 * wI) * r;
     g.f2 = T.carve.f2 * (1 + T.carve.fSpeed * Math.min(1, s01)) * bf * (1 + 0.25 * wI) * r;
