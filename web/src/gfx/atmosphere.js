@@ -137,16 +137,31 @@ function bake(opts = {}) {
     }
     rowMean.push(m);
   }
-  // Per-map sky colours: each elevation row is re-coloured toward the target (horizon .. zenith) while
-  // keeping its azimuthal structure (the warm glow toward the sun).
+  // Per-map sky colours: the sky is re-coloured toward the targets while keeping the baked luminance
+  // structure (brighter toward the sun / horizon). The horizon colour is the sun-side horizon: the
+  // opposite horizon gets a mix toward the zenith colour (twilight's blue-violet anti-solar side),
+  // and the horizon colour hugs the horizon (glow band) so the upper sky, which lights the shade,
+  // stays the zenith colour.
   const tinted = !!(opts.skyZenith || opts.skyHorizon);
   if (tinted) {
     const Z = opts.skyZenith ?? rowMean[LUT_H - 1], Hc = opts.skyHorizon ?? rowMean[Math.floor(LUT_H / 2)];
+    const away = [0, 1, 2].map((c) => Hc[c] + (Z[c] - Hc[c]) * 0.6);
+    const lum = (v) => 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+    const sunAz = Math.atan2(sun[2], sun[0]);
     for (let j = 0; j < LUT_H; j++) {
       const el = elevOf((j + 0.5) / LUT_H);
-      const t = Math.pow(Math.max(0, Math.sin(el)), 0.5);
-      const k = [0, 1, 2].map((c) => (Hc[c] + (Z[c] - Hc[c]) * t) / Math.max(1e-6, rowMean[j][c]));
-      for (let i = 0; i < LUT_W; i++) { const o = (j * LUT_W + i) * 3; for (let c = 0; c < 3; c++) raw[o + c] *= k[c]; }
+      const t = Math.pow(Math.max(0, Math.sin(el)), 0.3);
+      const mL = Math.max(1e-6, lum(rowMean[j]));
+      for (let i = 0; i < LUT_W; i++) {
+        const az = ((i + 0.5) / LUT_W - 0.5) * Math.PI * 2;
+        const w = Math.pow((1 + Math.cos(az - sunAz)) / 2, 1.5);   // 1 toward the sun, 0 away
+        const o = (j * LUT_W + i) * 3;
+        const rel = lum([raw[o], raw[o + 1], raw[o + 2]]) / mL;
+        for (let c = 0; c < 3; c++) {
+          const hz = away[c] + (Hc[c] - away[c]) * w;
+          raw[o + c] = (hz + (Z[c] - hz) * t) * rel;
+        }
+      }
     }
   }
   const lutAt = (az, el) => {
