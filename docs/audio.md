@@ -81,7 +81,7 @@ Stereo width is 0.75 for skis (two contacts, two independent noise streams) and 
 | Whistles | Two vortex-shedding tones at f = 0.2·U/d for d = 4.2 mm and 7.1 mm (Q 40), latching in and out above ~11 m/s |
 | Clothing flap | Irregular pulses at 8 + 0.55·U Hz through a 380 Hz band, from 11 m/s. Quieter in the air and when tucked. |
 | Tuck | Rush −6 dB and a darker low-pass (the lee of the body) |
-| Spin / flip whoosh | In the air, rotation rate × airtime: the ears alternate facing the airflow, so each half turn pans and swells the rush, and the rush filter sweeps |
+| Spin / flip whoosh | In the air, by rotation rate: the ears alternate facing the airflow, so each half turn pans and swells the rush and sweeps its filter, with a whoosh pulse (up to about +7 dB and brighter) as the face swings through the wind |
 | Gusts | Ornstein–Uhlenbeck processes (2.2 s rider-relative, ~5 s ambient) modulate level and relative airspeed |
 | Map wind | Distant wind over the ridges: band-passed brown noise at the map's `windF`, plus hiss, swelling with the gusts. Level and tone are set per map. |
 

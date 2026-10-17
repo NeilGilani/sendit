@@ -388,6 +388,8 @@ class WindProcessor extends AudioWorkletProcessor {
       const flapS = flap > 1e-5 ? this.flapF.bp(this.flapPk.next(this.flapRng.bi())) * flap * fp * fp * fp * (0.4 + this.flapA) * 4 : 0;
       this.ph += phInc; if (this.ph >= 1) this.ph -= 1;
       const cs = Math.cos(TAU * this.ph), sw = Math.sin(TAU * this.ph * 2);
+      // a whoosh each half turn as the face swings through the airflow
+      const pz = sw > 0 ? sw * sw * sw : 0, whoosh = 1 + T.spin.pulse * spin * pz;
       // buffet: shared low rumble, fluttering
       const wb = this.rng.bi();
       this.bBrown = (this.bBrown + 0.02 * wb) / 1.02;
@@ -403,8 +405,8 @@ class WindProcessor extends AudioWorkletProcessor {
         if ((i & 15) === 0) c.rush.set(fr * (1 + T.spin.sweep * spin * sw), T.rush.q, fs);
         let s = bfs + flapS * (ci === 0 ? 1.1 : 0.9);
         const pre = c.hp.hp(pk);
-        s += (c.rush.lp(pre) + c.bump.bp(pre) * T.rush.bump) * rush * 1.6 * ear * (ci === 0 ? earL : earR) * squall;
-        s += c.hi.bp(w) * hi * ear * (ci === 0 ? earL : earR);
+        s += (c.rush.lp(pre) + c.bump.bp(pre) * T.rush.bump) * rush * 1.6 * ear * (ci === 0 ? earL : earR) * squall * whoosh;
+        s += c.hi.bp(w) * hi * ear * (ci === 0 ? earL : earR) * (1 + (whoosh - 1) * 1.5) + c.hi.bp(pk) * T.spin.air * spin * pz;
         s += (c.w1.bp(w) * wh1 + c.w2.bp(w) * wh2) * 6;
         s += c.amb.bp(c.brown * 3.5) * amb * 2.2 + c.ambH.bp(pk) * ambHi;
         const o = clamp(s * outG, -1, 1);

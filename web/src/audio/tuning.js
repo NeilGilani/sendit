@@ -93,7 +93,7 @@ export const AUDIO = {
     // airborne: snow stops, the air takes over
     air: { boost: 1.25, rushUp: 1.15 },
     // spins and flips: ears rotate through the airflow → a whoosh per half turn
-    spin: { gain: 0.6, depth: 0.75, sweep: 0.45, full: 9 },
+    spin: { gain: 0.6, depth: 0.75, sweep: 0.45, full: 9, pulse: 2.2, air: 0.25 },   // pulse: the half-turn whoosh (×), air: its hiss
     // jacket / pants flapping in the airflow (from ~12 m/s): AM 8–25 Hz rising with speed, 200–600 Hz band
     flap: { gain: 0.3, from: 11, full: 24, f0: 8, fPerV: 0.55, f: 380, q: 0.9 },
     // tucked: the body shields the head (lee of a windscreen measures 8–9 dB): rush −6 dB, darker
