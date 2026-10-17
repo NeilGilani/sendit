@@ -50,8 +50,9 @@ export const AUDIO = {
     vRef: 20,             // speed where the speed curves reach 1
     vStart: 0.4,          // below this nothing slides
     scMax: 1.15,          // cap on the snow speed curve (≈ 23 m/s): above it the wind carries the speed
-    // glide hiss: pink noise band, centre rises with speed
-    // (+7 dB per speed doubling ≈ v^1.15; centre ≈ 1.6 kHz · (v / 5)^0.45 — research-real.md §3)
+    // glide hiss: pink noise between a high-pass and a low-pass that both rise as (v / 5)^0.45 (flat octave bands, like
+    // the groomed CC0 run); level +7 dB per speed doubling ≈ v^1.15; flat, unweighted skis are quieter and darker
+    // (docs/audio-research-notes/real-world-acoustics.md §3)
     hiss: { gain: 0.5, hp: 300, lp: 7000, lpMax: 11000, fExp: 0.45, white: 0.12, board: 0.38, boardGain: 0.55, flat: 0.4, flatLp: 0.7, exp: 1.15, powder: 0.18, ice: 0.8, park: 1.05 },
     // groomer corduroy: fine ridges ~2.2 cm apart → a zippy AM at v / spacing on flat bases
     corduroy: { depth: 0.22, spacing: 0.022 },
@@ -61,7 +62,7 @@ export const AUDIO = {
     // the edge "rip" of a carve: two resonant bands + board growl, wobbling slowly
     carve: { gain: 0.75, f1: 520, f2: 1700, fSpeed: 0.7, q1: 1.2, q2: 1.5, wobble: 0.12, edgeExp: 1.3, loadExp: 0.9,
       ice: 1.35, powder: 0.25, boardF: 0.5, growl: 1.2, growlF: 320 },
-    // edge chatter on hard snow: irregular AM at 16–34 Hz
+    // edge chatter on hard snow: irregular AM, skis 20–40 Hz, board 15–35 Hz
     chatter: { fMin: 20, fMax: 40, boardMin: 15, boardMax: 35, depth: 0.85 },   // ski / board bending modes
     // skid / slide / hockey stop: rough scrape + thrown spray
     skid: { gain: 0.95, f: 1700, fIce: 3800, q: 0.8, rough: 0.75, roughF: 45, spray: 0.4, sprayF: 2600, stop: 1.4, from: 0.08, full: 0.7 },
