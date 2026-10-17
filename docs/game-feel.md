@@ -58,7 +58,7 @@ Tunables (`JUICE_COMBO`):
 During FEVER:
 
 - Each move adds ×1.0 instead of ×0.5, and the cap is ×8. What was built stays when it ends.
-- A "FEVER! COMBOS ×2" banner shows, the screen edge pulses orange, and the combo panel counts down.
+- A "FEVER! COMBOS ×2" call-out shows (under the rider, clear of the live combo panel), the screen edge pulses orange, and the combo panel counts down.
 - A music drop plays, rush lines appear, the lens kicks, the controller rumbles, and the hot trail goes gold.
 
 Flow maps have SEND IT instead, and Challenge runs stay fair, so neither gets FEVER. Event: `juiceFever {on, t}`.

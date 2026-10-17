@@ -215,7 +215,7 @@ export function mountJuiceHud({ player, combo, input, camera }) {
   const fv = $('.cb .fv');
   on('juiceFever', ({ on: st }) => {
     root.classList.toggle('fever', !!st && riding());
-    if (st) { banner('FEVER!  COMBOS ×2', '#ff9a3d'); edge('rgba(255,140,40,.6)'); input?.rumble?.(0.5, 0.9, 260); }
+    if (st) { callout('FEVER!  COMBOS ×2', '#ff9a3d'); edge('rgba(255,140,40,.6)'); input?.rumble?.(0.5, 0.9, 260); }
   });
   // Challenge splits vs the best run (juice/splits.js).
   const split = (d, label) => {
