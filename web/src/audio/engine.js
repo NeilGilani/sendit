@@ -94,6 +94,12 @@ export class AudioEngine {
     this.duck = c.createGain(); this.duck.gain.value = M.music; this.duck.connect(this.musicLP);
     const bus = (g) => { const n = c.createGain(); n.gain.value = g; n.connect(this.sfx); return n; };
     this.snowBus = bus(M.snow); this.windBus = bus(M.wind); this.ambBus = bus(M.ambience); this.fxBus = bus(M.fx); this.uiBus = bus(M.ui);
+    // the place: a per-map reverb send (forest reflections, a faint long tail in open bowls, the park's structures)
+    this.verb = c.createConvolver(); this.verb.normalize = true;
+    this.verbOut = c.createGain(); this.verbOut.gain.value = 0;
+    this.verb.connect(this.verbOut); this.verbOut.connect(this.sfx);
+    this.verbIn = c.createGain(); this.verbIn.gain.value = 1; this.verbIn.connect(this.verb);
+    for (const [b, k] of [[this.fxBus, 1], [this.ambBus, 0.8], [this.snowBus, 0.12]]) { const s = c.createGain(); s.gain.value = k; b.connect(s); s.connect(this.verbIn); }
     // analysers for the headless test / debug overlay
     this.analyser = c.createAnalyser(); this.analyser.fftSize = 2048; this.clip.connect(this.analyser);
 
@@ -141,7 +147,33 @@ export class AudioEngine {
     this.legacy = new LegacyLoops(this.ctx, this.snowBus, this.windBus, this.buffers);
   }
 
-  setMap(id) { this.mapId = id || 'default'; this.map = { ...this.T.maps.default, ...(this.T.maps[this.mapId] || {}) }; this.amb?.setMap(this.mapId); }
+  setMap(id) {
+    this.mapId = id || 'default'; this.map = { ...this.T.maps.default, ...(this.T.maps[this.mapId] || {}) }; this.amb?.setMap(this.mapId);
+    this.setSpace(this.map);
+  }
+
+  /** Reverb for the map: a procedural impulse response (decorrelated noise, exponential decay, darker tail). */
+  setSpace(m) {
+    if (!this.verb) return;
+    const c = this.ctx, sr = c.sampleRate, len = Math.max(0.2, m.verbTime ?? 0.8), n = Math.floor(sr * (len + (m.verbPre ?? 0.02)));
+    const key = `${len}|${m.verbPre}|${m.verbDark}`;
+    if (key !== this.spaceKey) {
+      this.spaceKey = key;
+      const ir = c.createBuffer(2, n, sr), pre = Math.floor(sr * (m.verbPre ?? 0.02)), dark = m.verbDark ?? 0.5;
+      for (let ch = 0; ch < 2; ch++) {
+        const d = ir.getChannelData(ch);
+        let lp = 0;
+        for (let i = pre; i < n; i++) {
+          const t = (i - pre) / sr, a = Math.exp(-6.9 * t / len);   // −60 dB at len
+          const k = Math.min(0.95, 0.15 + dark * t / len);           // the tail gets darker as it decays
+          lp += (Math.random() * 2 - 1 - lp) * (1 - k);
+          d[i] = lp * a * (Math.random() < 0.002 ? 3 : 1);           // a few sparse early reflections
+        }
+      }
+      this.verb.buffer = ir;
+    }
+    this.verbOut.gain.setTargetAtTime(this.T.mix.verb * (m.verb ?? 0.1), c.currentTime, 0.3);
+  }
   setView(v) {
     this.view = v === 'fp' ? 'fp' : 'chase';
     this.fxBus?.gain.setTargetAtTime(this.T.mix.fx * this.T.perspective[this.view].fx, this.ctx.currentTime, 0.2);

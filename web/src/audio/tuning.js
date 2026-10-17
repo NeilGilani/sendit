@@ -10,6 +10,7 @@ export const AUDIO = {
     ambience: 0.7,        // map beds, trees, crowd
     fx: 0.85,             // one-shots: landings, whooshes, pole plants, crashes, grinds
     ui: 0.8,              // game / UI cues (gates, medals, tokens, combo)
+    verb: 1.0,            // the place: per-map reverb send level × maps[id].verb
     music: 0.85,
     glueThresholdDb: -12, glueKneeDb: 8, glueRatio: 1.6, glueAttack: 0.01, glueRelease: 0.2,   // SFX bus glue (gentle: Chrome adds make-up gain, which would lift the quiet bits)
     limiterThresholdDb: -2,   // limiter on the master (DynamicsCompressor, ratio 20, no look-ahead)…
@@ -131,11 +132,12 @@ export const AUDIO = {
 
   // ---------------------------------------------------------------- per-map ambience (by map id)
   maps: {
-    default: { wind: 0.35, windF: 650, birds: 1, trees: 0, crowd: 0, cold: 0.2, gustiness: 1 },
+    // verb / verbTime / verbPre / verbDark: the space (send level, RT60 s, pre-delay s, how much darker the tail gets)
+    default: { wind: 0.35, windF: 650, birds: 1, trees: 0, crowd: 0, cold: 0.2, gustiness: 1, verb: 0.08, verbTime: 0.9, verbPre: 0.03, verbDark: 0.6 },
     'valcrest-gully': { wind: 0.3, windF: 620, birds: 1, trees: 0.2, crowd: 0, cold: 0.2, gustiness: 1 },
-    blackspruce: { wind: 0.28, windF: 820, birds: 0.8, trees: 1, crowd: 0, cold: 0.35, gustiness: 0.8, sough: 0.6 },
-    ravenspire: { wind: 0.6, windF: 560, birds: 0.25, trees: 0, crowd: 0, cold: 0.7, gustiness: 1.6 },
-    'voltage-park': { wind: 0.22, windF: 700, birds: 0.4, trees: 0, crowd: 1, pa: 1, cold: 0.15, gustiness: 0.7, park: 1 },
+    blackspruce: { wind: 0.28, windF: 820, birds: 0.8, trees: 1, crowd: 0, cold: 0.35, gustiness: 0.8, sough: 0.6, verb: 0.22, verbTime: 1.1, verbPre: 0.012, verbDark: 0.7 },
+    ravenspire: { wind: 0.6, windF: 560, birds: 0.25, trees: 0, crowd: 0, cold: 0.7, gustiness: 1.6, verb: 0.1, verbTime: 2.4, verbPre: 0.09, verbDark: 0.8 },
+    'voltage-park': { wind: 0.22, windF: 700, birds: 0.4, trees: 0, crowd: 1, pa: 1, cold: 0.15, gustiness: 0.7, park: 1, verb: 0.14, verbTime: 1.0, verbPre: 0.02, verbDark: 0.5 },
     'lake-tahoe': { wind: 0.35, windF: 680, birds: 1, trees: 0.4, crowd: 0, cold: 0.25, gustiness: 1 },
   },
   ambience: {

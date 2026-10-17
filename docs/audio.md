@@ -119,6 +119,19 @@ mountain drops in pitch with time.
 | Voltage Park | Calmer wind, a crowd (procedural voiced babble of 24 "voices", looped on two decorrelated players), cheers on clean landings, and a far-off PA announcer every 25–50 s. The announcer is unintelligible on purpose: one formant voice through a 400 Hz–3 kHz horn band with 90 / 190 / 310 ms stadium slaps. |
 | Every map | Riding a chairlift: rope hum and tower rattles |
 
+**The place (reverb):** a per-map convolution send on the one-shots, the ambience and a little of the snow. Its
+impulse response is generated in code: decorrelated noise with an exponential decay and a tail that darkens as it
+falls.
+
+| Map | Reverb |
+|---|---|
+| Blackspruce | Close forest reflections: 1.1 s, 12 ms pre-delay, send 0.22 |
+| Ravenspire | A faint long bowl tail: 2.4 s, 90 ms pre-delay, send 0.1 |
+| Voltage Park | Structures: 1.0 s |
+| Others | 0.9 s at 0.08 |
+
+Tune it with `maps[id].verb`, `verbTime`, `verbPre` and `verbDark`.
+
 ## Mix and perspective
 
 - **Ducking (`AUDIO.duck`):** music −5 dB after 0.5 s of air, −9 dB on a crash (1.6 s), −4 dB toward 30 m/s, −3 dB
