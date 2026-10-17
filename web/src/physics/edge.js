@@ -238,7 +238,8 @@ export class EdgePhysics {
     if (mode.pivotOffset) pl.position.addScaledVector(_r.crossVectors(fwd, n).normalize(), mode.pivotOffset * (mode.yaw || 0) * dt);
     // Edges track their own path when the rider isn't steering (self-aligning).
     if (speed > 1.2 && !mode.noAlign) {
-      const velYaw = Math.atan2(-v.x, -v.z) + (this.travel < 0 ? Math.PI : 0);
+      // (P.wallAlign, opt-in: on steep transitions — pipe walls — track the path ON the snow, not its horizontal part.)
+      const velYaw = (P.wallAlign && n.y < 0.94 ? pathYaw(v, n) : Math.atan2(-v.x, -v.z)) + (this.travel < 0 ? Math.PI : 0);
       const a = C.selfAlign * (1 - Math.min(1, Math.abs(s)) * 0.85) * (pl._alignTimer > 0 ? 3 : 1);
       pl.heading = lerpAngle(pl.heading, velYaw, 1 - Math.exp(-a * dt));
     }
@@ -641,6 +642,16 @@ export class EdgePhysics {
 
   /** Trick name for the score popup. */
   trickLabel(t, spins) { return spins >= 1 ? `${spins * 180}` : ''; }
+}
+
+/**
+ * The yaw whose projection onto the slope (normal n) points along v: h = v − (v.y / n.y)·n is horizontal and
+ * projects onto v. On a 70–80° pipe wall the horizontal part of a climbing velocity points along the wall, so the
+ * plain atan2 of it would steer the gear sideways.
+ */
+export function pathYaw(v, n) {
+  const k = v.y / Math.max(n.y, 0.05), hx = v.x - k * n.x, hz = v.z - k * n.z;
+  return hx * hx + hz * hz > 1e-8 ? Math.atan2(-hx, -hz) : Math.atan2(-v.x, -v.z);
 }
 
 /** Flow-state boost for a tunable (physics/flow.js): 0 unless the map runs the flow layer and it is on. */

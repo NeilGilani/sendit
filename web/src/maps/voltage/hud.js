@@ -3,6 +3,7 @@
 // landing's window and sweet spot), the judged slopestyle card at the finish, the practice key (T: back to
 // the last feature you hit) and the grind sound (assets/audio/grind_loop.ogg + a clank on lock-on).
 import { on, emit, game, Mode, settings } from '../../state.js';
+import { predictLipSpeed } from './park.js';
 
 const CSS = /* css */`
 #parkHud { position: absolute; inset: 0; pointer-events: none; font-family: "Arial Black", "Segoe UI Black", Impact, sans-serif; font-style: italic; color: #fffaf0; }
@@ -166,9 +167,7 @@ export function mountParkHud(course) {
     if (!J) return;
     const L = J.jump.land, lo = Math.max(0, L.vMin - 4), hi = L.vMax + 4;
     const x = (v) => `${Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100))}%`;
-    // Energy to the lip (gravity minus ~12 % for friction / drag / the transition), no pop.
-    const dy = pl.position.y - J.jump.lipY;
-    const v = Math.sqrt(Math.max(0, pl.speed * pl.speed + 2 * 9.81 * dy * 0.88));
+    const v = predictLipSpeed(pl, J);
     win.style.left = x(L.vMin); win.style.width = `calc(${x(L.vMax)} - ${x(L.vMin)})`;
     sw.style.left = x(L.sweet?.v ?? (L.vMin + L.vMax) / 2);
     me.style.left = x(v);

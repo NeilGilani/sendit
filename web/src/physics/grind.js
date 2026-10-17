@@ -37,6 +37,9 @@ export const GRIND_DEFAULTS = {
   maxCross: 52,               // deg: crossing the rail more squarely than this clips it instead
   lockSlop: 42,               // deg off a 50-50 / slide alignment that still locks (the balance pays)
   slamSpeed: 9.5,             // m/s down onto the rail: harder than this is a slam (crash)
+  // Air assist (gentle, not a magnet): in the last `assistTime` s before the feet come down onto a rail
+  // that is within `assist` m to the side, the rider drifts toward it at up to assistAccel m/s².
+  assist: 0.9, assistTime: 0.35, assistAccel: 7,
   // Speed along the rail
   friction: { rail: 0.045, box: 0.04, tube: 0.055, ledge: 0.06 },
   slideFriction: 1.5,         // × friction with the gear across the rail (more base / edge in contact)
@@ -168,6 +171,7 @@ export class Grind {
     const sp = v.length();
     if (sp < C.minSpeed) return false;
     if (Math.abs(wrap(pl.flip || 0)) > 40 * DEG) return false;   // upside down: no lock
+    if (pl.state === 2 && C.assist > 0) this.airAssist(dt);
     const cx = Math.floor(p.x / CELL), cz = Math.floor(p.z / CELL);
     const cand = this.index.hash.get(cx * 65536 + cz);
     if (!cand) return false;
@@ -187,9 +191,11 @@ export class Grind {
       const dy0 = p0.y - (g.a.y + (g.b.y - g.a.y) * k0);
       // Coming down onto the top line (or riding onto it off a flush on-ramp).
       const grounded = pl.state === 1;
-      const vertOk = grounded ? Math.abs(dy) < 0.16 : dy <= C.above && dy >= -C.below && dy0 >= -0.06;
-      if (!vertOk) continue;
       const along = v.dot(g.t);
+      // Onto the end of a rail from a gap-on ramp a hand-width low: the feet catch its end (snap up onto it).
+      const sAt = g.s0 + g.len * k, atEnd = along >= 0 ? sAt < 0.9 : sAt > rail.length - 0.9;
+      const vertOk = grounded ? Math.abs(dy) < 0.16 : dy <= C.above && dy >= -C.below && (dy0 >= -0.06 || (atEnd && dy0 >= -C.below));
+      if (!vertOk) continue;
       if (Math.abs(along) < C.minSpeed) continue;
       // Crossing angle in plan.
       const th = Math.hypot(g.t.x, g.t.z) || 1, vh = Math.hypot(v.x, v.z) || 1;
@@ -204,6 +210,43 @@ export class Grind {
     if (!best) return false;
     this.lock(best);
     return true;
+  }
+
+  /**
+   * Coming down toward a rail a little to the side: drift onto its line (riders spot the rail and steer
+   * their feet onto it). Only when the flight crosses the rail's top height within assistTime s and the
+   * rail is within `assist` m sideways of where the feet will be, and the path runs along the rail.
+   */
+  airAssist(dt) {
+    const pl = this.pl, C = this.C, v = pl.velocity, p = pl.position;
+    if (v.y > 1.5) return;
+    const vh = Math.hypot(v.x, v.z);
+    if (vh < C.minSpeed) return;
+    let best = null;
+    for (let k = 1; k <= 4; k++) {
+      const t = (C.assistTime * k) / 4;
+      const x = p.x + v.x * t, y = p.y + v.y * t - 0.5 * P.gravity * t * t, z = p.z + v.z * t;
+      const cand = this.index.hash.get(Math.floor(x / CELL) * 65536 + Math.floor(z / CELL));
+      if (!cand) continue;
+      for (const [rail, g] of cand) {
+        if (this.cool > 0 && rail === this.coolRail) continue;
+        const dx = g.b.x - g.a.x, dz = g.b.z - g.a.z, L2 = dx * dx + dz * dz;
+        const kk = clamp(((x - g.a.x) * dx + (z - g.a.z) * dz) / L2, 0, 1);
+        const qx = g.a.x + dx * kk, qy = g.a.y + (g.b.y - g.a.y) * kk, qz = g.a.z + dz * kk;
+        if (Math.abs(y - qy) > 0.45) continue;
+        const along = Math.abs(v.x * g.t.x + v.z * g.t.z) / (vh * (Math.hypot(g.t.x, g.t.z) || 1));
+        if (along < Math.cos(C.maxCross * DEG)) continue;
+        const ex = qx - x, ez = qz - z, d = Math.hypot(ex, ez);
+        if (d > C.assist + rail.half || d < 0.02) continue;
+        if (!best || d < best.d) best = { d, ex, ez, t };
+      }
+      if (best) break;
+    }
+    if (!best) return;
+    // Lateral speed needed to arrive on the line at the crossing, capped.
+    const want = Math.min(2.5, best.d / Math.max(0.08, best.t)), cur = (v.x * best.ex + v.z * best.ez) / best.d;
+    const dv = clamp(want - cur, 0, C.assistAccel * dt);
+    v.x += best.ex / best.d * dv; v.z += best.ez / best.d * dv;
   }
 
   /** Feet came down on the rail crossing it too squarely: a clip (stumble, lose some speed), no lock. */

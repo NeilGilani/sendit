@@ -12,6 +12,7 @@ import { SkiPhysics } from './physics/ski.js';
 import { SnowboardPhysics } from './physics/snowboard.js';
 import { Flow } from './physics/flow.js';
 import { Grind } from './physics/grind.js';
+import { pathYaw } from './physics/edge.js';
 import { getEquipmentSpec, deriveHandling, normalizeType } from './equipment/registry.js';
 
 export const State = { FROZEN: 0, GROUNDED: 1, AIR: 2, CRASH: 3, LIFT: 4, GRIND: 5 };
@@ -447,7 +448,8 @@ export class Player {
       if (sp > P.landSpeedCap) this.velocity.multiplyScalar((P.landSpeedCap + (sp - P.landSpeedCap) * 0.35) / sp);
       this.speed = this.velocity.length();   // not the in-air speed (vertical included) on the speedometer for a frame
     }
-    const velYaw = Math.atan2(-this.velocity.x, -this.velocity.z);
+    // (P.wallAlign: landing back on a pipe wall, the path is down the wall, not its horizontal part.)
+    const velYaw = P.wallAlign && n.y < 0.94 ? pathYaw(this.velocity, n) : Math.atan2(-this.velocity.x, -this.velocity.z);
     // Landing on a sidewall bends the path; a rider lined up with the flight pivots into the new line
     // (PHYSICS.landRedirect degrees absorbed, 0 = off). preYaw = the flight direction before touchdown.
     if (P.landRedirect && this._preLandYaw !== undefined) {

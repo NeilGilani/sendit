@@ -215,8 +215,8 @@ export class VoltageCourse {
     const deckY = lipY + s.rise;
     B.lineBy(deckY - B.y, 34);
     B.mark('deck');
-    B.arc(4, -2).line(s.deckLen, -2);
-    B.arc(5, -26).toBase(14, 3);
+    B.arc(4, -14).line(s.deckLen, -14);   // the deck falls with the hill (a little flatter): you land near the top of the flight
+    B.arc(5, -36).toBase(16, 3);
     const f = B.build({ name: s.name, kind: 'stepup', lane: s.lane, rake: 1.1 });
     f.jump = { ...s, lipA: f.marks.lip.a, lipY };
     this.features.push(f);
@@ -349,10 +349,23 @@ export class VoltageCourse {
         this.features.push(f);
       } else {
         const r = s.ramp;
-        const lipA = 20 - r.gap, kickH = y0 - r.drop - this.base(START_X + s.u - r.gap * fx, s.v - r.gap * fz);
-        const B = this.kicker(B0, lipA, kickH, r.deg, Math.max(2.2, kickH * 3), 0.8);
-        B.mark('lip');
-        B.lineBy(-(B.y - B.baseAt(B.a)) + 0.02, -55);
+        const lipA = 20 - r.gap;
+        const first = s.shape === 'rainbow' ? Math.atan2(s.hump * Math.PI / s.len, 1) / DEG - 12 : s.shape === 'c' ? -12 : s.segs[0][1];
+        const deg = r.deg ?? Math.max(3, Math.min(18, first + (r.gap >= 2 ? 14 : 9)));   // (a kicker needs to rise: ≥ 3°)
+        // A straight snow ramp (eased at the foot) rising to the lip at `deg`, `drop` under the jib's start height.
+        const B = B0();
+        const lipY = y0 - r.drop, g = B.baseAngle(lipA - 2);
+        const H = lipY - B.baseAt(lipA), rel = Math.max(6, deg - g) * DEG, Lr = H / Math.tan(rel) * 1.15, aS = lipA - Lr;
+        const pts = [];
+        for (let a = Math.max(0, aS - 0.5); a <= lipA + 1e-6; a += STEP / 2) {
+          const k = Math.max(0, (a - aS) / Lr);
+          const e = k < 0.3 ? k * k / 0.6 : k - 0.15;
+          pts.push([a, B.baseAt(a) + H * Math.min(1, e / 0.85) + (lipY - B.baseAt(lipA) - H) * k, B.hw]);
+        }
+        pts[pts.length - 1][1] = lipY;
+        for (let a = lipA + STEP / 2; ; a += STEP / 2) { const y = lipY - (a - lipA) * Math.tan(55 * DEG); if (y < B.baseAt(a) - 0.05) break; pts.push([a, y, B.hw]); }
+        B.pts = pts;
+        B.marks.lip = { a: lipA, y: lipY, ang: deg };
         const f = B.build({ name: s.name, kind: 'ramp', lane: rail.lane, rake: 1.2 });
         f.rail = rail;
         this.features.push(f);
@@ -393,7 +406,7 @@ export class VoltageCourse {
   addBigAir(s) {
     const B = this.P(s.u, s.v, 0, s.hw);
     B.lift(s.top);
-    B.line(s.deckLen, -1);
+    B.line(s.deckLen, -9);                                // the start deck: steep enough to roll in from a standstill
     B.mark('top');
     B.arc(10, -s.inDeg);
     // In-run until the concave transition (+2 m straight at the lip) leaves the lip kickH over the snow.
@@ -484,7 +497,7 @@ export class VoltageCourse {
   buildDropZones() {
     return DROP_ZONES.map(([name, u, v, hd], i) => {
       if (i === 4) {   // the big air's scaffold deck
-        const [x, z] = this.bigAir.world(this.bigAir.marks.top.a - 4);
+        const [x, z] = this.bigAir.world(this.bigAir.marks.top.a - BIG_AIR.deckLen + 1);
         return { name, x, z, heading: -Math.PI / 2 };
       }
       if (i === 5) return { name, x: this.pipe.world(4, 0)[0], z: this.pipe.world(4, 0)[1], heading: -Math.PI / 2 + 0.25 };

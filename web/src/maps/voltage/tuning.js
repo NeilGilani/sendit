@@ -23,6 +23,7 @@ export const VOLTAGE_PHYSICS = {
     slowmo: { minAir: 2.6, minDrop: 7, scale: 0.75, easeIn: 0.2, hold: 0.25, easeOut: 0.3, cooldown: 5 },
     windRoar: 0.6,
     grind: {},                    // physics/grind.js GRIND_DEFAULTS overrides (none: the defaults are tuned here)
+    wallAlign: true,              // pipe / quarterpipe walls: the gear tracks its path up the wall (physics/edge.js)
   },
   ski: {
     maxVelocity: 21,              // soft cap: the jump line is ridden at 15–22 m/s
