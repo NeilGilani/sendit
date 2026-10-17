@@ -115,6 +115,11 @@ registerLobbyTab({
         };
         requestAnimationFrame(() => requestAnimationFrame(next));
       }
+      // Clicking the case shows what is inside (as in CS:GO), like the contents chips below.
+      const hero = root.querySelector('.cs-hero .cb');
+      hero.style.cursor = 'pointer';
+      hero.title = `${S.name}: contents and odds`;
+      hero.addEventListener('click', () => { showSeries = series; render(); root.querySelector('.cs-odds')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); });
       root.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => { pickId = b.dataset.pick; caseSfx.click(); render(); }));
       root.querySelectorAll('[data-show]').forEach((b) => b.addEventListener('click', () => { showSeries = showSeries === b.dataset.show ? null : b.dataset.show; render(); root.querySelector(`[data-show="${b.dataset.show}"]`)?.focus(); }));
     };
