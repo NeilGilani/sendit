@@ -375,10 +375,11 @@ export class DragonbackCourse {
   gullyAt(x, z) {
     const u = x - START_X;
     if (u < 150 || u > 1680) return 0;
-    const here = this.ridgesAt(u, z);
+    const wall = (v) => this.ridgesAt(u, v) + Math.max(0, this.spineField(u, v));   // ridges or the Organ Pipes
+    const here = wall(z);
     if (here > 5) return 0;
     let l = 0, r = 0;
-    for (const d of [24, 46, 70]) { l = Math.max(l, this.ridgesAt(u, z - d)); r = Math.max(r, this.ridgesAt(u, z + d)); }
+    for (const d of [24, 46, 70]) { l = Math.max(l, wall(z - d)); r = Math.max(r, wall(z + d)); }
     return (1 - here / 5) * sstep(4, 12, Math.min(l, r));
   }
 
