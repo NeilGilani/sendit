@@ -53,6 +53,7 @@ export class LoadingScene {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.debug.checkShaderErrors = !!this.opts.debug;
+    if (typeof this.opts.debug === 'string' && this.opts.debug.startsWith('view')) self.__loadDebugView = Number(this.opts.debug.slice(4));
     PHYSICS.trickStyle = true;              // this worker's own config copy: tweaked grabs on the rig
     patchShaderChunks();
 
@@ -87,6 +88,7 @@ export class LoadingScene {
     this.log(`pre-terrain ${Math.round(performance.now() - t0)} ms`);
     const terr = this.terrain = buildTerrain(height, sunDir, nearMat, farMat);
     scene.add(terr.near, terr.far);
+    if (this.opts.debug === 'noterrshadow') terr.near.castShadow = false;
     this.log(`terrain ${terr.stats.total} ms, ${terr.stats.verts} verts (${v.mtn}, ${v.tod})`);
     if (T.cloudSea || v.mountain.cloudSea) scene.add(this.cloudSea(v.mountain.seaLevel, terr.coarse));
 
@@ -97,8 +99,9 @@ export class LoadingScene {
     const c = sun.shadow.camera;
     c.left = -26; c.right = 26; c.top = 26; c.bottom = -26; c.near = 1; c.far = 400;
     c.updateProjectionMatrix();
-    sun.shadow.bias = -0.0004;
-    sun.shadow.normalBias = 0.04;
+    // Grazing low sun on big smooth slopes: generous normal bias, or crests get a black acne line.
+    sun.shadow.bias = -0.0006;
+    sun.shadow.normalBias = 0.16;
     sun.shadow.radius = 3;
     scene.add(sun, sun.target);
 
@@ -162,18 +165,21 @@ export class LoadingScene {
       fragmentShader: ATMO_PARS_GLSL + /* glsl */`
         uniform sampler2D noiseTex; uniform sampler2D uHeight; uniform float uHalf; uniform float uLevel; uniform vec3 uSunCol; uniform vec3 uSkyAmb; uniform float uTime;
         varying vec3 vW;
+        float cs(vec2 p) { return texture2D(noiseTex, p).r * 0.55 + texture2D(noiseTex, p * 3.1 + 0.3).g * 0.3 + texture2D(noiseTex, p * 9.0 + 0.7).r * 0.15; }
         void main() {
           vec2 uv = (vW.xz + uHalf) / (2.0 * uHalf);
           float ground = texture2D(uHeight, uv).r;
           vec2 p = vW.xz * 0.00022 + vec2(uTime * 0.0015, 0.0);
-          float n = texture2D(noiseTex, p).r * 0.55 + texture2D(noiseTex, p * 3.1 + 0.3).g * 0.3 + texture2D(noiseTex, p * 9.0 + 0.7).r * 0.15;
+          float n = cs(p);
           float thick = (uLevel - ground) + (n - 0.5) * 260.0;
           float a = smoothstep(-40.0, 160.0, thick);
-          // Lit billows: brighter on the sun side of each lump, cool blue in the troughs.
-          float nx = texture2D(noiseTex, p + vec2(0.004, 0.0)).r - texture2D(noiseTex, p).r;
-          float nz = texture2D(noiseTex, p + vec2(0.0, 0.004)).r - texture2D(noiseTex, p).r;
-          float lit = clamp(0.62 + (nx * uSunDirA.x + nz * uSunDirA.z) * -18.0 + uSunDirA.y * 0.6, 0.0, 1.3);
-          vec3 col = uSunCol * lit * 0.55 + uSkyAmb * (0.7 + 0.5 * n);
+          // Billows: a height field from the noise, lit by the sun (wrapped), cool sky-lit troughs.
+          float e = 0.012;
+          float hx = cs(p + vec2(e, 0.0)), hz = cs(p + vec2(0.0, e));
+          vec3 N = normalize(vec3(-(hx - n) * 22.0, 1.0, -(hz - n) * 22.0));
+          float ndl = clamp(dot(N, uSunDirA) * 0.75 + 0.25, 0.0, 1.0);
+          float cav = smoothstep(0.3, 0.75, n);
+          vec3 col = uSunCol * ndl * (0.22 + 0.4 * cav) + uSkyAmb * (0.38 + 0.5 * cav);
           col = aerial(col, vW);
           gl_FragColor = vec4(col * a, a);
         }`,

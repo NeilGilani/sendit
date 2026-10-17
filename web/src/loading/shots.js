@@ -77,11 +77,12 @@ export function planMove(kind, shot, sun, r, H) {
     }
     case 'reveal': {
       m.a = V(side * 4.5, lip.y + 1.8, 7);
-      m.b = V(side * r.range(26, 40), A.y + r.range(26, 40), r.range(40, 60));
-      m.fov = 46;
-      m.fov1 = 56;
+      // Pulls back and up over the shoulder, but not so far that the rider becomes a speck.
+      m.b = V(side * r.range(15, 22), A.y + r.range(11, 17), r.range(16, 26));
+      m.fov = 44;
+      m.fov1 = 52;
       m.pos = (s) => m.a.clone().lerp(m.b, ease(smooth(0.05, 1.0, s)));
-      m.look = (s, com) => com.clone().lerp(M, 0.25 + 0.4 * s);
+      m.look = (s, com) => com.clone().lerp(M, 0.1 + 0.15 * s);
       break;
     }
     case 'follow': {

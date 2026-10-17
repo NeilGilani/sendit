@@ -136,7 +136,8 @@ export function makeHeight(v) {
     const spN = 2 * Math.log1p(Math.exp((ax - 6) / 2));
     const spW = 3 * Math.log1p(Math.exp((ax - 22) / 3));
     const kN = smooth(-8, 4, z);
-    y += -0.02 * x * x * (1 - smooth(4, 9, ax)) * smooth(0, 6, z);
+    // Convex crest, monotonic away from the line (a tapered x² here folded a crease into the flanks).
+    y += -0.75 * (Math.sqrt(1 + (ax / 4) ** 2) - 1) * smooth(0, 6, z);
     y -= 0.85 * spN * kN + 0.75 * spW * (1 - kN);
     // Detail: smooth on the line, rougher off it (rock buttresses, drifts).
     const off = smooth(4, 26, ax) + smooth(30, 90, z) + smooth(80, 200, -z);
@@ -337,7 +338,8 @@ const TERRAIN_FRAG = /* glsl */`
   // Near: snow sticks to anything under ~55° (big, soft-edged rock bands above that, never spots).
   float nb = texture2D(noiseTex, vW.xz * 0.0017 + 0.31).g;
   float hold = 0.36 + (nb - 0.5) * 0.14 + (n0 - 0.5) * 0.06;
-  float rock = smoothstep(hold, hold + 0.12, slope);
+  // A wide transition: a narrow one turns every line of maximum slope into a 1-px dark contour.
+  float rock = smoothstep(hold, hold + 0.24, slope);
 #ifdef FAR
   // Big faces shed snow from ~35°: dark rock walls, snow in the couloirs and on the shoulders.
   float holdF = 0.2 + (n0 - 0.5) * 0.16 + (texture2D(noiseTex, vW.xz * 0.0011 + 0.5).g - 0.5) * 0.12;
@@ -376,7 +378,7 @@ const TERRAIN_FRAG = /* glsl */`
   tRock = rock;
   float age = smoothstep(0.3, 0.8, texture2D(noiseTex, vW.xz * 0.011 + 0.4).g);
   vec3 snowC = mix(uSnowAlbedo, uSnowOld, 0.15 + 0.35 * age) * (0.97 + 0.06 * n1);
-  diffuseColor.rgb = mix(snowC, rc, rock);
+  diffuseColor.rgb = mix(snowC, rc, rock * rock);   // partial cover stays snowy, not grey
   tCavity = mix(0.8, 1.0, vVisT.y);
   tGlaze = 0.25 + 0.4 * smoothstep(0.5, 0.9, n0);
   tGlintMask = 1.0 - rock;
@@ -396,7 +398,7 @@ export function terrainMaterial(uniforms, atmo, { far = false } = {}) {
     frag: TERRAIN_FRAG,
     band: SNOW_BAND_GLSL + ROCK_FILL_GLSL,
   });
-  m.defines = far ? { FAR: 1, ROCK_LITE: 1, ROCK_FAR: 1 } : { SNOW_SPARKLE: 1, ROCK_LITE: 1 };
+  m.defines = far ? { FAR: 1, ROCK_LITE: 1, ROCK_FAR: 1 } : { SNOW_SPARKLE: 1, DEBUGVIEW: (typeof self !== 'undefined' && self.__loadDebugView) || 0 };   // ?loaddebug=view1|2|3: rock mask / normals / baked visibility   // near: the game's full rock (joints, columns, photo grain)
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (shader, r) => {
     prev(shader, r);
@@ -404,7 +406,15 @@ export function terrainMaterial(uniforms, atmo, { far = false } = {}) {
       .replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(tN, 0.0)).xyz);')
       .replace('sunMaskFactor = sm.r;', 'sunMaskFactor = sm.r * vVisT.x;')
       .replace('skyVis = sm.g;', 'skyVis = sm.g * vVisT.y;')
-      .replace('#include <fog_fragment>', 'gl_FragColor.rgb = aerial(gl_FragColor.rgb, vW);');
+      .replace('#include <fog_fragment>', `gl_FragColor.rgb = aerial(gl_FragColor.rgb, vW);
+#if DEBUGVIEW == 1
+gl_FragColor.rgb = vec3(tRock, 0.2, 1.0 - tRock) * 3.0;
+#elif DEBUGVIEW == 2
+gl_FragColor.rgb = (normalize(vWN) * 0.5 + 0.5) * 3.0;
+#elif DEBUGVIEW == 3
+gl_FragColor.rgb = vec3(vVisT, 0.0) * 3.0;
+#endif
+`);
   };
   m.customProgramCacheKey = () => m.name;
   return m;
