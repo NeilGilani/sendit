@@ -109,7 +109,7 @@ export const LANE_JUMPS = [
   { name: 'Stack 1', lane: 'current', u: 495, v: 125, lipDeg: 29, R: 14, kickH: 3.3, table: 18, vMax: 25, hw: 3.2, deckHw: 7.5, landHw: 9., maxDeg: 40 },
   { name: 'Stack 2', lane: 'current', u: 557, v: 125, lipDeg: 29, R: 14, kickH: 3.3, table: 18, vMax: 25, hw: 3.2, deckHw: 7.5, landHw: 9., maxDeg: 40 },
   { name: 'Stack 3', lane: 'current', u: 619, v: 125, lipDeg: 29, R: 14, kickH: 3.4, table: 19, vMax: 25, hw: 3.2, deckHw: 7.5, landHw: 9., maxDeg: 40 },
-  { name: 'Current 3', lane: 'current', u: 990, v: 125, lipDeg: 30, R: 16, kickH: 3.8, table: 22, vMax: 26, hw: 3.2, deckHw: 8, landHw: 9.5, maxDeg: 40 },
+  { name: 'Current 3', lane: 'current', u: 1016, v: 125, lipDeg: 30, R: 16, kickH: 3.8, table: 22, vMax: 26, hw: 3.2, deckHw: 8, landHw: 9.5, maxDeg: 40 },
   // High Voltage — pro: big tables under the Launch (then the Canal gap, the step-up, the QP).
   { name: 'High Voltage 1', lane: 'high', u: 500, v: 186, lipDeg: 29, R: 16, kickH: 3.8, table: 22, vMax: 26, hw: 3.3, deckHw: 8, landHw: 10, maxDeg: 40 },
   { name: 'High Voltage 2', lane: 'high', u: 625, v: 186, lipDeg: 31, R: 18, kickH: 4.4, table: 27, vMax: 28, hw: 3.4, deckHw: 9, landHw: 11, maxDeg: 40 },
@@ -132,9 +132,9 @@ export const HIPS = [
   { name: 'Hip Three', lane: 'hips', u: 880, v: -228, turn: -28, lipDeg: 28, R: 13, kickH: 3.2, table: 16, vMax: 24, hw: 3.2, deckHw: 7, landHw: 9, maxDeg: 40 },
   { name: 'Hip Four', lane: 'hips', u: 995, v: -242, turn: 28, lipDeg: 28, R: 13, kickH: 3.2, table: 16, vMax: 24, hw: 3.2, deckHw: 7, landHw: 9, maxDeg: 40 },
   { name: 'Current Transfer', lane: 'current', u: 745, v: 148, turn: 26, lipDeg: 27, R: 12, kickH: 2.8, table: 13, vMax: 23, hw: 3, deckHw: 6, landHw: 8, maxDeg: 40 },
-  { name: 'Spark Side Hit', lane: 'spark', u: 1012, v: 60, turn: 20, lipDeg: 25, R: 10, kickH: 2.0, table: 10, vMax: 21, hw: 2.4, deckHw: 4, landHw: 5.5, maxDeg: 40 },
-  { name: 'Current Side Hit', lane: 'current', u: 700, v: 138, turn: -20, lipDeg: 25, R: 10, kickH: 2.0, table: 10, vMax: 21, hw: 2.4, deckHw: 4, landHw: 5.5, maxDeg: 40 },
-  { name: 'High Side Hit', lane: 'high', u: 735, v: 172, turn: 20, lipDeg: 25, R: 10, kickH: 2.0, table: 10, vMax: 21, hw: 2.4, deckHw: 4, landHw: 5.5, maxDeg: 40 },
+  { name: 'Spark Side Hit', lane: 'spark', u: 1012, v: 62, turn: 14, lipDeg: 25, R: 10, kickH: 2.0, table: 10, vMax: 21, hw: 2.4, deckHw: 4, landHw: 5.5, maxDeg: 40 },
+  { name: 'Current Side Hit', lane: 'current', u: 962, v: 129, turn: -10, lipDeg: 25, R: 10, kickH: 2.0, table: 10, vMax: 21, hw: 2.4, deckHw: 4, landHw: 5.5, maxDeg: 40 },
+  { name: 'High Side Hit', lane: 'high', u: 735, v: 176, turn: 14, lipDeg: 25, R: 10, kickH: 2.0, table: 10, vMax: 21, hw: 2.4, deckHw: 4, landHw: 5.5, maxDeg: 40 },
   { name: 'Stairway Hip', lane: 'stair', u: 995, v: 250, turn: -25, lipDeg: 27, R: 12, kickH: 2.9, table: 14, vMax: 23, hw: 3, deckHw: 6, landHw: 8, maxDeg: 40 },
 ];
 // Quarterpipes: a wall across the fall line at the bottom of a lane (air straight up, land back in it: research

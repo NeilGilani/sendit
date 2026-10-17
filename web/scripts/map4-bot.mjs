@@ -29,7 +29,7 @@ export const LINES = {
   spark: { start: [40, 70], feats: [jump('Spark 1'), jib('Spark Box'), jump('Spark 2'), jib('Spark Tube'), jib('Spark Down Box'), jump('Spark Double 1'), jump('Spark Double 2', 'spin360'), jib('Spark Butter Box'), jump('Spark 3'), jump('Spark 4'), jump('Spark Side Hit'), { kind: 'qp', name: 'Spark QP' }] },
   // Spark → the Spine → Current → the transfer hip → High Voltage: three lanes in one run.
   transfer: { start: [100, 78], feats: [jib('Spark Ledge'), jib('Spark Down Box'), jump('Spark Double 1'), spine('The Spine', 632, -1), jump('Current Transfer'), jump('The Canal'), { kind: 'stepup', name: 'Step-Up' }, { kind: 'qp', name: 'Voltage QP' }] },
-  current: { start: [50, 125], feats: [jump('Current 1'), jib('Current Flat-Down'), jib('Current Kink'), jib('Current Tube'), jump('Stack 1', 'spin360'), jump('Stack 2'), jump('Stack 3', 'spin360'), jump('Current Side Hit'), jump('Step-Down'), jump('Current 3')] },
+  current: { start: [50, 125], feats: [jump('Current 1'), jib('Current Flat-Down'), jib('Current Kink'), jib('Current Tube'), jump('Stack 1', 'spin360'), jump('Stack 2'), jump('Stack 3', 'spin360'), jump('Step-Down'), jump('Current Side Hit'), jump('Current 3')] },
   currentBox: { start: [110, 128], feats: [jib('Current Box'), jib('Current Tube'), jump('Stack 1'), jump('Stack 2'), jump('Stack 3'), jump('Step-Down'), jump('Current 3')] },
   high: { start: [60, 186], feats: [jib('High DFD'), jib('High Rainbow'), jib('High Down Rail'), jib('High Kink'), jump('High Voltage 1', 'spin360'), jump('High Voltage 2', 'flip'), jump('High Side Hit'), jump('The Canal'), { kind: 'stepup', name: 'Step-Up' }, { kind: 'qp', name: 'Voltage QP' }] },
   stair: { zone: 8, feats: [jump('Stair Drop 1'), { kind: 'stepup', name: 'Stair Up' }, jump('Stair Drop 2'), jump('Stairway Hip')] },
@@ -86,6 +86,8 @@ function ride(type, key, sty) {
     // (rows close together: an approach point uphill of where the last feature left you is skipped)
     const prev = way[way.length - 1];
     if (prev && (w[2] === 'line' || w[2] === 'inrun') && w[0] < prev[0] + 3) continue;
+    // (nor one that would need a traverse steeper than ~24° across the hill: the next point lines you up anyway)
+    if (prev && prev.f !== f && (w[2] === 'line' || w[2] === 'inrun') && Math.abs(w[1] - prev[1]) > 0.45 * (w[0] - prev[0])) continue;
     way.push({ ...w, f });
   }
   const last = way[way.length - 1] || [p.position.x + 40, p.position.z];
@@ -118,7 +120,7 @@ function ride(type, key, sty) {
     on('landed', (e) => { const nm = p.takeoffPos && course.featureAt(p.takeoffPos.x, p.takeoffPos.z); if (nm && e.air > 0.3 && course.named.some((n) => n.name === nm && n.kind === 'spine')) { const [, b0] = course.named.find((n) => n.name === nm).f.local(p.takeoffPos.x, p.takeoffPos.z), [, b1] = course.named.find((n) => n.name === nm).f.local(p.position.x, p.position.z); if (process.env.SPN) console.log('   spine', nm, 'b0', b0.toFixed(2), 'b1', b1.toFixed(2), 'air', e.air.toFixed(2), e.result, 'v', p.speed.toFixed(1)); const from = line.feats.find((q) => q.kind === 'spine' && q.name === nm)?.from; if (from && Math.abs(b0) < 1.5 && b1 * from < -1.5 && e.clean) ev.spines.add(nm); } }),
   ];
   const hist = [];
-  let key0 = 0, pipeSide = 1, pipeT = 0, airTrick = null, lastState = 1, stillT = 0;
+  let key0 = 0, pipeSide = 1, pipeT = 0, airTrick = null, lastState = 1, stillT = 0, landT = -9;
   p.script = (c, pl) => {
     Object.assign(c, { steer: 0, brake: 0, up: 0, jump: false, tuck: 0 });
     c._type = type; c._t = t;
@@ -173,6 +175,8 @@ function ride(type, key, sty) {
       const travel = pl.heading + (pl.travelSign < 0 ? Math.PI : 0);
       const d = Math.atan2(Math.sin(want - travel), Math.cos(want - travel));
       c.steer = Math.max(-1, Math.min(1, -d * 3.2));
+      // Just landed: absorb it before carving (full lock at 70 km/h on touchdown swings the gear 90°).
+      if (t - landT < 0.5) c.steer = Math.max(-0.35, Math.min(0.35, c.steer));
     }
     dbgT = [tgt[0], tgt[1], c.steer];
     // Speed: jumps → aim for the sweet spot; rails → 7–10 m/s; else tuck.
@@ -186,8 +190,9 @@ function ride(type, key, sty) {
       const nextQp = way.slice(wi).find((q) => q[2] === 'qp');
       const dQp = nextQp ? Math.hypot(nextQp[0] - pl.position.x, nextQp[1] - pl.position.z) : 1e9;
       if (dSpine < dJump && dSpine < dRail && dSpine < 60) c.tuck = pl.speed < 14 ? 1 : 0;   // carry speed across a spine
-      else if (dQp < 90 && dQp < dJump && dQp < dRail) {   // a quarterpipe: ~13 m/s (faster and you fly out of it)
-        if (pl.speed > 14.5 && dQp > 12) check(c, pl.speed - 13); else if (pl.speed < 11) c.tuck = 1; else c.brake = UP;
+      else if (dQp < 90 && dQp < dJump && dQp < dRail) {   // a quarterpipe: ~12–14 m/s by its height (faster and you fly out of it)
+        const want = nextQp[3].name === 'Spark QP' ? 12 : 12;
+        if (pl.speed > want + 2 && dQp > 12) check(c, pl.speed - want); else if (pl.speed < want - 1) c.tuck = 1; else c.brake = UP;
       }
       else if (dJump < dRail && nextJump && dJump < 160) {
         const F = nextJump[3], Ld = F.jump.land || { vMin: 10, vMax: 14 }, want = Ld.sweet?.v ?? (Ld.vMin + Ld.vMax) / 2;
@@ -244,7 +249,7 @@ function ride(type, key, sty) {
       if (airTrick === 'flip' && pl.airTime < 0.45) c.brake = 1;
       if (pl.airTime > 0.25 && tl > 0.6 && !target) c.tuck = 1;   // grab (not while spinning: the stick spins)
     }
-    if (pl.state === 1 && lastState === 2) airTrick = null;   // landed: the trick is done
+    if (pl.state === 1 && lastState === 2) { airTrick = null; landT = t; }   // landed: the trick is done
     lastState = pl.state;
   };
   const DT = 1 / 60;
