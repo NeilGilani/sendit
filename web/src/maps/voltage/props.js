@@ -404,8 +404,60 @@ function buildDressing(course, T, M) {
   }
   const mk = [];
   for (const [x, y, z] of sweet) { const p = new THREE.CylinderGeometry(0.05, 0.05, 1.3, 6); p.translate(x, y + 0.6, z); mk.push(p); }
+  // Neon strips along the deck edges of the big jumps (lip → end of the landing): the line reads at night-club
+  // brightness from the top of the course, and frames the sweet zone.
+  const neonC = [], neonP = [];
+  for (const f of course.features) {
+    if (!f.jump?.land || !(f.lane === 'slope' || f.kind === 'bigair' || f.lane === 'high')) continue;
+    const end = f.marks.landingEnd?.a ?? f.jump.lipA + 30;
+    for (const side of [-1, 1]) for (let a = f.jump.lipA + 0.6; a < end; a += 1) {
+      const p0 = f.world(a, side * (f.hwAt(a) + 0.05)), p1 = f.world(a + 1, side * (f.hwAt(a + 1) + 0.05));
+      const y0 = f.yAt(a), y1 = f.yAt(a + 1);
+      if (y0 === null || y1 === null) continue;
+      (f.lane === 'high' ? neonP : neonC).push(segBox(new THREE.Vector3(p0[0], y0 + 0.08, p0[1]), new THREE.Vector3(p1[0], y1 + 0.08, p1[1]), 0.12, 0.08));
+    }
+  }
+  // Park signage: a coloured shape on a post at every lane feature (green circle small, blue square medium,
+  // black diamond pro, orange oval for the jib garden), as resorts mark their parks.
+  const signs = { spark: [], current: [], high: [], grid: [] };
+  const signAt = (lane, x, z) => { if (!signs[lane]) return; const y = T.getHeight(x, z); const post = new THREE.CylinderGeometry(0.04, 0.04, 1.8, 6); post.translate(x, y + 0.9, z); poles.push(post); signs[lane].push([x, y + 1.9, z]); };
+  for (const f of course.features) {
+    if (f.kind === 'jump' && f.lane && signs[f.lane]) { const [x, z] = f.world(f.jump.lipA - 14, f.jump.hw + 2.5); signAt(f.lane, x, z); }
+  }
+  for (const r of course.rails) {
+    const lane = r.lane === 'grid' || r.section === 'The Grid' ? 'grid' : r.lane;
+    if (!signs[lane]) continue;
+    const p0 = r.pts[0], p1 = r.pts[1], dx = p1[0] - p0[0], dz = p1[2] - p0[2], l = Math.hypot(dx, dz) || 1;
+    signAt(lane, p0[0] - dx / l * 6 - dz / l * 2.2, p0[2] - dz / l * 6 + dx / l * 2.2);
+  }
+  const signGeo = {
+    spark: new THREE.CircleGeometry(0.35, 20), current: new THREE.PlaneGeometry(0.6, 0.6),
+    high: new THREE.PlaneGeometry(0.55, 0.55).rotateZ(Math.PI / 4), grid: new THREE.CircleGeometry(0.35, 20).scale(1.4, 0.8, 1),
+  };
+  const signMat = {
+    spark: toonMaterial({ name: 'signGreen', color: 0x1fbf5a, side: THREE.DoubleSide, frag: 'toonEmissive = vec3(0.05, 0.35, 0.12);' }),
+    current: toonMaterial({ name: 'signBlue', color: 0x2b6bff, side: THREE.DoubleSide, frag: 'toonEmissive = vec3(0.05, 0.12, 0.45);' }),
+    high: toonMaterial({ name: 'signBlack', color: 0x0b0d14, side: THREE.DoubleSide }),
+    grid: toonMaterial({ name: 'signOrange', color: 0xff8a1f, side: THREE.DoubleSide, frag: 'toonEmissive = vec3(0.45, 0.18, 0.02);' }),
+  };
+  for (const [lane, list] of Object.entries(signs)) {
+    if (!list.length) continue;
+    const im = new THREE.InstancedMesh(signGeo[lane], signMat[lane], list.length);
+    const m = new THREE.Matrix4();
+    list.forEach(([x, y, z], i) => { m.makeRotationY(-Math.PI / 2); m.setPosition(x, y, z); im.setMatrixAt(i, m); });
+    im.computeBoundingSphere();
+    g.add(im);
+  }
+  // DJ booth and speaker stacks in the finish arena.
+  { const x = X(FINISH_U + 25), v = -34, y = H(x, v);
+    const booth = new THREE.BoxGeometry(3, 1.2, 5); booth.translate(x, y + 0.6, v); darks.push(booth);
+    const deck = new THREE.BoxGeometry(2.6, 0.08, 4.2); deck.translate(x, y + 1.24, v); lamps.push(deck);
+    for (const dz of [-4, 4]) for (let k = 0; k < 3; k++) { const spk = new THREE.BoxGeometry(1.1, 1.0, 1.1); spk.translate(x, y + 0.5 + k * 1.02, v + dz); darks.push(spk); }
+    course.obstaclesExtra.push([x, v, 2.6, 'tower']); }
   const strip = (list) => mergeGeometries(list.map((q) => (q.index ? q.toNonIndexed() : q)).map((q) => { for (const n of Object.keys(q.attributes)) if (!['position', 'normal', 'uv'].includes(n)) q.deleteAttribute(n); return q; }));
   if (mk.length) g.add(new THREE.Mesh(strip(mk), M.yellow));
+  if (neonC.length) g.add(new THREE.Mesh(strip(neonC), M.cyan));
+  if (neonP.length) g.add(new THREE.Mesh(strip(neonP), M.pink));
   if (poles.length) g.add(new THREE.Mesh(strip(poles), M.steel));
   if (darks.length) g.add(new THREE.Mesh(strip(darks), M.dark));
   if (whites.length) g.add(new THREE.Mesh(strip(whites), toonMaterial({ name: 'fencePanels', map: fenceTexture(), color: 0xffffff })));
