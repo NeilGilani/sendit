@@ -7,15 +7,98 @@
   <meta name="description" content="A peaceful skiing game on a real mountain at golden hour." />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f6c58e'/%3E%3Cstop offset='1' stop-color='%238fb3d9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='128' height='128' rx='24' fill='url(%23s)'/%3E%3Cpath d='M14 104 L52 40 L66 60 L80 30 L114 104 Z' fill='%23f4f7fb'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/src/style.css" />
+  <style>
+    /* Loading screen (src/loading/index.js) — inline so it paints before anything else loads. */
+    #loading { position: fixed; inset: 0; z-index: 30; overflow: hidden; background: #141a2c; color: #faf8f3;
+      font-family: "Inter", "SF Pro Display", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    #loading .ld-static { position: absolute; inset: 0; transition: opacity 1.6s ease;
+      background: linear-gradient(180deg, #17213d 0%, #2d3b66 30%, #6d6f99 52%, #c48f97 66%, #f0c08e 76%, #f6d6a8 82%); }
+    #loading .ld-sun { position: absolute; left: 62%; top: 70%; width: 46vmax; height: 46vmax; transform: translate(-50%, -50%); border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,236,200,0.95) 0%, rgba(255,208,150,0.55) 6%, rgba(255,170,130,0.18) 26%, rgba(255,160,140,0) 60%); }
+    #loading .ld-ridges { position: absolute; left: 0; bottom: 0; width: 100%; height: 100%; }
+    #loading .ld-flakes { position: absolute; inset: -40% 0 0 0; will-change: transform; opacity: .7;
+      background-image: radial-gradient(circle, rgba(255,255,255,.95) 0 1.4px, transparent 2.2px), radial-gradient(circle, rgba(255,255,255,.7) 0 1px, transparent 1.6px);
+      background-size: 173px 211px, 97px 131px; background-position: 0 0, 41px 67px; animation: ld-fall 16s linear infinite; }
+    #loading .ld-flakes.b { background-size: 331px 367px, 229px 263px; background-position: 30px 90px, 160px 10px; filter: blur(1.2px); opacity: .55; animation-duration: 9s; }
+    @keyframes ld-fall { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-60px, 28.57%, 0); } }
+    #loadcanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 1.8s ease; }
+    #loading.live #loadcanvas { opacity: 1; }
+    #loading.live .ld-static { opacity: 0; }
+    #loading.static #loadcanvas { display: none; }
+    /* Cinematic 2.2:1 bars: the overlay lives in them; they retract on the hand-off. */
+    #loading .ld-bars i { position: absolute; left: 0; right: 0; height: clamp(0px, calc((100vh - 100vw / 2.2) / 2), 16vh); background: #05060a;
+      transition: transform var(--out, 1.3s) cubic-bezier(.6,0,.2,1); }
+    #loading .ld-bars i:first-child { top: 0; transform-origin: top; }
+    #loading .ld-bars i:last-child { bottom: 0; transform-origin: bottom; }
+    #loading .ld-ui { position: absolute; inset: 0; pointer-events: none; transition: opacity .6s ease; }
+    #loading .ld-brand { position: absolute; left: clamp(20px, 4vw, 64px); top: clamp(14px, calc((100vh - 100vw / 2.2) / 4 - 22px), 7vh); }
+    #loading .ld-brand .title { font-size: clamp(30px, 3.4vw, 52px); margin: 0; letter-spacing: 0.08em; }
+    #loading .ld-cap { position: absolute; right: clamp(20px, 4vw, 64px); top: clamp(18px, calc((100vh - 100vw / 2.2) / 4 - 12px), 7.5vh); text-align: right;
+      opacity: 0; transform: translateY(-4px); transition: opacity 1.2s ease, transform 1.2s ease; text-shadow: 0 1px 12px rgba(0,0,0,.5); }
+    #loading .ld-cap.on { opacity: 1; transform: none; }
+    #loading .ld-cap b { display: block; font-weight: 800; font-style: italic; font-size: 15px; letter-spacing: .22em; text-transform: uppercase; }
+    #loading .ld-cap span { display: block; margin-top: 4px; font-size: 12px; letter-spacing: .14em; color: rgba(250,248,243,.62); text-transform: uppercase; }
+    #loading .ld-foot { position: absolute; left: clamp(20px, 4vw, 64px); right: clamp(20px, 4vw, 64px); bottom: clamp(14px, calc((100vh - 100vw / 2.2) / 4 - 18px), 6vh);
+      display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; }
+    #loading .ld-tips { position: relative; flex: 1; height: 2.6em; font-size: 14px; color: rgba(250,248,243,.78); letter-spacing: .03em; max-width: 640px; }
+    #loading .tip { position: absolute; left: 0; bottom: 0; opacity: 0; animation: ld-tip var(--tip-cycle, 52s) linear infinite both; text-shadow: 0 1px 10px rgba(0,0,0,.55); }
+    #loading .tip::before { content: "TIP"; font-size: 10px; font-weight: 800; letter-spacing: .2em; color: #ffcc94; margin-right: 10px; }
+    #loading kbd { font: inherit; font-size: 12px; font-weight: 700; padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,.28); background: rgba(255,255,255,.08); }
+    @keyframes ld-tip { 0% { opacity: 0; transform: translateY(6px); } 1.6% { opacity: 1; transform: none; } 11% { opacity: 1; transform: none; } 12.5% { opacity: 0; transform: translateY(-4px); } 100% { opacity: 0; } }
+    #loading .ld-progress { width: min(300px, 38vw); flex: none; }
+    #loading .ld-msg { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: rgba(250,248,243,.6); margin-bottom: 9px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #loading .bar { position: relative; height: 2px; background: rgba(255,255,255,.16); overflow: hidden; border-radius: 2px; }
+    #loadbar { position: absolute; inset: 0; background: linear-gradient(90deg, #ffcc94, #fff3d6 60%, #7ff9ea); transform-origin: left; transform: scaleX(0);
+      transition: transform .9s cubic-bezier(.2,.7,.2,1); }
+    #loading .bar::after { content: ""; position: absolute; top: 0; bottom: 0; width: 30%; left: -30%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); animation: ld-shimmer 2.4s ease-in-out infinite; }
+    @keyframes ld-shimmer { to { transform: translateX(440%); } }
+    /* Hand-off: push in and dissolve into the lobby; the bars and overlay go first. */
+    #loading.out, #loading.out-quick { pointer-events: none; background: transparent; }
+    #loading.out .ld-ui, #loading.out-quick .ld-ui { opacity: 0; }
+    #loading.out .ld-bars i { transform: scaleY(0); }
+    #loading.out #loadcanvas, #loading.out .ld-static { opacity: 0; transform: scale(1.07); transition: opacity var(--out) cubic-bezier(.4,0,.2,1), transform var(--out) cubic-bezier(.3,0,.1,1); }
+    #loading.out-quick { opacity: 0; transition: opacity var(--out) ease; }
+    @media (max-aspect-ratio: 1/1) { #loading .ld-bars { display: none; }
+      #loading .ld-ui::before, #loading .ld-ui::after { content: ""; position: absolute; left: 0; right: 0; height: 26vh; pointer-events: none; }
+      #loading .ld-ui::before { top: 0; background: linear-gradient(rgba(5,6,10,.55), transparent); }
+      #loading .ld-ui::after { bottom: 0; background: linear-gradient(transparent, rgba(5,6,10,.7)); }
+      #loading .ld-brand, #loading .ld-foot { z-index: 1; } #loading .ld-brand { top: 18px; } #loading .ld-foot { bottom: 22px; } }
+    @media (max-width: 640px) { #loading .ld-foot { flex-direction: column; align-items: stretch; gap: 12px; } #loading .ld-progress { width: 100%; } #loading .ld-msg { text-align: left; } #loading .ld-cap { display: none; } }
+    @media (prefers-reduced-motion: reduce) { #loading .ld-flakes, #loading .bar::after { animation: none; } }
+  </style>
 </head>
 <body>
   <canvas id="game"></canvas>
 
+  <!-- Loading screen (src/loading/): a painted backdrop that shows instantly (and is the fallback),
+       the live slow-motion scene (rendered by a worker into #loadcanvas) and the overlay. -->
   <div id="loading" class="screen">
-    <div class="title">SENDIT</div>
-    <div class="sub">Preparing the mountain…</div>
-    <div class="bar"><div id="loadbar"></div></div>
-    <div id="loadmsg" class="tiny"></div>
+    <div class="ld-static" aria-hidden="true">
+      <div class="ld-sun"></div>
+      <svg class="ld-ridges" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMax slice">
+        <path fill="#9aa6c8" opacity=".55" d="M0 560 L90 520 L170 540 L260 470 L330 500 L420 430 L480 455 L560 400 L640 450 L720 420 L800 470 L880 410 L960 380 L1030 430 L1110 400 L1190 450 L1270 420 L1350 470 L1440 430 L1530 480 L1600 455 L1600 900 L0 900 Z"/>
+        <path fill="#6f7ca6" opacity=".8" d="M0 640 L120 580 L210 610 L300 540 L360 560 L450 500 L520 530 L600 470 L690 540 L760 520 L850 580 L960 520 L1040 560 L1130 500 L1220 560 L1300 530 L1400 600 L1490 560 L1600 610 L1600 900 L0 900 Z"/>
+        <path fill="#3a4569" d="M-20 900 L-20 720 L140 660 L260 690 L400 600 L520 640 L640 520 L700 470 L748 380 L790 300 L812 270 L835 300 L880 350 L940 430 L1010 470 L1080 560 L1180 600 L1300 590 L1420 660 L1620 700 L1620 900 Z"/>
+        <path fill="#f3e7e4" opacity=".92" d="M812 270 L835 300 L880 350 L940 430 L1010 470 L960 468 L930 450 L900 440 L870 400 L850 390 L828 340 L815 330 Z"/>
+        <path fill="#c7cde3" opacity=".55" d="M812 270 L790 300 L748 380 L760 385 L780 350 L800 330 Z"/>
+        <path fill="#232a45" d="M-20 900 L-20 820 L180 790 L380 820 L600 780 L820 830 L1040 790 L1260 830 L1460 800 L1620 820 L1620 900 Z"/>
+      </svg>
+      <div class="ld-flakes a"></div><div class="ld-flakes b"></div>
+    </div>
+    <canvas id="loadcanvas"></canvas>
+    <div class="ld-bars" aria-hidden="true"><i></i><i></i></div>
+    <div class="ld-ui">
+      <div class="ld-brand"><div class="title">SENDIT</div></div>
+      <div id="loadcap" class="ld-cap" aria-hidden="true"></div>
+      <div class="ld-foot">
+        <div id="loadtips" class="ld-tips" aria-live="off"></div>
+        <div class="ld-progress" role="progressbar" aria-label="Loading">
+          <div id="loadmsg" class="ld-msg">Preparing the mountain…</div>
+          <div class="bar"><div id="loadbar"></div></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- The lobby (first screen after loading) is built by src/lobby/Lobby.js. -->
@@ -93,6 +176,7 @@
   </div>
 
   <div id="fade"></div>
+  <script type="module" src="/src/loading/index.js"></script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

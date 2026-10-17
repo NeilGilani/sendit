@@ -1,10 +1,19 @@
-# Map 4: Voltage Park — an event terrain park, and grinding
+# Map 4: Voltage Park — a fast event terrain park, and grinding
 
-An event terrain park in the spirit of Olympic slopestyle and the Red Bull park builds: an Olympic-style
-slopestyle course (three rail sections, then three big table-tops), three park lanes for different levels, a
-jib garden, a 22 ft superpipe, a scaffold big air, skew kickers, a step-up, quarterpipes and a finish arena with
-grandstands, a big screen and a DJ booth. It also brings the game's first **grinding** mechanic
-(physics/grind.js): rails, boxes, tubes and ledges, on skis and on a snowboard.
+A fast event terrain park in the spirit of Olympic slopestyle and the Red Bull park builds. You drop off a scaffold
+start ramp onto a 30° summit pitch, ride three rail sections, drop in again (the Plunge, then the 28° Launch) and hit
+a line of big tables. The line ends on **Megawatt**, a big-air-size kicker in the course, and a road gap into the
+finish. Around it:
+
+- three park lanes, each with its own identity: Spark (flow), Current (the Triple Stack), High Voltage (pro);
+- the Grid (a jib garden), the Stairway (a step-down / step-up line) and a row of hips;
+- two spines down the fall line between the lanes (air them sideways into the next lane);
+- side hits, a transfer hip, a canal gap and two quarterpipes;
+- a 22 ft superpipe and the Tower, a 33 m scaffold big air;
+- a finish arena with grandstands, a big screen and a DJ booth.
+
+It also brings the game's first **grinding** mechanic (physics/grind.js): rails, boxes, tubes and ledges, on skis
+and on a snowboard.
 
 ```
 npm --prefix web run dev -- --port 5188 --strictPort
@@ -13,7 +22,9 @@ http://localhost:5188/?map=voltage-park&ride&equip=snowboard
 http://localhost:5188/?map=voltage-park&challenge               the judged slopestyle run (Challenge)
 node web/scripts/map4-unit.mjs                     registry, tuning, shapes, EFH landings, rails, grind, pipe, judge
 node web/scripts/map4-rails.mjs 8 --check          every rail locks and rides at 6 / 8 / 10 m/s, skis and board
-node web/scripts/map4-bot.mjs both all clean       line bot: every line, every rail (styles: clean | trick | human)
+node web/scripts/map4-bot.mjs both all clean --check   line bot: every line, rail, jump and spine (clean | trick | human)
+node web/scripts/map4-jumps.mjs                    every jump's designed window (m/s, km/h), table, landing, height
+node web/scripts/map4-speed.mjs ski 2 0.5          a rider straight down a line: speed every 25 m, lip speeds, airs
 node web/scripts/map4-fuzz.mjs 60 30               random riders at the rails, drop zones and anywhere
 node web/scripts/map3-perf.mjs http://localhost:5188 1600 900 1 60 voltage-park   GPU / CPU / draws along the course
 ```
@@ -24,102 +35,143 @@ Research behind the design: [docs/map4-research.md](map4-research.md).
 
 ## 1. The park
 
-Local frame (layout.js): **u** = metres down the fall line from the start gate (world x = −380 + u; the hill
+Local frame (layout.js): **u** = metres down the fall line from the start gate (world x = −520 + u; the hill
 falls toward +x / east), **v** = metres across (world z; + = skier's right). The sun comes from the
 south-south-east, so the park is cross-lit from the right.
 
 | u (m) | pitch | what is there |
 |---|---|---|
-| −20…0 | 4° | the start deck, the start hut and the VOLTAGE PARK start arch |
-| 0…35 | 20° | the drop-in |
-| 35…290 | 12° | jib zone: the three slopestyle rail sections, the Grid, the top of the lanes |
-| 290…360 | 23° | the in-run to the jump line (research: ≥ 30 m at 18–25°) |
-| 360…705 | 19° | the jump zone: the three big tables, the big air, the pipe, the lower lanes |
-| 705…765 | 9° | the run-out, quarterpipes |
-| **795** | | **the finish line** (the arch, grandstands, the big screen, the DJ booth) |
+| −40…0 | 4° | the start deck, the start hut and the **Start Ramp**: a scaffold deck 9 m up, rolled into at 36° |
+| 0…50 | **30°** | the summit drop (every lane starts on it) |
+| 50…265 | 13° | the rail bench: slopestyle sections 1 and 2, the Grid, the lanes' rails and small tables |
+| 265…300 | **28°** | **THE PLUNGE**, the drop-in to section 3 |
+| 300…385 | 14° | section 3, the lanes' last rails, the Spark rollers |
+| 385…455 | **28°** | **THE LAUNCH**, the drop-in to the jump line (every lane's big jumps sit under it) |
+| 455…760 | 18° | the jump line (Lightning, Thunder, Voltage), the Stack, the Stairway, the hips, the Tower's landing, the pipe |
+| 760…810 | **30°** | the drop into **Megawatt** |
+| 810…1110 | 18° | Megawatt, the Gap, the Canal, the step-ups, the last hips, the quarterpipes |
+| 1110…1170 | 9° | the run-out into the arena |
+| **1140** | | **the finish line** (the arch, grandstands, the big screen, the DJ booth) |
 
-The slopestyle course is ~795 m long with 225 m of drop. Beijing's course was 600 m with 198 m of drop and
-Livigno's 650 m with 165 m. The park is groomed corduroy over ±300 m across, between forested banks, with
+The slopestyle course is 1140 m long with 384 m of drop (was 795 m / 225 m). Beijing's course was 600 m / 198 m and
+Livigno's 650 m / 165 m: this one is longer and steeper, a game's version. The rhythm alternates **drop, rails, drop,
+jumps, drop, mega**. Each steep pitch is a drop-in that builds speed for what's below it; each bench carries the
+features that want a steadier speed. The park is groomed corduroy over ±300 m across, between forested banks, with
 mountains and a horn behind the start.
+
+**Speeds** (map4-speed / map4-bot, see §6):
+
+- off the start ramp: 15 m/s;
+- 18–20 m/s (65–72 km/h) at the bottom of the summit drop;
+- rails at 10–13 m/s;
+- 25 m/s (90 km/h) at the bottom of the Launch, tucked;
+- the big tables at **19–21 m/s (70–76 km/h)** at the lip;
+- Megawatt at **21–22.5 m/s (77–81 km/h)**;
+- the Tower's in-run reads 93 km/h before the kicker.
 
 ### The slopestyle course (centre, v ≈ −16…+16)
 
-Three rail sections, each with three parallel options (pick your line), then three jumps of growing size:
+Three rail sections, each with three parallel options (pick your line), then five jumps:
 
 | section | left | centre | right |
 |---|---|---|---|
-| **1 · The Circuit** (u 50) | Flat-Down rail (3.5 m flat + 7.5 m at −24°), gap-on | 12 m ride-on box | 9 m down rail, gap-on |
-| **2 · Surge** (u 124) | Down-flat-down rail (3 × 3.5 m) | 10 m rainbow box (0.7 m hump) | flat-down tube (Ø 0.9 m), ride-on |
-| **3 · Overload** (u 200) | 13 m C-rail (38° curve) | kinked handrail beside a 9-step stair set | 2.4 m gap to an 11 m down box |
+| **1 · The Circuit** (u 100) | Flat-Down rail (3.5 m flat + 7.5 m at −24°), gap-on | 12 m ride-on box | 9 m down rail, gap-on |
+| **2 · Surge** (u 185) | Down-flat-down rail (3 × 3.5 m) | 10 m rainbow box (0.7 m hump) | flat-down tube (Ø 0.9 m), ride-on |
+| **3 · Overload** (u 322, under the Plunge) | 13 m C-rail (38° curve) | kinked handrail beside a 9-step stair set | 2.4 m gap to an 11 m down box |
 
-| jump | lip | kicker | lip angle | table (lip → knuckle) | designed window (lip speed) | sweet spot |
-|---|---|---|---|---|---|---|
-| **Lightning** | u 392 | 3.6 m | 27° | 15.5 m | 13.2–16.6 m/s | 20 m out, at 14.1 m/s |
-| **Thunder** | u 502 | 4.1 m | 29° | 18.5 m | 14.4–17.6 m/s | 23 m out, at 15.3 m/s |
-| **Voltage** | u 616 | 4.6 m | 30° | 22 m | 15.6–18.5 m/s | 26 m out, at 16.4 m/s |
+| jump | lip | kicker | lip angle | table (lip → knuckle) | designed window (lip speed) | sweet spot | deck height |
+|---|---|---|---|---|---|---|---|
+| **Lightning** | u 495 | 4.4 m | 29° | 29 m | 18.6–21.6 m/s | 36 m out, at 19.5 m/s (70 km/h) | 15 m |
+| **Thunder** | u 610 | 4.5 m | 30° | 31 m | 19.1–22.0 m/s | 38 m out, at 20.0 m/s (72 km/h) | 16 m |
+| **Voltage** | u 720 | 4.8 m | 31° | 33 m | 19.7–22.4 m/s | 40 m out, at 20.5 m/s (74 km/h) | 17 m |
+| **Megawatt** | u 880 | 5 m | 32° | 36 m | 20.5–23.1 m/s | 42 m out, at 21.2 m/s (76 km/h) | 18 m |
+| **The Gap** (road gap) | u 1015 | 5 m | 24° | 35 m (a 23 m channel with a road across it, then a 12 m landing mound) | 19.0–21.3 m/s | 40 m out, at 19.6 m/s (71 km/h) | 12 m |
 
-Every table has ride-up ramps at 20° beside its kicker (go around and roll the deck). Neon strips edge the
-decks and a blue dye line marks every lip and knuckle. Each big landing has a banner with the jump's name on
-its sidewall and yellow sweet-spot markers either side.
+- **The tables.** Every table has ride-up ramps at 20° beside its kicker (go around and roll the deck). Neon
+  strips edge the decks and a blue dye line marks every lip and knuckle. Each big landing has a banner with the
+  jump's name on its sidewall and yellow sweet-spot markers either side.
+- **The Gap.** Too slow and you hit the landing mound's face.
+- **Megawatt's drop zone** (key 4) puts you just over Voltage's knuckle. You drop 17 m down its landing into the
+  30° pitch, and a full tuck arrives in Megawatt's window.
 
 ### The park lanes (right side)
 
-| lane | v | what is there |
+| lane | v | identity · what is there |
 |---|---|---|
-| **Spark Lane** (small, green ●) | 70 | four small tables (5–8 m, 1.3–1.7 m kickers, 22–24°), a 7 m box, a fat tube and a ledge (ride-on), a down box, a butter box, pump rollers, the **Spark QP** (3.2 m) |
-| **Current Lane** (medium, blue ■) | 125 | three medium tables (10–14 m, 2–3 m kickers), flat-down rail, box, kink, tube, rollers, a **step-down** |
-| **High Voltage** (pro, black ◆) | 186 | down-flat-down, rainbow rail, 13 m down rail, a big kink, two big tables (17.5 / 21 m, 3.6 / 4.1 m kickers, 29–31°), a **step-up** (land on a raised deck 2.4 m above the lip), the **Voltage QP** (5.2 m) |
-| **The Grid** (jib garden, orange ⬭) | 236–258 | 16 jibs in rows every 25–35 m, three columns: boxes, tubes, rails, a flat box, an A-frame, a 14 m rail, a kink, an S-rail, a rainbow box, a down box, a ledge, a battleship, a cannon, a finale DFD |
+| **Spark Lane** (green ●) | 70 | **flow.** Small tables on the bench (6–10 m), a box, a fat tube and a ledge, a down box, pump rollers. Under the Launch a **stacked double** (two 14 m tables back to back), a butter box, two more tables (16 / 18 m), three rollers, a **side hit**, the **Spark QP** (3.2 m) |
+| **Current Lane** (blue ■) | 125 | **the Triple Stack.** A table, flat-down / box / kink / tube on the benches. Under the Launch **three 18–19 m tables back to back**, ridden upright at ~14.5 m/s (each landing runs straight into the next in-run). The **Current Transfer** (a hip at v 148 that sends you into High Voltage), a **step-down**, a **side hit** on the lane's line (10° skew) and a 22 m table |
+| **High Voltage** (pro, black ◆) | 186 | down-flat-down, rainbow rail, 13 m down rail, a kink; under the Launch two pro tables (22 / 27 m, 16–17.5 m/s), a side hit, **the Canal** (a 14 m-wide ice-blue channel, then a 9 m landing mound), a **step-up**, the **Voltage QP** (5.2 m) |
+| **The Grid** (jib garden, orange ⬭) | 236–258, u 50–262 | 16 jibs in seven rows every 30–33 m, three columns: boxes, tubes, rails, a flat box, an A-frame, a 14 m rail, a kink, an S-rail, a rainbow box, a down box, a ledge, a battleship, a cannon, a finale DFD |
+| **The Stairway** (step line) | 245, under the Grid | **Stair Drop 1** (a step-down: the deck falls away 6°, 20 m table), **Stair Up** (a 32° kicker over a 7 m table to a deck 1.8 m above the lip), **Stair Drop 2** (24 m), the **Stairway Hip** |
 
-Every lane feature has a coloured sign on a post, as a resort would mark it. Lane entries have their own arches.
+- **Spines** (shapes.js `SpineFeature`) are ridges down the fall line between two lanes:
+  - **The Spine** runs between Spark and Current (u 598–690, 3.2 m tall, 40° faces).
+  - The **Stairway Spine** runs between High Voltage and the Stairway (u 812–905, 3.6 m, 42°).
+  - Ride up a face across the ridge, air the crest sideways, land on the far face: you are in the next lane with
+    all your speed. The bot's air across is 0.8–1.5 s at 12–16 m/s, landed clean (`landRedirect`, §5).
+- **Branching lines.**
+  - Spark → the Spine → Current → the Current Transfer → High Voltage, in one run.
+  - The Stairway → the Stairway Spine → High Voltage's step-up.
+- **Signs and arches.** Every lane feature has a coloured sign on a post, as a resort would mark it. Lane entries
+  and the drops have their own arches.
 
 ### The left side
 
-- **The Conduit — the 22 ft superpipe** (u 355–575, v −95).
-  - Wall: 6.7 m walls, 7.2 m transitions to 82° vert, 6.4 m flat bottom, 20.8 m coping to coping, 220 m long, 7 m decks.
-  - The pipe sits on the 19° slope (the FIS spec is 18° ± 1°).
-  - The walls grow in over the first 14 m, so you drop in from the top.
-- **The Tower — the big air** (u 322, v −172).
-  - A 31 m scaffold with a 9° start deck and a 34° in-run.
-  - A 5 m kicker at 32°, a 24 m rising table and a 38° landing.
-  - Designed for 16.3–18.8 m/s at the lip, with the sweet spot 29 m out.
-  - A drop zone sits on the deck. Its sheer sides are scaffold (fall off and you hit the snow 20 m below).
-- **Skew kickers** (the research's "hip / skew" jumps; Beijing and PyeongChang used them).
-  - **Hip Left** (u 420, 32° off the fall line) and **Hip Right** (u 540, 30° the other way).
-  - The kicker and its landing point across the slope, so you take off and land on a diagonal.
+- **The Conduit — the 22 ft superpipe** (u 485–725, v −95).
+  - Wall: 6.7 m walls, 7.2 m transitions to 82° vert, 6.4 m flat bottom, 20.8 m coping to coping, 240 m long, 7 m decks.
+  - The pipe sits on the 18° slope (the FIS spec is 18° ± 1°). The walls grow in over the first 14 m and fade out
+    over the last 22 m.
+  - Above 21 m/s in the pipe the snow scrubs speed (its old feel; faster and the airs go long and low).
+- **The Tower — the big air** (deck at u 460, v −172).
+  - A 33 m scaffold with a 9° start deck and a **124 m in-run at 38°**.
+  - A 5.5 m kicker at 33°, a 34 m rising table and a 40° landing.
+  - Designed for 19.8–22.1 m/s at the lip (sweet 20.4 m/s, 41 m out). A tucked rider arrives at 20.2–21.7 m/s and
+    is in the air for 2.4–3.5 s, with slow motion at the apex.
+  - The drop zone sits on the deck. Its sheer sides are scaffold.
+- **Hip Row** (v −228…−242): **Hip Left** (u 520, 30° left), **Hip Right** (u 632, 30° right), **Hip Three**
+  (u 880) and **Hip Four** (u 995). Their tables are 13–16 m, and the kicker and its landing point across the slope.
 
 ### Best lines
 
 1. **The slopestyle** (drop zone 1 or Challenge).
-   - **Rails:** Circuit Flat-Down → Surge DFD → Overload C-Rail. That is the hardest, highest-scoring line; the
-     centre (box, rainbow, handrail) is the stylish one, and the right side (down rail, tube, gap box) the fast one.
-   - **Jumps:** check your speed on the 23° in-run, then Lightning → Thunder → Voltage.
-   - The bot's best line is 360 → 540 → double backflip. A gold needs bigger rotations, switch-ups on the rails
-     and sweet-spot landings.
-2. **High Voltage.** DFD → rainbow → 13 m down rail → kink, then two pro tables, the step-up and the 5.2 m QP.
-3. **The Grid.** Snake the jib garden: left column 7 jibs, centre 6, right 3. Transfer rail to rail: a grind
-   that ends straight on the next rail banks with a **transfer** bonus.
-4. **The Tower.** Drop zone 5: one huge air, 3+ s, slow motion at the apex, room for a 720–1080.
-5. **The Conduit.** Drop zone 6: carve up each wall steeply (60–75° across the pipe), pump the transitions,
-   3–5 m out of a 6.7 m pipe.
+   - **Start.** Roll off the start ramp and down the summit drop at 65–70 km/h.
+   - **Rails.** Circuit Flat-Down → Surge DFD → down the Plunge → Overload C-Rail. That is the hardest,
+     highest-scoring line; the centre (box, rainbow, handrail) is the stylish one, and the right side (down rail,
+     tube, gap box) the fast one.
+   - **Jumps.** Drop into the Launch, check to ~70 km/h, then Lightning → Thunder → Voltage. Drop into the Megawatt
+     pitch, send Megawatt at ~78 km/h, then stomp the road gap.
+   - Clean bot runs take 82–84 s and land 4–5 of the 5 jumps in the sweet spot.
+2. **High Voltage.** DFD → rainbow → 13 m down rail → kink, down the Launch into two pro tables, the side hit,
+   the Canal, the step-up and the 5.2 m QP.
+3. **Lane hopper.** Spark Ledge → Down Box → Spark Double → **the Spine** → **Current Transfer** → the Canal →
+   the step-up: three lanes in one run.
+4. **The Triple Stack.** Drop zone 7. Three tables back to back, upright, no speed check, then the step-down,
+   the side hit and Current 3.
+5. **The Stairway.** Drop zone 9: step-down, step-up, step-down, then over the **Stairway Spine** into High
+   Voltage's step-up.
+6. **Megawatt.** Drop zone 4: down Voltage's landing, Megawatt (2.4–2.8 s, slow motion), the road gap.
+7. **The Tower.** Drop zone 5: 93 km/h on the in-run, one huge air, room for a 720–1080.
+8. **The Grid.** Snake the jib garden. A grind that ends straight on the next rail banks with a **transfer** bonus.
+9. **The Conduit.** Drop zone 6: carve up each wall steeply (60–75° across the pipe) and pump the transitions.
 
 ### Drop zones (practice): keys 1–9 / d-pad ◀ ▶, **T = back to the last feature you hit**
 
+Each drop zone is at the top of a steep in-run:
+
 | key | drop zone |
 |---|---|
-| 1 | Start Gate · Slopestyle |
-| 2 | Rail Section 2 · Surge |
-| 3 | Rail Section 3 · Overload |
-| 4 | Jump Line (top of the in-run) |
+| 1 | Start Ramp · Slopestyle (the scaffold deck) |
+| 2 | The Plunge · Section 3 (top of the 28° Plunge) |
+| 3 | The Launch · Jump Line (top of the 28° Launch) |
+| 4 | Megawatt · Mega Kicker (over Voltage's knuckle) |
 | 5 | The Tower · Big Air (scaffold deck) |
 | 6 | The Conduit · Superpipe |
-| 7 | Spark Lane · Small |
-| 8 | High Voltage · Pro |
-| 9 | The Grid · Jib Garden |
+| 7 | Triple Stack · Current Lane (top of the Launch) |
+| 8 | High Voltage · Pro (top of the Launch) |
+| 9 | The Stairway · Step Line (top of the Launch) |
 
 **T** puts you 26 m before the last rail you locked onto, or 45 m before the last kicker you launched off (the
-big air: its deck). Use it to hammer a feature until the timing is right. R / Y still goes back to the start
-gate.
+big air: its deck). Use it to hammer a feature until the timing is right. R / Y still goes back to the start.
 
 ---
 
@@ -129,23 +181,28 @@ gate.
 web/src/physics/grind.js       the grind (opt-in through course.rails): lock-on, balance, switch-ups, pops, scoring
 web/src/maps/voltage/
   index.js     registerMap (id 'voltage-park', order 4), thumbnail, lobby spot; loads props.js + hud.js lazily
-  layout.js    every feature in one place: PROFILE, JIBS, JUMPS, LANES, LANE_JUMPS, STEPS, HIPS, QUARTERPIPES,
-               ROLLERS, LANE_JIBS, GRID_JIBS, PIPE, BIG_AIR, DROP_ZONES, LINE_GOALS (tunables)
-  course.js    VoltageCourse: base snow (profile, banks, mountains, a horn), feature builders (tables, step-up,
-               QPs, rollers, jibs + mounds + ramps + the stair set, the pipe, the big air), the hooks
+  layout.js    every feature in one place: PROFILE (+ PITCH, the drops), START_RAMPS, JIBS, JUMPS, GAPS, SPINES,
+               LANES, LANE_JUMPS, STEPS, HIPS (hips, side hits, the transfer), QUARTERPIPES, ROLLERS, LANE_JIBS,
+               GRID_JIBS, PIPE, BIG_AIR, DROP_ZONES, LINE_GOALS (tunables)
+  course.js    VoltageCourse: base snow (profile, banks, mountains, a horn), feature builders (tables, step-ups
+               with a window from the flights, gap jumps, spines, scaffold start ramps, QPs, rollers, jibs +
+               mounds + ramps + the stair set, the pipe, the big air), the hooks
   shapes.js    ProfileBuilder (pen: lines, arcs, faces, the constant-EFH landing, back to the snow),
-               ProfileFeature (1D profile × width, raked sidewalls, a side profile), PipeFeature, FeatureIndex
+               ProfileFeature (1D profile × width, raked sidewalls, a side profile), PipeFeature, SpineFeature
+               (a ridge down the fall line), FeatureIndex
   park.js      per-rider park logic: pipe / QP vert, pumping, wall alignment, pipe landing spotting, pop and
                landing-zone feedback, rails → line goals, the in-run speed prediction
   scoring.js   SlopeJudge: the judged slopestyle run (Challenge results, zen run card)
-  hud.js       balance meter, feedback pops, in-run speed gauge, judged card, T practice key, grind audio
-  props.js     park snow mesh (dye lines), rails / boxes / tubes on legs, the scaffold, arches, crowd, fences,
-               light towers, flags, finish arena, screen, DJ booth, neon deck edges, lane signs
-  sparks.js    rail sparks / box spray (one additive Points cloud)
+  hud.js       balance meter, feedback pops, in-run speed gauge, judged card, T practice key, grind audio; the
+               event energy: drop-in calls, launch speed off the lips, MEGA AIR + a crowd roar, top speed / longest air
+  props.js     park snow mesh (dye lines), rails / boxes / tubes on legs, the scaffolds (start ramp, the Tower), the
+               road and the canal in the gaps, arches, crowd, fences, light towers, flags, finish arena, screen,
+               DJ booth, neon deck edges, lane signs
+  sparks.js    rail sparks / box snow (one Points cloud, normal blending)
   tuning.js    VOLTAGE_PHYSICS (per-map physics) and VOLTAGE_CAMERA
   noise.js     value / fbm / ridged noise, mulberry32
 web/src/maps/builtin.js      one line: import './voltage/index.js';
-web/scripts/map4-*.mjs        lib (headless park + player), unit, rails, bot, fuzz
+web/scripts/map4-*.mjs        lib (headless park + player), unit, rails, bot, fuzz, jumps (the designed windows), speed (a probe)
 ```
 
 ### Shapes: every park feature is an analytic surface over the base snow
@@ -184,6 +241,41 @@ far LOD and the tree scatter are untouched by the park.
   - The Overload handrail has a 9-step snow **stair set** beside it (treads and risers you can ride down).
 - **PipeFeature** is a cross-section of flat bottom, circular transitions to 82°, 82° wall to 6.7 m, a level
   deck and a 32° outer bank, on an axis that follows the slope.
+- **Gap jumps** (`addGap`): a kicker, its back face straight down to the snow, a channel of bare snow (the road /
+  the canal are drawn in it), then a landing mound. The mound has a 40° face up to a knuckle `landH` m over the
+  snow and a constant-EFH landing. The channel is open at the sides: fall in and you ride out around the mound.
+- **Spines** (`SpineFeature`): a ridge down the fall line whose crest follows the base slope. The cross-section is
+  a rounded crest (R 1.6 m), faces at 40–42° and rounded feet (R 4 m). The ridge grows in over 12 m and fades over
+  10 m.
+- **Step-ups** (`addStepUp`): kicker, a short table under the flight, a 30° face up to a deck above the lip, the
+  deck falling 10°. The landing window (just over the step → the end of the deck, sweet 3 m on) is worked out from
+  the same flights the EFH landings use (`flightLanding`).
+- **Scaffold ramps** (`addStartRamp`, `addBigAir`): a raised deck, a convex roll-in, a straight in-run, then
+  either back onto the snow (the start ramp) or the kicker (the Tower). The Tower's in-run stops early when the
+  kicker's transition would dip into the snow, so a steep hill under it can't bury the transition (a buried
+  transition is a kink that throws 7 m/s away).
+
+### Contracts with the rest of the game (all inside maps/voltage)
+
+- **Trails** (the mountain / trails contract):
+  - `registerMap({ trails })` lists nine trails: slopestyle (park), Spark (green), Current (blue), High Voltage
+    (black), the Grid (park), the Stairway (black), Hip Row (blue), the Conduit (black) and the Tower
+    (double-black).
+  - Each has `{ id, name, difficulty, description, length, vertical }`. Length and vertical are measured by
+    `course.trailInfo()`, and map4-unit checks they still match `TRAIL_SIZE` in index.js after a layout change.
+  - `course.trailSpawn(id) → { x, z, heading }`: a drop zone, or the top of the lane. The data is `TRAILS` in
+    layout.js.
+- **`runCompleted`** `{ mapId, trailId, distance, time, score, judged? }` goes out on the state.js bus when a run
+  reaches the finish (zen `runComplete` or Challenge `runFinished`) — park.js.
+  - The trail is the one most of the run's features (takeoffs and grinds) were on, else the trail it started on.
+  - The clock and distance start at the top, at a drop zone or at the spawn.
+- **Atmosphere — the night final** (`VOLTAGE_ATMOSPHERE` in tuning.js, applied by `world.js applyMapAtmosphere`).
+  - It starts from the `night` preset.
+  - A white-blue key light (the floodlights, intensity 0.15) shines high from the ESE, down the run.
+  - The horizon has a violet event glow (#26204c), with fog #8a8fd0, exposure 2.2 and ambient 3.6.
+  - The sky is dark and the landings stay readable; the neon, the lamp heads and the banners carry the colour.
+  - It was picked from six `?atmo` previews: night, a magenta dusk (too pink), a lavender blue hour (washed out),
+    and three night variants (the two brightest read as daytime).
 
 ### Hooks into shared files (all opt-in; the other maps behave exactly as before)
 
@@ -339,8 +431,13 @@ Each grounded or air step, `detect()` looks at the segments in the rider's hash 
 
 ### Feel
 
-- **Sparks.** Hot orange-white sparks stream off metal rails and tubes, and a fine spray comes off boxes and
-  ledges, with bursts on lock-on and at kinks (sparks.js).
+- **Sparks** (sparks.js, driven by grind.js's `railSpark`, which carries where the gear is and which way it is
+  going):
+  - Saturated orange sparks thrown back and out at foot level off metal rails and tubes.
+  - A faint dusting of snow off boxes and ledges.
+  - Bursts on lock-on and at kinks.
+  - Normal blending: additive orange on sunlit snow sums to white and was invisible.
+  - Point size is clamped, so nothing fogs the rider.
 - **Sound.** The grind loop (assets/audio/grind_loop.ogg) plays with pitch and volume set by speed and rail kind,
   plus a synthesized clank on lock-on.
 - **HUD.** The balance meter shows the live trick name, the rail and the length; switch-up, banked and lost pops
@@ -363,6 +460,16 @@ Each grounded or air step, `detect()` looks at the segments in the rider's hash 
   then the kicker's climb. The tips are "TOO SLOW · TUCK", "TOO FAST · CHECK SPEED (S)" and "SWEET SPOT SPEED".
   Speed control is the skill on a table (research: Livigno's speed problems).
 - **Pipe feedback.** "4.2 M OUT" on every pipe and QP air.
+- **Event energy** (hud.js):
+  - DROPPING IN · THE PLUNGE / THE LAUNCH and MEGAWATT · SEND IT at the top of the steep pitches.
+  - The launch speed off every big lip (MEGAWATT · 79 KM/H).
+  - **MEGA AIR · 3.1 S** (or HUGE / SKETCHY) with a crowd roar off the biggest airs, and a cheer on a big jump's
+    sweet spot.
+  - The run's top speed and longest air on the judged card.
+  - The camera opens up to +16° FOV in the top of the speed range, with +8° more entering SEND IT.
+  - A touch of apex slow motion (0.72×) only off airs of 2.7 s and more, 7 m and more over the snow: Megawatt, the
+    Tower and a Voltage sent deep.
+  - The wind roar layer is at full (the audio's speed wind keeps building up to the 27 m/s top speed).
 - **Balance.** The rail meter (above).
 - **Line chain and SEND IT.** The flow layer is on (physics/flow.js): every different move raises the multiplier,
   repeats count half, and the meter fills to SEND IT.
@@ -371,25 +478,30 @@ Each grounded or air step, `detect()` looks at the segments in the rider's hash 
   | Goal | Features in order | Bonus |
   |---|---|---|
   | **Rail Triple** | Sections 1 → 2 → 3 | +1500 |
-  | **Jump Line** | Lightning → Thunder → Voltage | +2000 |
-  | **Full Slopestyle** | all six | +3500 |
-  | **High Voltage** | DFD → rainbow → down rail → both pro tables | +2200 |
+  | **Jump Line** | Lightning → Thunder → Voltage → Megawatt | +2600 |
+  | **Full Slopestyle** | all eight (three rail sections, five jumps) | +5000 |
+  | **Triple Stack** | Stack 1 → 2 → 3 | +1800 |
+  | **High Voltage** | DFD → rainbow → down rail → both pro tables → the Canal | +2800 |
+  | **Stairway** | Stair Drop 1 → Stair Up → Stair Drop 2 → Stairway Spine | +2400 |
+  | **Hip Row** | Hip Left → Hip Right → The Spine → Hip Three → Hip Four | +2200 |
   | **Grid Runner** | four grid rails | +1500 |
 
-- **Golden snowflakes** (12): over each big lip, on five rails, high in the pipe, over the big air, on the step-up
-  deck and at the QP's coping.
+- **Golden snowflakes** (12): over each big lip, 3.5 m past the end of five rails (you fly through them after
+  popping off), high in the pipe, over the big air, on the step-up deck and at the QP's coping.
+  - Never on a rail itself: the generic pick-up puff (activities.js) would hang around a slow grinding rider like a
+    cloud. That was the "white haze" bug.
 - **The slopestyle judge** (scoring.js; research §7: one overall impression out of 100).
 
   | Part | Points | How it's scored |
   |---|---|---|
-  | Sections | 0–60 | Six sections, 0–10 each. A rail section takes its best grind: (1.2 + points / 95), with repeats decaying 100 / 75 / 50 / 25 / 10 % like Tony Hawk. A jump: difficulty = 1.5 + 1.15 per 180 + 2.3 per flip + 1 for a grab + 0.7 switch (≤ 8.5), × execution (sketchy 0.5, stomped 1.08) × repeat decay, + amplitude (sweet +1.5, deep +1, knuckle −1, cased −2, overshot −1.5). A crash zeroes the section |
+  | Sections | 0–60 | Eight sections (three rail sections, Lightning, Thunder, Voltage, Megawatt, The Gap), 0–10 each, scaled to 60. A rail section takes its best grind: (1.2 + points / 95), with repeats decaying 100 / 75 / 50 / 25 / 10 % like Tony Hawk. A jump: difficulty = 1.5 + 1.15 per 180 + 2.3 per flip + 1 for a grab + 0.7 switch (≤ 8.5), × execution (sketchy 0.5, stomped 1.08) × repeat decay, + amplitude (sweet +1.5, deep +1, knuckle −1, cased −2, overshot −1.5). A crash zeroes the section |
   | Variety | 0–20 | Different moves (spin size / direction, flips, grind sequences) |
   | Amplitude | 0–10 | Sweet spots and deep landings |
-  | Flow | 0–10 | Average speed, minus crashes and stalls |
+  | Flow | 0–10 | Average speed (full marks from 19 m/s), minus crashes and stalls |
 
   A crash also costs 6. **Medals: gold ≥ 80, silver ≥ 65, bronze ≥ 50** (winning Olympic runs score 82–93).
   - **Challenge mode.** A countdown, then a judged run to the finish. The results card shows the score / 100, the
-    medal, the six sections, variety · amplitude · flow and the medal lines (via `course.challenge.judge`). There
+    medal, the eight sections, variety · amplitude · flow and the medal lines (via `course.challenge.judge`). There
     are no gates, and best times and ghosts still record.
   - **Zen runs.** At the finish the judged card shows with a personal best (localStorage `sendit.park.voltage`).
 - **Practice.** The drop zones and **T** (above).
@@ -401,10 +513,11 @@ Each grounded or air step, `detect()` looks at the segments in the rider's hash 
 | what | where |
 |---|---|
 | feature placement and sizes, the profile, lanes, the pipe, the big air, drop zones, line goals | `maps/voltage/layout.js` |
-| landing design (EFH target 3.4 m/s, cap 6.8 m/s, 22–38°, the knuckle radius, the design pop 1.2 m/s, the sweet spot) | `course.js addJump` / `addBigAir`, `shapes.js efhLanding` |
+| landing design (EFH target 3.4 m/s, cap 6.8 m/s, 22–38° (40° on the big jumps: `maxDeg`), the knuckle radius, the design pop 1.2 m/s, the sweet spot) | `course.js addJump` / `addGap` / `addBigAir`, `shapes.js efhLanding` |
+| the pace: the profile's drops and benches, where each jump sits on them | `layout.js PROFILE`, `PITCH` |
 | jib clearance, ramp angle rules, the stair set | `course.js addJib` |
 | lock-on, balance, friction, hops, pops, scoring | `physics/grind.js GRIND_DEFAULTS` (per map: `physics.common.grind`) |
-| pipe / QP vert (≥ 55°, ≤ 12 m/s up, ≈ 1.1 m drift back in), pumping (5.5 m/s², × 1.6 timed), wall alignment | `maps/voltage/park.js` (`PUMP`, `attachPark`) |
+| pipe / QP vert (≥ 55°, ≤ 12 m/s up, ≈ 1.1 m drift back in), pumping (5.5 m/s², × 1.6 timed), the pipe's speed scrub above 21 m/s, wall alignment | `maps/voltage/park.js` (`PUMP`, `attachPark`) |
 | speeds, landings, slow motion, flow, wallAlign, camera | `maps/voltage/tuning.js` |
 | judging weights and medal lines | `maps/voltage/scoring.js` |
 | look: dye lines, neon, signs, crowd, lights, arches | `maps/voltage/props.js` |
@@ -413,86 +526,113 @@ Each grounded or air step, `detect()` looks at the segments in the rider's hash 
 
 | | value | why |
 |---|---|---|
-| ski / board `maxVelocity` | 21 / 20 | soft cap: the jump line is ridden at 15–22 m/s |
-| board `dragUpright` / `dragTuck` | 0.0128 / 0.0072 | a low park crouch: boards reach the big take-offs like skis (they arrived 1–2 m/s short) |
+| ski / board `maxVelocity` | 27 / 26 | soft cap: the jump line is ridden at 19–23 m/s, the drops reach 25–29 (was 21 / 20) |
+| board `dragUpright` / `dragTuck` | 0.0128 / 0.0060 | a low park crouch: boards reach the big take-offs like skis (tucked terminal on 18°: ski 22.4, board 21.5 m/s) |
 | `smoothFollow`, `terrainImpactLoss` | 1.4, 0.3 | kicker / QP / pipe transitions are curves, not bumps: no speed lost following them (the default model took 7 m/s off a 22 m/s rider on a kicker) |
 | `hardLanding` / `crashImpact` | 9 / 14 m/s into the slope | hard pack, no powder: EFH ≈ 4 m stumbles, ≈ 10 m crashes; designed landings are 3.4 m/s |
 | `powderDepth` | 0.05 | groomed |
 | `airSettleAngle` | 100 | out of a slide or a skid, the gear squares up in the air |
 | `microHop` | 0.1 s | skimming a roller is not a landing |
 | `landYawSpeed` | [16, 26, 0.85] | |
-| `slowmo` | ≥ 2.6 s and ≥ 7 m up: 0.75× | the big air and the biggest tables |
-| `flow` | on, `summary: false`, `speedFrom` 19, `chainWindow` 3.6 | line chains, SEND IT; the park's own judged card |
+| `slowmo` | ≥ 2.7 s and ≥ 7 m up: 0.72× | Megawatt, the Tower, a deep Voltage; not the tables or the lanes |
+| `flow` | on, `summary: false`, `speedFrom` 22, `chainWindow` 3.6 | line chains, SEND IT (speed alone fills it above 79 km/h); the park's own judged card |
 | `wallAlign` | true | pipe walls (edge.js / player.js hook) |
+| `landRedirect` | 30° | a spine transfer or a hip landed lined up with the flight: the gear pivots into the face's line (clean, not a yaw stumble) |
+| `windRoar` | 1 | the low-pass wind roar at full above 16 m/s |
 | ski / board pop | 2.1–3.9 / 2.4–4.3 m/s | |
-| camera | maxFovBonus 10, fovCurve 1.4, airLook 0.2, airFollowY 0.1, flowFov 6 | |
+| camera | maxFovBonus 16, fovCurve 1.7, airLook 0.2, airFollowY 0.1, flowFov 8 | the lens opens hard in the top of the speed range |
 
 ---
 
 ## 6. Measurements
 
-### Speeds and the jump line (map4-bot, clean style: speed-checked for each sweet spot)
+### Speeds, air times and the jump line
 
-| jump | designed window at the lip | ski / board lip speed (bot) | where they landed |
-|---|---|---|---|
-| Lightning | 13.2–16.6 m/s | 15.5 / 14.4 | sweet or deep |
-| Thunder | 14.4–17.6 m/s | 15.4 / 16.4–18 | sweet or deep |
-| Voltage | 15.6–18.5 m/s | 15.4–19.3 / 16.8–18.7 | sweet or deep |
-| The Tower | 16.3–18.8 m/s | 18.5 / 17.4 | sweet / deep |
+**Natural speed** (`map4-speed.mjs ski 0 0.5`: half tuck, straight down the centre, popping every lip):
 
-- **Rails.** Approached at 8.5–10.7 m/s (research: 3–8 m/s; the game is faster).
-- **Air time.**
+| where | speed |
+|---|---|
+| off the start ramp (u 11) | 15 m/s |
+| the bottom of the summit drop | 21 m/s (76 km/h) |
+| the rail bench | 18–20 m/s (riders check to 10–13 for the rails) |
+| the bottom of the Plunge | 22 m/s |
+| the bottom of the Launch | 25 m/s (90 km/h) |
+| the jump line | 18–26 m/s |
+| the Megawatt pitch | 27–28 m/s (100 km/h) |
 
-  | Feature | Air |
-  |---|---|
-  | Lightning | ~2.4 s |
-  | Thunder | ~2.5–2.9 s |
-  | Voltage | ~3 s |
-  | The Tower | 3.2–3.6 s (slow motion) |
+The old park ran 15–19 m/s on its jump line and 9–10 m/s on its rails.
 
-- **Straight-run tucking** (no speed check) overshoots the tables on skis: the speed gauge says so.
+**Speed-checked for each sweet spot** (map4-bot, clean style; lines A / B / C × skis and board):
 
-### Every rail (map4-rails.mjs 8)
+| jump | designed window | lip speed (bot) | km/h | air | where they landed |
+|---|---|---|---|---|---|
+| Lightning | 18.6–21.6 m/s | 19.2–19.9 | 69–72 | 2.1–2.5 s | sweet ×6 |
+| Thunder | 19.1–22.0 | 19.2–20.5 | 69–74 | 2.1–2.6 s | sweet ×4, knuckle → deep / sweet ×2 |
+| Voltage | 19.7–22.4 | 20.9–21.0 | 75–76 | 2.6–2.7 s | sweet ×6 |
+| Megawatt | 20.5–23.1 | 20.7–22.1 | 75–80 | 2.2–2.8 s | sweet ×3, knuckle ×1, cased ×2 at 20.7 m/s (boards: their tucked terminal on 18° is lower) |
+| The Gap | 19.0–21.3 | 19.6–20.1 | 71–72 | 2.4–2.7 s | sweet ×6 |
+| The Tower | 19.8–22.1 | 20.2–20.9 | 73–75 | 2.4–2.8 s (tucked, no check: 3.3–3.5 s) | sweet / knuckle |
+| High Voltage 1 / 2 | 15.3–17.8 / 17.0–19.4 | 16.2 / 17.7–18.0 | 58 / 64 | 2.2 / 2.4–2.5 s | sweet |
+| The Canal | 16.3–18.0 | 17.0 | 61 | 2.45 s | sweet |
+| Triple Stack 1 / 2 / 3 | 13.7–16.5 | 14.5–15.5 | 52–56 | 2.0–2.3 s | sweet, sweet, sweet |
+
+- **Rails** are hit at 10–12.5 m/s (36–45 km/h). Every rail locks and rides at 8, 12 and 16 m/s (map4-rails, ±2 m/s
+  around each).
+- **Run time.** A clean slopestyle run takes 81–84 s for 1140 m. The bot speed-checks for every rail and sweet spot;
+  free riding it averages 19 m/s.
+
+### Every rail (map4-rails.mjs 8 / 12 / 16)
 
 All 38 jibs (17 rails, 13 boxes, 6 tubes, 2 ledges) lock on and ride their **full length** on skis and on a
-snowboard. Each is ridden straight on at 6, 8 and 10 m/s, with balance, rolling the gap-on ramps (no pop); none
-fails at any of the three speeds.
+snowboard. Each is ridden straight on at 6–18 m/s (three runs per check: the speed ±2), with balance, rolling the
+gap-on ramps (no pop); none fails.
 
 ### Line bot (map4-bot.mjs)
 
 The line bot follows each line with a Stanley steering controller and speed checks. It rolls the gap-on ramps,
-balances the rails, pops at the end of each rail, and sets tricks at the lip. The styles:
+balances the rails, pops at the end of each rail (rolls off when the next rail is close), crosses the spines at
+~25° and pops on the crest, and sets tricks at the lip. The styles:
 
 - **clean:** straight airs, PD balance on the rails.
-- **trick:** a 360 / 540 / double backflip on the jump line, a 720 off the Tower, switch-ups and spins out on the
-  rails.
+- **trick:** a 360 / 540 / double backflip / 720 / 360 on the jump line, a 720 off the Tower, switch-ups and spins
+  out on the rails.
 - **human:** the trick inputs, plus a 0.2 s reaction delay and digital keys for balance on the rails.
 
-The slopestyle course (each line = three rail sections + the three tables):
+`node web/scripts/map4-bot.mjs both all clean --check` passes **38/38 line rides** (19 lines × skis and board).
+Every ride reaches the finish with 0 crashes; every rail of its line is ridden, every jump landed on (a landing
+zone), every spine crossed clean. The lines:
 
-| line | gear | clean: crashes · rails ridden · judged | trick: crashes · judged | human: crashes · judged |
+- **the slopestyle course:** A, B, C (three rail sections + Lightning, Thunder, Voltage, Megawatt, the Gap);
+- **Spark:** all its tables, the double, the rails, the side hit, the QP;
+- **the lane hopper:** Spark → the Spine → Current Transfer → the Canal → the step-up → the QP;
+- **Current** and **Current Box:** the Triple Stack, the side hit, the step-down, Current 3;
+- **High Voltage:** four rails, two pro tables, the side hit, the Canal, the step-up, the QP;
+- **the Stairway**, and the **Stairway → Stairway Spine → step-up** line;
+- **five Grid lines** (every other row; together all 16 jibs);
+- **Hip Row:** four hips;
+- **Megawatt** (from its drop zone) + the Gap;
+- **the Tower;**
+- **the Conduit.**
+
+The slopestyle course (each line = three rail sections + the five jumps):
+
+| line | gear | clean: crashes · judged | trick: crashes · judged | human: crashes · judged |
 |---|---|---|---|---|
-| A (flat-down, DFD, C-rail) | ski | 0 · 3/3 · 38.9 | 0 · 62.9 | 0 · 56.4 |
-| A | snowboard | 0 · 3/3 · 39.5 | 1 · 47.4 | 1 · 27.8 |
-| B (box, rainbow, handrail) | ski | 0 · 3/3 · 34.0 | 0 · 51.5 | 0 · 51.5 |
-| B | snowboard | 0 · 3/3 · 45.6 | 0 · **70.7** | 0 · 62.2 |
-| C (down rail, tube, gap box) | ski | 0 · 3/3 · 45.1 | 0 · 60.9 | 0 · 60.1 |
-| C | snowboard | 0 · 3/3 · 49.6 | 0 · 57.6 | 0 · 61.3 |
+| A (flat-down, DFD, C-rail) | ski | 0 · 42.5 | 0 · 67.9 | 1 · 59.8 |
+| A | snowboard | 0 · 42.0 | 0 · 66.2 | 1 · 58.4 |
+| B (box, rainbow, handrail) | ski | 0 · 46.4 | 0 · 69.7 | 0 · 70.0 |
+| B | snowboard | 0 · 49.0 | 0 · **78.4** | 1 · 65.1 |
+| C (down rail, tube, gap box) | ski | 0 · 45.9 | 0 · 69.9 | 0 · 69.7 |
+| C | snowboard | 0 · 45.4 | 0 · 72.5 | 0 · 72.5 |
 
-- **Run time.** 55–67 s start to finish.
-- **Judging.** Straight airs and plain 50-50s judge 34–50. A 360 / 540 / double backflip line with a switch-up
-  lipslide judges 50–71. Gold (80+) needs bigger spins, sweet spots on all three and varied grinds: the room to
-  progress.
-- **The lanes, the Grid, the hips, the big air and the pipe.** Every line reaches the finish.
-  - **Grid.** The left and right columns ride every jib, and the centre column 5 of 6.
-  - **Spark Lane.** Every rail, both gear.
-  - **High Voltage.** 3–4 of its 4 rails, then both pro tables and the step-up.
-  - **The Tower.** A clean 720 in the sweet zone on both gear.
-  - **The Conduit.** 2–5 m pipe airs, landed fakie.
-- **Bot misses.** The few rails the bot misses (Current Flat-Down on skis, High Down Rail on skis, the Grid
-  S-Rail / Down Box) are its line-up after a landing; the rails themselves lock (above).
-- **Bot crashes.** The few crashes are a backflip under-rotated off Voltage on a board, a fast QP run-in landing
-  beside the Spark QP, and an overshoot on a pro table.
+- **Judging.** Straight airs and plain 50-50s judge 42–49. Spins and flips on all five jumps with a switch-up
+  lipslide judge 66–78. Gold (80+) needs bigger rotations, sweet spots everywhere and varied grinds.
+- **How the bot rides.** It checks speed like a rider:
+  - Skis plough, a board skids 0.15 s in every 0.6 s.
+  - Standing up (feathering the edges, so the game's auto-tuck stays off) when the upright prediction is in the
+    window.
+  - ~13 m/s into the quarterpipes; around them to the finish.
+  - It never pops at a rail's ramp.
 
 ### Fuzz (map4-fuzz.mjs 60 30)
 
@@ -500,7 +640,7 @@ The slopestyle course (each line = three rail sections + the three tables):
 
 - 0 NaN, 0 frames under the snow, 0 stuck.
 - 0 endless grinds, 0 off-the-rail frames.
-- 19 locks, 12 banked, 3 bails.
+- 13 locks, 8 banked, 3 bails.
 
 ### Tests on this branch (all pass)
 
@@ -509,26 +649,39 @@ The slopestyle course (each line = three rail sections + the three tables):
 - physics-fuzz, physics-tricks, jumps-valcrest --check, equipment-check
 - map3-unit 32/32, map3-fuzz, map3-structures
 - map2-bot --verify --tuck --check: all map checks passed
-- map4-unit 14/14, map4-rails --check, map4-fuzz
-- Valcrest benches byte-identical to a5e4eba
+- map4-unit 14/14, map4-rails 8 / 12 / 16 --check, map4-fuzz, map4-bot both all clean --check (38/38)
+- gfxpopin voltage-park q1: 0 tree / shadow / scatter / terrain pops, 0 shader compiles, 0 texture uploads, 0 errors
+- Valcrest benches byte-identical to a5e4eba (no shared file changed in this round)
 
 ### Performance
 
 `node web/scripts/map3-perf.mjs http://localhost:5188 1600 900 1 60 <map>` at quality 1, 1600×900, on the
-integrated GPU, back to back. Other sessions shared the GPU; contention only adds time.
+integrated GPU, back to back. Other sessions shared the GPU; contention only adds time, so the quietest window per
+spot counts.
 
-| map | GPU avg / worst spot | per spot (2 / 20 / 38 / 55 / 62 / 80 %) | draws | triangles |
-|---|---|---|---|---|
-| voltage-park | 14.7 / 25.3 ms | 9.0 / 11.2 / 23.6 / 25.3 / 9.7 / 9.6 | 158–329 | 2.6–3.0 M |
-| valcrest-gully | 14.7 / 23.3 ms | 13.8 / 13.7 / 23.3 / 8.6 / 9.0 / 19.6 | 168–382 | 2.5–2.8 M |
+| run | map | GPU avg / worst spot | per spot (2 / 20 / 38 / 55 / 62 / 80 %) | draws | triangles |
+|---|---|---|---|---|---|
+| **final, quiet, back to back** | **voltage-park** | **14.3 / 17.3 ms** | 15.0 / 17.3 / 13.6 / 13.8 / 14.5 / 11.7 | 145–345 | **2.9–3.35 M** |
+| **final, quiet, back to back** | valcrest-gully | 16.1 / 23.3 ms | 23.3 / 17.3 / 12.4 / 14.8 / 15.2 / 13.8 | 172–386 | 2.8–3.1 M |
+| before the lighter mesh, quiet | voltage-park | 15.9 / 27.4 ms | 27.4 / 13.3 / 12.8 / 12.2 / 14.3 / 15.1 | 145–358 | 3.6–4.0 M |
+| contended, back to back | voltage-park | 21.5 / 34.2 ms | 18.1 / 20.2 / 34.2 / 19.7 / 18.8 / 17.8 | 148–353 | 3.6–4.0 M |
+| contended, back to back | valcrest-gully | 31.8 / 38.7 ms | 38.2 / 38.7 / 32.4 / 26.4 / 26.3 / 28.7 | 172–387 | 2.8–3.1 M |
+| contended, back to back | voltage-park | 23.6 / 34.5 ms | 31.1 / 20.1 / 18.7 / 19.0 / 18.1 / 34.5 | 162–349 | 3.6–4.0 M |
+| contended, back to back | valcrest-gully | 32.2 / 41.9 ms | 41.9 / 37.4 / 31.4 / 24.7 / 26.7 / 30.8 | 172–387 | 2.8–3.1 M |
 
-The park's added cost is small:
+Voltage sits in the 14–16 ms budget and under Valcrest. Under the same contention it costs about two-thirds of
+Valcrest. The triangles are summed over every pass (shadow cascades included). The park snow went to 0.75 m rows
+on the big jumps and 1.6 m columns on the level decks: 547k → 356k vertices (the old park had 289k), and
+3.6–4.0 M → 2.9–3.35 M triangles per frame.
 
-- The park snow is one merged mesh (~250k vertices).
-- Rails are merged per material (9 draws).
+What it costs:
+
+- The park snow is still one merged mesh (113 features, 356k vertices).
+- Rails are merged per material.
 - The crowd, flags and lane signs are instanced.
+- The road and the canal are one draw each; the scaffolds (start ramp, the Tower) one draw per material each.
 - Sparks are one Points draw.
-- CPU per frame is ~0.1 ms (Valcrest ~3 ms, its life sim).
+- CPU per frame is ~0.1 ms (Valcrest ~3–6 ms, its life sim).
 
 ---
 
@@ -537,18 +690,30 @@ The park's added cost is small:
 - **Pipe feel.** The pipe works (vert, pumping, wall alignment, fakie spotting), and bots get 2–5 m of air when
   carving 60–75° up the walls. Riding it well with keys needs practice: shallow angles just carve along the wall.
   - A dedicated pipe control scheme (auto-turn at the top, spin set from the wall) would help.
-  - The pipe sits on 19°; the spec is 18°.
+  - The pipe scrubs speed above 21 m/s (the park's top speed is 27): a deliberate exception, so the airs go up.
 - **Gear yaw on steep walls.** It is a world yaw (the whole game's model). On 70–82° walls the map aligns it to the
   path (`wallAlign`), so the rider's pose on a wall is approximate.
 - **Wallrides.** There are none. The research suggests 4–9 m wallrides; they need a vertical-surface mode like the
   grind.
-- **Line bot.** It still misses a few lane rails right after a landing (alignment). The rails themselves all lock
-  (map4-rails). The bot's QP run-ins are fast, so it sometimes lands beside the QP.
+- **Quarterpipes at the bottom of the lanes.** They span their lane: to carry on to the finish, ride around them
+  (or air them and turn out sideways).
+  - Come in at ~13 m/s. Off the step-ups the lanes run at 20+ m/s, and a 5 m QP at 23 m/s throws you out of its
+    side (the bot checks speed for them).
+- **Speed control is the skill.**
+  - A full tuck down the Launch arrives at Lightning ~5 m/s over its window, and the in-run gauge says so from
+    110 m out.
+  - Standing up (no tuck, no auto-tuck: any steering input) sheds it on the 18° jump line.
+  - The landings' windows are ~3 m/s wide (the constant-EFH design ends where even a 40° landing would take more
+    than 6.8 m/s into the slope).
+- **The Grid at speed.** The bench carries ~12 m/s and the rows are 30–33 m apart. Riding every row in one go needs
+  speed checks between them (the bot takes every other row: five Grid lines cover all 16 jibs).
+- **Huge snow.** Megawatt's and the Tower's landing hills stand 19–24 m over the slope (tables on an 18° hill). Their
+  raked sidewalls reach ~20 m out: keep other features clear of them.
 - **Visual-only extras.** The crowd, the arches and the DJ booth are not obstacles beyond their posts. Rail legs
   don't collide (riding under a rail passes through).
 - **Non-twin skis.** Skis that aren't twin tips (anything but the park skis) can't land switch. Straight airs in
   the pipe and QPs then need a 180.
-- **Daylight.** The world lighting is global (scene.js), so the "night final" look is suggested with neon,
-  floodlight heads and emissive banners rather than a night sky.
+- **Night lighting.** The night final is one key light plus a bright ambient. The floodlight heads glow but don't
+  pool light on the snow; real light cones would need local lights (a graphics feature).
 - **Merge watch-list.** player.js, physics/edge.js, config.js, rider.js (pose functions), activities.js, ui.js,
   physics/flow.js, maps/builtin.js (one line).

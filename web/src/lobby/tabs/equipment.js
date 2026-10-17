@@ -71,7 +71,7 @@ registerLobbyTab({
           <span class="eq-swatches" title="Colourway">${colors.map((col) => `<i style="background:${esc(col)}"></i>`).join('')}</span>
           <span class="eq-parts">${gear.slice(1).filter((g) => g.item).map((g) => `${esc(SLOTS[g.slot].label)}: <b>${esc(g.item.name)}</b>`).join(' · ')}</span>
         </div>
-        <div class="eq-more">${ICONS.sparkle}<span>More ${type === 'skis' ? 'skis' : 'boards'} and colourways coming soon</span></div>`;
+        <div class="eq-more">${ICONS.sparkle}<span>More ${type === 'skis' ? 'skis' : 'boards'} drop from cases: wear them in the Locker</span></div>`;
       renderMode();
     };
 

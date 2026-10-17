@@ -42,8 +42,45 @@ registerMap({
   thumbnail: BLACKSPRUCE_THUMB,
   order: 2,
   tags: ['handmade', 'trees', 'steep'],
+  // Mountain + trails (docs/maps.md). Starts: [fall-line t, lane id] (layout.js LANES); the first is the gate.
+  mountain: {
+    id: 'blackspruce', name: 'Blackspruce', region: 'Boreal ridge · steep trees',
+    blurb: 'A steep face in dense spruce: weave the lanes, thread the slots, drop the rock band.',
+    accent: '#4fc38a',
+  },
+  trails: [
+    { id: 'the-plunge', name: 'The Plunge · FLOW', difficulty: 'black', featured: true, length: 2030, vertical: 1100,
+      description: 'Gate to finish on the flow line: swings every 55 m, pivot trees, nine checkpoints.' },
+    { id: 'slot', name: 'SLOT', difficulty: 'double-black', featured: true, length: 1850, vertical: 1010,
+      description: 'Tight, straight, fast: drop into the Spruce Gate slot and follow the double diamonds.' },
+    { id: 'long-way', name: 'LONG WAY', difficulty: 'blue', length: 1850, vertical: 1010,
+      description: 'The safe line from Spruce Gate: wide lanes, few pivots, the chute instead of the cliff.' },
+    { id: 'kicker-meadow', name: 'Kicker Meadow', difficulty: 'black', length: 1620, vertical: 870,
+      description: 'Checkpoint 2: straight onto the meadow kicker, then the Needles.' },
+    { id: 'rock-band', name: 'Rock Band Drop', difficulty: 'double-black', length: 1280, vertical: 680,
+      description: 'Down the Needles slot and off the 4.5 m cliff, then the Pillow Garden.' },
+    { id: 'deadfall', name: 'Deadfall', difficulty: 'black', length: 1110, vertical: 590,
+      description: 'Checkpoint 5: logs across the line. Ollie them or take the low line.' },
+    { id: 'the-gauntlet', name: 'The Gauntlet', difficulty: 'double-black', length: 780, vertical: 420,
+      description: 'From the Saddle: the steepest, tightest trees on the mountain.' },
+    { id: 'big-air', name: 'Big Air & Old Growth', difficulty: 'black', length: 530, vertical: 250,
+      description: 'The big kicker in the clearing, then the flowing Old Growth to the finish.' },
+  ],
   describe: () => 'Steep tree run · 2 km · 1,100 m vertical',
-  load: async () => new BlackspruceCourse(),
+  load: async () => {
+    const course = new BlackspruceCourse();
+    const STARTS = { slot: [196, 'gate-slot'], 'long-way': [196, 'gate-safe'], 'kicker-meadow': [418, 'main'], 'rock-band': [745, 'needles-slot'],
+      deadfall: [905, 'main'], 'the-gauntlet': [1218, 'main'], 'big-air': [1462, 'main'] };
+    course.trailSpawn = (id) => {
+      const s = STARTS[id];
+      const lane = s && course.lanes.find((l) => l.id === s[1]);
+      if (!lane) return null;
+      const d0 = course.laneAt(lane, s[0])?.d ?? 0, d1 = course.laneAt(lane, s[0] + 8)?.d ?? d0;
+      const a = course.world(s[0], d0), b = course.world(s[0] + 8, d1);
+      return { x: a.x, z: a.z, heading: Math.atan2(-(b.x - a.x), -(b.z - a.z)) };
+    };
+    return course;
+  },
   // The lobby stands at the top of Kicker Meadow, looking down at the kicker, the crowd and the forest.
   lobby: ({ course }) => { const c = course.centre(424); return { x: c.x, z: c.z, heading: c.heading }; },
 });

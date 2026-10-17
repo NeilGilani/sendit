@@ -81,6 +81,7 @@ const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _n = new THREE.Vector3
 const yawOf = (x, z) => Math.atan2(-x, -z);
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const CELL = 6;
+const _spark = { kind: 'rail', v: 0, b: 0, hop: false, x: 0, y: 0, z: 0, dx: 0, dz: 0 };   // reused 'railSpark' payload
 
 /** Rails → segments with tangents, arc lengths, kinks and a spatial hash. */
 export function buildRailIndex(rails) {
@@ -427,7 +428,13 @@ export class Grind {
     pl.press = g.slide ? 0 : g.press;
     pl.turnVelocity = 0;
     if (pl.flow) pl.flow.idle = 0;                       // a grind keeps the line chain alive
-    emit('railSpark', { kind: rail.kind, v: g.v, b: g.b });
+    // FX (a map's sparks / spray): where the gear is on the rail and which way it is going.
+    const Tt = g.seg.t;
+    _spark.kind = rail.kind; _spark.v = g.v; _spark.b = g.b; _spark.hop = !!g.hop;
+    _spark.x = pl.position.x; _spark.y = pl.position.y - (g.hop ? g.hop.y : 0); _spark.z = pl.position.z;
+    const th = Math.hypot(Tt.x, Tt.z) || 1;
+    _spark.dx = Tt.x / th * g.dir; _spark.dz = Tt.z / th * g.dir;
+    emit('railSpark', _spark);
   }
 
   /** Horizontal curvature at the rider and which way is "out" of the curve in the balance frame (+1 right). */

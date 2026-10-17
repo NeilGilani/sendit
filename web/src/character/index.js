@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { BodyInfo } from './body.js';
 import { buildOutfitGeometry } from './garments.js';
 import { buildHelmet } from './helmet.js';
-import { fabricMaterial, bodyMaterial, helmetMaterial, lensMaterial } from './materials.js';
+import { fabricMaterial, bodyMaterial, helmetMaterial, lensMaterial, applyLook } from './materials.js';
 import { resolveOutfit } from './outfits.js';
 
 export { resolveOutfit, colorwaySlots, COLORWAYS, GARMENTS, OUTFIT_SLOTS, DEFAULT_COLORWAY } from './outfits.js';
@@ -108,6 +108,7 @@ export function dressRider(scene, { bones, fp = () => false } = {}) {
       H.uShell.value.set(C.helmet.base); H.uLiner.value.set(C.helmet.liner); H.uHAccent.value.set(C.helmet.accent);
       H.uStrap.value.set(C.goggles.strap); H.uStrapLogo.value.set(C.goggles.strapLogo);
       L.uLens.value.set(C.goggles.lens); L.uLensBase.value.set(C.goggles.lensBase);
+      applyLook({ fabric, helmet: helmetMat, lens }, C);   // reward prints, finishes, decals (profile/items.js)
       return o;
     },
   };
