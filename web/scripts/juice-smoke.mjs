@@ -51,18 +51,22 @@ const ride = await page.evaluate(async () => {
   const an = document.querySelector('#juiceHud .an');
   const announced = an.classList.contains('show') && /540/.test(an.textContent);
   const pops = document.querySelectorAll('#juiceHud .fp').length;
-  J.speedfx?.pulse('huge');
-  await new Promise((r) => setTimeout(r, 200));
-  const rush = !!J.speedfx?.pass.enabled;
+  // Headless Chromium drops the pointer lock, which pauses the ride: resume it (the rush is off while paused).
+  if (window.__sendit.game.mode === 2) window.__sendit.ui.h.resume();
+  // Poll (a busy GPU can stall frames for a while): the pass must enable within 3 s of a pulse.
+  let rush = false;
+  for (let i = 0; i < 30 && !rush; i++) { if (window.__sendit.game.mode === 2) window.__sendit.ui.h.resume(); J.speedfx?.pulse('huge'); await new Promise((r) => setTimeout(r, 100)); rush = !!J.speedfx?.pass.enabled; }
   window.__progression.addXP(window.__progression.getProgress().need + 5, 'smoke');
   await new Promise((r) => setTimeout(r, 2500));
   const lvl = document.getElementById('lvlUp')?.classList.contains('show');
-  return { hud, combo: combo && { mult: combo.mult, n: combo.n }, panel, announced, pops, rush, lvl };
+  const { settings } = await import('/src/state.js');
+  const why = { mode: window.__sendit.game.mode, q: settings.quality, fx: settings.juiceSpeedFx, view: settings.view };
+  return { hud, combo: combo && { mult: combo.mult, n: combo.n }, panel, announced, pops, rush, lvl, why };
 });
 check('juice HUD mounted', ride.hud);
 check('combo chain on Valcrest (own source) shows from ×1.5', ride.combo?.mult >= 1.5 && ride.panel, JSON.stringify(ride.combo));
 check('trick announcer shows the landing', ride.announced);
-check('speed rush pass enables on a pulse', ride.rush);
+check('speed rush pass enables on a pulse', ride.rush, JSON.stringify(ride.why));
 check('level-up celebration plays', ride.lvl);
 await page.evaluate(() => { document.exitPointerLock?.(); window.__sendit.ui.h.menu(); });
 await page.waitForFunction(() => window.__sendit.game.mode === 0, null, { timeout: 60000 }).catch(() => {});
