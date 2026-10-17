@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { ART } from './config.js';
 import { LIGHTING, OUTLINE, sunDirection } from './scene.js';
-import { sunColor, skyIrradiance, groundIrradiance, fogParsFragmentGLSL, fogFragmentGLSL } from './gfx/atmosphere.js';
+import { sunColor, skyIrradiance, groundIrradiance, fogParsFragmentGLSL, fogFragmentGLSL, applyAtmosphere } from './gfx/atmosphere.js';
 
 export const SUN_DIR = sunDirection();
 export const SUN_COLOR = sunColor();
@@ -65,6 +65,26 @@ export function patchShaderChunks() {
       'RE_Direct( directLight, geometryPosition',
       'directLight.color *= sunMaskFactor;\n\t\tsunShadowCol = directLight.color;\n\t\tRE_Direct( directLight, geometryPosition');
   }
+}
+
+/**
+ * Per-map atmosphere hook: course.atmosphere = { sunElevation, sunBearing, skyZenith, skyHorizon,
+ * fogColor, fogDensity, exposure, ambientScale, sunIntensity } (any subset; docs/graphics.md). Re-bakes
+ * the sky and light colours, then updates SUN_DIR / SUN_COLOR and the shared lighting uniforms in place
+ * and re-patches the fog chunk. Call it once per page load, after the map loads and before anything
+ * compiles or reads the sun (main.js does). Maps without it get the defaults. Returns { exposure }.
+ */
+export function applyMapAtmosphere(atm, opts) {
+  const out = applyAtmosphere(atm, opts);
+  SUN_DIR.copy(sunDirection());
+  SUN_COLOR.copy(sunColor());
+  globals.uSunDir.value.copy(SUN_DIR);
+  globals.uSunLum.value = 0.2126 * SUN_COLOR.r + 0.7152 * SUN_COLOR.g + 0.0722 * SUN_COLOR.b;
+  globals.uSunCol.value.copy(sunColor());
+  globals.uSkyAmb.value.copy(skyIrradiance());
+  globals.uGroundAmb.value.copy(groundIrradiance());
+  patchShaderChunks();
+  return out;
 }
 
 /** GLSL snippet: sample the baked sun mask for a world position. */
