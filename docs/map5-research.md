@@ -127,13 +127,19 @@ crest top.
 and the landing is the next crest segment at the face angle. A step every 120–200 m gives the Beak rhythm:
 the bot gets 1.5–3 s airs, almost all stomped.
 
-**Notch gaps** (`gaps`): a short steep wall down N m (12–22), a floor L m (5–10), and a far wall climbing
-back over 1.4·N (the first version used 2.6·N, and full-speed riders landed on the rising wall at 19–23 m/s
-impact). The crest beyond is S m lower (4–7).
-- **Clearing speed** *(derived)*: flight t = (v_n + √(v_n² + 2·g·cos θ·S)) / (g·cos θ), and distance
-  ≈ v·t + ½·g·sin θ·t². A gap ~45 m long with S = 6 clears from ~24 m/s.
-- Short: you land on the far wall (hard, still rideable). Way short: you drop into the notch and ride it out
-  sideways (the recovery line).
+**Notch gaps** (`gaps`): a take-off bench with **no roll-over and a small wind-lip kick** (1.4 m over ~10 m,
+≈ 8°), a short steep wall down N m (12–24), a floor L m (5–16), and a far wall climbing back over 1.4·N to a crest
+S m lower (4–8).
+- *The roll-over trap.* The first notches reused the cliff lip, which rolls over so you leave pointing down. Over
+  a cliff that's right, because the landing is below you. Over a notch it dived every rider into the far wall,
+  at *any* speed: the gap lab measured 28–31 m flights at 14–30 m/s, landing on the wall at 15–24 m/s impact.
+  With the kick, the small notches clear from ~14–20 m/s and the hero gap (54 m to the far crest) from ~22 m/s.
+  Landings are 5–11 m/s on the falling crest beyond.
+- *The far wall* was first 2.6·N long, so full-speed riders landed on the rising wall at 19–23 m/s impact. At
+  1.4·N it's a short wall: come up short and you land on it hard (sketchy); miss it and you drop into the notch
+  and ride it out sideways into the gully.
+- *Flights get long.* At 30 m/s a kicked notch flies 60–100 m, so the next feature must be beyond that, and the
+  kick is smaller where the crest is narrow or the next feature close (the Knife 0.5 m, the Little Gap 0.6 m).
 
 **Ridge-to-ridge hops** are the core of the map, and the design went through three versions:
 

@@ -403,9 +403,23 @@ Inside the 14–16 ms target, at Ravenspire's cost:
 - props are merged into about a dozen draws;
 - ridges are terrain, not meshes.
 
-**Pop-in** (`gfxpopin.mjs`, quality 1, 25 s at 25 m/s): 0 tree, shadow, scatter and terrain-LOD pops per
-second, no shader compiles or texture uploads during the ride, one CPU frame over 50 ms (62 ms). Load is
-~20 s on the dev server, including the prewarm. Terrain generation is ~3 s in node.
+**Pop-in** (`gfxpopin.mjs`, quality 1, 25 s at 25 m/s, five runs): 0 tree, shadow, scatter and terrain-LOD pops
+per second, no texture uploads during the ride. Every Dragonback material (props, flags, terrain) is compiled by
+the prewarm. The first run compiled nothing during the ride. The later runs report **one shader compile 3 s
+into the ride, `liftMetal`**, which isn't Dragonback code:
+- the shared `Lifts` system keeps an empty "Cables" mesh even on maps without lifts;
+- an empty geometry's bounding sphere sits at the world origin, so the mesh is "drawn" whenever the frustum
+  contains (0, 0, 0), which compiles its render-target variant (srgb-linear);
+- on this map the origin (mid-face, 2 km under the snow) enters the view just below the start;
+- prewarm only un-culls shadow casters, and this mesh isn't one.
+
+Fix in shared code (not touched here): skip the Cables mesh when there are no lifts (lifts.js), or have prewarm
+un-cull every mesh. Valcrest and Ravenspire report 0 in the same runs.
+
+Load is ~13–20 s on the dev server, including a 6–10 s prewarm; terrain generation is ~3 s in node.
+
+**GPU contention.** A later back-to-back run, with another session using the GPU, measured Dragonback 16.5–19.3 ms
+against Ravenspire 19.2 ms average. The ratio holds; the draws and triangles are identical to the quiet run.
 
 ---
 
@@ -428,6 +442,8 @@ second, no shader compiles or texture uploads during the ride, one CPU frame ove
   straight.
 - **Respawns** put you on the crest of the ridge you crashed on (respawn.js), rolling at 8 m/s. Without that,
   a respawn on a knife edge slid you off sideways at standstill.
+- **One shader compile 3 s into a ride** (`liftMetal`, the shared empty lift-cable mesh), described in §6
+  under Pop-in. It's a one-line fix in lifts.js or prewarm.js, left for the integration session.
 - **Cornices are visual only**, so they're kept off every rideable crest (`corniceOk`), as on Ravenspire.
 - **The prayer flags** only flutter in the vertex shader; there's no cloth physics.
 - **Sluff** is a drag, not moving snow. A real sluff slide that chases you down a channel (the research
