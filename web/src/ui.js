@@ -8,6 +8,7 @@ import { State } from './player.js';
 import { HUD } from './config.js';
 import { moveFocus, focusFirst, handleArrowKey, nudgeRange } from './lobby/nav.js';
 import { fmtTime } from './activities.js';
+import { progression } from './progression/index.js';
 
 const $ = (id) => document.getElementById(id);
 const BASES = ['loading', 'lobby', 'pause'];
@@ -153,6 +154,9 @@ export class UI {
     else if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) this.showBase(null);
     else if (game.mode === Mode.PAUSED) {
       $('stats').textContent = `${(game.distance / 1000).toFixed(1)} km ridden · ${game.smoothTurns} smooth turns · ${game.airTotal.toFixed(0)} s of air · score ${game.score}`;
+      $('stats').style.whiteSpace = 'pre-line';
+      const p = progression.getProgress(), left = progression.getChallenges().filter((c) => !c.done);
+      $('stats').textContent += `\nLevel ${p.level} ${p.rank.name} · ${p.need - p.into} XP to ${p.level + 1} · ${left.length ? `dailies: ${left.map((c) => c.title).join(', ')}` : 'all dailies done'}`;
       this.showBase('pause');
     }
   }

@@ -11,9 +11,9 @@ import { on, settings } from '../state.js';
 export const JUICE_SPEEDFX = {
   speedFrom: 0.82,       // speed ratio where the rush starts …
   speedFull: 1.0,        // … and is full
-  speedAmount: 0.55,     // rush at full speed (0..1)
-  blur: 0.022,           // zoom blur length at full rush (UV units at the edge)
-  aberration: 0.0055,    // chromatic fringe at full rush (UV units at the edge)
+  speedAmount: 0.45,     // rush at full speed (0..1)
+  blur: 0.018,           // zoom blur length at full rush (UV units at the edge)
+  aberration: 0.0028,    // chromatic fringe at full rush (UV units at the edge)
   clearRadius: 0.22,     // centre radius that stays untouched
   pulse: { stomp: 0.75, huge: 1, bank: 0.55, flow: 0.8, near: 0.3 },
   pulseDecay: 2.4,       // 1/s

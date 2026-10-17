@@ -53,7 +53,7 @@ const CSS = /* css */`
 #juiceHud .an .g span { display: inline-block; transform: skewX(12deg); }
 #juiceHud .an .t { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.05; letter-spacing: .02em; -webkit-text-stroke: 3px #1b1446; paint-order: stroke fill; text-shadow: 0 5px 0 rgba(27,20,70,.55); }
 #juiceHud .an .s { font-size: 26px; color: #2ff5d6; margin-top: 2px; -webkit-text-stroke: 1.5px #1b1446; paint-order: stroke fill; }
-#juiceHud .an .s small { font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 800; font-size: 13px; letter-spacing: .16em; color: rgba(250,248,243,.8); margin-left: 10px; -webkit-text-stroke: 0; }
+#juiceHud .an .s small { font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 900; font-size: 14px; letter-spacing: .16em; color: #fffaf0; margin-left: 10px; -webkit-text-stroke: 0; text-shadow: 0 1px 2px #1b1446, 0 0 8px rgba(27,20,70,.9); }
 @keyframes jhSlam {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(1.9) rotate(-6deg); filter: blur(4px); }
   9% { opacity: 1; transform: translate(-50%, -50%) scale(.94) rotate(-3deg); filter: blur(0); }
@@ -63,7 +63,7 @@ const CSS = /* css */`
   100% { opacity: 0; transform: translate(-50%, -70%) scale(.92) rotate(-3deg); }
 }
 /* live air */
-#juiceHud .air { position: absolute; left: 50%; top: 61%; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity .18s; white-space: nowrap; }
+#juiceHud .air { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity .18s; white-space: nowrap; }
 #juiceHud .air.on { opacity: 1; }
 #juiceHud .air .d { font-size: 46px; line-height: 1; display: inline-block; -webkit-text-stroke: 2px #1b1446; paint-order: stroke fill; text-shadow: 0 0 20px rgba(47,245,214,.5); }
 #juiceHud .air .d.tick { animation: jhBump .26s cubic-bezier(.2,1.8,.4,1); }
@@ -84,6 +84,13 @@ const CSS = /* css */`
 #juiceHud .eg { position: absolute; inset: 0; opacity: 0; box-shadow: inset 0 0 160px 40px var(--c, rgba(255,200,60,.45)); }
 #juiceHud .eg.show { animation: jhEdge .9s ease-out forwards; }
 @keyframes jhEdge { 0% { opacity: 1; } 100% { opacity: 0; } }
+/* rolling score (top right; the snowflake counter sits under it) */
+#juiceHud .sc { position: absolute; right: 26px; top: 18px; text-align: right; transition: opacity .8s; }
+#juiceHud .sc b { display: inline-block; font-size: 30px; line-height: 1; -webkit-text-stroke: 1.5px #1b1446; paint-order: stroke fill; text-shadow: 0 2px 12px rgba(0,0,0,.35); transform-origin: right center; }
+#juiceHud .sc b.up { animation: jhScore .3s cubic-bezier(.2,1.8,.4,1); color: #ffe14d; }
+#juiceHud .sc small { display: block; font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 800; font-size: 10px; letter-spacing: .3em; color: rgba(250,248,243,.65); margin-top: 2px; }
+@keyframes jhScore { 0% { transform: scale(1); } 40% { transform: scale(1.22); } 100% { transform: scale(1); } }
+#flakesHud { top: 66px !important; }
 /* toasts */
 #juiceHud .ts { position: absolute; right: 26px; top: 120px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 #juiceHud .tt { display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: 360px; padding: 10px 16px 10px 12px; border-radius: 12px; font-style: normal;
@@ -121,13 +128,14 @@ export function mountJuiceHud({ player, combo, input }) {
     <div class="air"><div class="d">0</div><div class="x"></div></div>
     <div class="co stroke"></div>
     <div class="bn"></div>
-    <div class="ts"></div>`;
+    <div class="ts"></div>
+    <div class="sc"><b class="stroke">0</b><small>SCORE</small></div>`;
   host.appendChild(root);
   const $ = (s) => root.querySelector(s);
   const cb = $('.cb'), cbM = $('.cb .m'), cbP = $('.cb .p'), cbIt = $('.cb .it'), cbTm = $('.cb .tm i');
   const an = $('.an'), anG = $('.an .g'), anT = $('.an .t'), anS = $('.an .s');
   const air = $('.air'), airD = $('.air .d'), airX = $('.air .x');
-  const co = $('.co'), bn = $('.bn'), fl = $('.fl'), eg = $('.eg'), ts = $('.ts');
+  const co = $('.co'), bn = $('.bn'), fl = $('.fl'), eg = $('.eg'), ts = $('.ts'), scB = $('.sc b');
   const restart = (el, cls = 'show') => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
   const fmt = (n) => Math.round(n).toLocaleString('en-US');
   const riding = () => game.mode === Mode.RIDING;
@@ -223,8 +231,19 @@ export function mountJuiceHud({ player, combo, input }) {
   show();
 
   // ------------------------------------------------------------------ per frame
-  let lastHalf = 0, airOn = false;
-  const update = () => {
+  let lastHalf = 0, airOn = false, shown = 0;
+  on('rideStarted', () => { shown = 0; scB.textContent = '0'; });
+  const update = (dt) => {
+    // Rolling score: counts up toward game.score (fast for big jumps), a bump when a chunk lands.
+    const target = game.score || 0;
+    if (target < shown) shown = target;
+    if (target > shown) {
+      const step = Math.max(1, (target - shown) * Math.min(1, (dt || 0.016) * 9));
+      const was = shown;
+      shown = Math.min(target, shown + step);
+      if (target - was >= 100 && !scB.classList.contains('up')) { restart(scB, 'up'); setTimeout(() => scB.classList.remove('up'), 320); }
+      scB.textContent = fmt(shown);
+    }
     const s = combo.state();
     if (s && riding()) {
       cbTm.style.transform = `scaleX(${s.left.toFixed(3)})`;

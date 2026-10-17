@@ -18,7 +18,7 @@ export const XP_SOURCES = {
 };
 
 export const RANKS = [
-  { from: 1, name: 'Rookie', color: '#9fb4c8' },
+  { from: 1, name: 'Rookie', color: '#7fd8ff' },
   { from: 5, name: 'Shredder', color: '#2ff5d6' },
   { from: 10, name: 'Ripper', color: '#7a5cff' },
   { from: 20, name: 'Pro', color: '#ff5fb0' },
@@ -173,6 +173,7 @@ export class Progression {
     if (!gained) return 0;
     const before = levelFor(this.state.xp).level;
     this.state.xp += gained;
+    if (this.ride) this.ride.xp += gained;
     const p = levelFor(this.state.xp);
     this.emit('xp', { gained, reason, xp: this.state.xp, ...p });
     for (let l = before + 1; l <= p.level; l++) {
@@ -223,6 +224,7 @@ export class Progression {
       if (c.done || d.done[c.id]) continue;
       if (c.value >= c.goal) {
         d.done[c.id] = true;
+        this.ride?.dailies.push(c.title);
         this.emit('challengeDone', { challenge: { ...c, done: true } });
         this.addXP(c.xp, `Daily: ${c.title}`);
       }
@@ -243,6 +245,7 @@ export class Progression {
     for (const a of ACHIEVEMENTS) {
       if (this.state.achievements[a.id] || !a.test(ctx, p)) continue;
       this.state.achievements[a.id] = this.now().getTime();
+      this.ride?.achievements.push(a.title);
       this.emit('achievement', { id: a.id, title: a.title, desc: a.desc, xp: a.xp, icon: a.icon });
       if (a.xp) this.addXP(a.xp, `Achievement: ${a.title}`);
     }
@@ -252,7 +255,10 @@ export class Progression {
 
   // ---------------------------------------------------------------- ride recording
   startRide(mapId) {
-    this.ride = { mapId: mapId || 'unknown', score: 0, rideScore: 0, air: 0, meters: 0, pbSeen: {}, pbStart: { ...(this.state.pb[mapId] || {}) } };
+    this.ride = {
+      mapId: mapId || 'unknown', score: 0, rideScore: 0, air: 0, meters: 0, pbSeen: {}, pbStart: { ...(this.state.pb[mapId] || {}) },
+      xp: 0, xpStart: this.state.xp, dailies: [], achievements: [], pbs: [],
+    };
     if (mapId) { this.state.life.maps[mapId] = (this.state.life.maps[mapId] || 0) + 1; }
   }
 
@@ -336,7 +342,6 @@ export class Progression {
   /** End of a ride: the ride bonus, one-ride challenge bests, saves. Returns a summary. */
   endRide() {
     const r = this.ride;
-    this.ride = null;
     if (!r) return null;
     const d = this.ensureDay();
     d.progress['best:rideScore'] = Math.max(d.progress['best:rideScore'] || 0, r.rideScore);
@@ -346,8 +351,10 @@ export class Progression {
       bonus = this.addXP(XP_SOURCES.ride, 'Ride');
     }
     this.checkAchievements();
+    this.ride = null;
     this.save();
-    return { ...r, bonus };
+    const { pbSeen, pbStart, ...out } = r;
+    return { ...out, bonus, from: levelFor(r.xpStart), to: levelFor(this.state.xp) };
   }
 
   /** PB per map: callout the first time this ride beats the stored best (if there was one). */
@@ -360,6 +367,7 @@ export class Progression {
     if (prev > 0 && value > prev && !r.pbSeen[stat]) {
       r.pbSeen[stat] = true;
       const S = PB_STATS[stat];
+      r.pbs.push(S.label);
       this.emit('personalBest', { mapId: r.mapId, stat, label: S.label, value, prev, text: `${S.label} · ${S.fmt(value)}`, was: S.fmt(prev) });
     }
   }

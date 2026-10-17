@@ -65,6 +65,7 @@ The HUD regions, from top to bottom:
 - **Live air, centre.** Once the air passes 0.45 s, the rotation shows in 180° steps and bumps on each new 180. It also shows flips (`FLIP`, `2× FLIP`) and the grab being held.
 - **Call-outs, below centre.** CLOSE SHAVE, then ×n for a streak within 2.6 s (gold from ×3). RAZOR CLOSE! appears under 0.8 m. RAIL LOST and line-goal steps also show here.
 - **Banners.** `COMBO ×3 +1,240` (MONSTER COMBO from ×4), with a gold edge glow from ×2.5. Line goals on flow maps also show here.
+- **Rolling score, top right.** It counts up toward the ride's score and bumps gold when a chunk of 100 or more lands. The snowflake counter moves under it.
 - **Toasts, right side.** Achievements, finished dailies, the daily halfway mark and personal bests.
 - **Flash.** A white flash on STOMPED (0.26) and PERFECT (0.18) landings, with rumble.
 
@@ -99,6 +100,7 @@ Tunables (`JUICE_HUD`):
 | `stomp` | 50 ms | 0.45× | 0.22 s | A stomped or perfect landing of a trick or > 1 s of air |
 | `crash` | 70 ms | 0.5× | 0.25 s | A crash |
 | `bank` | 0 | 0.6× | 0.3 s | A combo banked at ×3 or more |
+| `razor` | 0 | 0.55× | 0.28 s | A close shave under 0.8 m (`razorDist`) |
 
 `cooldown` is 0.9 s; within it, only a stronger freeze replaces the current one.
 
@@ -126,7 +128,7 @@ These are separate from the existing trauma shake, which is unchanged.
 
 This is one `EffectPass`, inserted before SMAA through `composer.addPass(pass, index)`; the gfx internals are not edited. It applies a radial zoom blur and a chromatic fringe that grow toward the screen edges, with the centre (radius 0.22) left clear. Rush lines (thin bright radial streaks) appear on boost moments.
 
-- **Rush.** Driven by speed ratio from 0.82 to 1.0, up to 0.55. The SEND IT state adds +0.12.
+- **Rush.** Driven by speed ratio from 0.82 to 1.0, up to 0.45. The SEND IT state adds +0.12. Blur length is 0.018 and fringe 0.0028 (UV at the edge), kept subtle.
 - **Pulses.** `huge` 1, `stomp` 0.75, `bank` 0.55, `flow` 0.8; they decay at 2.4/s.
 - **Cost.** The pass is disabled whenever its intensity is about 0.
 - **Quality.** Low = off, medium = 4 blur taps, high = 8 (`JUICE_SPEEDFX.taps`).
@@ -168,9 +170,11 @@ Bus events: `musicEnergy {level}` at 5 Hz, and `musicDrop {kind, strength}`.
   - Each daily pays 150 to 450 XP, and a clean sweep of all three pays +300.
   - Achievements pay 100 to 800 XP.
 - **Pacing.** A first ride usually reaches level 3, about four rides reach level 5, and the curve slows after that.
+- **Pause screen.** It adds the level, the rank, XP to the next level, and the dailies still open.
 - **Ranks (`RANKS`).** Rookie from level 1, Shredder from 5, Ripper from 10, Pro from 20, Legend from 35, Mountain God from 60. Each rank has a colour, used for the badge, the celebration and the Progress tab.
 - **Level-up.** A full-screen celebration (rings, the level number slamming in, the rank and XP to the next level) plays over the ride and the lobby. Level-ups queue, rumble, give a music drop and flash.
 - **XP bar.** A small bar under the speedometer fills in ride and fades out after 2.5 s.
+- **Ride recap.** Back in the lobby after a ride, a card slides in on the right. It counts up "+1,240 XP", animates the level bar from where the ride started, and lists the dailies, achievements and personal bests from that ride, plus distance and score. It ends with "ONE MORE RUN? PRESS ENTER", hides after 9 s or on click, and comes from `progressRideSummary`.
 
 ### Daily challenges
 

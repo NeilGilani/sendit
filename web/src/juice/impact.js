@@ -15,6 +15,8 @@ export const JUICE_IMPACT = {
   huge: { freeze: 0.085, slow: 0.3, recover: 0.38 },        // ≥ 720, a flip, or ≥ 2 s air, landed clean
   crash: { freeze: 0.07, slow: 0.5, recover: 0.25 },
   bank: { freeze: 0, slow: 0.6, recover: 0.3 },              // a big combo banks
+  razor: { freeze: 0, slow: 0.55, recover: 0.28 },           // a close shave under razorDist m
+  razorDist: 0.8,
   cooldown: 0.9,             // s between two warps
   // camera punches (fov in degrees: negative = the lens snaps tighter; dip in metres; roll in degrees)
   landFov: -0.5,             // per m/s of landing impact …
@@ -67,7 +69,8 @@ export function installImpact({ warp, cam, input, player }) {
       if (grade === 'stomped' || (big && e.clean)) setTimeout(() => kick({ fov: I.stompFov }), (big ? I.huge.freeze : I.stomp.freeze) * 1000 + 30);
     }),
     on('crashed', () => warp.hit(I.crash)),
-    on('nearMiss', ({ x, z }) => {
+    on('nearMiss', ({ x, z, dist }) => {
+      if (dist < I.razorDist) warp.hit(I.razor);
       // Roll away from the obstacle: which side of the rider it was on.
       let side = 1;
       if (player && x !== undefined) {
