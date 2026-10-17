@@ -41,9 +41,9 @@ shade. From any gully the ridges read as lit and shaded walls, and from above as
 | 0…82 | **the Shoulder** | 10° → 22° | the start (u 14), a bivouac shelter, prayer flags across the Shoulder, marker poles along its edge. Steep enough to traverse to any fin |
 | 82…112 | rollover | 31° | the fins grow out of it over ~70 m |
 | 112…670 | **the Comb** | 40° | West Fin, the Blade (knife edge), the Shard, **Dragon's Spine**, the Scales, the Twins, the Splinter, the Keel, East Fin, gullies between |
-| 670…1090 | the Fork, the Staircase, the Hollow | 38° | the Spine splits (**the Fork** left, **Dragon's Tail** right); **the Staircase**: four ridges en échelon; **the Sentinel** (right); **the Hollow** (open bowl, left) with wind lips, a pillow stack and **the Wishbone** (two ridges that merge) |
+| 670…1090 | the Fork, the Staircase, the Hollow | 38° | the Spine splits at u ≈ 900 (**the Fork** left, **Dragon's Tail** right, both leaving its crest at full height); **the Staircase**: four ridges en échelon; **the Sentinel** (right); **the Hollow** (open bowl, left) with wind lips, a pillow stack and **the Wishbone** (two ridges that merge) |
 | 1090…1560 | lower face | 40° | **the Organ Pipes** (a field of tight spines, Alaska style), **the Wyrm**, **the Knife** (a long knife-edge arête with a notch), **the Slot** (couloir), East Wall, West Buttress |
-| 1560…1780 | the prows | 34° | ridge ends: 17–30 m cliffs onto the apron; pillow stacks below the Organ Pipes and the Sentinel |
+| 1560…1780 | the prows | 34° | ridge ends: 17–30 m cliffs onto the apron and **the Dragon's Tooth** (38 m, the East Wall's end); pillow stacks below the Organ Pipes and the Sentinel |
 | 1780…2030 | the apron | 26° | wind lips, a roller |
 | 2030…2290 | runout | 15° | **run complete at u = 2290**: a row of cairns and a string of prayer flags across the valley |
 
@@ -54,27 +54,28 @@ shade. From any gully the ridges read as lit and shaded walls, and from above as
 | West Fin | 90–640 | 4 m | to 39 m | 25 m prow | 2 steps |
 | **The Blade** | 90–790 | **2.4 m (knife edge)** | to 40 m | fades | 2 steps, the Blade's Notch, **Blade Leap** spur |
 | The Shard | 470–730 | 3 m | 14 m | 10 m prow | the Blade Leap's target |
-| **Dragon's Spine** | 86–1010 | 5 m | to 51 m | splits at the Fork | 2 steps, **the Little Gap**, **the Spine's Gap** (hero gap), the **Scale Jump** spur |
+| **Dragon's Spine** | 86–970 | 5 m | to 51 m | splits into the Fork and the Tail | 2 steps, **the Little Gap** (u 560, the learner gap), **the Spine's Gap** (u 750, the hero gap), the **Scale Jump** spur |
 | The Scales | 300–600 | 3 m | 15 m | 11 m prow | Scale Jump's target |
 | Left / Right Twin | 140–700 | 3 m | 22–25 m | 11 / 18 m prows | **Twin Hop** and **Twin Hop Back** |
 | The Splinter | 420–680 | 3 m | 14 m | 9 m prow | the Keel Leap's target |
 | The Keel | 90–730 | 9 m (broad back) | to 41 m | 30 m prow | 2 steps, 2 side wind lips, **Keel Leap** spur |
 | East Fin | 90–600 | 4 m | to 38 m | 25 m prow | a step |
-| The Fork / Dragon's Tail | 860–1170 | 5 / 4 m | 31 / 26 m | 17 / 21 m prows | the Spine's two branches |
+| The Fork / Dragon's Tail | 880–1170 | 5 / 4 m | 31 / 29 m | 17 / 21 m prows | the Spine's two branches: they leave its crest at its full height (a true fork, no rollover) |
 | The Sentinel | 640–1120 | 4 m | 41 m | 26 m prow | a step, **the Sentinel Notch**, a side wind lip |
 | The Wishbone | 900–1130 | 4 m | 22 m | merge | two ridges that converge into one |
 | **Stair 1–4** | 760–1370 | 5–6 m | 26–27 m | 20 m prows | each one's spur (**Stair Hop 1–3**) lands on the next |
 | **The Knife** | 1230–1600 | **2.2 m (knife edge)** | 35 m | 22 m prow | 3 steps, the Knife's Notch |
 | The Wyrm | 1160–1610 | 4 m | 39 m | 23 m prow | a step, **Wyrm Leap** onto the Knife |
-| East Wall / West Buttress | 1150–1660 | 6 m | 38–41 m | 22–28 m prows | a step each, side wind lips |
+| East Wall | 1380–1640 | 6 m | 40 m | **the Dragon's Tooth**, 38 m | a step, a side wind lip; the map's biggest cliff |
+| West Buttress | 1150–1660 | 6 m | 41 m | 22 m prow | a step, a side wind lip |
 | the Organ Pipes | 1160–1620 × −330…−40 | 1.6 m | 7–18 m | short drops | spine field, 30 m spacing |
 
 ### Best lines (bot numbers in §6)
 
 1. **Ride the Dragon**: Dragon's Spine top to bottom. Steps at u 170 and 430 (40–60 m airs), **the Little Gap**
-   (u 560, 30 m to the far crest), **the Spine's Gap** (u 790, the hero gap: 54 m to the far crest, clears from
-   ~22 m/s, 60–85 m and 3 s in the air), then the Fork's left branch, its 17 m prow, the Organ Pipes and the
-   pillow stacks. The challenge line. 54–55 mph average, 85 mph top.
+   (u 560, the learner gap: 31 m to the far crest, a small kick), **the Spine's Gap** (u 750, the hero gap: 54 m to
+   the far crest, clears from ~22 m/s, 60–85 m and ~3 s in the air), then the Fork's left branch, its 17 m prow,
+   the Organ Pipes and the pillow stacks. The challenge line. 54–55 mph average, 85 mph top.
 2. **Twin Hop, back again → the Staircase**: Left Twin → Twin Hop → Right Twin → Twin Hop Back → Left Twin,
    its prow, then Stair 1 → Stair Hop 1 → Stair 2 → Stair Hop 2 → Stair 3 → Stair Hop 3 → Stair 4 → its prow.
    Seven ridge-to-ridge airs, the purest version of the map.
@@ -83,7 +84,7 @@ shade. From any gully the ridges read as lit and shaded walls, and from above as
 4. **The Blade**: the knife edge from the top, either Blade Leap onto the Shard ("Bladerunner") or the whole
    Blade through its notch. Balance matters: the crest top is 2.4 m wide over 45–55° flanks.
 5. **The Keel → Keel Leap → the Sentinel**: the broad Keel (side wind lips), Keel Leap onto the Splinter, across
-   to the Sentinel (its notch, 26 m prow, pillows below), then the East Wall and its 28 m prow.
+   to the Sentinel (its notch, 26 m prow, pillows below), then the East Wall and **the Dragon's Tooth** (38 m).
 6. **West Fin → the Wishbone → West Buttress**: West Fin's 25 m prow onto a pillow stack, the Hollow's wind
    lips, ride the Wishbone's right branch to where it merges, then West Buttress.
 7. The low lines: **the gullies** (between the big ridges) and **the Slot**. They're always rideable to the
@@ -219,6 +220,7 @@ drops, stomp boost, the judged FWT-style run summary and the personal best (docs
   - **Keel Over** (Keel Leap → The Splinter Prow, +1800)
   - **Sentinel** (the Sentinel → its notch → its prow, +1800)
   - **Organ Grinder** (four Organ Pipes take-offs, +1800)
+  - **Pulling Teeth** (land the Dragon's Tooth, 38 m, cleanly, +2000)
   - **Fin and Pillows** (West Fin Prow → two Pillow Stacks → The Wishbone, +1600)
 - **Golden snowflakes** (12, `placeFlakes`) sit on the hard spots:
   - **mid-air over the Little Gap, the Spine's Gap, the Blade's Notch and the Knife's Notch** (on the flight
@@ -230,11 +232,11 @@ drops, stomp boost, the judged FWT-style run summary and the personal best (docs
   The game's pickup radius is 1.6 m, so they're genuinely hard.
 - **Drop zones** (keys 1–9 / d-pad): 1 The Shoulder, 2 The Blade, 3 Dragon's Spine, 4 The Twins, 5 The Keel,
   6 The Fork, 7 The Staircase, 8 The Organ Pipes, 9 The Knife.
-- **Challenge mode**: the hero path is the Dragon's Spine line. Twelve gates (14 m on the crest, 18 m lower down)
-  sit mid-segment on its crest (never right after a gap: you can't steer a flight, so the landing scatters a
+- **Challenge mode**: the hero path is the Dragon's Spine line. Twelve gates (14 m on the crest, 20 m on the Fork,
+  26 m through the Organ Pipes and below, where the line hops spine to spine) sit mid-segment on its crest (never right after a gap: you can't steer a flight, so the landing scatters a
   few metres), on the Fork, through the Organ Pipes and down the apron. A missed gate costs +2 s. Medals are
-  at 21.5 / 18.5 / 15.5 m/s down the fall line: gold 106.5 s, silver 123.8 s, bronze 147.7 s. A clean bot run
-  with no SEND IT is silver (109 s); gold needs the boost or a tighter line.
+  at 20.5 / 17.5 / 14.5 m/s down the fall line: gold 111.7 s, silver 130.9 s, bronze 157.9 s. A clean bot run
+  with no SEND IT is silver (124–128 s in the real game); gold needs the boost or a tighter line.
 
 ---
 
@@ -245,7 +247,7 @@ drops, stomp boost, the judged FWT-style run summary and the personal best (docs
 | ridges (crest, height, width, top, steps, gaps, lips, ends) | `layout.js RIDGES` |
 | ridge-to-ridge hops (take-off, target, landing, spur length, aim past the crest, kick) | `layout.js HOPS` (`len`, `over`, `h`, `H`, `drop`, `top`) |
 | spur shape (tangent curve-in, height tracking) | `course.js buildHops()` |
-| notch take-off kick | `ridges.js GAP_KICK` (or per gap, 6th element) |
+| notch take-off kick | `ridges.js GAP_KICK` (1.4 m), or per gap (6th element: the Little Gap 0.6, the Knife's Notch 0.5) |
 | step lip roll-over | `ridges.js LIP_ROLL`, `LIP_ROLL_LEN` |
 | flank fluting, crest wander | `ridges.js Ridge.at()` (`flute`), `wander` option |
 | face profile, width, framing walls | `layout.js PROFILE`, `FACE` |
@@ -256,11 +258,15 @@ drops, stomp boost, the judged FWT-style run summary and the personal best (docs
 | sluff drag, respawn roll, slow-mo, everything physics | `tuning.js` |
 | snowflakes, challenge gates and medals, props placement | `course.js placeFlakes()`, `placeGates()`, constructor, `placeProps()` |
 
-Two layout rules, both unit-tested:
+Layout rules learned the hard way (the first two are unit-tested):
 - **No step or gap within 70 m above a spur's root.** A step launches you 40–70 m down the crest, straight
   over the turn-off.
 - **A spur must start tangent to its parent's crest.** A spur that left the crest at an angle meant
   crossing the crest's convex top diagonally, which at 30 m/s is a kicker.
+- **A fork's branches leave the parent's crest at its full height.** The first Fork had the Spine fade out under
+  two branches that grew out of the slope: a 25 m rollover in 50 m that launched riders onto the wrong branch.
+- **Space features for their flights.** With kicks, a notch flies 60–100 m at 30 m/s; the next feature must start
+  beyond that (the Little Gap's 100 m flight used to land on the Spine's Gap's take-off).
 
 ---
 
@@ -278,35 +284,37 @@ Styles:
 
 | line | gear | style | time | avg speed | max | crashes | stumbles | air total (longest) | biggest drop | hops | judged | line goals |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Dragon's Spine | ski | send | 118.0 s | 24.0 m/s (54 mph) | 38.0 (85) | 0 | 0 | 36.5 s (4.15 s) | 27 m | – | 99 | Ride the Dragon, Organ Grinder |
-| Dragon's Spine | board | send | 114.3 s | 24.5 m/s (55 mph) | 36.0 (81) | 0 | 0 | 30.7 s (4.0 s) | 43 m | – | 100 | Ride the Dragon, Organ Grinder |
-| Scale Jump → Wyrm Leap → Knife | ski | send | 141.5 s | 23.1 m/s (52 mph) | 35.9 (80) | 1 | 1 | 41.5 s (4.12 s) | 18 m | 1 | 98 | Scaling the Dragon, Wyrm Rider |
-| Scale Jump → Wyrm Leap → Knife | board | send | 121.2 s | 23.2 m/s (52 mph) | 35.7 (80) | 0 | 0 | 28.4 s (2.65 s) | 21 m | 2 | 99 | – |
-| The Blade → Blade Leap | ski | send | 141.0 s | 20.0 m/s (45 mph) | 37.2 (83) | 0 | 0 | 41.0 s (3.07 s) | 19 m | 1 | 95 | Bladerunner, Organ Grinder |
-| The Blade → Blade Leap | board | send | 129.8 s | 21.7 m/s (49 mph) | 36.3 (81) | 0 | 0 | 28.4 s (2.57 s) | 19 m | 1 | 94 | Bladerunner |
-| The Blade end to end | ski | send | 138.9 s | 20.4 m/s (46 mph) | 36.2 (81) | 0 | 0 | 40.7 s (3.55 s) | 19 m | – | 95 | Organ Grinder |
-| The Blade end to end | board | send | 130.4 s | 21.1 m/s (47 mph) | 36.3 (81) | 0 | 0 | 34.6 s (2.45 s) | 18 m | 1 | 91 | Organ Grinder |
+| Dragon's Spine | ski | send | 120.8 s | 24.4 m/s (55 mph) | 38.0 (85) | 0 | 0 | 38.1 s (3.52 s) | 25 m | – | 100 | Ride the Dragon, Organ Grinder |
+| Dragon's Spine | board | send | 116.2 s | 23.6 m/s (53 mph) | 36.7 (82) | 0 | 1 | 28.4 s (3.77 s) | 43 m | – | 99 | Ride the Dragon, Organ Grinder |
+| Scale Jump → Wyrm Leap → Knife | ski | send | 122.7 s | 23.5 m/s (53 mph) | 35.2 (79) | 0 | 1 | 35.8 s (3.83 s) | 25 m | 1 | 99 | Scaling the Dragon |
+| Scale Jump → Wyrm Leap → Knife | board | send | 126.3 s | 22.2 m/s (50 mph) | 35.5 (79) | 0 | 1 | 35.5 s (3.58 s) | 22 m | 2 | 98 | Ride the Dragon |
+| The Blade → Blade Leap | ski | send | 135.7 s | 20.9 m/s (47 mph) | 37.2 (83) | 0 | 0 | 36.9 s (2.67 s) | 17 m | 1 | 96 | Bladerunner, Organ Grinder |
+| The Blade → Blade Leap | board | send | 129.3 s | 21.7 m/s (49 mph) | 36.3 (81) | 0 | 1 | 29.4 s (2.62 s) | 19 m | 1 | 95 | Bladerunner |
+| The Blade end to end | ski | send | 140.7 s | 19.8 m/s (44 mph) | 36.2 (81) | 0 | 0 | 42.2 s (3.55 s) | 19 m | – | 95 | Organ Grinder |
+| The Blade end to end | board | send | 137.2 s | 20.3 m/s (45 mph) | 36.3 (81) | 0 | 1 | 37.5 s (3.62 s) | 17 m | 1 | 90 | Organ Grinder |
 | Twins → Staircase | ski | send | 135.7 s | 22.0 m/s (49 mph) | 34.3 (77) | 0 | 3 | 41.7 s (3.43 s) | 19 m | 3 | 97 | Fin Hopper |
-| Twins → Staircase | board | send | 128.8 s | 22.5 m/s (50 mph) | 34.9 (78) | 0 | 1 | 27.7 s (3.97 s) | 24 m | 3 | 98 | Fin Hopper |
-| Keel → Sentinel | ski | send | 158.5 s | 18.8 m/s (42 mph) | 35.6 (80) | 0 | 0 | 40.8 s (4.62 s) | 37 m | 2 | 94 | – |
-| Keel → Sentinel | board | send | 148.3 s | 19.6 m/s (44 mph) | 37.4 (84) | 0 | 1 | 37.9 s (4.15 s) | 29 m | 2 | 95 | Keel Over, Sentinel |
+| Twins → Staircase | board | send | 129.5 s | 22.3 m/s (50 mph) | 34.9 (78) | 0 | 1 | 27.7 s (3.97 s) | 24 m | 3 | 98 | Fin Hopper |
+| Keel → Sentinel → Dragon's Tooth | ski | send | 158.7 s | 18.8 m/s (42 mph) | 35.6 (80) | 0 | 0 | 41.3 s (4.62 s) | 37 m | 2 | 94 | Pulling Teeth |
+| Keel → Sentinel → Dragon's Tooth | board | send | 148.8 s | 19.5 m/s (44 mph) | 37.3 (83) | 0 | 1 | 38.7 s (4.13 s) | 38 m | 2 | 95 | Keel Over, Sentinel, Pulling Teeth |
 | West Fin → Wishbone | ski | send | 144.6 s | 19.7 m/s (44 mph) | 37.4 (84) | 0 | 0 | 30.3 s (3.35 s) | 29 m | 1 | 95 | Fin and Pillows |
 | West Fin → Wishbone | board | send | 139.7 s | 20.7 m/s (46 mph) | 35.7 (80) | 0 | 0 | 26.9 s (2.65 s) | 25 m | 1 | 96 | Fin and Pillows |
-| the gullies (low line) | ski | send | 119.5 s | 24.2 m/s (54 mph) | 31.8 (71) | 0 | 0 | 10.1 s (4.02 s) | 19 m | 0 | 70 | – |
-| the gullies (low line) | board | send | 125.4 s | 22.9 m/s (51 mph) | 34.2 (77) | 0 | 0 | 10.3 s (2.72 s) | 7 m | 0 | 62 | – |
-| the Slot | ski | send | 145.0 s | 21.0 m/s (47 mph) | 33.6 (75) | 0 | 0 | 13.7 s (3.32 s) | 24 m | 0 | 70 | – |
-| the Slot | board | send | 141.4 s | 21.3 m/s (48 mph) | 31.3 (70) | 0 | 0 | 10.3 s (3.33 s) | 25 m | 0 | 69 | – |
-| Dragon's Spine | ski | trick | 115.5 s | 23.6 m/s (53 mph) | 38.0 (85) | 0 | 0 | 32.2 s (3.72 s) | 27 m | – | 99 | Organ Grinder |
-| Dragon's Spine | board | trick | 119.5 s | 23.3 m/s (52 mph) | 35.7 (80) | 0 | 1 | 27.1 s (3.95 s) | 43 m | – | 99 | Ride the Dragon |
-| Scale Jump → Wyrm Leap → Knife | ski | trick | 132.2 s | 23.6 m/s (53 mph) | 36.1 (81) | 1 | 0 | 35.4 s (3.12 s) | 23 m | 1 | 99 | Wyrm Rider |
-| Twins → Staircase | board | trick | 132.0 s | 21.8 m/s (49 mph) | 35.6 (80) | 0 | 0 | 32.6 s (3.7 s) | 22 m | 3 | 97 | Fin Hopper |
-| Keel → Sentinel | ski | trick | 170.2 s | 19.5 m/s (44 mph) | 36.0 (81) | 1 | 0 | 44.7 s (4.52 s) | 31 m | 3 | 95 | Keel Over, Sentinel |
-| West Fin → Wishbone | board | trick | 141.3 s | 20.2 m/s (45 mph) | 36.0 (81) | 0 | 0 | 29.4 s (2.92 s) | 25 m | 0 | 95 | Fin and Pillows |
+| the gullies (low line) | ski | send | 115.8 s | 24.5 m/s (55 mph) | 35.8 (80) | 0 | 0 | 11.8 s (4.28 s) | 22 m | 0 | 71 | – |
+| the gullies (low line) | board | send | 125.6 s | 23.0 m/s (51 mph) | 29.7 (66) | 0 | 0 | 8.7 s (3.72 s) | 22 m | 0 | 75 | – |
+| the Slot | ski | send | 142.1 s | 21.4 m/s (48 mph) | 33.6 (75) | 0 | 0 | 11.3 s (3.32 s) | 24 m | 0 | 69 | – |
+| the Slot | board | send | 141.0 s | 21.4 m/s (48 mph) | 31.3 (70) | 0 | 0 | 10.0 s (3.33 s) | 25 m | 0 | 69 | – |
+| Dragon's Spine | ski | trick | 148.5 s | 23.8 m/s (53 mph) | 37.7 (84) | 2 | 1 | 48.3 s (4.23 s) | 41 m | – | 96 | Organ Grinder |
+| Dragon's Spine | board | trick | 118.6 s | 23.4 m/s (52 mph) | 36.6 (82) | 0 | 1 | 27.4 s (3.8 s) | 43 m | – | 99 | Ride the Dragon |
+| Scale Jump → Wyrm Leap → Knife | ski | trick | 125.7 s | 22.9 m/s (51 mph) | 35.7 (80) | 0 | 0 | 34.8 s (3.5 s) | 23 m | 3 | 98 | – |
+| The Blade end to end | ski | trick | 126.6 s | 21.6 m/s (48 mph) | 38.5 (86) | 0 | 0 | 31.3 s (3.72 s) | 24 m | – | 97 | – |
+| Twins → Staircase | ski | trick | 125.9 s | 23.2 m/s (52 mph) | 35.3 (79) | 0 | 1 | 30.2 s (3.65 s) | 22 m | 4 | 99 | Fin Hopper |
+| Twins → Staircase | board | trick | 132.6 s | 21.6 m/s (48 mph) | 35.6 (80) | 0 | 1 | 32.7 s (3.7 s) | 22 m | 3 | 97 | Fin Hopper |
+| Keel → Sentinel → Dragon's Tooth | board | trick | 154.5 s | 18.6 m/s (42 mph) | 35.6 (80) | 0 | 1 | 38.2 s (3.78 s) | 38 m | 2 | 94 | Pulling Teeth |
+| West Fin → Wishbone | board | trick | 140.8 s | 20.5 m/s (46 mph) | 35.1 (79) | 0 | 0 | 27.5 s (2.88 s) | 25 m | – | 96 | Fin and Pillows |
 
 Every line rides start to finish on both gears (`map5-ride.mjs both all send --check`: finished, ≤ 1 crash,
-≥ 40 mph); trick style (36 runs in all with send) adds spins off every air with the same results. The ridge
-lines average 42–55 mph (top 77–86 mph). The low lines score 62–75 judged against 91–100 for the ridge lines.
-Lots of the ridge lines' time is in the air (28–45 s of 115–170 s).
+≥ 40 mph). Trick style adds spins (360 / 720) off every air long enough for one; its few crashes are
+under-rotated spins. The ridge lines average 42–55 mph (top 77–86 mph). The low lines score 69–75 judged
+against 90–100 for the ridge lines. Much of the ridge lines' time is in the air (27–45 s of 116–170 s).
 
 **Crest vs gully.** Through the Comb (u 200–800, where the gullies are real), staying on the Spine's crest is
 faster than the gully beside it: 24.7 s vs 27.1 s on skis, 24.9 s vs 29.3 s on a board. That's the sluff drag
@@ -317,6 +325,8 @@ Pipes diagonally, spine after spine.
 
 The bot rides one fixed waypoint line, so it doesn't fly every hop on every run (a full-line run arrives at a
 spur at whatever speed and offset the previous features left it). The hop lab below isolates each hop.
+
+Challenge gates on the Spine line in the node bot: 11/12 on skis, 10/12 on a board.
 
 ### Ridge-to-ridge hops (web/scripts/map5-hops.mjs)
 
@@ -339,27 +349,31 @@ the 60 m stair spurs and the Scale Jump's curve are too tight to follow.
 
 ### Gaps (notches)
 
-Take-off 25 m below the start of a run-in, entry speed varied (no pop):
+The rider starts 25 m above the take-off on the crest at the entry speed, no pop:
 
 | gap | to the far crest | clears from | flight when cleared | impact |
 |---|---|---|---|---|
-| the Little Gap (Spine u 560) | 31 m | ~16 m/s | 36–61 m, 2.1–2.7 s | 6–8 |
-| **the Spine's Gap** (Spine u 790) | 54 m | ~22 m/s | 59–85 m, 2.8–3.4 s | 10–13 |
-| the Blade's Notch | 28 m | ~12–16 m/s | 31–59 m, 2–2.6 s | 5–7 |
-| the Sentinel Notch | 38 m | ~20–22 m/s | 43–60 m, 2.1–2.4 s | 8–11 |
-| the Knife's Notch (kick 0.5 m) | 24 m | ~12–16 m/s | 25–40 m, 1.6–1.7 s | 8–9 |
+| the Little Gap (Spine u 560, kick 0.6 m: the learner gap) | 31 m | ~20 m/s | 36–52 m, 1.9–2.2 s | 5–7 |
+| **the Spine's Gap** (Spine u 750) | 54 m | ~22–26 m/s | 56–77 m, 2.7–3.1 s | 10–11 |
+| the Blade's Notch | 28 m | under 14 m/s | 32–69 m, 2.0–2.9 s | 5–7 |
+| the Sentinel Notch | 38 m | ~22 m/s | 43–60 m, 2.1–2.4 s | 9–11 |
+| the Knife's Notch (kick 0.5 m) | 24 m | ~18 m/s | 25–37 m, 1.4–1.6 s | 5–6 |
 
 Come up short and you land on the far wall at 15–23 m/s impact (sketchy). Way short and you drop into the
 notch and ride it out sideways into the gully.
 
 ### End to end in the real game (web/scripts/map5-e2e.mjs: dev server, GPU, real scatter / props / HUD)
 
-- **Dragon's Spine on skis, zen**: Ride the Dragon + Organ Grinder; judged 100 (Line 25, Fluidity 25, Control
-  25, Air & Style 25); 55 mph average, 83 mph top, 30 m biggest drop, 3.3 s longest air; 2/12 snowflakes (the
-  two over the Spine's notches); no crash, no console errors.
-- **Twins → Staircase on a board, zen**: Stairway; judged 98; 15 named features linked; no console errors.
-- **Dragon's Spine, challenge**: skis 109.1 s **silver**, 11/12 gates; board 116.7 s **silver**, 11/12 gates.
-  No console errors.
+- **Dragon's Spine on skis, zen**: Ride the Dragon + Organ Grinder; judged 99 (Line 25, Fluidity 24.3, Control
+  25, Air & Style 25); 54 mph average, 85 mph top, 36 m biggest drop, 4.0 s longest air; no crash, no console
+  errors.
+- **The Keel → the Dragon's Tooth on a board, zen**: Keel Over + Pulling Teeth; judged 96; 10 named features
+  linked, including Keel Leap and the Dragon's Tooth (36 m drop); no console errors.
+- **Twins → Staircase on a board, zen** (before the final fork / gap changes): Fin Hopper; judged 92; Twin Hop
+  and Stair Hop 1 scored as ridge hops.
+- **Dragon's Spine, challenge**: skis 124.1 s, 10/12 gates; board 127.7 s, 9/12 gates. No crashes, no console
+  errors. With the final medals (gold 111.7 s, silver 130.9 s, bronze 157.9 s) both are **silver**. Gold needs
+  SEND IT or a tighter line than the bot's.
 
 ### Fuzz, units, structures
 

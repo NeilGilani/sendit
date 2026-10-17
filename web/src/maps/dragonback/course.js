@@ -35,7 +35,7 @@ export class DragonbackCourse {
     this.life = { skiers: 0, lodge: false };
     // scatter.js overrides: a few boulders, a sparse larch / pine fringe low down only.
     this.spawn = { rockClusterChance: 0.03, rockScale: [0.7, 2.0], rockMinSlope: 22, treeStep: 10, treeMax: 6000 };
-    this.challenge = { medalSpeeds: { gold: 21.5, silver: 18.5, bronze: 15.5 } };   // m/s down the fall line (FINISH_U / time)
+    this.challenge = { medalSpeeds: { gold: 20.5, silver: 17.5, bronze: 14.5 } };   // m/s down the fall line (FINISH_U / time)
     this.physics = DRAGONBACK_PHYSICS;
     this.camera = DRAGONBACK_CAMERA;
     this.water = -1e5;

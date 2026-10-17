@@ -151,7 +151,8 @@ export function ride(type, key, style = 'send', opts = {}) {
         const lipNear = (h0 - T.getHeight(pl.position.x + fx * 2.5, pl.position.z + fz * 2.5)) - slope * 2.5;
         if (drop > (opts.popDrop ?? 5)) c.jump = !(lipNear > 1.2);
       }
-      if (style === 'trick' && pl.state === State.AIR && (Math.abs(pl._spinTotal) > 0.6 || pl.dyn.timeToLand() > 1.3)) {
+      // A rider only throws a 360 into an air long enough to finish it (≥ 1.6 s predicted, ≥ 15 m/s).
+      if (style === 'trick' && pl.state === State.AIR && (Math.abs(pl._spinTotal) > 0.6 || (pl.dyn.timeToLand() > 1.6 && pl.speed > 15))) {
         const tl = pl.dyn.timeToLand();
         if (Math.abs(pl._spinTotal) + Math.abs(pl.spinRate) * 0.15 + Math.abs(pl.dyn.spinH || 0) * pl.dyn.C.spinOpen * Math.max(0, tl - 0.15) < Math.PI * (opts.spins || 2)) c.steer = -1;
       }
