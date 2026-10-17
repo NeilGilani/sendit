@@ -122,6 +122,8 @@ const CSS = /* css */`
 /* the other HUDs' versions of these give way to ours */
 #flowHud .ch, #flowHud .gr, #flowHud .bank { display: none !important; }
 #chal #comboHud { display: none; }
+#chal:not(.hidden) ~ #juiceHud .cb { top: 122px; }
+#chal:not(.hidden) ~ #juiceHud .bn { top: 196px; }
 body.fp #juiceHud .an { top: 34%; }
 `;
 

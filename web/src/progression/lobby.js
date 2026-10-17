@@ -41,6 +41,16 @@ const CSS = /* css */`
 .pg-pb { display: grid; grid-template-columns: 1fr auto; gap: 0.3em 1em; font-size: 0.9em; }
 .pg-pb span { color: var(--lb-dim); }
 .pg-pb b { font-weight: 800; text-align: right; }
+.pg-today { position: absolute; right: var(--lb-pad); bottom: calc(var(--lb-pad) + 5.6em); z-index: 2; display: flex; flex-direction: column; align-items: flex-end; gap: 0.3em; pointer-events: auto; cursor: pointer; }
+.pg-today > b { font: 900 italic 0.72em/1 var(--font); letter-spacing: 0.3em; color: rgba(255,255,255,0.85); text-shadow: 0 1px 6px rgba(10,14,40,0.6); }
+.pg-today .row { display: flex; align-items: center; gap: 0.5em; padding: 0.3em 0.75em 0.3em 0.35em; border-radius: 999px; background: var(--lb-glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--lb-line); font-size: 0.8em; font-weight: 700; max-width: 21em; }
+.pg-today .row.done { color: var(--lb-dim); text-decoration: line-through; text-decoration-color: rgba(47,245,214,0.7); }
+.pg-today .ring { flex: none; width: 1.5em; height: 1.5em; border-radius: 50%; background: conic-gradient(var(--lb-cyan) calc(var(--p) * 1%), rgba(255,255,255,0.16) 0); display: grid; place-items: center; }
+.pg-today .ring::after { content: ''; width: 0.95em; height: 0.95em; border-radius: 50%; background: rgba(18,22,46,0.9); }
+.pg-today .row.done .ring::after { content: '✓'; display: grid; place-items: center; font-size: 0.7em; color: var(--lb-cyan); }
+.pg-today .row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pg-today .row em { font-style: normal; color: var(--lb-gold); font-weight: 900; font-size: 0.85em; }
+@media (max-height: 560px) { .pg-today { display: none; } }
 .pg-badge { flex: none; margin-left: 0.2em; font: 900 italic 0.72em/1 var(--font); color: var(--lb-navy); padding: 0.32em 0.55em; border-radius: 999px; background: var(--rc, var(--lb-cyan)); letter-spacing: 0.04em; }
 .pg-chipbar { display: block; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.14); overflow: hidden; margin-top: 3px; }
 .pg-chipbar i { display: block; height: 100%; background: linear-gradient(90deg, var(--lb-cyan), #7a5cff); }
@@ -106,6 +116,7 @@ registerLobbyTab({
         const c = progression.rerollChallenge(Number(b.dataset.slot));
         if (c) ctx.toast?.(`New daily: ${c.title}`);
         render();
+        todayWidget();
         el.querySelector('.pg-rr, .pg-ch')?.focus?.();
       }));
     };
@@ -113,6 +124,26 @@ registerLobbyTab({
     for (const ev of ['progressXp', 'challengeDone', 'achievement', 'rideRecorded']) ctx.on(ev, render);
   },
 });
+
+/** "TODAY" strip above the Ride button: the three dailies with mini progress rings (click → Progress tab). */
+function todayWidget() {
+  const lobby = typeof document !== 'undefined' && document.getElementById('lobby');
+  if (!lobby || !lobby.querySelector('.lb-go')) return false;
+  css();
+  let el = lobby.querySelector('.pg-today');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'pg-today';
+    el.title = 'Daily challenges · open Progress';
+    el.addEventListener('click', () => globalThis.__sendit?.lobby?.select?.('progress'));
+    lobby.appendChild(el);
+  }
+  const list = progression.getChallenges();
+  const left = list.filter((c) => !c.done).length;
+  el.innerHTML = `<b>${left ? 'TODAY' : 'ALL DAILIES DONE'}</b>${list.map((c) => `
+    <div class="row${c.done ? ' done' : ''}"><i class="ring" style="--p:${Math.min(100, (c.value / c.goal) * 100).toFixed(0)}"></i><span>${esc(c.title)}</span>${c.done ? '' : `<em>+${n(c.xp)}</em>`}</div>`).join('')}`;
+  return true;
+}
 
 /** Level badge + XP bar on the lobby's profile chip. */
 function chipWidget() {
@@ -138,7 +169,7 @@ function chipWidget() {
   return true;
 }
 if (typeof document !== 'undefined') {
-  for (const ev of ['mode', 'progressXp', 'profile', 'lobbyTabs']) on(ev, () => chipWidget());
-  const tryMount = () => { if (!chipWidget()) setTimeout(tryMount, 500); };
+  for (const ev of ['mode', 'progressXp', 'profile', 'lobbyTabs', 'challengeDone']) on(ev, () => { chipWidget(); todayWidget(); });
+  const tryMount = () => { if (!chipWidget() || !todayWidget()) setTimeout(tryMount, 500); };
   tryMount();
 }

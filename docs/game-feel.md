@@ -281,6 +281,7 @@ The progression state never touches the profile files (web/src/profile/). It has
   - Today's three dailies, with progress bars, XP and **Swap**, and the time until new ones.
   - The achievement grid, with hover for details.
   - This map's personal bests.
+- **TODAY strip.** It sits above the Ride button and shows the three dailies, each with a mini progress ring and its XP; finished ones are struck through. Clicking it opens the Progress tab. It hides on very short windows.
 - **Profile chip.** An `LV n` badge in the rank colour, and a thin XP bar under the name. It is a small widget appended to the chip; Lobby.js is not edited.
 
 ## Tests and tools
