@@ -443,7 +443,8 @@ class WindProcessor extends AudioWorkletProcessor {
         let s = bfs + flapS * (ci === 0 ? 1.1 : 0.9);
         const pre = c.hp.hp(pk);
         s += (c.rush.lp(pre) + c.bump.bp(pre) * T.rush.bump) * rush * 1.6 * ear * (ci === 0 ? earL : earR) * squall * whoosh;
-        s += c.hi.bp(w) * hi * ear * (ci === 0 ? earL : earR) * (1 + (whoosh - 1) * 1.5) + c.hi.bp(pk) * T.spin.air * spin * pz;
+        const hiS = c.hi.bp(pk);   // one tick per sample (both uses share it)
+        s += hiS * hi * 2.2 * ear * (ci === 0 ? earL : earR) * (1 + (whoosh - 1) * 1.5) + hiS * T.spin.air * spin * pz * 2.2;
         s += (c.w1.bp(w) * wh1 + c.w2.bp(w) * wh2) * 6;
         s += c.amb.bp(c.brown * 3.5) * amb * 2.2 + c.ambH.bp(pk) * ambHi;
         if (howl > 1e-5) s += (c.howl.bp(pk) + c.howl2.bp(pk) * 0.35) * howl * 4;

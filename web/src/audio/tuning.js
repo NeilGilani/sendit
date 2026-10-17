@@ -92,7 +92,7 @@ export const AUDIO = {
     buffet: { gain: 0.7, f: 110, flutterF: 7, flutterDepth: 0.7 },
     // the rush: two noise bands sweeping up with speed
     // the rush: 2-pole low-pass at 250 + 45·U Hz with a +5 dB bump at 150–400 Hz, a little pinna hiss on top
-    rush: { gain: 0.8, f0: 250, fPerV: 45, q: 0.7, bump: 0.8, bumpF: 280, bumpQ: 1.1, hiGain: 0.14, hiF0: 1100, hiExp: 0.7, hiQ: 0.7 },
+    rush: { gain: 0.8, f0: 250, fPerV: 50, q: 0.7, bump: 0.8, bumpF: 280, bumpQ: 1.1, hiGain: 0.32, hiF0: 1500, hiExp: 0.7, hiQ: 0.45 },   // hi: a broad 1.5–4 kHz band (the CC0 freefall roar has no 4 kHz hole)
     // vortex-shedding whistles off helmet vents / goggle frame: f = St · v / d
     whistle: { gain: 0.05, st: 0.2, d1: 0.0042, d2: 0.0071, q: 40, from: 11 },
     // gusts: slow random level / airspeed swells

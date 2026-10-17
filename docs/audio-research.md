@@ -84,6 +84,9 @@ levels in dB relative to the loudest band, for the loudest 15 % of seconds.
 | Body fall in hard snow (craigsmith #675895) | −17 | 0 | 0 | −7 | −9 | −11 | −13 | −19 | −53 | 0.46 kHz |
 | Our landings (first build) | 0 | −8 | −20 | −23 | −24 | −23 | −26 | −33 | −41 | 0.1 kHz, a sub boom |
 | Our landings (tuned) | −3 | 0 | −3 | −5 | −6 | −13 | −16 | −23 | −34 | 0.3 kHz |
+| Skydive freefall, ~50 m/s (DangerLaef #811077) | −12 | −4 | 0 | 0 | −3 | −5 | −9 | −15 | −24 | 0.8 kHz |
+| Our rider wind at 30 m/s (first build) | −4 | −3 | 0 | −1 | −3 | −8 | −22 | −18 | −21 | 0.5 kHz, a hole at 4 kHz |
+| Our rider wind at 30 m/s (tuned) | −4 | −3 | 0 | −1 | −4 | −7 | −11 | −12 | −19 | 0.7 kHz |
 
 **What changed because of the comparison:**
 - The glide hiss became pink noise between a rising high-pass and low-pass. Pink noise is flat in octave bands,
