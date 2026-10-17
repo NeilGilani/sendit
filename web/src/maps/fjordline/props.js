@@ -343,7 +343,6 @@ function buildHarbour(course, M, terrain, bag) {
     const x0 = START_X + D.u0, x1 = START_X + D.u1, z0 = D.v0, z1 = D.v1;
     // Deck (timber, a thin snow skin on top), piles every 2.5 m where it stands over the water or the ice edge.
     bag.add(M.timber, box((x0 + x1) / 2, top - 0.25, (z0 + z1) / 2, x1 - x0, 0.5, z1 - z0));
-    bag.add(M.snow, box((x0 + x1) / 2, top + 0.02, (z0 + z1) / 2, x1 - x0 - 0.3, 0.08, z1 - z0 - 0.3));
     for (let x = x0 + 0.3; x <= x1; x += 2.5) for (let z = z0 + 0.3; z <= z1; z += key === 'pier' ? z1 - z0 - 0.6 : 3.5) {
       const g0 = terrain.getHeight(x, z) - 0.0;
       if (course.natural(x, z) > top - 0.6) continue;

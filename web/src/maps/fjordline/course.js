@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import { vnoise, noise1, fbm, ridged, smooth, sstep, hash1 } from './noise.js';
 import {
   TILE, START_X, SEA, BEACH, SHORE_U, FINISH_U, PROFILE, BEHIND, SHOULDER, CIRQUE, COULOIR, BANDS, SPINES, HITS,
-  SHOULDER_ROLLERS, HEADLAND, FJORD, BUILDINGS, QUAY, HARBOUR, DROP_ZONES, TRAILS, LINE_GOALS, RIDE_LINES, LIGHTHOUSE,
+  SHOULDER_ROLLERS, HEADLAND, BUTTRESSES, FJORD, BUILDINGS, QUAY, HARBOUR, DROP_ZONES, TRAILS, LINE_GOALS, RIDE_LINES, LIGHTHOUSE,
   HJELL, coastU, finishCoastU,
 } from './layout.js';
 import { Structure, Deck } from './structures.js';
@@ -264,7 +264,7 @@ export class FjordlineCourse {
     const H = HEADLAND;
     if (u < H.u0 - 30 || u > H.u1 + 30) return -1e9;
     const d = v - H.crest(u), ad = Math.abs(d);
-    if (ad > 900) return -1e9;
+    if (ad > 520) return -1e9;
     let e = this.crestAt(u);
     const flank = Math.tan((d < 0 ? H.bayFlank : H.seaFlank) * DEG);
     // Rounded crest, a shoulder, then the flank (rockier and steeper on the sea side).
@@ -292,15 +292,16 @@ export class FjordlineCourse {
       const calm = 1 - 0.65 * sstep(560, 640, u) * (1 - sstep(1100, 1200, u)) * (1 - sstep(220, 300, Math.abs(v + 20)));
       const big = rib1(v / 150 + 0.9 * noise1(u / 650, 31) + 2.1, 41) * (0.6 + 0.4 * noise1(u / 420, 32));
       const small = rib1(v / 44 + 0.7 * noise1(u / 260, 33) + 1.1, 42) * (0.5 + 0.5 * noise1(u / 200, 34));
-      e += onFace * (calm * (big - 0.42) * 34 + (small - 0.45) * 5.5);
+      e += onFace * (calm * (big - 0.42) * 44 + (small - 0.45) * 5.5);
     }
     // Lower mountain: broad lateral undulations (natural banks between the lines).
     const low = sstep(1350, 1600, u) * (1 - sstep(2050, 2250, u)) * land;
     if (low > 0) e += low * (fbm(u / 260 + 4, v / 120, 2) - 0.5) * 14;
     // Big buttresses and bowls across the whole mountain (seen from the fjord it must not read as a plane).
     const wide = sstep(60, 300, u) * (1 - sstep(1900, 2200, u)) * land;
-    if (wide > 0) e += wide * (fbm(u / 700 + 1.3, v / 230 + 8.1, 3) - 0.5) * 44 * (1 - 0.6 * Math.exp(-((this.lineDistFast(u, v) / 40) ** 2)));
+    if (wide > 0) e += wide * (fbm(u / 700 + 1.3, v / 230 + 8.1, 3) - 0.5) * 80 * (1 - 0.8 * Math.exp(-((this.lineDistFast(u, v) / 50) ** 2)));
     if (u > 130 && u < 1750) e += this.outcrops(u, v);
+    for (const B of BUTTRESSES) e += buttress(u, v, B);
     e += this.spines(u, v);
     e += this.bands(u, v);
     e += this.hits(u, v) * land;
@@ -346,6 +347,7 @@ export class FjordlineCourse {
     for (const B of BANDS) if (Math.abs(u - B.uc) < 45 && v > B.v0 - 30 && v < B.v1 + 30) return false;
     for (const [hu, hv, L] of HITS) if (Math.abs(u - hu) < 40 && Math.abs(v - hv) < L + 20) return false;
     if (Math.abs(v - HEADLAND.crest(u)) < 60 || Math.abs(v - SHOULDER.crest(u)) < 70) return false;
+    for (const B of BUTTRESSES) if (u > B.u0 - 20 && u < B.u1 + 20 && Math.abs(v - (B.v0 + (B.v1 - B.v0) * (u - B.u0) / (B.u1 - B.u0))) < B.w + 15) return false;
     for (const [, zu, zv] of DROP_ZONES) if (typeof zv === 'number' && Math.hypot(u - zu, v - zv) < 60) return false;
     return true;
   }
@@ -806,6 +808,18 @@ function horn(e, x, z, hx, hz, peak, slope, twist) {
   const top = peak - r * slope + (ridged(dx / 260, dz / 260, 4) - 0.5) * 150 * sstep(30, 300, r) + gullies;
   if (top <= e) return e;
   return e + (top - e) * smooth((top - e) / 50);
+}
+
+/** A rock arete along the fall line: jagged crest, steep flanks, fading in at the top and out below (Ravenspire's). */
+function buttress(u, v, B) {
+  if (u < B.u0 - 5 || u > B.u1 + 5) return 0;
+  const t = (u - B.u0) / (B.u1 - B.u0);
+  const vc = B.v0 + (B.v1 - B.v0) * t + 12 * (noise1(u / 70, B.seed + 90) * 2 - 1);
+  const dv = Math.abs(v - vc);
+  if (dv > B.w) return 0;
+  const H = B.h * sstep(0, 0.15, t) * (1 - sstep(0.75, 1, t)) * (0.75 + 0.5 * Math.pow(ridged(u / 55, B.seed * 3.1, 2), 2));
+  const k = 1 - dv / B.w;
+  return H * k * k;
 }
 
 function rib1(x, seed) {

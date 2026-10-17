@@ -74,6 +74,15 @@ export const BANDS = [
 // Spine field on the left of the upper cirque (Sølvryggene, "the silver spines"): absolute v.
 export const SPINES = { u0: 120, u1: 830, v0: -650, v1: -360, spacing: 27, height: 12, wander: 12 };
 
+// Rock buttresses: sharp aretes along the fall line between the lines (they show rock: Lyngen faces are ribbed).
+// v0 → v1 = crest position at u0 → u1, w = half-width at the foot, h = height above the face.
+export const BUTTRESSES = [
+  { name: 'Ramnaryggen', u0: 90, u1: 640, v0: -300, v1: -250, w: 46, h: 30, seed: 1 },
+  { name: 'Kvalryggen', u0: 560, u1: 1350, v0: 330, v1: 395, w: 55, h: 30, seed: 2 },
+  { name: 'Trollryggen', u0: 880, u1: 1560, v0: -690, v1: -640, w: 55, h: 26, seed: 3 },
+  { name: 'Midtryggen', u0: 1180, u1: 1700, v0: 210, v1: 250, w: 42, h: 18, seed: 4 },
+];
+
 // Natural hits: [u, v, half-length across (m), height (m), kind, name?] — rollers (symmetric), lips (gentle
 // up, abrupt down), kickers (a steeper, shorter lip).
 export const HITS = [
@@ -187,12 +196,12 @@ export const DROP_ZONES = [
 // The trails (static data for the lobby in index.js; spawn / finish here). length / vertical are measured
 // along RIDE_LINES by scripts/map7-unit.mjs (and checked there).
 export const TRAILS = [
-  { id: 'skaret', name: 'Skaret', difficulty: 'double-black', description: 'The hero couloir: 45° through the summit rock, a 9 m choke and an ice chokestone, spat straight onto Ørneredet, then Hammaren, the rollers and the harbour.' },
-  { id: 'kvalneset', name: 'Kvalneset', difficulty: 'double-black', description: 'The headland: ride the crest above the fjord and drop its stairs (Trappa I–III), off Neskanten onto the point. The lighthouse is the finish; past it is the sea.' },
-  { id: 'solvryggen', name: 'Sølvryggene', difficulty: 'black', description: 'The silver spines: slash a 45° spine face, Kråkesteget, wind lips, Bjørkehoppet in the birches and the village roofs to the quay.' },
-  { id: 'fjordlopa', name: 'Fjordløypa', difficulty: 'blue', description: 'Top to sea: the long shoulder, twelve big rollers at 60 mph, a sweep into the bay past the drying racks to the harbour.' },
-  { id: 'brygga', name: 'Brygga', difficulty: 'park', description: 'The village jump line: the big rollers, Bjørkehoppet, a roof-hop over three houses and the gap over the boathouse onto the quay.' },
-  { id: 'sjosiden', name: 'Sjøsiden', difficulty: 'green', description: 'The easy way down to the sea: through the birches and the village lanes to the harbour.' },
+  { id: 'skaret', name: 'Skaret', difficulty: 'double-black', length: 3000, vertical: 1445, description: 'The hero couloir: 45° through the summit rock, a 9 m choke and an ice chokestone, spat straight onto Ørneredet, then Hammaren, the rollers and the harbour.' },
+  { id: 'kvalneset', name: 'Kvalneset', difficulty: 'double-black', length: 2580, vertical: 975, description: 'The headland: ride the crest above the fjord and drop its stairs (Trappa I–III), off Neskanten onto the point. The lighthouse is the finish; past it is the sea.' },
+  { id: 'solvryggen', name: 'Sølvryggene', difficulty: 'black', length: 2830, vertical: 1335, description: 'The silver spines: slash a 45° spine face, Kråkesteget, wind lips, Bjørkehoppet in the birches and the village roofs to the quay.' },
+  { id: 'fjordlopa', name: 'Fjordløypa', difficulty: 'blue', length: 3040, vertical: 1105, description: 'Top to sea: the long shoulder, twelve big rollers at 60 mph, a sweep into the bay past the drying racks to the harbour.' },
+  { id: 'brygga', name: 'Brygga', difficulty: 'park', length: 975, vertical: 265, description: 'The village jump line: the big rollers, Bjørkehoppet, a roof-hop over three houses and the gap over the boathouse onto the quay.' },
+  { id: 'sjosiden', name: 'Sjøsiden', difficulty: 'green', length: 710, vertical: 135, description: 'The easy way down to the sea: through the birches and the village lanes to the harbour.' },
 ];
 
 // Line goals (Steep "Mountain Stories" style): named features in order in one clean run. [name, bonus, ...features]
@@ -204,6 +213,7 @@ export const LINE_GOALS = [
   ['Naustgapet', 1500, 'Naustgapet'],
   ['Wave Rider', 1200, 'Bølgene', 'Bølgene', 'Bølgene'],
   ['Ski to Sea', 3000, 'Skaret', 'Hammaren', 'Bølgene', 'Naustgapet'],
+  ['Rollercoaster', 1400, 'Fjordryggen Roller', 'Fjordryggen Roller', 'Fjordryggen Roller', 'Fjordryggen Roller'],
 ];
 
 // The canonical lines, as (u, v) waypoints ('headland' = the headland crest, 'shoulder' = the shoulder crest):
