@@ -71,7 +71,7 @@ export const JUMPS = [
   { name: 'Lightning', short: 'Jump 1', u: 495, v: -3, lipDeg: 29, R: 20, kickH: 4.4, table: 28, vMax: 25, hw: 3.4, deckHw: 11, landHw: 13, deckDeg: 4, maxDeg: 40 },
   { name: 'Thunder', short: 'Jump 2', u: 610, v: -3, lipDeg: 30, R: 20, kickH: 4.5, table: 30, vMax: 27, hw: 3.6, deckHw: 12, landHw: 14, deckDeg: 4, maxDeg: 40 },
   { name: 'Voltage', short: 'Jump 3', u: 720, v: -3, lipDeg: 31, R: 22, kickH: 4.8, table: 32, vMax: 28.5, hw: 3.8, deckHw: 12, landHw: 15, deckDeg: 4, maxDeg: 40 },
-  { name: 'Megawatt', short: 'Jump 4', u: 880, v: -3, lipDeg: 32, R: 24, kickH: 5, table: 36, vMax: 31, hw: 4.2, deckHw: 14, landHw: 17, deckDeg: 4, maxDeg: 40 },
+  { name: 'Megawatt', short: 'Jump 4', u: 880, v: -3, lipDeg: 32, R: 24, kickH: 5, table: 35, vMax: 31, hw: 4.2, deckHw: 14, landHw: 17, deckDeg: 4, maxDeg: 40 },
 ];
 
 // Gap jumps: a kicker, then nothing — a channel `gap` m long (the snow, or a road across it) — up to a landing

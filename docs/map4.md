@@ -84,7 +84,7 @@ Three rail sections, each with three parallel options (pick your line), then fiv
 | **Lightning** | u 495 | 4.4 m | 29° | 29 m | 18.6–21.6 m/s | 36 m out, at 19.5 m/s (70 km/h) | 15 m |
 | **Thunder** | u 610 | 4.5 m | 30° | 31 m | 19.1–22.0 m/s | 38 m out, at 20.0 m/s (72 km/h) | 16 m |
 | **Voltage** | u 720 | 4.8 m | 31° | 33 m | 19.7–22.4 m/s | 40 m out, at 20.5 m/s (74 km/h) | 17 m |
-| **Megawatt** | u 880 | 5 m | 32° | 38 m | 20.8–23.4 m/s | 43 m out, at 21.5 m/s (77 km/h) | 19 m |
+| **Megawatt** | u 880 | 5 m | 32° | 36 m | 20.5–23.1 m/s | 42 m out, at 21.2 m/s (76 km/h) | 18 m |
 | **The Gap** (road gap) | u 1015 | 5 m | 24° | 35 m (a 23 m channel with a road across it, then a 12 m landing mound) | 19.0–21.3 m/s | 40 m out, at 19.6 m/s (71 km/h) | 12 m |
 
 - **The tables.** Every table has ride-up ramps at 20° beside its kicker (go around and roll the deck). Neon
@@ -569,7 +569,7 @@ The old park ran 15–19 m/s on its jump line and 9–10 m/s on its rails.
 | Lightning | 18.6–21.6 m/s | 19.2–19.9 | 69–72 | 2.1–2.5 s | sweet ×6 |
 | Thunder | 19.1–22.0 | 19.2–20.5 | 69–74 | 2.1–2.6 s | sweet ×4, knuckle → deep / sweet ×2 |
 | Voltage | 19.7–22.4 | 20.9–21.0 | 75–76 | 2.6–2.7 s | sweet ×6 |
-| Megawatt | 20.8–23.4 | 20.8–22.1 | 75–80 | 2.2–2.8 s | sweet ×3; cased ×3 at 20.8–20.9 m/s (the bottom of the window), rolled on clean |
+| Megawatt | 20.5–23.1 | 20.7–22.1 | 75–80 | 2.2–2.8 s | sweet ×4, knuckle ×1, cased ×1 (the table was 38 m: three of six cased at 20.8 m/s; now 35 m) |
 | The Gap | 19.0–21.3 | 19.6–20.1 | 71–72 | 2.4–2.7 s | sweet ×6 |
 | The Tower | 19.8–22.1 | 20.2–20.9 | 73–75 | 2.4–2.8 s (tucked, no check: 3.3–3.5 s) | sweet / knuckle |
 | High Voltage 1 / 2 | 15.3–17.8 / 17.0–19.4 | 16.2 / 17.7–18.0 | 58 / 64 | 2.2 / 2.4–2.5 s | sweet |
