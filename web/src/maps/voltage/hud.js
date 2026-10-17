@@ -106,6 +106,15 @@ export function mountParkHud(course) {
     pl.fadeThen(() => { pl.place({ x: last.x, y: 0, z: last.z }, last.heading); emit('respawned'); });
   });
 
+  // ---- on the way in: the controls for rails, and a word about non-twin skis (they can't land switch)
+  on('rideStarted', () => {
+    setTimeout(() => emit('hint', 'Rails: come down onto them lined up · A / D balance · tap Space to switch up · hold + release to pop off'), 9000);
+    setTimeout(() => {
+      const eq = course.player?.equipment;
+      if (eq?.type === 'ski' && !eq.spec?.twin) emit('hint', 'Tip: twin-tip park skis (Jibworks Twin, in the lobby) land switch — straight airs in the pipe and off rails land backwards');
+    }, 15000);
+  });
+
   // ---- judged run card (zen runs; challenge runs use the results screen)
   let cardT = 0;
   on('runComplete', () => {
