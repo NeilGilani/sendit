@@ -217,7 +217,7 @@ export function mountParkHud(course) {
     if (!J) return;
     const L = J.jump.land, lo = Math.max(0, L.vMin - 4), hi = L.vMax + 4;
     const x = (v) => `${Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100))}%`;
-    const v = predictLipSpeed(pl, J);
+    const v = predictLipSpeed(pl, J) + 0.35;   // (the 1D in-run model reads ~0.35 m/s under the real lip speed, measured tucked 20–40 m out)
     win.style.left = x(L.vMin); win.style.width = `calc(${x(L.vMax)} - ${x(L.vMin)})`;
     sw.style.left = x(L.sweet?.v ?? (L.vMin + L.vMax) / 2);
     me.style.left = x(v);
