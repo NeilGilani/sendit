@@ -259,10 +259,10 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await page.waitForFunction(() => document.querySelector('.cr-overlay.reel'), null, { timeout: 15000 });
   const reel = await page.evaluate(() => ({ cards: document.querySelectorAll('.cr-strip .cr-card').length, gold: document.querySelectorAll('.cr-strip .cr-card.r-gold').length, tiers: new Set([...document.querySelectorAll('.cr-strip .cr-card')].map((c) => c.className.match(/\br-(\w+)/)[1])).size }));
   ok(reel.cards === 60 && reel.tiers >= 4, `reel of ${reel.cards} cards in ${reel.tiers} grades`);
-  // Let it spin a moment: the reel moves and slows down (CS2 curve).
-  await page.waitForTimeout(2500);
-  const tr = await page.evaluate(() => window.__senditCases.opener.trace.slice());
-  ok(tr.length > 5 && tr.at(-1).x > tr[0].x, `the reel scrolls (${tr.length} frames)`);
+  // Let it spin: the reel covers ten cards (time-based, so this holds even at a low frame rate).
+  const moved = await page.waitForFunction(() => { const o = window.__senditCases.opener; const t = o.trace; return t.length > 2 && t.at(-1).x - o.x0 > o.pitch * 10; }, null, { timeout: 30000 }).then(() => true, () => false);
+  const tr = await page.evaluate(() => window.__senditCases.opener.trace.length);
+  ok(moved, `the reel scrolls (${tr} frames)`);
   await page.keyboard.press('Space');
   await page.waitForSelector('.cr-reveal:not([hidden]) h2', { timeout: 10000 });
   const rv = await page.evaluate(() => ({ name: document.querySelector('.cr-reveal h2').textContent, res: window.__senditCases.result.key, grade: document.querySelector('.cr-grade').textContent }));
