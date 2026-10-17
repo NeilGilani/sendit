@@ -159,6 +159,15 @@ Tune it with `maps[id].verb`, `verbTime`, `verbPre` and `verbDark`.
     quiet moments;
   - a limiter, then a tanh soft clipper with a 0.86 ceiling, keep even the extreme full-volume test under −1 dBFS.
 
+## Music hooks for the game-feel layer
+
+`juice/music.js` (game-feel branch) calls these optional SoundScape methods when they exist:
+- **`sound.setMusicEnergy(level 0..1)`:**
+  - lifts the upbeat track above 0.62 energy and releases it below 0.4, with a minimum 8 s hold;
+  - makes the music mellow (low-passed at 5 kHz) when calm, fully open by 0.6.
+- **`sound.musicDrop(kind, strength)`:** a pink-noise riser over 0.33 s while the music dips 6 dB, the `boost`
+  hit when it lands, then a +2 dB push for 0.6 s. There is a 2.5 s cooldown.
+
 ## Events the audio listens to
 
 The audio reads these events (read-only): `takeoff`, `jumped`, `landed`, `crashed`, `nearMiss`, `hardBrake`,

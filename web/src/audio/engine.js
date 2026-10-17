@@ -239,14 +239,19 @@ export class AudioEngine {
     duck = Math.min(duck, D.speedDb * sstep(D.speedFrom, D.speedFull, r.speed));
     if (r.st === ST.GRIND) duck = Math.min(duck, D.grindDb);
     if (this.landDuckT > 0) { this.landDuckT -= dt; duck = Math.min(duck, D.landDb); }
+    // a music drop (musicDrop): dip under the riser, then a short push when it lands
+    if (this.dropT > 0) { this.dropT -= dt; duck = Math.min(duck, D.dropDb); if (this.dropT <= 0) this.pushT = D.pushTime; }
+    else if (this.pushT > 0) { this.pushT -= dt; if (duck === 0) duck = D.pushDb; }
     if (Math.abs(duck - this.duckDb) > 0.1) {
       this.duck.gain.setTargetAtTime(T.mix.music * dbToGain(duck), when, duck < this.duckDb ? D.attack : D.release);
       this.duckDb = duck;
     }
     // music low-pass: muffled in big air, dark on a bail, opens on landing
-    let lp = 20000;
+    // music energy (setMusicEnergy): mellow (low-passed) when calm, fully open as the ride heats up
+    let lp = this.energy === undefined ? 20000 : Math.min(20000, D.calmLp * Math.pow(20000 / D.calmLp, sstep(D.calmFrom, D.calmFull, this.energy)));
     if (r.st === ST.AIR && r.air > D.airLpAfter) lp = D.airLp;
     if (this.crashT > 0) lp = D.crashLp;
+    lp = Math.round(lp / 50) * 50;
     if (lp !== this.musicLpF) {
       this.musicLP.frequency.setTargetAtTime(lp, when, lp < (this.musicLpF ?? 20000) ? (this.crashT > 0 ? 0.04 : 0.12) : D.lpRelease);
       this.musicLpF = lp;
@@ -310,6 +315,8 @@ export class AudioEngine {
       }
       case 'parkLanding': if (d.clean) this.amb.cheer(when + 0.2, clamp((d.dist ?? 15) / 20, 0.6, 1.3)); break;
       case 'crashed': this.fx.crash(when, 1, powder, board); this.crashT = this.T.duck.crashHold; this.breath.jolt(0.35); this.breath.huff(when + 0.03, this.T.fx.breath.gain * this.T.perspective[this.view].breath); break;
+      case 'musicEnergy': this.setMusicEnergy(d.level ?? 0); break;   // (SoundScape calls these directly; the test drives them as events)
+      case 'musicDrop': this.musicDrop(when, d.strength ?? 1); break;
       case 'liftTower': this.lift.tower(when, d.k ?? 1); break;
       case 'rideStarted': this.fx.bindings(when + 0.4, d.board ?? board); break;
       case 'liftBoarded': this.fx.chairBump(when, 1); break;
@@ -325,6 +332,16 @@ export class AudioEngine {
       case 'grindClip': this.grind.clank(when, 'rail', 0.6); break;
       default: break;
     }
+  }
+
+  /** Music energy 0..1 from the game-feel layer (juice/music.js), optional. */
+  setMusicEnergy(level) { this.energy = clamp(level, 0, 1); }
+
+  /** A music 'drop' on a huge moment: riser and dip now, a push when it hits (the hit sample is played by SoundScape). */
+  musicDrop(when, k = 1) {
+    const F = this.T.fx.drop;
+    this.dropT = this.T.duck.dropTime;
+    this.fx.noise(when, { buf: 'pink', f: 500, f2: 4500, q: 0.7, gain: F.riser * clamp(k, 0.3, 1.2), attack: this.T.duck.dropTime * 0.9, decay: 0.1, out: this.uiBus });
   }
 
   count(name) { this.stats.events[name] = (this.stats.events[name] || 0) + 1; }

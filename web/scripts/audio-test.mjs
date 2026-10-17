@@ -112,6 +112,8 @@ add('fallback-no-worklet', { seconds: 6, noWorklet: true, frames: frames(6, (t) 
 add('landings', { seconds: 9, solo: 'fxBus', frames: frames(9, (t) => (t < 4.5 ? { speed: 0, board: t > 4.4 ? 1 : 0 } : t < 6 ? { speed: 0, board: 1 } : { speed: 0, board: 0, groomed: 0, powder: 1, deep: 1 })),
   events: [[0.5, 3], [2, 7], [3.5, 11], [5, 8], [6.5, 8], [8, 12]].map(([t, impact]) => ({ t, name: 'landed', d: { impact, rawImpact: impact } })) });
 add('cold-slow-board', { seconds: 8, map: 'ravenspire', frames: frames(8, (t) => ({ board: 1, speed: ramp(t, 0, 8, 1, 14), ...carve(t, 3, 0.4, 6) })) });
+add('music-energy-drop', { seconds: 7, music: true, tune: { mix: { snow: 0, wind: 0, ambience: 0, fx: 0 } }, frames: frames(7, () => ({ speed: 0 })),
+  events: [{ t: 0, name: 'musicEnergy', d: { level: 0 } }, { t: 3, name: 'musicDrop', d: { strength: 1 } }, { t: 3, name: 'musicEnergy', d: { level: 1 } }] });
 if (traceDir) for (const type of ['ski', 'snowboard', 'bigmountain']) {
   const f = join(traceDir, `trace-${type}.json`);
   if (!existsSync(f)) continue;
@@ -170,6 +172,7 @@ if (has('powder-faceshot-fp')) expect((R['powder-faceshot-fp'].events.faceShot |
 if (has('park-pa')) expect((R['park-pa'].events.pa || 0) >= 2, 'the park PA speaks up');
 if (has('skier-passes')) { const p = R['skier-passes'].rms; expect(Math.max(...p.slice(30, 50)) > Math.max(...p.slice(0, 10)) * 3, 'another skier swishes past and fades'); }
 if (has('cold-slow-board')) expect((R['cold-slow-board'].events.squeak || 0) >= 5, 'cold snow squeaks when riding slowly');
+if (has('music-energy-drop')) { const r = R['music-energy-drop']; expect(r.centroid > 0 && (r.events.musicDrop || 0) === 1, 'music energy and drops drive the music'); }
 if (has('park-crowd')) expect(lvl('park-crowd', 3.2, 5) > lvl('park-crowd', 0.5, 2.5) * 1.5, 'a clean park landing gets a cheer');
 await browser.close();
 if (errors.length) { console.log('page errors:', errors.slice(0, 5)); fails++; }

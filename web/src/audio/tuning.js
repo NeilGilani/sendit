@@ -29,6 +29,8 @@ export const AUDIO = {
     grindDb: -3,
     landDb: -5,                 // short duck on hard landings (impact > 4 m/s), 0.35 s
     airLp: 1200, airLpAfter: 0.4, crashLp: 400, lpRelease: 0.5,   // music low-pass in big air / on a bail
+    calmLp: 5000, calmFrom: 0.1, calmFull: 0.6,                  // music energy: low-passed at 5 kHz when calm, open by 0.6
+    dropDb: -6, dropTime: 0.33, pushDb: 2, pushTime: 0.6,        // a music drop: dip under the riser, then a +2 dB push
     attack: 0.25, release: 1.6,
   },
   // First person (helmet cam) vs chase cam. fp: the rider's own ears inside the helmet.
@@ -122,6 +124,7 @@ export const AUDIO = {
     grind: { gain: 0.5, sample: 0.55, scrape: 0.5, clank: 0.5 },
     faceShot: { gain: 0.4, powder: 0.55, sink: 0.08, minSpeed: 7, minGap: 1.2 },   // powder thrown into the face at a turn
     gate: { gain: 0.45 },
+    drop: { riser: 0.3, hit: 0.5 },     // music drops (game-feel's musicDrop): the riser and the 'boost' hit
     bindings: { gain: 0.35 },           // stepping into bindings / strapping in at the start; the chair bump               // a slalom pole whacked aside: hollow plastic clack + flex
     lift: { gain: 0.16, creak: 0.12, tower: 0.45 },   // rope hum, chair creak, grip over the sheaves
     // breathing: exertion fills with speed / turn load / stops, drains at rest; heard when slowing down after

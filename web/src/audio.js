@@ -128,6 +128,27 @@ export class SoundScape {
     return this.ctx.createBuffer(2, 4410, 44100);
   }
 
+  /**
+   * Optional hooks for the game-feel layer (juice/music.js): music energy 0..1 lifts the upbeat track (with
+   * hysteresis and a minimum hold) and opens the music's tone; a drop is a riser, a dip and a hit.
+   */
+  setMusicEnergy(level) {
+    if (!this.engine) return;
+    const now = this.ctx.currentTime;
+    this.engine.setMusicEnergy(level);
+    if (!this.lifted && level > 0.62) { this.lifted = true; this.liftUntil = now + 8; }
+    else if (this.lifted && level < 0.4 && now > this.liftUntil) this.lifted = false;
+  }
+
+  musicDrop(kind, strength = 1) {
+    if (!this.engine) return;
+    const now = this.ctx.currentTime, k = Math.min(1.2, Math.max(0.3, strength));
+    if (now - (this.lastDrop ?? -9) < 2.5) return;
+    this.lastDrop = now;
+    this.engine.musicDrop(now, k);
+    this.oneShot('boost', this.engine.T.fx.drop.hit * k, kind === 'levelUp' ? 1.2 : 1.05, this.engine.uiBus, now + this.engine.T.duck.dropTime);
+  }
+
   resume() { this.ctx?.state === 'suspended' && this.ctx.resume(); }
 
   applyVolumes() {
@@ -136,14 +157,14 @@ export class SoundScape {
     this.engine.setView(settings.view);
   }
 
-  async oneShot(name, gain, rate, out) {
+  async oneShot(name, gain, rate, out, when = 0) {
     if (!this.ctx) return;
     this.extra = this.extra || {};
     if (!this.extra[name]) this.extra[name] = this.buf?.[name] ? Promise.resolve(this.buf[name]) : this.load(name);
     const buf = await this.extra[name];
     const src = this.ctx.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate;
     const g = this.ctx.createGain(); g.gain.value = gain;
-    src.connect(g); g.connect(out || this.sfx || this.ctx.destination); src.start();
+    src.connect(g); g.connect(out || this.sfx || this.ctx.destination); src.start(when);
   }
 
   /** Soft pentatonic sparkle (snowflake pickup). */
@@ -237,7 +258,7 @@ export class SoundScape {
     if (this.musicRest > 0) { this.musicRest -= dt; target = 0; }
     const rate = target > this.musicLevel ? 0.25 : 0.18;
     this.musicLevel += Math.sign(target - this.musicLevel) * Math.min(Math.abs(target - this.musicLevel), rate * dt);
-    const up = (this.track === 'challenge' || this.flowOn) && !menu ? 1 : 0;   // the SEND IT flow state lifts the music too
+    const up = (this.track === 'challenge' || this.flowOn || this.lifted) && !menu ? 1 : 0;   // the SEND IT flow state (or high music energy) lifts the music too
     this.upLevel += (up - this.upLevel) * Math.min(1, dt * 0.8);
     this.musicGain.gain.setTargetAtTime(this.musicLevel ** 1.6 * (1 - this.upLevel), c.currentTime, 0.1);
     this.upbeatGain.gain.setTargetAtTime((paused ? 0.45 : 0.75) * this.upLevel, c.currentTime, 0.1);
