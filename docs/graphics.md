@@ -13,7 +13,7 @@ Branch `agent/gfx-snow`. This replaces the cel/"clay" toon look of the web build
 | Rock / mountains | `gfx/snow.js`, `terrain.js`, `gfx/cornices.js`, `scatter.js` | Steep faces lose their snow above about 53° (noise + concavity). Couloirs hold snow and ribs stay bare. Rock is bi-planar projected (never stretched): grey gneiss with beds, runoff streaks and iron staining, Voronoi fracture blocks as tilted facets with dark joints, and ledge bands (fine and coarse, broken) holding snow. The far backdrop gets noise-gradient relief, and there is a ring of procedural ranges 12–37 km out that the aerial perspective layers into blue haze. Cornices and wind lips sit on the lee side of convex breaks. Boulders are fractured, smooth-shaded and grey, with snow caps and a per-cell LOD. |
 | Air | `scene.js` (`createSnowfall`, `SNOWFALL`) | Clear-sky diamond dust replaces the falling snow: sparse ice crystals that flash when they mirror the sun, mostly when you look toward it. |
 | Park | `features.js` | Kickers use the snow optics: packed, glazed park snow with shovel lumps and a slightly icy lip. Crowd billboards and fog pockets are converted to HDR. |
-| Trees | `gfx/trees.js`, `scatter.js` | Procedural spruce (narrow, drooping) and fir (rounder) are built from whorls of needle-frond cards: a procedural alpha needle texture with coverage-preserving alpha test, hanging skirts and volumetric normals. Snow ridges sit along the top of each branch, with per-tree load and colour. There is wind sway plus tip flutter. LOD0/LOD1 are dynamic pools around the camera, and LOD2 is cone shells per 750 m cell that hide inside the pool radius. |
+| Trees | `gfx/trees.js`, `scatter.js` | Procedural spruce (narrow, drooping) and fir (rounder) are built from whorls of needle-frond cards: a procedural alpha needle texture with coverage-preserving alpha test, hanging skirts and volumetric normals. Snow ridges sit along the top of each branch, with per-tree load and colour. There is wind sway plus tip flutter. LOD0/LOD1 are dynamic pools around the camera, and LOD2 is cone shells per 750 m cell. The LODs cross-fade rather than switch (see "No pop-in" below). |
 | Spray | `gfx/spray.js`, `fx.js` | Equipment-agnostic `SprayEmitter` (API below): rooster-tail sheets, clumps / ice chips, glittering crystals, lingering backlit powder clouds, sluff (loose snow that pours downhill along the surface on steep powder), hard-stop fans, landing puffs and crash bursts. Particles are lit by the sun with a Henyey-Greenstein forward lobe plus sky and snow bounce, use the baked mountain shadows, and fade softly into the snow. |
 
 ## Second graphics pass (branch `claude/gfx-snow-668da8`)
@@ -91,7 +91,7 @@ spray.emit(contacts, dt, { powder, normal });
 | Snow wind ripples / sastrugi / corduroy | off | on | on |
 | Track trenches | normal-mapped | normal-mapped | steep parallax |
 | Rock detail | one projection, one fracture scale | one projection, one fracture scale | full |
-| Trees: full / mid LOD radius | 35 / 126 m | 41 / 260 m | 58 / 420 m |
+| Trees: fronds → mid → far shells hand-over (ends of the cross-fade bands) | 35 / 126 m | 41 / 260 m | 58 / 420 m |
 | Far tree / boulder distance | 1800 / 500 m | 3000 / 900 m | 4500 / 1400 m |
 | Spray particle budget / mist | 35 % / 60 % | 65 % / 85 % | 100 % |
 | Sun glare / lens ghosts | off / off | on / off | on / on |
@@ -103,12 +103,37 @@ All of these live in one table: `PERF` in `web/src/gfx/perf.js`. Measurements an
 
 Terrain LOD distances scale 0.6 / 1.0 / 1.5.
 
+## No pop-in: LOD hand-over and load-time warm-up
+
+Nothing should appear, vanish or change abruptly while you ride, and nothing compiles or uploads for
+the first time mid-ride. Measured with `web/scripts/gfxpopin.mjs` on all three maps and tiers (numbers in
+`docs/graphics-perf.md`).
+
+| What | Where | How |
+|---|---|---|
+| Tree LODs | `gfx/trees.js` | Fronds (LOD0) → mid fronds (LOD1) → far cone shells cross-fade over a band before each hand-over distance (25 % / 15 % of the distance). Neighbouring LODs use complementary screen-door dither (interleaved gradient noise on `gl_FragCoord`), so each pixel is drawn by exactly one of them. Every instance computes its band position in the vertex shader from the **live** camera position (`uLodEye`), not the pool centre of the last refill. Fully handed-over instances collapse in the vertex shader. Far shells never `discard` (keeps early-z for thousands of them): they sit complete inside the dissolving mid fronds, and shrink into the snow at the far distance. |
+| Tree pools | `gfx/trees.js` | The near pool is refilled every 3 m from a 32 m spatial grid, the mid pool and the shadow cones every 10 m. Each pool holds every tree it can draw before the next refill. Capacity is every tree of the kind, so dense forests never get holes that fill in as you come closer. A dense map's `course.perf` hint still shrinks the hand-over distances. |
+| Tree shadows | `gfx/trees.js` | Near fronds cast with the same dither (custom depth material, same sway). Beyond them, shadow-only cones (far-shell geometry, drawn in the shadow pass only) cast for every tree in the shadow range (`box / sin(sun elevation)`). Shadows no longer pop in when a tree crosses the near radius. |
+| Boulders, fences, ice | `scatter.js`, `world.js` `withDistanceFade()` | Each instance shrinks into the snow over the last 22 % before its cull distance, so whole 750 m cells never pop. Vertex-only, no `discard`. Boulders switch to low poly only once every rock in the cell is beyond 400 m. |
+| Terrain chunks | `terrain.js` | Geomorphing (CDLOD-style): each vertex carries `aMorph` = (height difference to the next-coarser grid, LOD). Over the last 30 % before a LOD distance the vertex slides onto the coarser surface, so the chunk looks identical when it swaps. The same applies to the 10 m mid ring. Chunk geometry is built ahead along the camera velocity (3 s look-ahead), and spare geometry stays in an LRU cache (48) instead of being rebuilt. |
+| Track parallax (high) | `gfx/snow.js` | The trench parallax offset fades out over 32–45 m instead of switching off at 45 m. |
+| Shader compiles | `gfx/prewarm.js`, `main.js` | Behind the loading screen: fill LOD and tree pools around the spawn and the lobby spot, upload every texture (`initTexture`), then render warm frames with everything on screen once. That covers all tree LODs with their shadow shaders, a spray particle with its shadow shader, the speed-wind pass, the track stamp + recentre passes, culled scatter cells and every shadow caster unculled. It also warms each distinct shadow-depth variant: three's shared depth material only re-picks its program when state flips between draws, so each caster variant is drawn once right after a dummy that forces the re-pick. After loading, the other quality levels' terrain / backdrop shaders compile in the background (`compileAsync`). |
+| Textures | `gfx/snow.js` | Loading waits (up to 8 s) for the rock detail JPEG, so it no longer swaps in from a grey placeholder mid-ride. |
+
+Knobs: `PERF.trees` (hand-over distances, band fractions), `PERF.treeRefill`, `PERF.terrainMorph`,
+`PERF.terrainLookahead`, `PERF.terrainCache`, `PERF.scatterFadeBand`, `PERF.boulderLoDistance` in
+`web/src/gfx/perf.js`.
+
+Not covered: changing the quality level in the settings still compiles the post-processing variants
+(AO / SMAA presets) once. That happens in a menu, not while riding.
+
 ## Debug and preview helpers
 
 - URL params: `?tm=agx` (tone curve), `?exposure=0.62`, `?sun=bearing,elevation` (degrees), `?goggles=1` (amber goggle lens), plus the existing `?ride`, `?quality`, `?at`, `?kicker`.
 - `?shaderdebug` turns three.js shader log checks back on. They are off by default because reading program logs stalls on the first use of every program, and ANGLE/D3D11 prints a benign compiler warning for the third-party N8AO shader.
 - `window.__post` is the PostStack instance (debug).
 - `window.__gfxCam = [px,py,pz, tx,ty,tz, fov?]` or a function returning that array overrides the camera (honoured in `sky.js`). This is for screenshots.
+- `node web/scripts/gfxpopin.mjs <url> [maps] [qualities] [seconds]` flies the camera down each map's run at speed and counts pops per second (tree LOD jumps, tree shadows starting or stopping, scatter cells, terrain LOD swaps). It also counts mid-ride shader compiles and texture uploads, frame spikes, and reports load time. `node web/scripts/gfxpopshots.mjs <url> <map> <start> <steps> <stepMetres> <outDir>` saves a fixed-step screenshot sequence for before/after comparisons.
 - `node web/scripts/gfxshots.mjs <url> <outDir> <views.json>` boots once in headless Chromium and captures many views (`cam`, `side` rider-relative camera, `keys`, `eval`, `wait`). Set `SUF=_x` to suffix the file names. `GPU=1` renders on the real GPU through ANGLE/D3D11, which is much faster than SwiftShader on this machine; `clip` captures a sub-rectangle.
 
 ## Performance (second pass)

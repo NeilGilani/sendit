@@ -99,6 +99,92 @@ per-tree AO remain), the second rock projection and fine fracture cells (rock re
 close), and some sharpness on high-DPI screens. Low loses a few mid-distance frond trees, which become
 far shells sooner.
 
+## Pop-in pass (no LOD pops, no mid-ride compiles)
+
+Branch `claude/gfx-snow-668da8`, on top of the integrated `claude/funny-volta-2nzvj6` (a5e4eba). Design and knobs
+are in `docs/graphics.md` ("No pop-in").
+
+### Root causes found
+
+1. **Hard tree LOD swaps** at the near hand-over (q1: 41 m on Valcrest; **18 m** on Blackspruce, whose
+   `course.perf` hint shrinks the pools). Fronds swapped to the mid LOD, with its different snow and dark core.
+   At the mid hand-over (q1: 260 m; 91 m on Blackspruce) they swapped to cone shells. The hide/show radius
+   was measured from the pool centre, which only moved every 10 m, so boundaries also jumped in 10 m steps.
+2. **Shadow pop**: only near-pool trees cast shadows, so a tree's shadow appeared when it crossed the near
+   radius, inside the shadow box.
+3. **Pool capacity**: pools had fixed caps (900 / 9000). On a dense map, overflow trees were simply not drawn
+   until you came closer.
+4. **Whole-cell pops**: boulders, fences and ice appear and disappear per 750 m cell. Boulder cells swapped to
+   high poly only within ~120 m of the cell edge.
+5. **Terrain chunk LOD swaps** with no morph (the geometry jumps at 168–420 m by tier), plus the same for
+   the 10 m mid ring. Chunk geometry was built lazily under a per-frame budget and thrown away behind you.
+6. **Shader compiles mid-ride**: the speed-wind post pass (first time you go fast), the track-stamp /
+   recentre passes, tree LOD shadow shaders, and shadow-depth variants for textured casters (e.g. Ravenspire's
+   double-sided station roof). The last happen because three's shared depth material only re-picks its program
+   when some state flips between draws. Also the rock detail JPEG could swap in from a grey placeholder
+   after loading.
+7. The q2 track parallax switched off at 45 m.
+
+Not found: lazily built scatter cells (everything is built at load) and mid-ride texture uploads (none
+measured).
+
+### Pop-in measurements (`gfxpopin.mjs`, 12 s fly-through at 25 / 20 / 31 m/s, 1280×720)
+
+Pops per second (trees < 60 m / 60–150 m / 150–400 m, tree shadows, scatter cells, terrain swaps) and shader
+programs linked during the ride:
+
+| Map | q | Before (a5e4eba) | After |
+|---|---|---|---|
+| Valcrest | 0 | trees 15.3 / 59.7 / 0, shadows 15.3, scatter 0.8, terrain 7.6, compiles 2 | all 0, compiles 0 |
+| Valcrest | 1 | trees 15.4 / 0 / 70.8 (nearest 31 m), shadows 15.4, scatter 1.4, terrain 6.8, compiles 3 | all 0, compiles 0 |
+| Valcrest | 2 | trees 12.1 / 7.8 / 0, shadows 19.8, scatter 0.9, terrain 7.3, compiles 2 | all 0, compiles 0 |
+| Blackspruce | 0 | trees 43.7 / 0 / 0 (nearest **7 m**), shadows 10.0, scatter 0.6, terrain 6.7, compiles 3 | all 0, compiles 0 |
+| Blackspruce | 1 | trees 11.5 / 55.4 / 0 (nearest 9 m), shadows 11.5, scatter 0.5, terrain 5.8, compiles 2 | all 0, compiles 0 |
+| Blackspruce | 2 | trees 17.5 / 75.5 / 33.1 (nearest 15 m), shadows 17.5, scatter 0.3, terrain 7.0, compiles 2 | all 0, compiles 0 |
+| Ravenspire | 0 | trees 0 / 0.6 / 0, scatter 1.2, terrain 10.7, compiles 4 | all 0, compiles 0 |
+| Ravenspire | 1 | trees 0 / 0 / 3.7, scatter 1.3, terrain 9.7, compiles 4 | all 0, compiles 0 |
+| Ravenspire | 2 | trees 0, scatter 0.3, terrain 8.1, compiles 4 | all 0, compiles 0 |
+
+How the metric works:
+- Tree "levels" are continuous: LOD plus cross-fade progress, or 3 for "should be drawn but isn't".
+- A pop is a jump of ≥ 0.5 in one frame. Frames where the camera moved > 2 m (frame hitches) re-sync without
+  counting. Their counts are in the script output, and they occur in both builds.
+- Before / after screenshot sequences (`gfxpopshots.mjs`, Blackspruce, 1.5 m steps) show it directly. In the old
+  build, trees around 18 m turn into dark, featureless mid-LOD blobs, and only the closest trees cast shadows.
+  In the new build, fronds and branch snow stay at that range, and every tree in the shadow box casts.
+
+### Load time (navigation to first riding frame, q0 / q1 / q2, same run order)
+
+| Map | Before | After (of which warm-up) |
+|---|---|---|
+| Valcrest | 8.2 / 5.3 / 7.3 s | 8.8 / 6.2 / 8.2 s (4.1 / 1.3 / 3.4 s) |
+| Blackspruce | 5.0 / 4.7 / 4.7 s | 5.6 / 5.3 / 5.1 s (0.8 / 0.5 / 0.6 s) |
+| Ravenspire | 7.8 / 6.1 / 6.1 s | 7.7 / 6.2 / 6.4 s (1.7 / 0.6 / 0.6 s) |
+
+That's +0.1 to +0.9 s. Most of the warm-up is shader compiles that used to happen in the first riding seconds (or
+later, mid-ride). The first map in a fresh browser profile pays the cold shader cache.
+
+### Frame cost (GPU ms per frame, 1600×900, timer queries)
+
+Interleaved A/B on a quiet GPU (another session and the user's browser share it, so absolute numbers
+drift by ±2 ms; compare within a row):
+
+| | Before | After |
+|---|---|---|
+| Valcrest q0 / q1 / q2 (`gfxperf.mjs`, 2 runs each) | 9.8–10.6 / 14.0–14.3 / 21.1–24.0 | 9.7–9.8 / 14.2–14.9 / 22.2–24.8 |
+| Ravenspire q1 (`map3-perf.mjs`, 6 spots) | avg 10.5, worst 12.2 | avg 10.8, worst 13.1 |
+| Blackspruce q1 (`map2-perf.mjs`, 7 spots, fastest frame) | median 13.2, max 15.5 | median 13.4, max 16.9 |
+| Main thread, Valcrest q1 (`gfxcpu.mjs`) | 2.89 ms | 3.05 ms (terrain look-ahead builds) |
+
+Quality 1 stays at 14–16 ms GPU. What it took to keep the cost flat:
+- Each cross-fade band **ends** where the old hard switch was, so the full-detail coverage is unchanged.
+- Bands scale with the hand-over distance: inside a band both frond LODs rasterise their alpha-tested cards,
+  which cost 2.2 ms with a fixed 10 m band at Blackspruce's 18 m hand-over.
+- Far shells, boulders and fences fade by shrinking, not dithering: a `discard` in their shaders would cost
+  early-z on thousands of opaque instances.
+- The near pool refills every 3 m from a spatial grid (tight margins, fewer collapsed instances).
+- Beyond the near fronds, trees cast shadows with cheap shadow-only cones.
+
 ## Next levers, if a weaker GPU needs more
 
 - **Shadow map**: casters inside a 1200 m-deep ortho box. Pulling the far plane in would cull up-sun terrain
@@ -106,5 +192,8 @@ far shells sooner.
 - **Mid trees**: alpha-tested cards cover a lot of screen. A cheaper fragment path for LOD1, without the snow
   noise, would change the look slightly.
 - **Terrain**: q1 could also drop glints (about 1 ms).
+- **Pop-in budget**: the near hand-over could move further out on quality 2 (`PERF.trees[2].minNear`:
+  more frond trees, so measure with `gfxperf.mjs` / `map2-perf.mjs`). Wider bands look smoother but cost
+  more on dense maps.
 - **CPU** (not the bottleneck): `getProgramParameter` shows up at about 0.3 ms per frame on the main thread.
   Worth tracking down if the game ever becomes CPU-bound.
