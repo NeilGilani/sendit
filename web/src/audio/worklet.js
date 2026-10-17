@@ -348,7 +348,7 @@ class WindProcessor extends AudioWorkletProcessor {
     this.ch = [0, 1].map((c) => ({ rng: new Rng(99991 + c * 31337), pink: new Pink(), brown: 0, rush: new SVF(), bump: new SVF(), hp: new SVF(), hi: new SVF(), w1: new SVF(), w2: new SVF(), amb: new SVF(), ambH: new SVF(), howl: new SVF(), howl2: new SVF() }));
     this.howlF = 300; this.howlTgt = 300; this.howlT = 0;
     this.buf = new SVF(); this.flut = new SVF(); this.bBrown = 0; this.flapF = new SVF(); this.flapPh = 0; this.flapA = 1; this.flapPk = new Pink(); this.flapRng = new Rng(4242);
-    this.g1 = 0; this.g2 = 0; this.g3 = 0; this.sqPh = 0; this.sqA = 0; this.sqT = 0; this.lock1 = 0; this.lock2 = 0; this.lockT1 = 0; this.lockT2 = 0; this.lt1 = 0; this.lt2 = 0;
+    this.g1 = 0; this.g2 = 0; this.g3 = 0; this.g4 = 0; this.sqPh = 0; this.sqA = 0; this.sqT = 0; this.lock1 = 0; this.lock2 = 0; this.lockT1 = 0; this.lockT2 = 0; this.lt1 = 0; this.lt2 = 0;
     this.ph = 0;
     this.prev = null;
     this.smoothA = 1 - Math.exp(-128 / (this.fs * 0.04));
@@ -365,6 +365,8 @@ class WindProcessor extends AudioWorkletProcessor {
     this.g1 = clamp(this.ou(this.g1, T.gust.tau, dt), -2.5, 2.5);
     this.g2 = clamp(this.ou(this.g2, T.gust.tau * 2.2, dt), -2.5, 2.5);
     this.g3 = clamp(this.ou(this.g3, T.ears.tau, dt), -2, 2);   // head yaw against the airflow
+    this.g4 = clamp(this.ou(this.g4, T.ambient.travelTau, dt), -2, 2);   // where the distant gust is: it sweeps across
+    const ambL = clamp(1 + T.ambient.travel * this.g4, 0.3, 1.7), ambR = clamp(1 - T.ambient.travel * this.g4, 0.3, 1.7);
     const earL = clamp(1 + T.ears.depth * this.g3, 0.35, 1.8), earR = clamp(1 - T.ears.depth * this.g3, 0.35, 1.8);
     if ((this.sqT -= dt) <= 0) { this.sqT = 0.2 + this.rng.u() * 0.4; this.sqA = this.rng.u(); }
     this.sqPh += T.gust.squallF * dt;
@@ -446,7 +448,7 @@ class WindProcessor extends AudioWorkletProcessor {
         const hiS = c.hi.bp(pk);   // one tick per sample (both uses share it)
         s += hiS * hi * 2.2 * ear * (ci === 0 ? earL : earR) * (1 + (whoosh - 1) * 1.5) + hiS * T.spin.air * spin * pz * 2.2;
         s += (c.w1.bp(w) * wh1 + c.w2.bp(w) * wh2) * 6;
-        s += c.amb.bp(c.brown * 3.5) * amb * 2.2 + c.ambH.bp(pk) * ambHi;
+        s += (c.amb.bp(c.brown * 3.5) * amb * 2.2 + c.ambH.bp(pk) * ambHi) * (ci === 0 ? ambL : ambR);
         if (howl > 1e-5) s += (c.howl.bp(pk) + c.howl2.bp(pk) * 0.35) * howl * 4;
         const o = safe(s * outG);
         if (ci === 0) L[i] = o; else if (R !== L) R[i] = o;

@@ -87,7 +87,7 @@ carve leans up to 22 % toward the outside, loaded ski (turning right, the left s
 | Tuck | Rush −6 dB and a darker low-pass (the lee of the body) |
 | Spin / flip whoosh | In the air, by rotation rate: the ears alternate facing the airflow, so each half turn pans and swells the rush and sweeps its filter, with a whoosh pulse (up to about +7 dB and brighter) as the face swings through the wind |
 | Gusts | Ornstein–Uhlenbeck processes (2.2 s rider-relative, ~5 s ambient) modulate level and relative airspeed |
-| Map wind | Distant wind over the ridges: band-passed brown noise at the map's `windF`, plus hiss, swelling with the gusts. Level and tone are set per map. |
+| Map wind | Distant wind over the ridges: band-passed brown noise at the map's `windF`, plus hiss, swelling with the gusts and sweeping across the stereo field (±3 dB, as in Farnell's moving gusts). Level and tone are set per map. |
 | Ridge howl | On exposed maps (`maps[id].howl`: Ravenspire, Dragonback) the strongest ambient gusts moan through rock edges: two narrow resonances (Q 14, a fifth apart) gliding in 220–420 Hz, rising with the gust |
 
 Slow motion (the apex slow-mo event) scales every filter and modulation rate by 0.55 + 0.45·scale, so the
