@@ -74,7 +74,7 @@ class SnowProcessor extends AudioWorkletProcessor {
     this.ch = [0, 1].map((c) => ({
       rng: new Rng(1234567 + c * 7919), pink: new Pink(), brown: 0,
       hiss: new SVF(), hissLP: new SVF(), powHP: new SVF(), c1: new SVF(), c2: new SVF(), growl: new SVF(), skid: new SVF(), spray: new SVF(), powder: new SVF(),
-      lowCut: new SVF(), base: new SVF(), iceH: new SVF(), iceB: new SVF(), scr1: new SVF(), scr2: new SVF(), grain: new SVF(), absorb: 0,
+      lowCut: new SVF(), sq: new SVF(), base: new SVF(), iceH: new SVF(), iceB: new SVF(), scr1: new SVF(), scr2: new SVF(), grain: new SVF(), absorb: 0,
     }));
     this.rng = new Rng(424242);
     // grains
@@ -82,6 +82,7 @@ class SnowProcessor extends AudioWorkletProcessor {
     this.rough = new SVF(); this.roughLvl = 0;
     this.cordPh = 0; this.cordJit = 1;
     this.chPh = 0; this.chF = 24; this.chAmp = 1;
+    this.sqPh = 0; this.sqF = 420; this.sqOn = 0; this.sqTgt = 0; this.sqT = 0;   // stick-slip squeal
     this.wob1 = 0; this.wob2 = 0; this.wobT1 = 0; this.wobT2 = 0;
     this.scrF1 = 3000; this.scrF2 = 4800;   // the edge's narrow scrape resonances on ice (random walk 2–6 kHz)
     this.prev = null;   // previous block's gains (for ramps)
@@ -113,6 +114,9 @@ class SnowProcessor extends AudioWorkletProcessor {
     g.powder = T.powder.gain * wP * sc * (0.5 + T.powder.sinkBoost * sink) * ground;
     g.base = T.base.gain * board * sc * (1 - edge) * hard * ground * p.low;
     g.ice = T.ice.gain * wI * sc * (0.5 + edge + Math.min(1, skid)) * ground;
+    // edge squeal: stick-slip while skidding on hard / icy snow (a harmonic ladder ~350–500 Hz in the field recordings)
+    g.squeal = T.squeal.gain * Math.min(1, Math.max(skid, stop)) * sstep(0.35, 0.8, edge) * (wG * 0.6 + wK * 0.6 + wI * 1.4) * sstep(1.5, 5, speed) * (1 - 0.5 * board) * ground;
+    g.sqF = lerp(T.squeal.fMin, T.squeal.fMax, Math.min(1, speed / 20)) * lerp(1, 0.75, board) * clamp(p.rate, 0.25, 2);
     g.chatter = clamp(p.chatter, 0, 1) * T.chatter.depth * ground;
     g.grainRate = (T.grains.rate0 + T.grains.ratePerV * speed * (1 + T.grains.rateEdge * edge * load) + 900 * Math.min(1, skid) * mv) * mv * ground;
     g.grainRate = Math.min(T.grains.max, g.grainRate) * clamp(p.rate, 0.2, 1.5) * lerp(1, T.grains.boardRate, board);
@@ -150,7 +154,7 @@ class SnowProcessor extends AudioWorkletProcessor {
     const g = this.gains();
     const a = this.prev || g;
     this.prev = g;
-    const loud = g.hiss + g.carve + g.skid + g.powder + g.ice + g.base + g.growl + g.spray + g.grainAmp * Math.min(1, g.grainRate / 500);
+    const loud = g.squeal + g.hiss + g.carve + g.skid + g.powder + g.ice + g.base + g.growl + g.spray + g.grainAmp * Math.min(1, g.grainRate / 500);
     if (loud < 1e-5 && this.active <= 0) { L.fill(0); if (R !== L) R.fill(0); return true; }
     this.active = loud > 1e-5 ? fs * 0.3 : this.active - n;   // keep running for a tail after it falls silent
     // slow wobble of the carve bands (random walk toward new targets)
@@ -159,6 +163,8 @@ class SnowProcessor extends AudioWorkletProcessor {
     if ((this.wobT2 -= bt) <= 0) { this.wobT2 = 0.1 + this.rng.u() * 0.5; this.wobG2 = this.rng.bi(); }
     this.wob1 += ((this.wobG1 || 0) - this.wob1) * 0.08; this.wob2 += ((this.wobG2 || 0) - this.wob2) * 0.1;
     const w1 = 1 + T.carve.wobble * this.wob1, w2 = 1 + T.carve.wobble * this.wob2;
+    if ((this.sqT -= n / fs) <= 0) { this.sqT = 0.15 + this.rng.u() * 0.5; this.sqTgt = this.rng.u() < T.squeal.duty ? 0.5 + 0.5 * this.rng.u() : 0; }
+    this.sqF += (g.sqF * (1 + 0.06 * Math.sin(this.wob1 * 3)) - this.sqF) * 0.2;
     const width = g.width;
     const S = T.ice.scrape;
     this.scrF1 = clamp(this.scrF1 * (1 + (this.rng.u() - 0.5) * S.walk), S.fMin, S.fMax);
@@ -167,6 +173,7 @@ class SnowProcessor extends AudioWorkletProcessor {
       c.hiss.set(g.fHiss, 0.6, fs); c.hissLP.set(g.fHissLP, 0.6, fs); c.powHP.set(T.powder.hp * g.r, 0.7, fs);
       c.c1.set(g.f1 * w1, T.carve.q1, fs); c.c2.set(g.f2 * w2, T.carve.q2, fs);
       c.growl.set(g.fGrowl, 0.8, fs);
+      c.sq.set(T.squeal.band * g.r, 0.9, fs);
       c.skid.set(g.fSkid, T.skid.q, fs); c.spray.set(T.skid.sprayF * g.r, 0.6, fs);
       c.powder.set(g.fPowder, T.powder.q, fs);
       c.base.set(T.base.f * g.r, 0.7, fs); c.lowCut.set(T.base.lowCut, 0.7, fs);
@@ -185,6 +192,7 @@ class SnowProcessor extends AudioWorkletProcessor {
       const hiss = a.hiss * it + g.hiss * t, carve = a.carve * it + g.carve * t, growl = a.growl * it + g.growl * t;
       const skid = a.skid * it + g.skid * t, spray = a.spray * it + g.spray * t, powder = a.powder * it + g.powder * t;
       const base = a.base * it + g.base * t, ice = a.ice * it + g.ice * t, grainAmp = a.grainAmp * it + g.grainAmp * t;
+      const squeal = (a.squeal ?? 0) * it + g.squeal * t;
       const cord = a.cord * it + g.cord * t, chat = a.chatter * it + g.chatter * t, outG = a.out * it + g.out * t;
       // corduroy: zippy AM at ridge rate, jittered
       this.cordPh += cordInc * this.cordJit;
@@ -194,6 +202,11 @@ class SnowProcessor extends AudioWorkletProcessor {
       this.chPh += this.chF * g.chF / fs;
       if (this.chPh >= 1) { this.chPh -= 1; this.chF = lerp(g.chMin, g.chMax, this.rng.u()); this.chAmp = 0.4 + 0.6 * this.rng.u(); }
       const chatAM = 1 - chat * this.chAmp * (0.5 + 0.5 * Math.cos(TAU * this.chPh));
+      // squeal: a jittered sawtooth (rich harmonic ladder), latching on and off like real stick-slip
+      this.sqOn += (this.sqTgt - this.sqOn) * 0.0015;
+      this.sqPh += (this.sqF * (1 + 0.004 * this.rng.bi())) / fs;
+      if (this.sqPh >= 1) this.sqPh -= 1;
+      const sqS = squeal > 1e-5 ? (this.sqPh * 2 - 1) * squeal * this.sqOn : 0;
       // skid roughness: lumpy envelope from low-passed noise
       const rn = this.rough.lp(this.rng.bi());
       const roughEnv = (1 - T.skid.rough) + T.skid.rough * Math.min(2.5, Math.abs(rn) * 9);
@@ -221,6 +234,7 @@ class SnowProcessor extends AudioWorkletProcessor {
         let s = c.hissLP.lp(c.hiss.hp(pk * 0.8 + w * T.hiss.white)) * hiss * 1.8 * cordAM;
         s += (c.c1.bp(w) * 1.3 + c.c2.bp(w)) * carve * chatAM;
         s += c.growl.bp(br) * growl * 1.6;
+        s += c.sq.bp(sqS) * (ci === 0 ? 1 : 0.85);
         s += c.skid.bp(w) * skid * roughEnv * chatAM + c.spray.lp(pk) * spray * roughEnv;
         s += c.powder.lp(c.powHP.hp(br + pk * T.powder.shh)) * powder * 1.5;
         s += c.base.bp(br) * base * 3.0;

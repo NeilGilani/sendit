@@ -25,8 +25,13 @@ window.renderScenario = async function renderScenario(spec) {
 
 function othersAt(o, t) { return { x: o.x + (o.vx || 0) * t + Math.sin(t * 2.4) * (o.wig || 0), y: o.y || 0, z: o.z + (o.vz || 0) * t, speed: o.speed, roll: Math.sin(t * 2.4) * 0.35 }; }
 
-function merge(dst, src) { for (const k in src) { if (src[k] && typeof src[k] === 'object' && !Array.isArray(src[k])) merge(dst[k] ||= {}, src[k]); else dst[k] = src[k]; } }
-function restore(dst, src) { for (const k in src) { if (src[k] && typeof src[k] === 'object' && !Array.isArray(src[k])) restore(dst[k], src[k]); else dst[k] = src[k]; } }
+function merge(dst, src) { for (const k in src) { if (src[k] && typeof src[k] === 'object' && !Array.isArray(src[k])) { if (!dst[k] || typeof dst[k] !== 'object') dst[k] = {}; merge(dst[k], src[k]); } else dst[k] = src[k]; } }
+function restore(dst, src) {
+  for (const k in src) {
+    if (src[k] && typeof src[k] === 'object' && !Array.isArray(src[k]) && dst[k] && typeof dst[k] === 'object') restore(dst[k], src[k]);
+    else dst[k] = src[k] && typeof src[k] === 'object' ? JSON.parse(JSON.stringify(src[k])) : src[k];
+  }
+}
 
 async function render(spec, sr, secs) {
   const ctx = new OfflineAudioContext(2, Math.ceil(sr * secs), sr);
@@ -70,7 +75,7 @@ async function render(spec, sr, secs) {
     pk.push(p);
   }
   const sp = spectrum(L, R, sr, Math.floor((spec.specFrom || 0) * sr), spec.specTo ? Math.floor(spec.specTo * sr) : L.length);
-  const out = { peak, nan, rms, pk, rmsAll: Math.sqrt(sum / (2 * L.length)), centroid: sp.centroid, bands: sp.bands, events: eng.stats.events, paramNaN: eng.stats.nan || 0, worklet: eng.worklet };
+  const out = { peak, nan, rms, pk, rmsAll: Math.sqrt(sum / (2 * L.length)), centroid: sp.centroid, bands: sp.bands, events: eng.stats.events, paramNaN: eng.stats.nan || 0, workletError: eng.stats.workletError || 0, worklet: eng.worklet };
   if (spec.wav) out.wav = toWavBase64(L, R, sr);
   return out;
 }

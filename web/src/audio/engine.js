@@ -88,12 +88,20 @@ export class AudioEngine {
       this.wind = mk('sendit-wind', this.T.wind); this.wind.connect(this.windBus);
       this.sp = this.snow.parameters; this.wp = this.wind.parameters;
       this.worklet = true;
+      // a DSP exception stops a processor for good: count it (the tests fail on it) and switch to the sample loops
+      const onErr = (e) => {
+        this.stats.workletError = (this.stats.workletError || 0) + 1;
+        console.warn('[audio] worklet processor error, falling back to sample loops', e);
+        if (this.legacy || !this.worklet) return;
+        this.worklet = false;
+        try { this.snow.disconnect(); this.wind.disconnect(); } catch { /* already gone */ }
+        this.startLegacy();
+      };
+      this.snow.onprocessorerror = onErr; this.wind.onprocessorerror = onErr;
     } catch (e) {
       console.warn('[audio] worklet unavailable, using sample loops', e);
       this.worklet = false;
-      const names = ['snow_powder', 'snow_groomed', 'snow_carve', 'snow_ice', 'wind_speed', 'wind_ambient'];
-      if (this.loadBuffer) await Promise.all(names.map(async (n) => { this.buffers[n] ||= await this.loadBuffer(n); }));
-      this.legacy = new LegacyLoops(c, this.snowBus, this.windBus, this.buffers);
+      await this.startLegacy();
     }
     this.grind = new Grind(c, this.fxBus, this.fx, this.T.fx.grind, this.buffers.grind_loop);
     this.amb = new Ambience(c, this.ambBus, this.fx, this.T.ambience, this.T.maps);
@@ -102,6 +110,12 @@ export class AudioEngine {
     this.others = new OtherRiders(c, this.fxBus, this.fx, this.T.others);
     this.amb.setMap(this.mapId);
     return this;
+  }
+
+  async startLegacy() {
+    const names = ['snow_powder', 'snow_groomed', 'snow_carve', 'snow_ice', 'wind_speed', 'wind_ambient'];
+    if (this.loadBuffer) await Promise.all(names.map(async (n) => { this.buffers[n] ||= await this.loadBuffer(n); }));
+    this.legacy = new LegacyLoops(this.ctx, this.snowBus, this.windBus, this.buffers);
   }
 
   setMap(id) { this.mapId = id || 'default'; this.map = { ...this.T.maps.default, ...(this.T.maps[this.mapId] || {}) }; this.amb?.setMap(this.mapId); }
@@ -150,7 +164,7 @@ export class AudioEngine {
     if (this.worklet) {
       for (const k in snowParams) this.setP(this.sp, 's' + k, k, snowParams[k], when);
       for (const k in windParams) this.setP(this.wp, 'w' + k, k, windParams[k], when);
-    } else this.legacy.update(when, snowParams, windParams);
+    } else this.legacy?.update(when, snowParams, windParams);
     // ---- transients from state changes
     if (!quiet) this.transients(r, when, edge, powder);
     // ---- grind

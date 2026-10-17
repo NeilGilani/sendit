@@ -140,6 +140,7 @@ for (const s of S) {
   if (!r.worklet && !s.noWorklet) fail(`${s.name}: worklet did not load`);
   if (s.noWorklet && (r.worklet || r.rmsAll < 0.003)) fail(`${s.name}: the sample-loop fallback is silent or did not engage`);
   if (r.nan) fail(`${s.name}: ${r.nan} non-finite samples`);
+  if (r.workletError) fail(`${s.name}: the worklet DSP threw (processorerror)`);
   if (r.paramNaN) fail(`${s.name}: ${r.paramNaN} non-finite parameters`);
   if (r.peak > 0.9) fail(`${s.name}: peak above −1 dBFS (${r.peak.toFixed(3)})`);
 }

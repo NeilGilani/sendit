@@ -56,6 +56,9 @@ export const AUDIO = {
     chatter: { fMin: 20, fMax: 40, boardMin: 15, boardMax: 35, depth: 0.85 },   // ski / board bending modes
     // skid / slide / hockey stop: rough scrape + thrown spray
     skid: { gain: 0.95, f: 1700, fIce: 3800, q: 0.8, rough: 0.75, roughF: 45, spray: 0.4, sprayF: 2600, stop: 1.4, from: 0.08, full: 0.7 },
+    // edge squeal when skidding hard on hard / icy snow: stick-slip makes a harmonic ladder (≈ 350–500 Hz
+    // fundamental, partials to 3 kHz) that latches on and off — heard in the French resort CC0 descent
+    squeal: { gain: 0.55, fMin: 330, fMax: 520, band: 1800, duty: 0.6 },
     // deep snow: low muffled whoosh, quieter overall, top end absorbed
     // fresh snow absorbs the highs: low-pass ≈ 600 + 40·v Hz, edge hiss −15 dB
     powder: { gain: 0.42, f0: 600, fPerV: 40, q: 0.55, hp: 110, shh: 0.9, sinkBoost: 1.6, absorbF: 2600, absorbMax: 0.85 },
