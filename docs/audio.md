@@ -22,7 +22,7 @@ the numbers and the comparisons with real recordings are in `docs/audio-research
 | `web/src/audio/breath.js` | The rider's breathing: an exertion meter, catching breath after hard runs, and huffs on crashes. |
 | `web/src/audio/tuning.js` | Every parameter, in one place. |
 | `web/src/audio/harness.{html,js}` | Offline render and analysis harness for the tests. Dev only; nothing imports it. |
-| `web/scripts/audio-test.mjs` | Headless test that renders ~35 scripted rides and checks levels, clipping, NaNs and sound-design relations, optionally writing WAVs. |
+| `web/scripts/audio-test.mjs` | Headless test that renders ~45 scenarios (41 scripted plus 3 real-physics traces) and checks levels, clipping, NaNs, worklet errors and 24 sound-design relations, optionally writing WAVs. |
 | `web/scripts/audio-dsp.mjs` | Runs the worklet DSP directly in Node (AudioWorklet shim): checks raw processor output for NaNs, blow-ups and headroom (peaks must stay under the 0.7 safety knee). Takes seconds. |
 | `web/scripts/audio-trace.mjs` | Records real-physics rides (skis and board) as rider-frame traces for the test. |
 | `web/scripts/audio-compare.mjs` | Octave-band, centroid and modulation comparison of recordings and renders. |
