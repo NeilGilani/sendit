@@ -58,6 +58,7 @@ async function render(spec, sr, secs) {
     if (spec.others) eng.others.update(t, spec.others.map((o) => { const s = othersAt(o, t); return { mesh: { visible: true, position: s }, speed: s.speed, roll: s.roll }; }), { x: 0, y: 0, z: 0 }, true);
   }
   const buf = await ctx.startRendering();
+  await new Promise((r) => setTimeout(r, 100));   // let the worklet's port messages (event counts) arrive
   const L = buf.getChannelData(0), R = buf.getChannelData(1);
   const win = Math.floor(sr * (spec.window || 0.1));
   let peak = 0, nan = 0, sum = 0;

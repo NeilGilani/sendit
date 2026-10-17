@@ -22,6 +22,7 @@ the numbers and the comparisons with real recordings are in `docs/audio-research
 | `web/src/audio/tuning.js` | Every parameter, in one place. |
 | `web/src/audio/harness.{html,js}` | Offline render and analysis harness for the tests. Dev only; nothing imports it. |
 | `web/scripts/audio-test.mjs` | Headless test that renders ~25 scripted rides and checks levels, clipping, NaNs and sound-design relations, optionally writing WAVs. |
+| `web/scripts/audio-dsp.mjs` | Runs the worklet DSP directly in Node (AudioWorklet shim): checks raw processor output for NaNs, blow-ups and headroom (peaks must stay under the 0.7 safety knee). Takes seconds. |
 | `web/scripts/audio-trace.mjs` | Records real-physics rides (skis and board) as rider-frame traces for the test. |
 | `web/scripts/audio-compare.mjs` | Octave-band, centroid and modulation comparison of recordings and renders. |
 | `web/scripts/audio-spectrogram.mjs` | Log-frequency spectrogram PNGs of recordings and renders, for comparing time structure. |
@@ -126,6 +127,11 @@ mountain drops in pitch with time.
 - **First person versus chase (`AUDIO.perspective`):** `settings.view === 'fp'` gives the full helmet wind
   (buffet, whistles, flap) and the full low end of the snow. The chase cam hears the snow from a little further
   away (×0.85, less low end), and the wind ×0.75 with little buffeting.
+- **Headroom inside the worklets:** the processors run at a low internal level (`snow.out` 0.25, `wind.out`
+  0.227) with matching bus gains (`mix.snow` 3.24, `mix.wind` 3.0). Their output passes a soft safety knee
+  (linear to ±0.7, tanh above), never a hard clamp. `audio-dsp.mjs` checks that ordinary riding never reaches the
+  knee. An earlier build hard-clipped at ±1 inside the worklet in hockey stops, ice and 30 m/s wind; the downstream
+  gains hid it, and this test caught it.
 - **No clipping:**
   - the glue compressor is gentle on purpose, because Chrome's compressor adds make-up gain that would lift the
     quiet moments;
@@ -157,6 +163,7 @@ same parameters. The one-shots, grinds and ambience still work.
 
 ```
 npm --prefix web run dev -- --port 5192 --strictPort
+node web/scripts/audio-dsp.mjs                             # the worklet DSP alone, in Node (fast)
 node web/scripts/audio-trace.mjs <dir>                     # real-physics traces (optional)
 node web/scripts/audio-test.mjs http://localhost:5192/ [wavDir|-] [traceDir|-] [filter]
 BANDS=1 …                                                  # print octave bands per scenario

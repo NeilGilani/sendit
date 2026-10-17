@@ -11,6 +11,8 @@ const TAU = Math.PI * 2;
 const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
+/** Last-resort safety on the processor output: linear to ±0.7, then a tanh knee to ±1 (never a hard clip). */
+const safe = (x) => { const a = x < 0 ? -x : x; if (a <= 0.7) return x; const y = 0.7 + 0.3 * Math.tanh((a - 0.7) / 0.3); return x < 0 ? -y : y; };
 
 class Rng {
   constructor(seed) { this.s = (seed >>> 0) || 0x9e3779b9; }
@@ -111,7 +113,7 @@ class SnowProcessor extends AudioWorkletProcessor {
     this.ch = [0, 1].map((c) => ({
       rng: new Rng(1234567 + c * 7919), pink: new Pink(), brown: 0,
       hiss: new SVF(), hissLP: new SVF(), powHP: new SVF(), c1: new SVF(), c2: new SVF(), growl: new SVF(), skid: new SVF(), spray: new SVF(), powder: new SVF(),
-      lowCut: new SVF(), sq: new SVF(), base: new SVF(), iceH: new SVF(), iceB: new SVF(), scr1: new SVF(), scr2: new SVF(), grain: new SVF(), absorb: 0,
+      lowCut: new SVF(), sq: new SVF(), cold: new SVF(), cold2: new SVF(), base: new SVF(), iceH: new SVF(), iceB: new SVF(), scr1: new SVF(), scr2: new SVF(), grain: new SVF(), absorb: 0,
     }));
     this.rng = new Rng(424242);
     // grains
@@ -119,6 +121,7 @@ class SnowProcessor extends AudioWorkletProcessor {
     this.rough = new SVF(); this.roughLvl = 0;
     this.cordPh = 0; this.cordJit = 1;
     this.chPh = 0; this.chF = 24; this.chAmp = 1;
+    this.ck = { on: false, t: 0, dur: 0, f: 600, f1: 600, ph: 0, rate: 60, amp: 0 };   // cold-snow squeak (one event at a time)
     this.sqPh = 0; this.sqF = 420; this.sqOn = 0; this.sqTgt = 0; this.sqT = 0;   // stick-slip squeal
     this.wob1 = 0; this.wob2 = 0; this.wobT1 = 0; this.wobT2 = 0;
     this.scrF1 = 3000; this.scrF2 = 4800;   // the edge's narrow scrape resonances on ice (random walk 2–6 kHz)
@@ -154,6 +157,10 @@ class SnowProcessor extends AudioWorkletProcessor {
     g.powder = T.powder.gain * wP * sc * (0.5 + T.powder.sinkBoost * sink) * ground;
     g.base = T.base.gain * board * sc * (1 - edge) * hard * ground * p.low;
     g.ice = T.ice.gain * wI * sc * (0.5 + edge + Math.min(1, skid)) * ground;
+    // cold snow (below about −10 °C) squeaks under the base when slow: short creaks, gone by ~12 m/s (meltwater)
+    const C = T.squeak;
+    g.squeak = C.gain * clamp(p.cold, 0, 1) * (1 - sstep(C.vFade, C.vMax, speed)) * mv * (hard + 0.3 * wP) * ground * lerp(1, 1.3, board);
+    g.squeakRate = (C.rate0 + C.rateV * speed) * mv;
     // edge squeal: stick-slip while skidding on hard / icy snow (a harmonic ladder ~350–500 Hz in the field recordings)
     g.squeal = T.squeal.gain * Math.min(1, Math.max(skid, stop)) * sstep(0.35, 0.8, edge) * (wG * 0.6 + wK * 0.6 + wI * 1.4) * sstep(1.5, 5, speed) * (1 - 0.5 * board) * ground;
     g.sqF = lerp(T.squeal.fMin, T.squeal.fMax, Math.min(1, speed / 20)) * lerp(1, 0.75, board) * clamp(p.rate, 0.25, 2);
@@ -200,7 +207,7 @@ class SnowProcessor extends AudioWorkletProcessor {
     const g = this.gains();
     const a = this.prev || g;
     this.prev = g;
-    const loud = g.texSki + g.texBoard + g.texSkid + g.squeal + g.hiss + g.carve + g.skid + g.powder + g.ice + g.base + g.growl + g.spray + g.grainAmp * Math.min(1, g.grainRate / 500);
+    const loud = g.squeak + g.texSki + g.texBoard + g.texSkid + g.squeal + g.hiss + g.carve + g.skid + g.powder + g.ice + g.base + g.growl + g.spray + g.grainAmp * Math.min(1, g.grainRate / 500);
     if (loud < 1e-5 && this.active <= 0) { L.fill(0); if (R !== L) R.fill(0); return true; }
     this.active = loud > 1e-5 ? fs * 0.3 : this.active - n;   // keep running for a tail after it falls silent
     // slow wobble of the carve bands (random walk toward new targets)
@@ -239,6 +246,24 @@ class SnowProcessor extends AudioWorkletProcessor {
       const skid = a.skid * it + g.skid * t, spray = a.spray * it + g.spray * t, powder = a.powder * it + g.powder * t;
       const base = a.base * it + g.base * t, ice = a.ice * it + g.ice * t, grainAmp = a.grainAmp * it + g.grainAmp * t;
       const squeal = (a.squeal ?? 0) * it + g.squeal * t;
+      // cold squeak: Poisson creaks — stick-slip pulse trains (40–90 Hz) through a narrow gliding resonance
+      const ck = this.ck;
+      let ckS = 0;
+      if (!ck.on && g.squeak > 1e-4 && this.rng.u() < g.squeakRate / fs) {
+        const Q = T.squeak;
+        ck.on = true; ck.t = 0; ck.dur = lerp(Q.durMin, Q.durMax, this.rng.u()); ck.f = lerp(Q.fMin, Q.fMax, this.rng.u()); ck.f1 = ck.f * (0.85 + 0.3 * this.rng.u());
+        ck.rate = 40 + 50 * this.rng.u(); ck.amp = 0.4 + 0.6 * this.rng.u(); ck.ph = 0; ck.pe = 0;
+        this.port.postMessage({ squeak: 1 });   // counted by the engine (stats / tests)
+      }
+      if (ck.on) {
+        const x = ck.t / ck.dur, env = Math.pow(Math.sin(Math.PI * x), 1.5);
+        ck.ph += ck.rate / fs;
+        if (ck.ph >= 1) { ck.ph -= 1; ck.pe = 1; }
+        ck.pe *= this.ckDec || (this.ckDec = Math.exp(-1 / (0.004 * fs)));   // each stick-slip jerk decays in ~4 ms
+        if ((i & 31) === 0) for (const c of this.ch) { const f = lerp(ck.f, ck.f1, x); c.cold.set(f, T.squeak.q, fs); c.cold2.set(f * 1.04, T.squeak.q, fs); }
+        ckS = this.rng.bi() * (0.3 + 0.7 * ck.pe) * env * ck.amp * g.squeak;   // creaky noise, not a buzz
+        if (++ck.t >= ck.dur * fs) ck.on = false;
+      }
       const tSki = a.texSki * it + g.texSki * t, tBoard = a.texBoard * it + g.texBoard * t, tSkid = a.texSkid * it + g.texSkid * t;
       this.tex.ski.tick(tSki, g.texRate, fs, width); this.tex.board.tick(tBoard, g.texRate, fs, width); this.tex.skid.tick(tSkid, g.texRate * (1.15 - 0.25 * g.board), fs, width);
       const texL = this.tex.ski.l + this.tex.board.l + this.tex.skid.l, texR = this.tex.ski.r + this.tex.board.r + this.tex.skid.r;
@@ -284,6 +309,7 @@ class SnowProcessor extends AudioWorkletProcessor {
         s += (c.c1.bp(w) * 1.3 + c.c2.bp(w)) * carve * chatAM;
         s += c.growl.bp(br) * growl * 1.6;
         s += c.sq.bp(sqS) * (ci === 0 ? 1 : 0.85);
+        if (ckS) s += c.cold2.bp(c.cold.bp(ckS)) * (ci === 0 ? 2.7 : 3);   // two band-passes: steep skirts, a squeak not a hiss
         s += c.skid.bp(w) * skid * roughEnv * chatAM + c.spray.lp(pk) * spray * roughEnv;
         s += c.powder.lp(c.powHP.hp(br + pk * T.powder.shh)) * powder * 1.5;
         s += c.base.bp(br) * base * 3.0;
@@ -295,8 +321,8 @@ class SnowProcessor extends AudioWorkletProcessor {
         if (ci === 0) this._l = c.absorb; else this._r = c.absorb;
       }
       const m = (this._l + this._r) * 0.5, sd = (this._l - this._r) * 0.5 * width;
-      L[i] = clamp((m + sd) * outG, -1, 1);
-      if (R !== L) R[i] = clamp((m - sd) * outG, -1, 1);
+      L[i] = safe((m + sd) * outG);
+      if (R !== L) R[i] = safe((m - sd) * outG);
     }
     return true;
   }
@@ -409,7 +435,7 @@ class WindProcessor extends AudioWorkletProcessor {
         s += c.hi.bp(w) * hi * ear * (ci === 0 ? earL : earR) * (1 + (whoosh - 1) * 1.5) + c.hi.bp(pk) * T.spin.air * spin * pz;
         s += (c.w1.bp(w) * wh1 + c.w2.bp(w) * wh2) * 6;
         s += c.amb.bp(c.brown * 3.5) * amb * 2.2 + c.ambH.bp(pk) * ambHi;
-        const o = clamp(s * outG, -1, 1);
+        const o = safe(s * outG);
         if (ci === 0) L[i] = o; else if (R !== L) R[i] = o;
       }
     }

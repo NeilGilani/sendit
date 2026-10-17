@@ -115,6 +115,7 @@ export class AudioEngine {
         this.startLegacy();
       };
       this.snow.onprocessorerror = onErr; this.wind.onprocessorerror = onErr;
+      this.snow.port.onmessage = (e) => { if (e.data?.squeak) this.count('squeak'); };
       // field textures for the snow worklet's granular layer (mono, high-passed, RMS-normalised)
       if (this.loadBuffer) await Promise.all([['ski', 'tex_snow_ski.mp3'], ['board', 'tex_snow_board.mp3'], ['skid', 'tex_snow_skid.mp3']].map(async ([k, n]) => {
         const b = this.buffers[n] || await this.loadBuffer(n).catch(() => null);

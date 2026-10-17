@@ -5,8 +5,8 @@
 export const AUDIO = {
   // ---------------------------------------------------------------- mix (bus gains before settings volumes)
   mix: {
-    snow: 0.9,            // the snow engine (worklet)
-    wind: 0.8,            // rider wind (worklet)
+    snow: 3.24,           // the snow engine (worklet; its internal level is kept low for headroom — see snow.out)
+    wind: 3.0,            // rider wind (worklet; see wind.out)
     ambience: 0.7,        // map beds, trees, crowd
     fx: 0.85,             // one-shots: landings, whooshes, pole plants, crashes, grinds
     ui: 0.8,              // game / UI cues (gates, medals, tokens, combo)
@@ -56,6 +56,9 @@ export const AUDIO = {
     chatter: { fMin: 20, fMax: 40, boardMin: 15, boardMax: 35, depth: 0.85 },   // ski / board bending modes
     // skid / slide / hockey stop: rough scrape + thrown spray
     skid: { gain: 0.95, f: 1700, fIce: 3800, q: 0.8, rough: 0.75, roughF: 45, spray: 0.4, sprayF: 2600, stop: 1.4, from: 0.08, full: 0.7 },
+    // cold snow squeak (below ≈ −10 °C, per map `cold`): creaks of 40–160 ms at 350 Hz–1.3 kHz when slow,
+    // fading out by 12 m/s as friction melts the contact (the creaky-snow CC0 board recording, facemusic #39082)
+    squeak: { gain: 0.3, rate0: 1.5, rateV: 1.6, fMin: 350, fMax: 1300, q: 4, durMin: 0.04, durMax: 0.16, vFade: 4, vMax: 12 },
     // edge squeal when skidding hard on hard / icy snow: stick-slip makes a harmonic ladder (≈ 350–500 Hz
     // fundamental, partials to 3 kHz) that latches on and off — heard in the French resort CC0 descent
     squeal: { gain: 0.55, fMin: 330, fMax: 520, band: 1800, duty: 0.6 },
@@ -71,7 +74,7 @@ export const AUDIO = {
     // organic detail noise lacks — ski carve (Lydmakeren #567839), board glide and board skid (Nox_Sound #667729)
     tex: { ski: 3.0, board: 3.5, skid: 3.0, powder: 0.25, rate0: 0.85, rateV: 0.3, rms: 0.12 },
     width: { ski: 0.75, board: 0.25 },   // stereo spread (two skis vs one board)
-    out: 0.9,
+    out: 0.25,            // internal output level: peaks stay well under the worklet's safety limiter (audio-dsp.mjs)
   },
 
   // ---------------------------------------------------------------- wind (worklet 'sendit-wind')
@@ -93,14 +96,14 @@ export const AUDIO = {
     // airborne: snow stops, the air takes over
     air: { boost: 1.25, rushUp: 1.15 },
     // spins and flips: ears rotate through the airflow → a whoosh per half turn
-    spin: { gain: 0.6, depth: 0.75, sweep: 0.45, full: 9, pulse: 2.2, air: 0.25 },   // pulse: the half-turn whoosh (×), air: its hiss
+    spin: { gain: 0.6, depth: 0.75, sweep: 0.45, full: 9, pulse: 1.4, air: 0.15 },   // pulse: the half-turn whoosh (×), air: its hiss
     // jacket / pants flapping in the airflow (from ~12 m/s): AM 8–25 Hz rising with speed, 200–600 Hz band
     flap: { gain: 0.3, from: 11, full: 24, f0: 8, fPerV: 0.55, f: 380, q: 0.9 },
     // tucked: the body shields the head (lee of a windscreen measures 8–9 dB): rush −6 dB, darker
     tuck: { rush: 0.5, lp: 0.4, flap: 0.5 },
     // map ambience wind (independent of the rider): distant, over ridges
     ambient: { gain: 0.35, f: 650, q: 0.5, hiss: 0.4, hissF: 1800 },   // alpine gust reference: flat to 2 kHz
-    out: 0.85,
+    out: 0.227,           // internal output level (×3.0 on the bus): headroom inside the worklet
   },
 
   // ---------------------------------------------------------------- one-shots
@@ -109,7 +112,7 @@ export const AUDIO = {
     edgeChange: { gain: 0.35, minSpeed: 4, minGap: 0.35 },
     slash: { gain: 0.55, minSpeed: 6, edge: 0.6, skid: 0.12, minGap: 0.6 },
     takeoff: { gain: 0.45, swell: 0.35 },   // swell: the air rushing in as the snow falls away
-    landing: { gain: 1.1, crack: 0.9, thump: 0.6, crunch: 0.45, debris: 22, spray: 0.6, slap: 0.6 },   // shaped on CC0 snow impacts
+    landing: { gain: 1.5, crack: 0.9, thump: 0.6, crunch: 0.45, debris: 22, spray: 0.6, slap: 0.6 },   // shaped on CC0 snow impacts
     grab: { gain: 0.28 },
     crash: { gain: 0.8 },
     nearMiss: { gain: 0.55 },
