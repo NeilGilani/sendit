@@ -22,6 +22,7 @@ import { getEquipmentSpec, normalizeType } from './equipment/registry.js';
 import { dressRider, HEAD_SCALE, OUTFIT_SLOTS } from './character/index.js';
 import { outfitSlotsFromProfile } from './character/profile.js';
 import { proportionRig } from './character/body.js';
+import { fpSkiArm, fpPoleDir, fpProtract, fpHand, fpShadow } from './fpview.js';
 
 const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4(), _v1 = new THREE.Vector3();
@@ -338,6 +339,7 @@ export class Rider {
     if (p.sit > 0.01) this.gearToFeet(p.sit);
     this.placePoles(pl);
     this.root.updateMatrixWorld(true);
+    fpShadow(this);   // first person: shadow-only helmet / head (the head bone is collapsed)
     this.updateContacts(pl);
     void camera;
   }
@@ -684,6 +686,7 @@ export class Rider {
     const B = this.bones, s = side > 0 ? '_l' : '_r';
     const upper = B['upperarm' + s], lower = B['lowerarm' + s], hand = B['hand' + s];
     this.inherit(B['clavicle' + s]);
+    if (this.fp) fpProtract(this, side);   // first person: shoulders forward so the gloves reach into view
     this.inherit(upper);
     this.aim(upper, lower, u);
     this.inherit(lower);
@@ -736,9 +739,10 @@ export class Rider {
     this.armSpin(side, u, l, 1 - g);
     this.armGrind(side, u, l, 1 - g);
     [u, l] = this.armOverlays(side, u, l);
+    if (this.fp) [u, l] = fpSkiArm(this, side, pl, u, l);   // first person: gloves framed in view (fpview.js)
     this.armAim(side, u, l);
     // First person: turn the gloves into a pole grip (palms in, knuckles forward).
-    if (this.fp) this.rotateGlobal(this.bones['hand' + (side > 0 ? '_l' : '_r')], new THREE.Quaternion().setFromAxisAngle(Z, side * 1.35).multiply(new THREE.Quaternion().setFromAxisAngle(X, 0.5)));
+    if (this.fp) fpHand(this, side, true);
   }
 
   /**
@@ -831,11 +835,12 @@ export class Rider {
     const hand = new THREE.Vector3(), dir = new THREE.Vector3(), q = new THREE.Quaternion();
     const down = new THREE.Vector3(0, -1, 0);
     [['hand_l', -1], ['hand_r', 1]].forEach(([name, sx], i) => {
-      this.bones[name].getWorldPosition(hand);
+      if (this.fp) this.bones[name].localToWorld(hand.set(0, 0.075, 0.012));   // first person: the grip sits in the fist, not at the wrist
+      else this.bones[name].getWorldPosition(hand);
       this.visual.worldToLocal(hand);
       const plant = p.plant[i];
       dir.set(sx * 0.16, -1, 0.42 - plant * 0.9).normalize();
-      if (this.fp) dir.set(sx * 0.3, -1, -0.12 - plant * 0.5).normalize();   // first person: shafts drop away just outside the gloves
+      if (this.fp) fpPoleDir(this, i, sx, dir);   // first person: shafts angled out past the gloves (fpview.js)
       if (p.push > 0.01) { const ph = p.pushPhase || 0; dir.lerp(new THREE.Vector3(sx * 0.1, -1, ph < 0.4 ? 0.1 : 0.55 + (ph - 0.4)), p.push).normalize(); }
       dir.lerp(new THREE.Vector3(sx * 0.08, -0.3, 1).normalize(), p.tuck).normalize();
       dir.lerp(new THREE.Vector3(sx * 0.6, -0.4, 0.3).normalize(), p.air * 0.5).normalize();
