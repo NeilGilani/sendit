@@ -61,6 +61,7 @@ export const progression = {
  */
 export function trackProgression({ player, getMapId }) {
   const P = C();
+  if (typeof window !== 'undefined') window.__progression = progression;   // debug / screenshot handle
   let lastDist = 0, speedT = 0, open = false;
   const start = () => { if (open) P.endRide(); P.startRide(getMapId()); open = true; lastDist = game.distance || 0; };
   const end = () => { if (!open) return null; open = false; return P.endRide(); };

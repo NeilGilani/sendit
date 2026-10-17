@@ -7,13 +7,13 @@
 // installJuice() is called once by main.js after the systems exist; main.js calls juice.update() per
 // frame and multiplies the physics clock by juice.timeScale(dt).
 import { ComboTracker } from './combo.js';
-import { mountJuiceHud } from './hud.js';
+import { mountJuiceHud, gradeOf } from './hud.js';
 import { TimeWarp, installImpact } from './impact.js';
 import { installSpeedFx } from './speedfx.js';
 import { MusicEnergy } from './music.js';
 import { game, Mode, on } from '../state.js';
 
-export function installJuice({ player, cam, sound, input, post, camera }) {
+export function installJuice({ player, cam, sound, input, post, camera, fx }) {
   const combo = new ComboTracker(player);
   const warp = new TimeWarp();
   const hud = typeof document !== 'undefined' ? mountJuiceHud({ player, combo, input }) : null;
@@ -36,7 +36,11 @@ export function installJuice({ player, cam, sound, input, post, camera }) {
   };
   // Boost pulses for the rush lines.
   on('landed', (e) => {
-    if (!speedfx || !e.clean || e.result === 'crash') return;
+    if (!e.clean || e.result === 'crash') return;
+    // A stomp throws an extra ring of snow (the landing spray itself is fx.js's).
+    const g = gradeOf(e);
+    if ((g === 'stomped' || g === 'perfect') && (e.trick || e.air > 1)) fx?.burst?.(player.renderPos, g === 'stomped' ? 46 : 30, g === 'stomped' ? 5.5 : 4);
+    if (!speedfx) return;
     const huge = /720|900|1080|flip|cork|misty|rodeo|wildcat|tamedog/i.test(e.trick || '') || e.air >= 2;
     if (huge) speedfx.pulse('huge');
     else if (e.perfect && (e.trick || e.air > 1)) speedfx.pulse('stomp');

@@ -33,7 +33,7 @@ await page.waitForFunction(() => window.__sendit.game.mode === 1 && window.__sen
 await page.waitForTimeout(2500);
 
 // A spin off the kicker (scripted controls: the trick system's own input path, see jumps-shots.mjs).
-const ride = async (trick, spinDir = -1) => page.evaluate(({ k: ki, trick, spinDir }) => {
+const ride = async (trick, spinDir = -1, turns = 1.5) => page.evaluate(({ k: ki, trick, spinDir, turns }) => {
   const s = window.__sendit, pl = s.player, k = s.features.kickers[ki] || s.features.kickers[0];
   pl.place({ x: k.o.x - k.f.x * 25, z: k.o.y - k.f.y * 25 }, Math.atan2(-k.f.x, -k.f.y));
   pl.velocity.copy(pl.forward()).multiplyScalar(14);
@@ -44,20 +44,23 @@ const ride = async (trick, spinDir = -1) => page.evaluate(({ k: ki, trick, spinD
       const dx = p.position.x - k.o.x, dz = p.position.z - k.o.y, a = dx * k.f.x + dz * k.f.y;
       const aNext = a + (p.velocity.x * k.f.x + p.velocity.z * k.f.y) * (1 / 60) * 1.5;
       c.jump = a > -10 && aNext < k.L;
-      if (trick !== 'spin') c.brake = a > -6 && aNext < k.L ? 1 : 0;
-      if (trick !== 'backflip') c.steer = a > k.L - 3 && aNext < k.L ? spinDir : 0;
+      if (trick === 'backflip') c.brake = a > -6 && aNext < k.L ? 1 : 0;
+      if (trick !== 'backflip' && trick !== 'grab') c.steer = a > k.L - 3 && aNext < k.L ? spinDir : 0;
     } else if (p.state === 2) {
       window.__done = true; window.__ph = 'air';
       const tl = p.dyn.timeToLand();
+      if (trick === 'grab') { if (p.airTime > 0.25 && p.dyn.timeToLand() > 0.35) c.tuck = 1; return; }
       if (trick !== 'spin' && (p.airTime < 0.12 || Math.abs(p.flip) + Math.abs(p.flipRate) * 0.2 + Math.abs(p.dyn.flipH) * Math.max(0, tl - 0.2) < TAU)) c.brake = 1;
-      if (trick !== 'backflip' && (p.airTime < 0.12 || Math.abs(p._spinTotal) + Math.abs(p.spinRate) * 0.15 + Math.abs(p.dyn.spinH) * 0.6 * Math.max(0, tl - 0.15) < TAU * 1.5)) c.steer = spinDir;
-      if (p.airTime > 0.3) c.tuck = 1;   // grab
+      if (trick !== 'backflip' && (p.airTime < 0.12 || Math.abs(p._spinTotal) + Math.abs(p.spinRate) * 0.15 + Math.abs(p.dyn.spinH) * 0.6 * Math.max(0, tl - 0.15) < TAU * turns)) c.steer = spinDir;
+      if (p.airTime > 0.3 && p.dyn.timeToLand() > 0.35) c.tuck = 1;   // grab, let go to land
     } else if (window.__done) { window.__ph = 'landed'; pl.script = null; }
   };
-}, { k: Number(kick), trick, spinDir });
+}, { k: Number(kick), trick, spinDir, turns });
 
-for (const [i, trick] of ['spin', 'backflip'].entries()) {
-  await ride(trick, i ? 1 : -1);
+const TRICKS = (process.env.TRICKS || 'spin:1,grab,spin:0.5').split(',');
+for (const [i, tk] of TRICKS.entries()) {
+  const [trick, turns] = tk.split(':');
+  await ride(trick, i % 2 ? 1 : -1, Number(turns || 1));
   await page.waitForFunction(() => window.__ph === 'air' && window.__sendit.player.airTime > 0.75, null, { timeout: 30000 }).catch(() => {});
   await shot(`${i + 1}-air-${trick}`);
   await page.waitForFunction(() => window.__ph === 'landed' || window.__sendit.player.state === 3, null, { timeout: 30000 }).catch(() => {});
@@ -79,7 +82,7 @@ await shot('4-speed-rush');
 
 // Progression celebrations: a level-up and the toasts (driven through the public API / bus).
 await page.evaluate(async () => {
-  const { progression } = await import('/src/progression/index.js');
+  const progression = window.__progression;   // the app's instance (a dynamic import may get a fresh copy)
   const p = progression.getProgress();
   progression.addXP(p.need - p.into + 5, 'screenshot');
 });
@@ -93,5 +96,10 @@ await page.evaluate(async () => {
 });
 await page.waitForTimeout(900);
 await shot('6-toasts');
+// Pause screen (level + dailies), then back to the lobby for the ride recap.
+await page.evaluate(() => { document.exitPointerLock?.(); window.__sendit.ui.h.menu(); });
+await page.waitForFunction(() => window.__sendit.game.mode === 0, null, { timeout: 60000 }).catch(() => {});
+await page.waitForTimeout(2200);
+await shot('7-lobby-recap');
 console.log('errors', errors);
 await browser.close();

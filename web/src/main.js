@@ -171,7 +171,7 @@ async function boot() {
   sound = new SoundScape(player, terrain);
 
   setupPost();
-  juice = installJuice({ player, cam, sound, input, post, camera });
+  juice = installJuice({ player, cam, sound, input, post, camera, fx });
   progressUpdate = trackProgression({ player, getMapId: () => currentMap?.map.id ?? 'unknown' });
   mountProgressionUi({ juice });
   applyQuality();
