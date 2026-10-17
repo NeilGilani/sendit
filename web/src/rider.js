@@ -834,6 +834,17 @@ export class Rider {
       if (p.push > 0.01) { const ph = p.pushPhase || 0; dir.lerp(new THREE.Vector3(sx * 0.1, -1, ph < 0.4 ? 0.1 : 0.55 + (ph - 0.4)), p.push).normalize(); }
       dir.lerp(new THREE.Vector3(sx * 0.08, -0.3, 1).normalize(), p.tuck).normalize();
       dir.lerp(new THREE.Vector3(sx * 0.6, -0.4, 0.3).normalize(), p.air * 0.5).normalize();
+      // The tip rests on the snow, not through it: with the hand low (deep crouch, long arms) the shaft
+      // swings further back. Snow in this (lean-rolled) frame sits at y = x · tan(lean), as for the skis.
+      if (!this.fp && p.air < 0.5) {
+        const L = this.poleLen ?? (this.poleLen = (this.poles[i].geometry.computeBoundingBox(), -this.poles[i].geometry.boundingBox.min.y));
+        const snowY = (hand.x + dir.x * L) * Math.tan(p.lean) - 0.04;
+        const maxDown = (hand.y - snowY) / L;
+        if (-dir.y > maxDown && maxDown > 0.15) {
+          const h = Math.hypot(dir.x, dir.z), c = Math.sqrt(1 - maxDown * maxDown);
+          dir.set(dir.x / h * c, -maxDown, dir.z / h * c);
+        }
+      }
       this.poles[i].position.copy(hand);
       this.poles[i].quaternion.copy(q.setFromUnitVectors(down, dir));
       this.poles[i].visible = p.sit < 0.5;
