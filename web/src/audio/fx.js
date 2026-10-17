@@ -41,7 +41,7 @@ export class FX {
    */
   noise(when, o) {
     const c = this.ctx, src = c.createBufferSource();
-    src.buffer = this[o.buf || 'white'];
+    src.buffer = this[o.buf || 'white']; src.loop = true;   // looped: a long sound never runs off the 2 s buffer
     const dur = (o.attack ?? 0.002) + (o.hold ?? 0) + (o.decay ?? 0.1);
     const f = c.createBiquadFilter(); f.type = o.type || 'bandpass'; f.Q.value = o.q ?? 1;
     f.frequency.setValueAtTime(o.f ?? 1000, when);
@@ -55,7 +55,7 @@ export class FX {
     if (o.type2) { const f2 = c.createBiquadFilter(); f2.type = o.type2; f2.frequency.value = o.ff2 ?? 4000; f2.Q.value = o.q2 ?? 0.7; f.connect(f2); node = f2; }
     src.connect(f); node.connect(g); g.connect(this.dest(o.pan, o.out));
     src.start(when, Math.random() * 1.5);
-    src.stop(when + dur + 0.05);
+    src.stop(when + dur + (o.decay ?? 0.1) * 0.8 + 0.05);   // stop once the tail is ~−60 dB (no click)
     return g;
   }
 
@@ -80,7 +80,7 @@ export class FX {
       o.frequency.value = f * rnd(0.985, 1.015);
       g.gain.setValueAtTime(0, when); g.gain.linearRampToValueAtTime(gain * a, when + 0.002);
       g.gain.setTargetAtTime(0, when + 0.002, dec / 4);
-      o.connect(g); g.connect(d); o.start(when); o.stop(when + dec + 0.05);
+      o.connect(g); g.connect(d); o.start(when); o.stop(when + dec * 1.6 + 0.05);   // tail at ~−55 dB before the stop
     }
   }
 
