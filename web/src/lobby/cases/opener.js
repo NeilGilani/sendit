@@ -158,9 +158,15 @@ class Opener {
           this.ticks.push(+t.toFixed(3));
           this.el.querySelector('.cr-marker').classList.remove('tk'); void this.el.offsetWidth; this.el.querySelector('.cr-marker').classList.add('tk');
         }
-        // The near miss: the rare card crawling past (or toward) the marker.
-        const nm = this.result.reel.nearMiss;
-        if (nm && k > 0.6 && Math.abs(cell - (this.result.reel.winAt + nm.side)) <= 0) caseSfx.tease();
+        // A red or ★ card sliding under the marker in the slow part: the marker flashes its colour and
+        // a soft shimmer plays (the near-miss teaser next to the winner gets the same treatment).
+        const under = this.result.reel.cards[cell];
+        if (under && k > 0.25 && cell !== this.result.reel.winAt && (under.rarity === 'legendary' || under.rarity === 'gold')) {
+          caseSfx.tease();
+          const m = this.el.querySelector('.cr-marker');
+          m.style.setProperty('--mk', rarityOf(under.rarity).color);
+          m.classList.remove('hot'); void m.offsetWidth; m.classList.add('hot');
+        }
         this.lastCell = cell;
       }
       if (k > 0.55 && !this.tense) { this.tense = true; this.el.classList.add('tense'); }

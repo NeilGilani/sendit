@@ -66,6 +66,8 @@
 .cr-marker::after { top: 0; border-top-color: #ffe55a; }
 .cr-marker i { bottom: 0; border-bottom-color: #ffe55a; }
 .cr-marker.tk::before { animation: crTick .09s ease-out; }
+.cr-marker.hot::before { animation: crHot .6s ease-out; }
+@keyframes crHot { 0% { background: var(--mk); box-shadow: 0 0 22px var(--mk), 0 0 50px var(--mk); } }
 /* The crawl: the marker breathes while the reel decides. */
 .cr-overlay.tense:not(.landed) .cr-marker::before { animation: crTense .7s ease-in-out infinite; }
 @keyframes crTense { 50% { box-shadow: 0 0 18px #fff3a0, 0 0 46px rgba(255, 229, 90, .9); } }
