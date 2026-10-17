@@ -42,6 +42,7 @@ export class AudioEngine {
     this.ctx = ctx;
     this.T = AUDIO;
     this.buffers = o.buffers || {};
+    this.loadBuffer = o.load || null;
     this.workletUrl = o.workletUrl || WORKLET_URL;
     this.mapId = 'default';
     this.view = 'chase';
@@ -90,6 +91,8 @@ export class AudioEngine {
     } catch (e) {
       console.warn('[audio] worklet unavailable, using sample loops', e);
       this.worklet = false;
+      const names = ['snow_powder', 'snow_groomed', 'snow_carve', 'snow_ice', 'wind_speed', 'wind_ambient'];
+      if (this.loadBuffer) await Promise.all(names.map(async (n) => { this.buffers[n] ||= await this.loadBuffer(n); }));
       this.legacy = new LegacyLoops(c, this.snowBus, this.windBus, this.buffers);
     }
     this.grind = new Grind(c, this.fxBus, this.fx, this.T.fx.grind, this.buffers.grind_loop);

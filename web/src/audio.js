@@ -9,8 +9,7 @@ import { game, Mode, on, settings } from './state.js';
 import { AudioEngine } from './audio/engine.js';
 import { readRider } from './audio/rider.js';
 
-const BUFFERS = ['music_golden_hour', 'music_upbeat', 'bird_1', 'bird_2', 'bird_3', 'bird_4', 'grind_loop', 'jump_pop',
-  'snow_powder', 'snow_groomed', 'snow_carve', 'snow_ice', 'wind_speed', 'wind_ambient'];
+const BUFFERS = ['music_golden_hour', 'music_upbeat', 'bird_1', 'bird_2', 'bird_3', 'bird_4', 'grind_loop', 'jump_pop'];
 const _f = new THREE.Vector3();
 
 export class SoundScape {
@@ -31,7 +30,7 @@ export class SoundScape {
     window.__senditAudio = this;   // debug handle; also tells the park HUD that grinds are handled here
     const bufs = await Promise.all(BUFFERS.map((n) => this.load(n)));
     this.buf = Object.fromEntries(BUFFERS.map((n, i) => [n, bufs[i]]));
-    this.engine = await new AudioEngine(c, { buffers: this.buf }).init();
+    this.engine = await new AudioEngine(c, { buffers: this.buf, load: (n) => this.load(n) }).init();   // load: the no-worklet fallback's loops
     this.engine.setMap(this.mapId || window.__sendit?.map?.map?.id || 'default');
     this.sfx = this.engine.uiBus;   // game cues (gates, tokens, medals…) and main.js UI clicks
     this.applyVolumes();
