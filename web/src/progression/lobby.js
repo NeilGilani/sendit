@@ -3,7 +3,7 @@
 // added next to the chip's text; the lobby's own markup is not edited).
 import { registerLobbyTab } from '../lobby/tabs.js';
 import { on, game, Mode } from '../state.js';
-import { progression, PB_STATS, XP_SOURCES } from './index.js';
+import { progression, PB_STATS, XP_SOURCES, nextRank, rankEmblem } from './index.js';
 import { fmtVal } from './ui.js';
 
 const ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2.5L5 13.5h6l-1 8 8-11h-6z"/></svg>';
@@ -17,7 +17,14 @@ const CSS = /* css */`
   color: var(--lb-navy); background: conic-gradient(var(--rc) calc(var(--p) * 1%), rgba(255,255,255,0.18) 0); position: relative; }
 .pg-num::before { content: ''; position: absolute; inset: 0.22em; border-radius: 50%; background: #fffaf0; }
 .pg-num span { position: relative; }
-.pg-rank { font-weight: 900; font-style: italic; font-size: 1.15em; color: var(--rc); letter-spacing: 0.04em; }
+.pg-rank { font-weight: 900; font-style: italic; font-size: 1.15em; color: var(--rc); letter-spacing: 0.04em; display: flex; align-items: center; gap: 0.3em; }
+.pg-rank svg { flex: none; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--rc) 60%, transparent)); }
+.pg-rank { flex-wrap: wrap; }
+.pg-rank small { flex-basis: 100%; font-size: 0.62em; font-style: normal; letter-spacing: 0.02em; color: var(--lb-dim); font-weight: 700; }
+.pg-badge svg { width: 1.05em; height: 1.05em; vertical-align: -0.15em; margin-right: 0.15em; }
+#lobby .lb-ride.pg-bonus { animation: pgRide 1.6s ease-in-out infinite alternate; }
+#lobby .lb-ride.pg-bonus:hover, #lobby .lb-ride.pg-bonus:focus-visible, #lobby .lb-ride.pg-bonus:active { animation: none; }
+@keyframes pgRide { from { box-shadow: 0.18em 0.18em 0 var(--lb-navy), 0 12px 40px rgba(47,245,214,0.35); } to { box-shadow: 0.18em 0.18em 0 var(--lb-navy), 0 0 30px 6px rgba(255,211,77,0.6); } }
 .pg-xp { font-size: 0.8em; color: var(--lb-dim); }
 .pg-bar { height: 0.42em; border-radius: 1em; background: rgba(255,255,255,0.12); overflow: hidden; margin-top: 0.35em; }
 .pg-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--lb-cyan), #7a5cff); border-radius: 1em; }
@@ -94,6 +101,7 @@ registerLobbyTab({
       const mapId = ctx.maps?.current?.()?.map?.id;
       const pb = mapId ? progression.getPersonalBests(mapId) : {};
       const rr = progression.rerollsLeft();
+      const nr = nextRank(p.level);
       const book = progression.getTrickBook();
       const wk = progression.getWeekly();
       el.innerHTML = `
@@ -101,7 +109,7 @@ registerLobbyTab({
         <p class="lp-sub">Level up by riding: style points, distance, dailies and achievements all give XP.</p>
         <div class="pg-lvl" style="--rc:${p.rank.color};--p:${pct.toFixed(1)}">
           <div class="pg-num"><span>${p.level}</span></div>
-          <div class="pg-rank">${esc(p.rank.name.toUpperCase())}</div>
+          <div class="pg-rank">${rankEmblem(p.level, 20)} ${esc(p.rank.name.toUpperCase())}${nr ? `<small> · ${esc(nr.name)} at level ${nr.from}</small>` : ''}</div>
           <div><div class="pg-xp">${n(p.into)} / ${n(p.need)} XP to level ${p.level + 1} · ${n(p.xp)} total</div><div class="pg-bar"><i style="width:${pct.toFixed(1)}%"></i></div></div>
         </div>
         <div class="pg-h">Daily challenges <small>new in ${untilMidnight()}</small></div>
@@ -157,6 +165,7 @@ function todayWidget() {
   const list = progression.getChallenges();
   const left = list.filter((c) => !c.done).length;
   const bonus = progression.dailyBonusLeft();
+  lobby.querySelector('.lb-ride')?.classList.toggle('pg-bonus', bonus > 0);   // the day's 2× XP is waiting
   el.innerHTML = `<b>${left ? 'TODAY' : 'ALL DAILIES DONE'}</b>${bonus > 0 ? `<div class="row bonus"><i class="ring" style="--p:${(100 - (bonus / XP_SOURCES.dailyBonus) * 100).toFixed(0)}"></i><span>2× XP on your next ${n(bonus)} XP</span></div>` : ''}${list.map((c) => `
     <div class="row${c.done ? ' done' : ''}"><i class="ring" style="--p:${Math.min(100, (c.value / c.goal) * 100).toFixed(0)}"></i><span>${esc(c.title)}</span>${c.done ? '' : `<em>+${n(c.xp)}</em>`}</div>`).join('')}`;
   return true;
@@ -178,7 +187,7 @@ function chipWidget() {
     chip.querySelector('.lb-chip-text')?.appendChild(bar);
   }
   const p = progression.getProgress();
-  badge.textContent = `LV ${p.level}`;
+  badge.innerHTML = `${rankEmblem(p.level, 14)}LV ${p.level}`;
   badge.style.setProperty('--rc', p.rank.color);
   badge.title = `${p.rank.name} · ${p.into} / ${p.need} XP`;
   const i = chip.querySelector('.pg-chipbar i');

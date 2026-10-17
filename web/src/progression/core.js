@@ -28,6 +28,18 @@ export const RANKS = [
   { from: 60, name: 'Mountain God', color: '#ff9a3d' },
 ];
 
+/** The rank after `level`'s, or null at the top. */
+export function nextRank(level) { return RANKS.find((r) => r.from > level) || null; }
+
+/** Rank emblem (inline SVG, currentColor): one chevron per rank tier, a star on top for the last two. */
+export function rankEmblem(level, size = 18) {
+  const tier = RANKS.filter((r) => level >= r.from).length;   // 1..6
+  const chev = Math.min(tier, 4);
+  const paths = Array.from({ length: chev }, (_, i) => `<path d="M4 ${17 - i * 4}l8-4 8 4" />`).join('');
+  const star = tier >= 5 ? '<path d="M12 1.5l1.2 2.5 2.7.3-2 1.8.6 2.6L12 7.4 9.5 8.7l.6-2.6-2-1.8 2.7-.3z" fill="currentColor" stroke="none"/>' : '';
+  return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}${star}</svg>`;
+}
+
 export const xpToNext = (level) => Math.round(XP_CURVE.base * Math.pow(Math.max(1, level), XP_CURVE.exp));
 
 /** { level, into, need } for a lifetime XP total. */
