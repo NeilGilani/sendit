@@ -55,7 +55,8 @@ rock / scraped as "ice", and park on maps flagged `park`), deep-snow sink, and s
 | Skid / stop | Rough band-passed scrape (1.7 kHz, or 3.8 kHz on ice) with a lumpy envelope, plus thrown spray | Skid angle or amount; hockey stop ×1.4 |
 | Powder | Pink-and-brown whoosh, high-passed at 110 Hz, low-passed at 600 + 40·v Hz; the whole snow output also gets a low-pass that closes in deep snow | Powder weight × (0.5 + 1.6·sink) |
 | Board base / growl | Band-passed rumble at 230 Hz (flat base) and a 260 Hz growl on edge | Snowboard only |
-| Ice | High-passed, band-passed scrape at 3.8 kHz with chatter | Rock / scraped surface weight |
+| Ice | High-passed, band-passed scrape at 3.8 kHz with chatter, plus two narrow edge-scrape resonances (Q 8) wandering 2–6 kHz |
+| Edge squeal | Stick-slip in hard skids on hard or icy snow: a jittered sawtooth at 330–520 Hz (rising with speed) band-passed at 1.8 kHz, latching on and off. The resulting harmonic ladder is visible in a CC0 resort descent. | Rock / scraped surface weight |
 
 Stereo width is 0.75 for skis (two contacts, two independent noise streams) and 0.25 for a board.
 
@@ -134,6 +135,9 @@ The audio reads these events (read-only): `takeoff`, `jumped`, `landed`, `crashe
 speed on every map, and Ravenspire's gustier, louder map wind comes from `AUDIO.maps.ravenspire`.
 
 ## Fallback
+
+If a worklet processor throws (`processorerror`), the engine counts it (the test fails on it) and switches live to the sample loops, so a DSP bug can never silence the mountain.
+
 
 If AudioWorklet is unavailable, the engine falls back to the old sample loops (`snow_*`, `wind_*`), blended by the
 same parameters. The one-shots, grinds and ambience still work.
