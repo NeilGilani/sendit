@@ -6,11 +6,12 @@
 //
 // To change the schema: bump PROFILE_VERSION, add MIGRATIONS[oldVersion] that returns the upgraded
 // object, update defaultProfile(), and extend sanitize() for the new fields.
-import { SLOTS, EQUIPMENT_TYPES, DEFAULT_EQUIPMENT, getItem, defaultItemFor } from './catalog.js';
+import { SLOTS, EQUIPMENT_TYPES, DEFAULT_EQUIPMENT, getItem, defaultItemFor, defaultVariantFor, ownsVariant } from './catalog.js';
+import { defaultRewards, sanitizeRewards, grandfather } from './rewards.js';
 import { SETTINGS_KEY } from '../state.js';
 
 export const PROFILE_KEY = 'sendit.profile';
-export const PROFILE_VERSION = 1;
+export const PROFILE_VERSION = 2;
 export const DEFAULT_MAP_ID = 'valcrest-gully';
 
 /** A fresh profile with the default loadout (first default item for every slot). */
@@ -29,6 +30,9 @@ export function defaultProfile(now = Date.now()) {
       bestScore: 0, totalScore: 0, playTime: 0, lastRideAt: null,
     },
     unlocks: { items: [] },
+    // v2: earned skins and the case system (profile/rewards.js). items: { 'itemId:variantId': { at, n, seen } }
+    inventory: { items: {} },
+    rewards: defaultRewards(),
   };
 }
 
@@ -36,7 +40,7 @@ function defaultSlots() {
   const slots = {};
   for (const slot of Object.keys(SLOTS)) {
     const item = defaultItemFor(slot);
-    if (item) slots[slot] = { item: item.id, variant: item.variants[0].id };
+    if (item) slots[slot] = { item: item.id, variant: defaultVariantFor(item).id };
   }
   return slots;
 }
@@ -50,6 +54,16 @@ export const MIGRATIONS = {
     const p = defaultProfile();
     p.stats.bestScore = Number(legacy.best) || 0;
     if (legacy.settings?.resort) p.map = { id: 'lake-tahoe', variant: { resort: legacy.settings.resort, run: Number(legacy.settings.run) || 0 } };
+    p.fresh = true;   // a brand-new rider: v1 → v2 grants nothing
+    return p;
+  },
+  // v1 → v2: the case system. Everyone now starts with the plain Rental kit and earns the rest. A rider
+  // from before keeps what they were wearing (those skins go into the inventory) and gets a welcome
+  // case plus up to three cases for the riding they already did (rewards.js grandfather()).
+  1: (old) => {
+    const p = { ...old, inventory: { items: {} }, rewards: defaultRewards() };
+    if (old.fresh) { delete p.fresh; return p; }
+    grandfather(p, old);
     return p;
   },
 };
@@ -83,15 +97,25 @@ export function sanitize(p) {
   out.stats = { ...d.stats, ...(p.stats || {}) };
   out.links = { ...d.links, ...(p.links || {}) };
   out.unlocks = { items: Array.isArray(p.unlocks?.items) ? p.unlocks.items.filter((x) => typeof x === 'string') : [] };
+  out.inventory = { items: {} };
+  for (const [k, v] of Object.entries(p.inventory?.items || {})) {
+    const [id, vid] = k.split(':');
+    const item = getItem(id);
+    if (item && item.variants.some((x) => x.id === vid)) out.inventory.items[k] = { at: Number(v?.at) || 0, n: Math.max(1, Number(v?.n) || 1), seen: !!v?.seen };
+  }
+  out.rewards = sanitizeRewards(p.rewards);
+  delete out.fresh;
   out.map = p.map && typeof p.map.id === 'string' ? { id: p.map.id, variant: p.map.variant ?? null } : d.map;
   const lo = p.loadout || {};
   const slots = {};
   for (const slot of Object.keys(SLOTS)) {
     const want = lo.slots?.[slot];
     const item = want && getItem(want.item);
-    if (item && item.slot === slot) {
-      slots[slot] = { item: item.id, variant: item.variants.some((v) => v.id === want.variant) ? want.variant : item.variants[0].id };
-    } else if (d.loadout.slots[slot]) slots[slot] = d.loadout.slots[slot];
+    // Reward skins must be owned; anything else falls back to the slot's starter.
+    const variant = item && (item.variants.find((v) => v.id === want.variant) ?? defaultVariantFor(item));
+    const usable = item && item.slot === slot && (!variant.rarity && !variant.starter ? true : ownsVariant(out, item, variant));
+    if (usable) slots[slot] = { item: item.id, variant: variant.id };
+    else if (d.loadout.slots[slot]) slots[slot] = d.loadout.slots[slot];
   }
   out.loadout = { equipment: EQUIPMENT_TYPES[lo.equipment] ? lo.equipment : DEFAULT_EQUIPMENT, slots };
   if (typeof out.displayName !== 'string' || !out.displayName.trim()) out.displayName = d.displayName;

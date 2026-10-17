@@ -23,7 +23,7 @@ async function test(name, fn) {
 }
 
 // ---------------------------------------------------------------- schema
-await test('default profile is valid v1 with a full loadout', () => {
+await test('default profile is valid with a full loadout', () => {
   const p = schema.defaultProfile();
   assert.equal(p.version, schema.PROFILE_VERSION);
   assert.equal(p.loadout.equipment, 'skis');
@@ -176,6 +176,200 @@ await test('catalog: gear items point at real equipment models', () => {
   profileStore.equip('test-board-park');
   assert.equal(profileStore.gearModel('snowboard'), 'park');
   assert.equal(profileStore.gearModel('skis'), 'allmountain');
+});
+
+// ---------------------------------------------------------------- rewards: cases, odds, progression
+const rewards = await import('../src/profile/rewards.js');
+const { RARITIES } = await import('../src/profile/rarity.js');
+const { SERIES_ORDER } = await import('../src/profile/items.js');
+const OUTFIT = ['helmet', 'goggles', 'face', 'jacket', 'gloves', 'pants'];
+
+await test('rewards: a new rider owns only the plain starter kit and stock gear', () => {
+  profileStore.reset();
+  const p = profileStore.profile;
+  assert.equal(p.version, 2);
+  for (const slot of OUTFIT) {
+    const e = profileStore.equipped(slot);
+    assert.ok(e.variant.starter, `${slot} wears a starter (${e.item.id}:${e.variant.id})`);
+    assert.ok(profileStore.ownedIn(slot).every((o) => o.variant.starter), `${slot}: only starters owned`);
+  }
+  assert.equal(profileStore.equipped('jacket').variant.id, 'basic');
+  const real = (slot) => profileStore.ownedIn(slot).map((o) => o.item.id).filter((id) => !id.startsWith('test-'));   // earlier tests add test items
+  assert.deepEqual(real('skis'), ['skis-northwake-carver']);
+  assert.deepEqual(real('board'), ['board-northwake-twin']);
+  assert.equal(profileStore.collection().owned, 0);
+  assert.ok(profileStore.collection().total >= 70, `${profileStore.collection().total} reward skins`);
+  assert.equal(p.rewards.cases.length, 0, 'no free case for a brand-new rider');
+});
+
+await test('rewards: equip refuses a skin you do not own, accepts it once earned', () => {
+  profileStore.reset();
+  assert.equal(profileStore.equip('jacket-tuff-shell', 'woodland'), false);
+  assert.equal(profileStore.equip('helmet-tuff', 'chrome'), false);
+  assert.equal(profileStore.equip('skis-gold-leaf'), false);
+  profileStore.update((p) => { p.inventory.items['jacket-tuff-shell:woodland'] = { at: 1, n: 1, seen: false }; });
+  assert.equal(profileStore.equip('jacket-tuff-shell', 'woodland'), true);
+  assert.equal(profileStore.equipped('jacket').variant.id, 'woodland');
+  assert.deepEqual(profileStore.newSkins(), ['jacket-tuff-shell:woodland']);
+  profileStore.markSeen();
+  assert.deepEqual(profileStore.newSkins(), []);
+  // Losing the skin (hand-edited save) falls back to the starter.
+  profileStore.update((p) => { delete p.inventory.items['jacket-tuff-shell:woodland']; });
+  assert.equal(profileStore.equipped('jacket').variant.id, 'basic');
+});
+
+await test('migration v1 → v2: keeps the worn colourway, adds a welcome case and veteran cases', () => {
+  const v1 = {
+    version: 1, displayName: 'Old Timer', createdAt: 1, updatedAt: 2,
+    loadout: { equipment: 'snowboard', slots: {
+      jacket: { item: 'jacket-tuff-shell', variant: 'arcade' }, pants: { item: 'pants-tuff-bib', variant: 'arcade' },
+      helmet: { item: 'helmet-tuff', variant: 'summit' }, goggles: { item: 'goggles-tuff', variant: 'tuff' },
+      gloves: { item: 'gloves-tuff-mitt', variant: 'nightshift' }, board: { item: 'board-northwake-twin', variant: 'sunset' } } },
+    map: { id: 'blackspruce', variant: null }, stats: { rides: 40, runsCompleted: 30, distance: 90000, bestScore: 5000 }, unlocks: { items: [] },
+  };
+  const { profile, from } = schema.migrateProfile(v1);
+  assert.equal(from, 1); assert.equal(profile.version, 2);
+  assert.equal(profile.loadout.slots.jacket.variant, 'arcade', 'still wearing Arcade');
+  assert.equal(profile.loadout.slots.helmet.variant, 'summit');
+  assert.equal(profile.loadout.slots.face.variant, 'basic', 'new face slot gets the starter');
+  for (const k of ['jacket-tuff-shell:arcade', 'pants-tuff-bib:arcade', 'helmet-tuff:summit', 'goggles-tuff:tuff', 'gloves-tuff-mitt:nightshift']) assert.ok(profile.inventory.items[k], k);
+  assert.equal(profile.rewards.cases.length, 4, '1 welcome + 3 veteran cases (capped)');
+  assert.equal(profile.rewards.cases[0].source, 'welcome');
+  assert.equal(profile.rewards.distance, 90000);
+  assert.equal(profile.rewards.milestone, 50000, 'old km count toward milestones without back pay');
+  assert.equal(profile.stats.distance, 90000);
+  // A light v1 rider gets just the welcome case; a stored v2 profile round-trips unchanged.
+  const light = schema.migrateProfile({ ...v1, stats: { distance: 2000, runsCompleted: 1 } }).profile;
+  assert.equal(light.rewards.cases.length, 1);
+  const again = schema.migrateProfile(JSON.parse(JSON.stringify(profile)));
+  assert.equal(again.migrated, false);
+  assert.deepEqual(again.profile.inventory, profile.inventory);
+  assert.equal(again.profile.rewards.cases.length, 4);
+  // v0 → v2 (a first visit) gets no free cases.
+  assert.equal(schema.migrateProfile(null).profile.rewards.cases.length, 0);
+});
+
+await test('odds: every case has items in every tier and every skin can drop', () => {
+  const all = new Set(catalog.rewardSkins().map(({ item, variant }) => `${item.id}:${variant.id}`));
+  const reach = new Set();
+  for (const s of SERIES_ORDER) {
+    const pool = rewards.casePool(s);
+    for (const r of RARITIES) assert.ok(pool[r.id].length > 0, `${s} has ${r.id} items`);
+    for (const r of RARITIES) for (const e of pool[r.id]) reach.add(e.key);
+    const odds = rewards.caseOdds(s);
+    assert.ok(Math.abs(Object.values(odds).reduce((a, b) => a + b, 0) - 100) < 1e-9, 'odds sum to 100 %');
+  }
+  for (const k of all) assert.ok(reach.has(k), `${k} is in a case`);
+});
+
+await test('odds: 200 000 simulated openings match the table; gold stays rare', () => {
+  for (const s of SERIES_ORDER) {
+    const rng = rewards.seeded(s.length * 7919);
+    const N = 200000;
+    const n = Object.fromEntries(RARITIES.map((r) => [r.id, 0]));
+    const items = new Map();
+    for (let i = 0; i < N; i++) { const r = rewards.rollCase(s, rng); n[r.rarity]++; items.set(r.key, (items.get(r.key) || 0) + 1); }
+    for (const r of RARITIES) {
+      const pct = (n[r.id] / N) * 100;
+      const sd = Math.sqrt(r.weight * (100 - r.weight) / N);    // binomial s.d. in %
+      assert.ok(Math.abs(pct - r.weight) < 5 * sd + 0.02, `${s} ${r.id}: ${pct.toFixed(3)} % vs ${r.weight} %`);
+    }
+    assert.ok(n.gold / N < 0.004 && n.gold / N > 0.002, `gold ${(n.gold / N * 100).toFixed(3)} %`);
+    assert.ok(n.gold < n.legendary / 3, 'gold is several times rarer than red');
+    // Inside a tier every skin is equally likely (within 25 %).
+    const pool = rewards.casePool(s);
+    for (const r of ['common', 'uncommon', 'rare']) {
+      const c = pool[r].map((e) => items.get(e.key) || 0);
+      assert.ok(Math.min(...c) > Math.max(...c) * 0.75, `${s} ${r} spread ${Math.min(...c)}…${Math.max(...c)}`);
+    }
+  }
+});
+
+await test('reel: winner at winAt, whole ladder visible, gold hidden, near misses sit at the edge', () => {
+  const rng = rewards.seeded(42);
+  let near = 0, sideHits = 0;
+  const N = 2000;
+  for (let i = 0; i < N; i++) {
+    const res = rewards.rollCase('first-chair', rng);
+    const reel = rewards.buildReel(res, 'first-chair', rng);
+    assert.equal(reel.cards.length, rewards.REEL.cards);
+    const w = reel.cards[reel.winAt];
+    assert.ok(w.win && w.rarity === res.rarity && w.revealKey === res.key);
+    assert.ok(reel.stop >= 0 && reel.stop <= 1);
+    for (const c of reel.cards) if (c.rarity === 'gold' && !c.win) assert.equal(c.key, null, 'gold filler is anonymous');
+    const late = reel.cards.slice(reel.winAt - 14, reel.winAt + 4).map((c) => c.rarity);
+    assert.ok(late.includes('legendary') && late.includes('gold'), 'red and gold scroll by near the end');
+    if (reel.nearMiss) {
+      near++;
+      const nb = reel.cards[reel.winAt + reel.nearMiss.side];
+      assert.ok(RARITIES.findIndex((r) => r.id === nb.rarity) > RARITIES.findIndex((r) => r.id === res.rarity), 'teaser is rarer');
+      if (reel.nearMiss.side < 0 ? reel.stop < 0.1 : reel.stop > 0.9) sideHits++;
+    }
+  }
+  assert.ok(near / N > 0.4 && near / N < 0.65, `near-miss rate ${(near / N * 100).toFixed(0)} %`);
+  assert.equal(sideHits, near, 'the marker stops at the edge next to the teaser');
+});
+
+await test('progression: first case in 10–15 min, then one every 15–25 min of riding', () => {
+  // A typical rider: 0.7 km per minute, a finished run every 3 minutes, the first run on two maps.
+  const sim = (kmPerMin, runEvery, mins, maps = ['valcrest-gully', 'blackspruce']) => {
+    const p = schema.defaultProfile();
+    const at = [];
+    for (let t = 1; t <= mins; t++) {
+      const fin = t % runEvery === 0;
+      const mapId = t < mins / 2 ? maps[0] : maps[1];
+      const r = rewards.creditRun(p, { mapId, trailId: mapId, distance: kmPerMin * 1000, finished: fin, equipment: 'skis' });
+      for (let k = 0; k < r.cases.length; k++) at.push(t);
+    }
+    return at;
+  };
+  const avg = sim(0.7, 3, 180);
+  assert.ok(avg[0] >= 9 && avg[0] <= 15, `first case at ${avg[0]} min`);
+  const gaps = avg.slice(1).map((t, i) => t - avg[i]);
+  const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+  assert.ok(mean >= 15 && mean <= 25, `mean gap ${mean.toFixed(1)} min (${gaps.join(', ')})`);
+  const slow = sim(0.45, 4, 180), fast = sim(1.0, 2, 180);
+  assert.ok(slow[0] <= 20 && fast[0] >= 6, `slow first ${slow[0]} min, fast first ${fast[0]} min`);
+  assert.ok(180 / slow.length <= 32 && 180 / fast.length >= 11, `slow every ${(180 / slow.length).toFixed(0)}, fast every ${(180 / fast.length).toFixed(0)} min`);
+});
+
+await test('progression: milestones and first-run bonuses pay once; dupes become progress', () => {
+  const p = schema.defaultProfile();
+  const a = rewards.creditRun(p, { mapId: 'm1', trailId: 'm1.0', distance: 1200, finished: true });
+  assert.ok(a.gains.some((g) => g.label === 'First kilometre') && a.gains.some((g) => g.label.startsWith('First run')));
+  assert.ok(a.gains.some((g) => g.label === 'New trail finished'));
+  const b = rewards.creditRun(p, { mapId: 'm1', trailId: 'm1.0', distance: 1200, finished: true });
+  assert.ok(!b.gains.some((g) => g.milestone), 'no second bonus');
+  // Open 300 cases with a seeded RNG: duplicates convert to XP (and so to more cases).
+  const rng = rewards.seeded(7);
+  for (let i = 0; i < 300; i++) rewards.grantCase(p, 'test');
+  let dupes = 0, fromDupes = 0, xp = 0;
+  while (p.rewards.cases.length) {
+    const r = rewards.openCase(p, null, rng);
+    if (r.dupe) { dupes++; xp += r.dupeXp; fromDupes += r.cases.length; }
+  }
+  assert.ok(dupes > 100, `${dupes} duplicates`);
+  assert.equal(p.rewards.dupeXp, xp);
+  assert.ok(fromDupes >= Math.floor(xp / rewards.CASE_XP) - 1 && fromDupes > 10, `${fromDupes} cases from dupes`);
+  assert.ok(Object.values(p.inventory.items).some((e) => e.n > 1));
+  const col = rewards.collection(p);
+  assert.ok(col.pct > 0.5 && col.pct <= 1, `collection ${(col.pct * 100).toFixed(0)} %`);
+  assert.equal(p.rewards.opened, 300 + fromDupes);
+});
+
+await test('store: openCase persists the pull and emits rewards / caseEarned', () => {
+  profileStore.reset();
+  const seen = [];
+  const offs = [on('caseEarned', (e) => seen.push(['earned', e.cases.length])), on('rewards', (e) => seen.push(['rewards', e.reason]))];
+  profileStore.grantCase('test');
+  const res = profileStore.openCase(null, rewards.seeded(3));
+  offs.forEach((f) => f());
+  assert.ok(res && res.key && res.reel.cards.length === 60);
+  assert.ok(profileStore.owns(res.item.id, res.variant.id));
+  assert.equal(JSON.parse(mem.get(schema.PROFILE_KEY)).rewards.opened, 1, 'saved');
+  assert.deepEqual(seen.slice(0, 3), [['rewards', 'grant'], ['earned', 1], ['rewards', 'open']]);
+  assert.equal(profileStore.openCase(), null, 'no case left');
+  assert.equal(profileStore.equip(res.item.id, res.variant.id), true, 'the pull can be worn');
 });
 
 console.log(failed ? `\n${failed} failed, ${passed} passed` : `\nall ${passed} passed`);

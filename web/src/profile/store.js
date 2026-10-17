@@ -4,11 +4,14 @@
 // every change on the state.js event bus:
 //   'profile'  { profile, reason }                       any change (stats, map, name, unlocks, loadout)
 //   'loadout'  { equipment, slot, item, variant, reason } equipment type or an equipped item changed
+//   'rewards'  { reason, gains?, cases?, result? }        case XP, cases earned or opened (rewards.js)
+//   'caseEarned' { cases, source }                        one or more new unopened cases
 // UI and gameplay never write localStorage directly; they call these methods.
 import { emit } from '../state.js';
 import { storage } from '../services/storage.js';
 import { PROFILE_KEY, migrateProfile, sanitize, defaultProfile } from './schema.js';
-import { SLOTS, EQUIPMENT_TYPES, getItem, getVariant, unlockState, gearModel } from './catalog.js';
+import { SLOTS, EQUIPMENT_TYPES, getItem, getVariant, unlockState, gearModel, ownKey, ownsVariant, listItems } from './catalog.js';
+import * as R from './rewards.js';
 
 class ProfileStore {
   constructor(store) {
@@ -71,12 +74,15 @@ class ProfileStore {
     return item ? { item, variant: getVariant(item, e.variant) } : null;
   }
 
-  /** Equip an item (and optionally a colourway). Refuses locked items. */
+  /** Equip an item (and optionally a colourway). Refuses locked items and skins you do not own. */
   equip(itemId, variantId) {
     const item = getItem(itemId);
     if (!item) throw new Error(`unknown item "${itemId}"`);
-    if (!unlockState(item, this.profile).unlocked) return false;
-    const variant = getVariant(item, variantId).id;
+    let v = getVariant(item, variantId);
+    // No colourway given: keep wearing an owned one (the first owned variant).
+    if (!variantId && !unlockState(item, this.profile, v.id).unlocked) v = item.variants.find((x) => ownsVariant(this.profile, item, x)) ?? v;
+    if (!unlockState(item, this.profile, v.id).unlocked) return false;
+    const variant = v.id;
     this.update((p) => { p.loadout.slots[item.slot] = { item: item.id, variant }; }, 'equip');
     emit('loadout', { equipment: this.equipment, slot: item.slot, item: item.id, variant, reason: 'equip' });
     return true;
@@ -105,6 +111,69 @@ class ProfileStore {
     if (this.profile.unlocks.items.includes(itemId)) return;
     this.update((p) => { p.unlocks.items.push(itemId); }, 'unlock');
   }
+
+  // ------------------------------------------------------------ inventory and cases (rewards.js)
+  /** True if the skin is yours (earned or starter). */
+  owns(itemId, variantId) { const item = getItem(itemId); return ownsVariant(this.profile, item, getVariant(item, variantId)); }
+
+  /** Owned skins of a slot: [{ item, variant, key, entry }] (starters first). */
+  ownedIn(slot) {
+    const out = [];
+    for (const item of listItems({ slot })) {
+      for (const variant of item.variants) {
+        if (!ownsVariant(this.profile, item, variant) && !(!variant.rarity && !variant.starter && unlockState(item, this.profile, variant.id).unlocked)) continue;
+        const key = ownKey(item.id, variant.id);
+        out.push({ item, variant, key, entry: this.profile.inventory.items[key] || null });
+      }
+    }
+    return out;
+  }
+
+  get rewards() { return this.profile.rewards; }
+  get unopened() { return this.profile.rewards.cases; }
+
+  /** Feed a run (or a ride's distance) into case progress; emits 'rewards' and maybe 'caseEarned'. */
+  creditRun(run) {
+    let res = null;
+    this.update((p) => { res = R.creditRun(p, run); }, 'rewards');
+    emit('rewards', { reason: 'run', ...res, run });
+    if (res.cases.length) emit('caseEarned', { cases: res.cases, source: run.finished ? 'run' : 'distance' });
+    return res;
+  }
+
+  /** Grant a case directly (milestones, dev tools). */
+  grantCase(source = 'gift', series = null) {
+    let c = null;
+    this.update((p) => { c = R.grantCase(p, source, Date.now(), series); }, 'rewards');
+    emit('rewards', { reason: 'grant', cases: [c] });
+    emit('caseEarned', { cases: [c], source });
+    return c;
+  }
+
+  /** Open an unopened case (the first one when no id). The result carries the reel to animate. */
+  openCase(caseId, rng = Math.random) {
+    let res = null;
+    this.update((p) => { res = R.openCase(p, caseId, rng); }, 'case');
+    if (!res) return null;
+    emit('rewards', { reason: 'open', result: res, cases: res.cases });
+    if (res.cases.length) emit('caseEarned', { cases: res.cases, source: 'duplicate' });
+    return res;
+  }
+
+  /** Clear the "new" marker of a skin (or all of them). */
+  markSeen(key = null) {
+    const inv = this.profile.inventory.items;
+    const keys = key ? [key] : Object.keys(inv);
+    if (!keys.some((k) => inv[k] && !inv[k].seen)) return;
+    this.update((p) => { for (const k of keys) if (p.inventory.items[k]) p.inventory.items[k].seen = true; }, 'seen');
+  }
+
+  /** Unseen (new) skins, optionally in one slot. */
+  newSkins(slot = null) {
+    return Object.entries(this.profile.inventory.items).filter(([k, v]) => !v.seen && (!slot || getItem(k.split(':')[0])?.slot === slot)).map(([k]) => k);
+  }
+
+  collection() { return R.collection(this.profile); }
 
   setDisplayName(name) { this.update((p) => { p.displayName = String(name); }, 'name'); }
 

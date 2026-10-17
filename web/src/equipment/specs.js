@@ -102,3 +102,22 @@ export const SNOWBOARD_VARIANTS = {
     graphic: { base: 0x221133, top: 0xfff36a, top2: 0xff6ad5, accent: 0x7b2cff, edge: 0xff9df0, pattern: 'split' },
   },
 };
+
+// Legendary topsheets: the gold tier of the reward cases (profile/items.js GOLD_ITEMS). Each is a stock
+// model's shape and handling under a special graphic. Patterns gold / chrome / holo / inferno / galaxy /
+// aurora are metallic or animated in models.js; top / top2 / accent / edge feed them as usual.
+const legend = (table, base, id, name, graphic) => ({ ...table[base], id, name: `★ ${name}`, blurb: `Legendary ${table[base].name}.`, legendary: true, graphic });
+Object.assign(SKI_VARIANTS, {
+  'gold-leaf': legend(SKI_VARIANTS, 'allmountain', 'gold-leaf', 'Ridge 172 | Gold Leaf', { base: 0x1a1206, top: 0xffd76a, top2: 0xb8862a, accent: 0xfff2c4, edge: 0xffd76a, pattern: 'gold' }),
+  chrome: legend(SKI_VARIANTS, 'slalom', 'chrome', 'SL Race 165 | Mirror Chrome', { base: 0x101214, top: 0xf2f6fa, top2: 0x8a96a0, accent: 0x2a2c30, edge: 0xdff6ff, pattern: 'chrome' }),
+  holo: legend(SKI_VARIANTS, 'park', 'holo', 'Twin 168 | Holographic', { base: 0x140a24, top: 0x9bf0ff, top2: 0xff9df0, accent: 0xfff36a, edge: 0xc9a7ff, pattern: 'holo' }),
+  inferno: legend(SKI_VARIANTS, 'gs', 'inferno', 'GS Race 188 | Inferno', { base: 0x0b0806, top: 0x1a0c08, top2: 0xff4a12, accent: 0xffd23a, edge: 0xff6a1a, pattern: 'inferno' }),
+  galaxy: legend(SKI_VARIANTS, 'powder', 'galaxy', 'Float 186 | Galaxy', { base: 0x06061a, top: 0x0b0b30, top2: 0x7a5cff, accent: 0xffffff, edge: 0x9b8cff, pattern: 'galaxy' }),
+});
+Object.assign(SNOWBOARD_VARIANTS, {
+  'gold-leaf': legend(SNOWBOARD_VARIANTS, 'allmountain', 'gold-leaf', 'Atlas 156 | Gold Leaf', { base: 0x1a1206, top: 0xffd76a, top2: 0xb8862a, accent: 0xfff2c4, edge: 0xffd76a, pattern: 'gold' }),
+  chrome: legend(SNOWBOARD_VARIANTS, 'carver', 'chrome', 'Edge 163 | Mirror Chrome', { base: 0x101214, top: 0xf2f6fa, top2: 0x8a96a0, accent: 0x2a2c30, edge: 0xdff6ff, pattern: 'chrome' }),
+  holo: legend(SNOWBOARD_VARIANTS, 'park', 'holo', 'Butter 152 | Holographic', { base: 0x140a24, top: 0x9bf0ff, top2: 0xff9df0, accent: 0xfff36a, edge: 0xc9a7ff, pattern: 'holo' }),
+  inferno: legend(SNOWBOARD_VARIANTS, 'freeride', 'inferno', 'Steeple 161 | Inferno', { base: 0x0b0806, top: 0x1a0c08, top2: 0xff4a12, accent: 0xffd23a, edge: 0xff6a1a, pattern: 'inferno' }),
+  aurora: legend(SNOWBOARD_VARIANTS, 'powder', 'aurora', 'Fish 158 | Aurora', { base: 0x05101a, top: 0x081a2a, top2: 0x5dffb0, accent: 0xb07aff, edge: 0x5dffb0, pattern: 'aurora' }),
+});
