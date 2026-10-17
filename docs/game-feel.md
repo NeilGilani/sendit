@@ -189,7 +189,7 @@ Three challenges are chosen per local day from `CHALLENGE_POOL`, each from a dif
 | Air | 30, 45 or 60 s of air |
 | Combos | Bank a ×2.5, ×3 or ×4 combo |
 | Stomps | Stomp 3, 5 or 8 landings |
-| Speed | Hit 70, 85 or 100 km/h |
+| Speed | Hit 55, 70 or 85 km/h (the higher ones need Ravenspire or Blackspruce) |
 | Score | Score 3,000, 6,000 or 10,000 in one ride |
 | Tricks | Land 10, 20 or 30 tricks |
 | Rails | Grind 40, 80 or 150 m |

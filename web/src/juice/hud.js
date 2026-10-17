@@ -31,7 +31,7 @@ const CSS = /* css */`
 #juiceHud { position: absolute; inset: 0; pointer-events: none; font-family: "Arial Black", "Segoe UI Black", Impact, sans-serif; font-style: italic; color: #fffaf0; }
 #juiceHud .stroke { -webkit-text-stroke: 1.5px #1b1446; paint-order: stroke fill; }
 /* combo chain */
-#juiceHud .cb { position: absolute; left: 50%; top: 86px; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity .25s; white-space: nowrap; }
+#juiceHud .cb { position: absolute; left: 50%; top: 96px; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity .25s; white-space: nowrap; }
 #juiceHud .cb.on { opacity: 1; }
 #juiceHud .cb .m { font-size: 50px; line-height: 1; display: inline-block; text-shadow: 0 3px 22px rgba(122,92,255,.55); transition: color .2s; }
 #juiceHud .cb .m.bump { animation: jhBump .32s cubic-bezier(.2,1.8,.4,1); }
@@ -75,7 +75,7 @@ const CSS = /* css */`
 #juiceHud .co { position: absolute; left: 50%; top: 70%; transform: translateX(-50%); white-space: nowrap; font-size: 24px; opacity: 0; }
 #juiceHud .co.show { animation: jhPop 1.05s ease-out forwards; }
 @keyframes jhPop { 0% { opacity: 0; transform: translateX(-50%) scale(.6); } 14% { opacity: 1; transform: translateX(-50%) scale(1.15); } 26% { transform: translateX(-50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-18px); } }
-#juiceHud .bn { position: absolute; left: 50%; top: 150px; transform: translateX(-50%); white-space: nowrap; font-size: 38px; opacity: 0; -webkit-text-stroke: 2px #1b1446; paint-order: stroke fill; }
+#juiceHud .bn { position: absolute; left: 50%; top: 172px; transform: translateX(-50%); white-space: nowrap; font-size: 38px; opacity: 0; -webkit-text-stroke: 2px #1b1446; paint-order: stroke fill; }
 #juiceHud .bn.show { animation: jhBank 1.8s ease-out forwards; }
 #juiceHud .bn.lost.show { animation: jhLost 1.4s ease-out forwards; }
 @keyframes jhBank { 0% { opacity: 0; transform: translateX(-50%) scale(.5); } 10% { opacity: 1; transform: translateX(-50%) scale(1.2); } 20% { transform: translateX(-50%) scale(1); } 78% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-30px) scale(.95); } }

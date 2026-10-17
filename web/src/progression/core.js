@@ -57,7 +57,7 @@ export const CHALLENGE_POOL = [
   { cat: 'air', make: (r) => { const g = pick(r, [30, 45, 60]); return { stat: 'air', goal: g, title: `${g} s of air`, desc: 'Total hang time today', xp: 150 + g * 3, unit: 's' }; } },
   { cat: 'combo', make: (r) => { const g = pick(r, [2.5, 3, 4]); return { stat: `combo${g}`, goal: 1, title: `Bank a ×${g} combo`, desc: 'Chain different tricks, rails and close shaves, then ride it out', xp: Math.round(160 + g * 70) }; } },
   { cat: 'stomp', make: (r) => { const g = pick(r, [3, 5, 8]); return { stat: 'stomps', goal: g, title: `Stomp ${g} landings`, desc: 'PERFECT or STOMPED grades', xp: 140 + g * 25 }; } },
-  { cat: 'speed', make: (r) => { const g = pick(r, [70, 85, 100]); return { stat: `kmh${g}`, goal: 1, title: `Hit ${g} km/h`, desc: 'Tuck on the steeps', xp: 120 + (g - 70) * 6 }; } },
+  { cat: 'speed', make: (r) => { const g = pick(r, [55, 70, 85]); return { stat: `kmh${g}`, goal: 1, title: `Hit ${g} km/h`, desc: g > 55 ? 'Tuck down the big steeps (Ravenspire, Blackspruce)' : 'Tuck and hold a straight line', xp: 120 + (g - 55) * 6 }; } },
   { cat: 'score', make: (r) => { const g = pick(r, [3000, 6000, 10000]); return { stat: 'rideScore', goal: g, title: `Score ${fmt(g)} in one ride`, desc: 'Style points, one ride', xp: 160 + g / 40, scope: 'ride' }; } },
   { cat: 'tricks', make: (r) => { const g = pick(r, [10, 20, 30]); return { stat: 'tricks', goal: g, title: `Land ${g} tricks`, desc: 'Spins, flips, grabs and rails', xp: 120 + g * 6 }; } },
   { cat: 'grind', make: (r) => { const g = pick(r, [40, 80, 150]); return { stat: 'grindM', goal: g, title: `Grind ${g} m of rails`, desc: 'Voltage Park has the rails', xp: 160 + g, unit: 'm' }; } },
@@ -347,7 +347,7 @@ export class Progression {
     if (!this.ride) return;
     const L = this.state.life;
     if (kmh > L.topKmh) L.topKmh = kmh;
-    for (const g of [70, 85, 100]) if (kmh >= g) this.bump(`kmh${g}`, 1, { max: true });
+    for (const g of [55, 70, 85]) if (kmh >= g) this.bump(`kmh${g}`, 1, { max: true });
     this.pbCheck('kmh', Math.floor(kmh));
     if (kmh >= 100) this.checkAchievements();
   }
