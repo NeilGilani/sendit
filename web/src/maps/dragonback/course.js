@@ -14,7 +14,7 @@ import { vnoise, noise1, fbm, ridged, smooth, sstep, hash1 } from '../ravenspire
 import {
   TILE, START_X, TOP, FINISH_U, PROFILE, BEHIND, FACE, RIDGES, HOPS, SPINE_FIELD, HITS, PILLOWS, DROP_ZONES, LINE_GOALS, RIDE_LINES,
 } from './layout.js';
-import { Ridge, cliff, smax } from './ridges.js';
+import { Ridge, smax } from './ridges.js';
 import { DRAGONBACK_PHYSICS, DRAGONBACK_CAMERA } from './tuning.js';
 import { attachRidgeScoring } from './scoring.js';
 import { attachSluff } from './sluff.js';
@@ -504,18 +504,19 @@ export class DragonbackCourse {
   }
 
   /**
-   * Challenge gates along the hero line (the Dragon's Spine line): on the crest between its steps and gaps, the
-   * Fork, through the Organ Pipes and down the apron — stay high or pay +2 s a gate. [{ at, lateral, width }].
+   * Challenge gates along the hero line (the Dragon's Spine line): on the crest between its steps and gaps (14 m),
+   * the Fork (20 m), through the Organ Pipes and down the apron (26 m: the line hops spine to spine there) — stay
+   * high or pay +2 s a gate. [{ at, lateral, width }].
    */
   placeGates() {
     const gates = [];
     let at = 0;
     // Mid-segment on the crest (never right after a gap: you can't steer a flight, so the landing scatters a
     // few metres), the Fork, the Organ Pipes, the apron.
-    const marks = [200, 390, 480, 720, 900, 1060, 1210, 1360, 1540, 1750, 1980, 2200];
+    const marks = [200, 390, 480, 680, 860, 1080, 1240, 1360, 1540, 1750, 1980, 2200];
     for (let i = 1, m = 0; i < this.path.length && m < marks.length; i++) {
       at += this.path[i].distanceTo(this.path[i - 1]);
-      if (this.path[i].x - START_X >= marks[m]) { gates.push({ at, lateral: 0, width: marks[m] < 1150 ? 14 : 18 }); m++; }
+      if (this.path[i].x - START_X >= marks[m]) { gates.push({ at, lateral: 0, width: marks[m] < 1000 ? 14 : marks[m] < 1150 ? 20 : 26 }); m++; }
     }
     return gates;
   }
@@ -585,4 +586,3 @@ function horn(e, x, z, hx, hz, peak, slope, twist) {
   return e + (top - e) * smooth((top - e) / 50);
 }
 
-export { cliff };

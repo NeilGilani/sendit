@@ -100,15 +100,10 @@ export class Ridge {
     for (const l of lips) this.addLip({ u: l.u, side: l.side, h: l.h, aim: 0.55 });
   }
 
-  /**
-   * A wind lip on the crest's edge at u, on `side`, aimed `aim` rad off the fall line toward that side (or at
-   * a point: to = [u, v]). Returns the lip ({ u, v, du, dv, h, name }).
-   */
-  addLip({ u, side, h, aim = 0.55, to = null, name = null }) {
+  /** A wind lip on the crest's edge at u, on `side`, aimed `aim` rad off the fall line toward that side. */
+  addLip({ u, side, h, aim = 0.55 }) {
     const v = this.crestAt(u) + side * (this.topAt(u) + 2.5);
-    let du = Math.cos(aim), dv = Math.sin(aim) * side;
-    if (to) { const a = to[0] - u, b = to[1] - v, n = Math.hypot(a, b); du = a / n; dv = b / n; }
-    const lip = { u, v, side, h, du, dv, name };
+    const lip = { u, v, side, h, du: Math.cos(aim), dv: Math.sin(aim) * side };
     this.lips.push(lip);
     return lip;
   }

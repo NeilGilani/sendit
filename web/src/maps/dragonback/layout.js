@@ -63,8 +63,8 @@ export const RIDGES = [
   { id: 'shard', name: 'The Shard', top: 3, p: 1.6, rise: 50, end: 'prow', seed: 8,
     knots: [[470, -200, 8, 22], [560, -197, 12, 24], [660, -193, 14, 24], [730, -190, 12, 22]] },
   { id: 'spine', name: "Dragon's Spine", top: 5, p: 1.9, rise: 70, end: 'fade', seed: 3,
-    knots: [[86, -96, 28, 52], [300, -84, 38, 58], [500, -70, 42, 62], [700, -58, 38, 60], [880, -50, 30, 56], [1010, -44, 18, 50]],
-    steps: [[170, 6], [430, 7]], gaps: [[560, 16, 6, 5, 'The Little Gap'], [790, 24, 16, 8, "The Spine's Gap"]] },
+    knots: [[86, -96, 28, 52], [300, -84, 38, 58], [500, -70, 42, 62], [700, -58, 38, 60], [880, -50, 31, 56], [970, -47, 24, 50]],
+    steps: [[170, 6], [430, 7]], gaps: [[560, 16, 6, 5, 'The Little Gap', 0.6], [750, 24, 16, 8, "The Spine's Gap"]] },
   { id: 'scale', name: 'The Scales', top: 3, p: 1.6, rise: 60, end: 'prow', seed: 9,
     knots: [[300, -40, 8, 22], [390, -36, 12, 24], [520, -30, 16, 26], [600, -26, 14, 24]] },
   { id: 'twinL', name: 'Left Twin', top: 3, p: 1.6, rise: 50, end: 'prow', seed: 4,
@@ -80,12 +80,13 @@ export const RIDGES = [
     knots: [[90, 286, 24, 46], [320, 358, 32, 50], [500, 366, 30, 50], [600, 370, 26, 46]],
     steps: [[360, 6]] },
 
-  // ---- the Fork: the Spine splits round the Hollow (left) and the Dragon's Tail (right)
-  { id: 'forkL', name: 'The Fork', top: 5, p: 1.9, asym: 0.9, rise: 60, end: 'prow', seed: 15,
-    knots: [[860, -64, 18, 46], [960, -112, 26, 50], [1080, -160, 24, 48], [1170, -182, 20, 44]],
-    steps: [[1010, 6]] },
-  { id: 'tail', name: "Dragon's Tail", top: 4, p: 1.8, rise: 60, end: 'prow', seed: 16,
-    knots: [[880, -30, 14, 40], [1000, -10, 24, 44], [1130, 8, 22, 40]] },
+  // ---- the Fork: the Spine splits in two at u ≈ 900 — both branches leave its crest at its full height (no
+  // rollover at the junction): the Fork bends left round the Hollow, the Dragon's Tail right
+  { id: 'forkL', name: 'The Fork', top: 5, p: 1.9, asym: 0.9, rise: 0, end: 'prow', seed: 15, wander: 1,
+    knots: [[880, -50, 31, 50], [920, -56, 30, 50], [990, -100, 27, 50], [1090, -156, 24, 48], [1170, -182, 20, 44]],
+    steps: [[1040, 6]] },
+  { id: 'tail', name: "Dragon's Tail", top: 4, p: 1.8, rise: 0, end: 'prow', seed: 16, wander: 1,
+    knots: [[880, -50, 31, 44], [920, -44, 29, 44], [1010, -14, 24, 44], [1130, 8, 22, 40]] },
 
   // ---- the Sentinel: a tall lone ridge down the right side, a notch in its middle
   { id: 'sentinel', name: 'The Sentinel', top: 4, p: 1.9, asym: 1.1, rise: 60, end: 'prow', seed: 17,
@@ -116,8 +117,10 @@ export const RIDGES = [
   { id: 'wyrm', name: 'The Wyrm', top: 4, p: 1.8, rise: 70, end: 'prow', seed: 24,
     knots: [[1160, 62, 14, 40], [1260, 72, 30, 46], [1380, 80, 34, 48], [1500, 76, 30, 46], [1610, 84, 24, 42]],
     steps: [[1440, 6]] },
-  { id: 'eastwall', name: 'East Wall', top: 6, p: 2.0, asym: 1.2, rise: 60, end: 'prow', seed: 22,
-    knots: [[1380, 262, 22, 52], [1480, 266, 34, 58], [1630, 274, 30, 56]],
+  // The East Wall ends in the map's biggest cliff, the Dragon's Tooth: 38 m onto the 34° apron (Ravenspire's
+  // Hammer recipe: land it straight at any speed and it's clean, ~16 m/s; a few metres taller tips it to sketchy).
+  { id: 'eastwall', name: 'East Wall', prowName: "The Dragon's Tooth", top: 6, p: 2.0, asym: 1.2, rise: 60, end: 'prow', seed: 22,
+    knots: [[1380, 262, 22, 52], [1480, 266, 34, 58], [1580, 272, 36, 60], [1640, 276, 40, 60]],
     steps: [[1540, 7]], lips: [[1480, -1, 2.4]] },
   { id: 'westwall', name: 'West Buttress', top: 6, p: 1.9, asym: 0.8, rise: 50, end: 'prow', seed: 23,
     knots: [[1150, -430, 22, 50], [1350, -436, 32, 56], [1560, -440, 30, 54], [1660, -444, 24, 50]],
@@ -172,7 +175,7 @@ export const DROP_ZONES = [
   ["Dragon's Spine", 96, -96],
   ['The Twins', 140, 36],
   ['The Keel', 100, 182],
-  ['The Fork', 820, -56],
+  ['The Fork', 860, -52],
   ['The Staircase', 740, 112],
   ['The Organ Pipes', 1130, -230],
   ['The Knife', 1210, 138],
@@ -190,6 +193,7 @@ export const LINE_GOALS = [
   ['Bladerunner', 2000, 'The Blade', 'Blade Leap', 'The Shard Prow'],
   ['Keel Over', 1800, 'Keel Leap', 'The Splinter Prow'],
   ['Sentinel', 1800, 'The Sentinel', 'The Sentinel Notch', 'The Sentinel Prow'],
+  ['Pulling Teeth', 2000, "The Dragon's Tooth"],
   ['Organ Grinder', 1800, 'The Organ Pipes', 'The Organ Pipes', 'The Organ Pipes', 'The Organ Pipes'],
   ['Fin and Pillows', 1600, 'West Fin Prow', 'Pillow Stacks', 'Pillow Stacks', 'The Wishbone'],
 ];
@@ -198,8 +202,8 @@ export const LINE_GOALS = [
 // trees and rocks off them. '@id' = that ridge's crest at u (consecutive '@id' waypoints follow the crest);
 // '>Hop name' = that hop's lip (the next waypoint is its landing).
 export const RIDE_LINES = {
-  spine: { name: "Dragon's Spine (crest, two gaps, the Fork)", pts: [[0, -30], [60, -70], [100, '@spine'], [860, '@spine'], [900, '@forkL'], [1170, '@forkL'], [1300, -200], [1700, -60], [2400, 0]] },
-  scales: { name: 'Scale Jump → the Tail → Wyrm Leap → the Knife', pts: [[0, -30], [60, -70], [100, '@spine'], '>Scale Jump', [400, '@scale'], [600, '@scale'], [800, -10], [880, '@tail'], [1130, '@tail'], [1170, 64], [1200, '@wyrm'], '>Wyrm Leap', [1395, '@knife'], [1600, '@knife'], [1700, 170], [2000, 120], [2400, 60]] },
+  spine: { name: "Dragon's Spine (crest, two gaps, the Fork)", pts: [[0, -30], [60, -70], [100, '@spine'], [890, '@spine'], [900, '@forkL'], [1170, '@forkL'], [1300, -200], [1700, -60], [2400, 0]] },
+  scales: { name: 'Scale Jump → the Tail → Wyrm Leap → the Knife', pts: [[0, -30], [60, -70], [100, '@spine'], '>Scale Jump', [400, '@scale'], [600, '@scale'], [820, -10], [880, -48], [900, '@tail'], [1130, '@tail'], [1170, 64], [1200, '@wyrm'], '>Wyrm Leap', [1395, '@knife'], [1600, '@knife'], [1700, 170], [2000, 120], [2400, 60]] },
   blade: { name: 'The Blade → Blade Leap → the Shard', pts: [[0, -30], [60, -150], [100, '@blade'], '>Blade Leap', [580, '@shard'], [730, '@shard'], [900, -260], [1140, -200], [1650, -200], [1800, -230], [2400, -100]] },
   bladecrest: { name: 'The Blade end to end (knife edge, the notch)', pts: [[0, -30], [60, -150], [100, '@blade'], [770, '@blade'], [900, -250], [1140, -200], [1650, -200], [1800, -230], [2400, -100]] },
   twins: { name: 'Twin Hop, back again → the Staircase', pts: [[0, -30], [60, 10], [140, '@twinL'], '>Twin Hop', [370, '@twinR'], '>Twin Hop Back', [630, '@twinL'], [680, '@twinL'], [720, 62], [750, 90], [790, '@stair1'], '>Stair Hop 1', [1010, '@stair2'], '>Stair Hop 2', [1140, '@stair3'], '>Stair Hop 3', [1270, '@stair4'], [1370, '@stair4'], [1500, 220], [1800, 140], [2400, 60]] },

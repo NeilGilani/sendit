@@ -4,27 +4,29 @@ import { DragonbackCourse } from './course.js';
 
 const svg = (body) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 90">${body}</svg>`)}`;
 
-// A serrated summit ridge (the dragon's back) over a face combed into parallel ridges, lit on one side
-// and shaded on the other; a rider in the air between two crests; an orange bivouac box on a ridge.
+// A serrated summit ridge (the dragon's back, snow on its towers) over a face combed into ridges, lit on one
+// side and shaded on the other; a rider mid-hop between two crests; an orange bivouac; a string of prayer flags.
 export const DRAGONBACK_THUMB = svg(`
   <defs>
-    <linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#27477f"/><stop offset="0.65" stop-color="#8fb3de"/><stop offset="1" stop-color="#e3ecf6"/></linearGradient>
-    <linearGradient id="r" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e8eef7"/></linearGradient>
+    <linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f3d74"/><stop offset="0.6" stop-color="#7ea6d8"/><stop offset="1" stop-color="#dbe7f5"/></linearGradient>
+    <linearGradient id="lit" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#eef3fa"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fa6c6"/><stop offset="1" stop-color="#b7c8de"/></linearGradient>
   </defs>
   <rect width="160" height="90" fill="url(#s)"/>
-  <path d="M0 40 L14 30 L20 34 L30 18 L36 26 L44 14 L50 22 L58 10 L64 20 L72 12 L80 22 L90 8 L98 20 L108 14 L116 24 L126 16 L134 26 L146 20 L160 30 L160 90 L0 90 Z" fill="#4a4f5c"/>
-  <path d="M0 44 L30 24 L44 20 L58 16 L72 18 L90 14 L108 20 L126 22 L160 34 L160 90 L0 90 Z" fill="#f4f7fb"/>
-  <g fill="url(#r)" stroke="#9fb3cf" stroke-width="0.6">
-    <path d="M8 90 L36 30 L42 32 L24 90 Z"/><path d="M34 90 L56 26 L62 28 L50 90 Z"/><path d="M62 90 L76 24 L82 26 L78 90 Z"/>
-    <path d="M92 90 L96 26 L102 26 L108 90 Z"/><path d="M120 90 L112 28 L118 28 L138 90 Z"/><path d="M146 90 L128 32 L134 32 L160 82 Z"/>
-  </g>
-  <g fill="#b9c9e0" opacity="0.9">
-    <path d="M24 90 L42 32 L44 34 L30 90 Z"/><path d="M50 90 L62 28 L64 30 L56 90 Z"/><path d="M78 90 L82 26 L84 28 L84 90 Z"/>
-    <path d="M108 90 L102 26 L104 28 L114 90 Z"/><path d="M138 90 L118 28 L120 30 L144 90 Z"/>
-  </g>
-  <path d="M70 48 q8 -10 18 -4" stroke="#ffffff" stroke-width="1" fill="none" stroke-dasharray="2 2"/>
-  <g transform="translate(88 44) rotate(-18)"><rect x="-3" y="-1" width="7" height="1.2" fill="#22324f"/><circle cx="0.5" cy="-3" r="1.4" fill="#ff6a3d"/></g>
-  <rect x="98" y="34" width="5" height="3.2" rx="1.2" fill="#ff7a1a"/>`);
+  <path d="M0 34 L8 26 L13 30 L20 12 L26 24 L33 18 L40 6 L47 22 L54 16 L62 2 L70 20 L78 13 L86 4 L94 21 L101 15 L109 7 L116 23 L123 17 L131 9 L138 25 L146 19 L154 27 L160 24 L160 44 L0 44 Z" fill="#363b47"/>
+  <path d="M20 12 L23 18 L18 20 Z M62 2 L66 10 L60 12 Z M86 4 L90 12 L84 13 Z M109 7 L112 14 L106 15 Z M40 6 L43 13 L38 14 Z" fill="#f2f5fa" opacity="0.9"/>
+  <path d="M0 46 L40 34 L80 31 L120 34 L160 44 L160 90 L0 90 Z" fill="#f4f7fb"/>
+  <path d="M2 90 L34 38 L40 40 L22 90 Z" fill="url(#lit)"/><path d="M22 90 L40 40 L43 42 L32 90 Z" fill="url(#shade)"/>
+  <path d="M34 90 L56 36 L62 37 L52 90 Z" fill="url(#lit)"/><path d="M52 90 L62 37 L65 39 L62 90 Z" fill="url(#shade)"/>
+  <path d="M66 90 L76 34 L82 34 L80 90 Z" fill="url(#lit)"/><path d="M80 90 L82 34 L85 36 L90 90 Z" fill="url(#shade)"/>
+  <path d="M96 90 L98 35 L104 35 L110 90 Z" fill="url(#lit)"/><path d="M110 90 L104 35 L107 37 L120 90 Z" fill="url(#shade)"/>
+  <path d="M124 90 L118 37 L124 38 L140 90 Z" fill="url(#lit)"/><path d="M140 90 L124 38 L127 40 L150 90 Z" fill="url(#shade)"/>
+  <g fill="#4a4f5c" opacity="0.55"><path d="M41 58 L45 57 L44 62 Z"/><path d="M63 55 L66 55 L65 60 Z"/><path d="M85 60 L88 59 L88 64 Z"/><path d="M107 57 L110 58 L108 62 Z"/></g>
+  <path d="M78 52 q11 -14 24 -4" stroke="#ffffff" stroke-width="1.1" fill="none" stroke-dasharray="2.2 2"/>
+  <g transform="translate(103 46) rotate(-20)"><rect x="-4" y="-1" width="9" height="1.5" rx="0.6" fill="#1d2a44"/><path d="M-1 -1 L1 -5 L3 -1 Z" fill="#2a3a5a"/><circle cx="1.2" cy="-6.2" r="1.6" fill="#ff6a3d"/></g>
+  <rect x="113" y="40.5" width="6" height="3.4" rx="1.4" fill="#ff7a1a"/>
+  <path d="M10 44 Q30 49 52 44" stroke="#3b3b3b" stroke-width="0.4" fill="none"/>
+  <g><circle cx="16" cy="45.6" r="0.9" fill="#2f63c8"/><circle cx="22" cy="46.6" r="0.9" fill="#f4f4f0"/><circle cx="28" cy="47.1" r="0.9" fill="#cc2b24"/><circle cx="34" cy="47.1" r="0.9" fill="#258c4d"/><circle cx="40" cy="46.6" r="0.9" fill="#f2c526"/><circle cx="46" cy="45.6" r="0.9" fill="#2f63c8"/></g>`);
 
 registerMap({
   id: 'dragonback',
