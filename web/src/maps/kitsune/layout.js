@@ -104,17 +104,17 @@ export const HITS = [
 // The shrine village.
 // Buildings: u, v = centre; yaw: long axis away from the fall line (rad); L = length along it, W = width
 // across; roof 'sori' = a curved Japanese gable (ridge across the fall line, upturned eaves: the downhill
-// eave is a natural kicker), pitch at the ridge, eave = wall height; drift = how high the uphill drift
-// climbs toward the ridge (≥ 1 rides straight onto the roof). Rideable through features.heightAt.
+// eave is a natural kicker), pitch at the ridge, eave = wall height
+// at the downhill wall; drift = how far the uphill drift climbs toward the uphill eave (1 = onto the roof). Rideable through features.heightAt.
 export const BUILDINGS = [
-  { id: 'haiden', name: 'Kitsune Shrine', u: 1765, v: 40, L: 18, W: 24, roof: 'sori', pitch: 30, eave: 4.2, drift: 1.05, colour: 'shrine' },
-  { id: 'kiku', name: 'Ryokan Kiku', u: 1852, v: 46, L: 16, W: 20, roof: 'sori', pitch: 27, eave: 4.6, drift: 1.0, colour: 'ryokan' },
-  { id: 'tsuki', name: 'Ryokan Tsuki', u: 1918, v: 50, L: 14, W: 18, roof: 'sori', pitch: 27, eave: 4.0, drift: 0.9, colour: 'ryokan' },
-  { id: 'yuki', name: 'Ryokan Yuki', u: 1984, v: 56, L: 14, W: 18, roof: 'sori', pitch: 27, eave: 4.0, drift: 0.9, colour: 'ryokan' },
-  { id: 'tea', name: 'Tea House', u: 1640, v: -150, L: 10, W: 12, roof: 'sori', pitch: 28, eave: 3.4, drift: 1.0, colour: 'ryokan' },
-  { id: 'topstation', name: 'Gondola Top Station', u: 395, v: 575, L: 16, W: 14, roof: 'sori', pitch: 24, eave: 5.0, drift: 1.0, colour: 'station' },
-  { id: 'basestation', name: 'Gondola Base Station', u: 2470, v: 520, L: 20, W: 16, roof: 'sori', pitch: 24, eave: 5.5, drift: 0.6, colour: 'station' },
-  { id: 'lodge', name: 'Base Lodge', u: 2500, v: 240, L: 18, W: 26, roof: 'sori', pitch: 26, eave: 5, drift: 0.5, colour: 'ryokan' },
+  { id: 'haiden', name: 'Kitsune Shrine', u: 1765, v: 40, L: 18, W: 24, roof: 'sori', pitch: 30, eave: 6.2, drift: 1.05, colour: 'shrine' },
+  { id: 'kiku', name: 'Ryokan Kiku', u: 1852, v: 46, L: 16, W: 20, roof: 'sori', pitch: 27, eave: 6.8, drift: 1.0, colour: 'ryokan' },
+  { id: 'tsuki', name: 'Ryokan Tsuki', u: 1918, v: 50, L: 14, W: 18, roof: 'sori', pitch: 27, eave: 6.4, drift: 0.9, colour: 'ryokan' },
+  { id: 'yuki', name: 'Ryokan Yuki', u: 1984, v: 56, L: 14, W: 18, roof: 'sori', pitch: 27, eave: 6.4, drift: 0.9, colour: 'ryokan' },
+  { id: 'tea', name: 'Tea House', u: 1640, v: -150, L: 10, W: 12, roof: 'sori', pitch: 28, eave: 4.6, drift: 1.0, colour: 'ryokan' },
+  { id: 'topstation', name: 'Gondola Top Station', u: 395, v: 575, L: 16, W: 14, roof: 'sori', pitch: 24, eave: 6.5, drift: 1.0, colour: 'station' },
+  { id: 'basestation', name: 'Gondola Base Station', u: 2470, v: 520, L: 20, W: 16, roof: 'sori', pitch: 24, eave: 6.5, drift: 0.6, colour: 'station' },
+  { id: 'lodge', name: 'Base Lodge', u: 2500, v: 240, L: 18, W: 26, roof: 'sori', pitch: 26, eave: 6.5, drift: 0.5, colour: 'ryokan' },
 ];
 
 // The five-storey pagoda: a landmark (solid, not rideable). Square plan, tiers of curved roofs.
@@ -183,7 +183,7 @@ export const TRAILS = [
 export const LINE_GOALS = [
   ['Rim Rider', 2200, 'Kazan Gap 1', 'Kazan Gap 2', 'Kazan Gap 3'],
   ['Pillow Talk', 1800, 'Makura Pillows', 'Makura Cliff', 'Makura Stacks'],
-  ['Pilgrimage', 2400, 'Senbon Torii', 'Kitsune Shrine', 'Ryokan Kiku'],
+  ['Pilgrimage', 2400, 'Torii Exit', 'Kitsune Shrine', 'Ryokan Kiku'],
   ['Roof Hopper', 2000, 'Ryokan Kiku', 'Ryokan Tsuki', 'Ryokan Yuki'],
   ['Fox Fire', 1500, 'Kitsunebi Gully', 'Fox Fire Drop'],
   ['Summit to Shrine', 1600, 'Okama Lip', 'Fox Ledge', 'Kitsune Shrine'],

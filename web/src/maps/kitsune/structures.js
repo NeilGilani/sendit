@@ -39,8 +39,10 @@ export class Structure {
     this.ridge = Math.max(this.gDn + def.eave + this.fall(this.hl), this.gUp + 2.5);
     this.top = this.ridge + SNOW;
     this.R = Math.hypot(this.rl, this.rw) + 0.5;
-    // Drift on the uphill side: snow piled toward the ridge (baked into the terrain by the course).
-    this.driftTop = this.gUp + (this.ridge - this.gUp) * (def.drift ?? 0.8);
+    // Drift on the uphill side: a ramp of snow up to the uphill eave (baked into the terrain by the course), so a
+    // rider coming down the fall line rides straight onto the roof. `drift` < 1 stops it short of the eave.
+    this.eaveUp = this.roofY(-this.rl, 0) + SNOW * 0.8;
+    this.driftTop = this.gUp + (this.eaveUp - this.gUp) * Math.min(1, def.drift ?? 1);
   }
 
   /** Metres the roof has fallen from the ridge at |a| (concave: steep at the ridge, flatter at the eave). */
@@ -133,11 +135,10 @@ export class Structure {
     if (dx * dx + dz * dz > (reach + this.hw) ** 2) return 0;
     const [a, b] = this.local(x, z);
     const up = -a - this.hl;                       // metres uphill of the uphill wall
-    if (up < -this.hl || up > 28) return 0;
+    if (up < -0.3 || up > 28) return 0;            // never inside the footprint (the walls stand clear)
     const side = 1 - smooth((Math.abs(b) - this.rw) / 13);
     if (side <= 0) return 0;
-    let t = 1 - smooth(Math.max(0, up - 15) / 13);
-    t *= 1 - smooth((Math.abs(b) - this.hw + 1) / 2) * (1 - smooth((up + this.hl) / 10));
+    const t = 1 - smooth(Math.max(0, up - 15) / 13);
     const want = this.driftTop - 0.12 + Math.max(0, up) * 0.33;
     return Math.max(0, (want - ground) * t * side);
   }

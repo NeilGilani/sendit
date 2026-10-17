@@ -144,7 +144,7 @@ Ravenspire's base tuning was adapted for deep light powder and a gentler mountai
 
 ## 4. Scoring, goals, Challenge
 
-- **Line goals** (flow.js): Rim Rider (the three Kazan gaps), Pillow Talk, Pilgrimage (tunnel → shrine → Kiku),
+- **Line goals** (flow.js): Rim Rider (the three Kazan gaps), Pillow Talk, Pilgrimage (Torii Exit → shrine → Kiku),
   Roof Hopper (Kiku → Tsuki → Yuki), Fox Fire (gully → Fox Fire Drop), Summit to Shrine.
 - **Senbon Torii bonus**: ride all 33 gates in one go (inside the posts, no crash) for 600 + 6 × average km/h
   points (~1,000 at 70 km/h).
