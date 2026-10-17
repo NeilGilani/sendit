@@ -1,9 +1,12 @@
 // Voltage Park HUD (browser only; mounted from index.js): the grind balance meter and live trick name, timing
 // feedback (pop, landing zone, pipe height, switch-ups), the in-run speed gauge for the jump ahead (its
 // landing's window and sweet spot), the judged slopestyle card at the finish, the practice key (T: back to
-// the last feature you hit) and the grind sound (assets/audio/grind_loop.ogg + a clank on lock-on).
+// the last feature you hit), the grind sound (assets/audio/grind_loop.ogg + a clank on lock-on), and the event
+// energy: drop-in callouts at the top of the steep in-runs, the launch speed off every big lip, MEGA AIR calls
+// with a crowd roar off the biggest airs, and the run's top speed and longest air on the judged card.
 import { on, emit, game, Mode, settings } from '../../state.js';
 import { predictLipSpeed } from './park.js';
+import { START_X, PITCH } from './layout.js';
 
 const CSS = /* css */`
 #parkHud { position: absolute; inset: 0; pointer-events: none; font-family: "Arial Black", "Segoe UI Black", Impact, sans-serif; font-style: italic; color: #fffaf0; }
@@ -21,6 +24,9 @@ const CSS = /* css */`
 #parkHud .p1 { bottom: 262px; font-size: 22px; }
 #parkHud .p2 { bottom: 294px; font-size: 30px; }
 #parkHud .p3 { top: 150px; font-size: 20px; }
+#parkHud .p4 { top: 92px; font-size: 44px; letter-spacing: .04em; text-shadow: 0 0 24px rgba(255,61,154,.75), 0 0 6px rgba(0,0,0,.6); }
+#parkHud .p4.show { animation: pkBig 1.9s cubic-bezier(.2,.9,.3,1) forwards; }
+@keyframes pkBig { 0% { opacity: 0; transform: translateX(-50%) scale(1.6); } 10% { opacity: 1; transform: translateX(-50%) scale(.96); } 18% { transform: translateX(-50%) scale(1.02); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) scale(1); } }
 #parkHud .spd { position: absolute; right: 36px; bottom: 150px; width: 210px; opacity: 0; transition: opacity .25s; text-align: right; }
 #parkHud .spd.on { opacity: 1; }
 #parkHud .spd .lab { font-size: 12px; letter-spacing: .26em; opacity: .8; }
@@ -42,6 +48,8 @@ const CSS = /* css */`
 #parkHud .card .tot b { font-family: "Arial Black", Impact, sans-serif; font-style: italic; font-size: 44px; color: #ffe14d; }
 `;
 
+const DROPS = [['plunge', 'DROPPING IN · THE PLUNGE'], ['launch', 'DROPPING IN · THE LAUNCH'], ['mega', 'MEGAWATT · SEND IT']];
+
 const ZONES = {
   sweet: ['SWEET SPOT', '#ffe14d'], deep: ['DEEP · CLEAN', '#2ff5d6'], short: ['SHORT', '#ffb02e'],
   knuckle: ['KNUCKLED', '#ff8a3d'], cased: ['CASED THE DECK', '#ff3d6e'], overshot: ['OVERSHOT', '#ff3d6e'],
@@ -56,7 +64,7 @@ export function mountParkHud(course) {
   root.id = 'parkHud';
   root.innerHTML = `
     <div class="bal"><div class="trick"></div><div class="len"></div><div class="bar"><div class="needle"></div></div><div class="keys">A / D BALANCE · SPACE TAP SWITCH-UP · HOLD + RELEASE POP · W / S PRESS</div></div>
-    <div class="pop p1"></div><div class="pop p2"></div><div class="pop p3"></div>
+    <div class="pop p1"></div><div class="pop p2"></div><div class="pop p3"></div><div class="pop p4"></div>
     <div class="spd"><div class="lab">IN-RUN SPEED</div><div class="nm"></div><div class="track"><div class="win"></div><div class="sw"></div><div class="me"></div></div><div class="tip"></div></div>
     <div class="card"></div>`;
   const attach = () => (document.getElementById('hud') || document.body).appendChild(root);
@@ -65,7 +73,7 @@ export function mountParkHud(course) {
   const bal = $('.bal'), trick = $('.trick'), len = $('.len'), needle = $('.needle');
   const spd = $('.spd'), card = $('.card');
   const pop = (el, text, color) => { el.textContent = text; el.style.color = color; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); };
-  const p1 = $('.p1'), p2 = $('.p2'), p3 = $('.p3');
+  const p1 = $('.p1'), p2 = $('.p2'), p3 = $('.p3'), p4 = $('.p4');
   const fmt = (n) => Math.round(n).toLocaleString('en-US');
   on('parkPop', ({ label, q }) => pop(p1, label, q >= 0.95 ? '#ffe14d' : q >= 0.8 ? '#2ff5d6' : '#ffb02e'));
   on('parkLanding', ({ zone, jump, dist }) => { const [t, c] = ZONES[zone] || ['', '#fff']; pop(p2, `${t} · ${Math.round(dist)} M`, c); void jump; });
@@ -75,6 +83,31 @@ export function mountParkHud(course) {
   on('grindLost', () => pop(p3, 'GRIND LOST', '#ff6bb0'));
   on('grindClip', () => pop(p1, 'CLIPPED THE RAIL', '#ff6bb0'));
   on('grindEnd', ({ reason }) => { if (reason === 'bail') pop(p2, 'BAILED', '#ff3d6e'); else if (reason === 'stall') pop(p1, 'STALLED', '#ffb02e'); });
+
+  // ---- event energy
+  const kmh = (v) => Math.round(v * 3.6);
+  const BIG = new Set(['Megawatt', 'The Tower', 'The Gap', 'Voltage', 'Thunder', 'The Canal']);
+  const run = { top: 0, air: 0, drops: new Set() };
+  on('rideStarted', () => { run.top = 0; run.air = 0; run.drops.clear(); });
+  on('resetTop', () => { run.top = 0; run.air = 0; run.drops.clear(); });
+  let launch = null;
+  on('takeoff', () => {
+    const pl = course.player;
+    if (!pl) return;
+    const nm = course.featureAt(pl.position.x, pl.position.z);
+    launch = nm ? { nm, v: pl.speed } : null;
+    if (nm && pl.speed > 16 && course.named.some((n) => n.name === nm && n.kind === 'jump')) pop(p1, `${nm.toUpperCase()} · ${kmh(pl.speed)} KM/H`, pl.speed > 21 ? '#ffe14d' : '#2ff5d6');
+  });
+  on('landed', (e) => {
+    run.air = Math.max(run.air, e.air || 0);
+    const big = launch && BIG.has(launch.nm);
+    if (e.air >= 2.6 && (big || e.air >= 3)) {
+      pop(p4, e.clean ? (e.air >= 3.2 ? `MEGA AIR · ${e.air.toFixed(1)} S` : `HUGE · ${e.air.toFixed(1)} S`) : `SKETCHY · ${e.air.toFixed(1)} S`, e.clean ? '#ffe14d' : '#ff6bb0');
+      if (e.clean) roar(Math.min(1, (e.air - 2) / 1.6));
+    }
+    launch = null;
+  });
+  on('parkLanding', ({ zone, jump }) => { if (zone === 'sweet' && BIG.has(jump)) roar(0.45); });
 
   // ---- practice: T = back to the approach of the last feature you hit
   let last = null, hinted = false;
@@ -131,7 +164,8 @@ export function mountParkHud(course) {
       ${j.sections.map((s) => bar(s.name, s.score, 10)).join('')}
       ${bar('Variety', j.variety, 20)}${bar('Amplitude', j.amplitude, 10)}${bar('Flow', j.flow, 10)}
       <div class="tot"><span>${rating}${j.medal ? ` · ${j.medal.toUpperCase()}` : ''}</span><b>${j.total.toFixed(1)}</b></div>
-      <div class="row"><span>Personal best</span><b>${isBest ? 'NEW BEST!' : best.total.toFixed(1)}</b></div>`;
+      <div class="row"><span>Personal best</span><b>${isBest ? 'NEW BEST!' : best.total.toFixed(1)}</b></div>
+      <div class="row"><span>Top speed · longest air</span><b>${kmh(run.top)} km/h · ${run.air.toFixed(1)} s</b></div>`;
     card.classList.add('on');
     cardT = performance.now() + 7500;
   });
@@ -153,6 +187,13 @@ export function mountParkHud(course) {
     }
     gauge(pl);
     audio(pl);
+    if (pl.state === 1 || pl.state === 5) run.top = Math.max(run.top, pl.speed);
+    // Dropping into the steep pitches: a call at the top of each.
+    const u = pl.position.x - START_X;
+    for (const [k, label] of DROPS) {
+      const at = PITCH[k];
+      if (u > at - 6 && u < at + 4 && !run.drops.has(k)) { run.drops.add(k); pop(p3, label, '#ff3d9a'); }
+    }
   };
   requestAnimationFrame(tick);
 
@@ -166,7 +207,7 @@ export function mountParkHud(course) {
         if (!f.jump?.land) continue;
         const [a, b] = f.local(pl.position.x, pl.position.z);
         const ahead = f.jump.lipA - a;
-        if (ahead < 2 || ahead > 75 || Math.abs(b) > f.jump.hw + 1.5) continue;
+        if (ahead < 2 || ahead > 110 || Math.abs(b) > f.jump.hw + 1.5) continue;   // (≈ 5 s out at 22 m/s)
         // Heading roughly along the jump.
         if (sp > 2 && (pl.velocity.x * f.fx + pl.velocity.z * f.fz) / sp < 0.7) continue;
         if (ahead < best) { best = ahead; J = f; }
@@ -212,6 +253,26 @@ export function mountParkHud(course) {
       clank(kind);
     });
   });
+  // The crowd: a band-passed noise swell (a roar off the biggest airs, a cheer on a sweet spot).
+  let noise = null;
+  function roar(k) {
+    ensure().then(() => {
+      if (!ctx) return;
+      if (ctx.state === 'suspended') ctx.resume();
+      if (!noise) {
+        noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+        const d = noise.getChannelData(0);
+        let b = 0;
+        for (let i = 0; i < d.length; i++) { b = 0.97 * b + 0.03 * (Math.random() * 2 - 1); d[i] = b * 6; }
+      }
+      const t = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      s.buffer = noise; s.playbackRate.value = 0.9 + Math.random() * 0.2;
+      f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 0.7;
+      const peak = (0.12 + 0.25 * k) * vol();
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + 0.25); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2 + 0.8 * k);
+      s.connect(f); f.connect(g); g.connect(ctx.destination); s.start(t); s.stop(t + 2.1);
+    });
+  }
   function clank(kind) {
     if (!ctx) return;
     const t = ctx.currentTime, o = ctx.createOscillator(), g2 = ctx.createGain(), f = ctx.createBiquadFilter();

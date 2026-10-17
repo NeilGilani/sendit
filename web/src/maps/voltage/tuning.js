@@ -19,9 +19,9 @@ export const VOLTAGE_PHYSICS = {
     crashImpact: 14,
     landYawSpeed: [16, 26, 0.85],
     stumbleTime: 0.8,
-    // A touch of apex slow motion off the biggest airs only (Megawatt, the Tower, the Gap: 3 s and more, high
-    // over the snow); the tables run in real time.
-    slowmo: { minAir: 3.0, minDrop: 8, scale: 0.72, easeIn: 0.2, hold: 0.3, easeOut: 0.35, cooldown: 4 },
+    // A touch of apex slow motion off the biggest airs only (Megawatt, the Tower, a Voltage sent deep: 2.7 s and
+    // more, high over the snow); Lightning, the lanes and the hips run in real time.
+    slowmo: { minAir: 2.7, minDrop: 7, scale: 0.72, easeIn: 0.2, hold: 0.3, easeOut: 0.35, cooldown: 4 },
     windRoar: 1,
     grind: {},                    // physics/grind.js GRIND_DEFAULTS overrides (none: the defaults are tuned here)
     wallAlign: true,              // pipe / quarterpipe walls: the gear tracks its path up the wall (physics/edge.js)
