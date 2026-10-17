@@ -28,6 +28,9 @@ The research behind the numbers is in [equipment-research.md](equipment-research
 | `web/scripts/physics-tricks.mjs` | Headless flip and cork bench: launches, stick timing, landings and trick names for both types. |
 | `web/scripts/physics-kicker.mjs` | Headless kicker bench: a features.js-shaped kicker on a slope, straight, popped, spun, flipped and preloaded. Takes `[ski\|snowboard\|both] [slopeDeg]`. |
 | `web/scripts/physics-course.mjs` | Headless bot on the real hand-built gully (course.js on the game's 1.25 m grid), start to finish. Styles: `carve`, `straight`, `park` (pop + 360 off the drops), `flip` (preloaded backflips). Logs landings, stumbles, crashes and speeds. |
+| `web/scripts/physics-steer.mjs` | Headless steering-feel bench at pinned speeds with each map's physics: turn-in time, full-lock gear and path rates, skid, key-tap size, 30 % / 60 % stick response, edge-to-edge time, release. |
+| `web/scripts/physics-release.mjs` | Headless steer-release bench: hold a turn, let go, time the settle. |
+| `web/scripts/rider-seq.mjs` | GPU: pose contact sheet through a scripted slalom (frozen at each capture, so frames are on time), with world-space pose numbers (head / chest roll, counter-rotation, head vs path). Env AT, V0, Q. |
 
 ## APIs other modules rely on
 
@@ -275,7 +278,7 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
   - `landLeanTime` / `landLeanResponse`: for 0.35 s after a landing the lean catches up at 30/s, so the body is plumb at once on a steep face.
   - `carveCrouch`: extra crouch at full lean (a lower, athletic stance in hard carves).
   - `angulation`, `angulationReverse` (the share kept when the edge is below the lean or already on the other side, 0), `crossover` (the upper body leading into the new turn at an edge change), `polePlantTime`.
-  - Skis: `skiCounter` (counter-rotation per rad of lean), `skiStanceCarve` (wider stance in deep carves).
+  - Skis: `skiCounter` (counter-rotation per rad of lean), `skiStanceCarve` (wider stance in deep carves), `skiTipLead` (the inside ski runs up to 8 cm ahead in a carve).
   - Head: `headLevel` (share of the body's world roll the head takes back out), `headLook` (head turn into the carve per rad of lean).
   - Letting go: `rollRelease` (the lean eases back up, 15 vs `rollResponse` 10) and `leadRelease` (the upper-body turn lead, 10 vs 6), used only while the steer is released and the value is heading back to neutral.
   - Skis: `skiPressPitch`, `skiPressShift`, `skiPopSnap`.
@@ -321,6 +324,7 @@ At runtime, `registerVariant(type, spec)` adds a model (for DLC or user presets)
   - Hockey-stop counter-rotation: the torso keeps facing down the path.
   - Pole plant on every edge change at speed, a double-pole cycle when pushing with W, snowplough wedge, tuck, grabs.
   - When leaning, the inside ski is lifted back to the snow (inside knee flexes, outside leg extends).
+  - Carving, the inside ski runs a little ahead (`skiTipLead`), and the pole tips rest on the snow surface (the shaft swings back when the hands are low).
 - **Snowboard:**
   - Sideways stance: the chest faces the toe edge, with binding angles on the feet and knees toward the toes.
   - Hips and shoulders open toward the nose; the head turns toward the travel direction (`headTurn` 1.5 rad: about 8° off it riding straight), over the back shoulder when switch.

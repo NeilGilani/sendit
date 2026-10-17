@@ -16,7 +16,7 @@ const end = script.at(-1)[0];
 const browser = await chromium.launch({ args: process.env.GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : [] });
 const page = await browser.newPage({ viewport: { width: 480, height: 480 } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
-await page.goto(`${url}?ride&equip=${equip}${map ? '&map=' + map : ''}`);
+await page.goto(`${url}?ride&equip=${equip}${map ? '&map=' + map : ''}${process.env.Q ? '&' + process.env.Q : ''}`);   // env Q = extra query (e.g. stance=goofy)
 await page.waitForFunction(() => window.__sendit && window.__sendit.player.controllable?.(), null, { timeout: 300000 });
 await page.waitForTimeout(500);
 await page.evaluate(({ end, script, cam, v0, at }) => {
