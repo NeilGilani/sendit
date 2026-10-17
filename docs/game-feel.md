@@ -53,6 +53,16 @@ Tunables (`JUICE_COMBO`):
 | `repeatCredit` | 0.35 | How much the first repeat of a move counts; the k-th counts this / k. |
 | `minBankMult` | 1.5 | Below this, the chain ends without a bonus line. |
 
+**FEVER** (Forza's skill songs, `JUICE_COMBO.fever`). On own-chain maps (Valcrest, Blackspruce, Zen), a 12 s hot window opens 45–90 s into a ride, then every 75–130 s, counting only while actually moving.
+
+During FEVER:
+
+- Each move adds ×1.0 instead of ×0.5, and the cap is ×8. What was built stays when it ends.
+- A "FEVER! COMBOS ×2" banner shows, the screen edge pulses orange, and the combo panel counts down.
+- A music drop plays, rush lines appear, the lens kicks, the controller rumbles, and the hot trail goes gold.
+
+Flow maps have SEND IT instead, and Challenge runs stay fair, so neither gets FEVER. Event: `juiceFever {on, t}`.
+
 Bus events:
 
 - `juiceCombo {mult, pts, n, items, left, source} | null`

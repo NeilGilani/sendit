@@ -15,6 +15,8 @@ export const JUICE_COMBO = {
   max: 6,
   repeatCredit: 0.35,   // the first repeat of a move counts this much towards the multiplier, the k-th this / k
   minBankMult: 1.5,     // below this the chain just ends (no bonus line)
+  // FEVER (Forza's skill songs): now and then a short hot window doubles the step and lifts the cap.
+  fever: { first: [45, 90], gap: [75, 130], length: 12, step: 1.0, max: 8, minSpeed: 0.45 },
 };
 
 const AIR = 2, GRIND = 5;
@@ -32,7 +34,7 @@ export class ComboTracker {
     this.offs = [
       // A Challenge run is scored on the activity's style combo, so it wins over the flow line chain.
       on('activity', ({ type }) => { this.source = type === 'challenge' ? 'challenge' : this.pl.flow ? 'flow' : 'own'; this.clear(); }),
-      on('rideStarted', () => { this.clear(); this.best = 0; }),
+      on('rideStarted', () => { this.clear(); this.best = 0; this.feverIn = undefined; if (this.feverT > 0) this.endFever(); }),
       on('respawned', () => this.clear()),
       on('score', (e) => this.onScore(e)),
       on('crashed', () => this.lose()),
@@ -82,7 +84,7 @@ export class ComboTracker {
   ownState() {
     const c = this.chain;
     if (!c) return null;
-    return { mult: Math.min(this.C.max, 1 + Math.max(0, c.n - 1) * this.C.step), pts: c.pts, n: c.n, items: c.items.slice() };
+    return { mult: c.m, pts: c.pts, n: c.n, items: c.items.slice(), fever: this.feverT > 0 };
   }
 
   setMirror(s) {
@@ -96,11 +98,16 @@ export class ComboTracker {
     if (this.source !== 'own' || this._banking || !label || /^\d+ m$/.test(label)) return;
     if (game.mode !== Mode.RIDING && game.mode !== Mode.LIFT && typeof document !== 'undefined') return;
     const key = moveKey(label);
-    if (!this.chain) this.chain = { pts: 0, n: 0, seen: new Map(), items: [] };
+    if (!this.chain) this.chain = { pts: 0, n: 0, m: 1, seen: new Map(), items: [] };
     const c = this.chain;
     const seen = c.seen.get(key) || 0;
     c.seen.set(key, seen + 1);
-    c.n += seen ? this.C.repeatCredit / seen : 1;   // the k-th repeat counts repeatCredit / k (THPS: repeats wear out)
+    const credit = seen ? this.C.repeatCredit / seen : 1;   // the k-th repeat counts repeatCredit / k (THPS: repeats wear out)
+    // The multiplier grows from the second move on, faster and higher during FEVER.
+    const F = this.C.fever, hot = this.feverT > 0;
+    const cap = hot ? F.max : this.C.max;
+    if (c.n > 0) c.m = Math.max(c.m, Math.min(cap, c.m + credit * (hot ? F.step : this.C.step)));   // never drops (a FEVER-built ×8 stays)
+    c.n += credit;
     c.pts += points;
     c.items.push(label);
     if (c.items.length > 6) c.items.shift();
@@ -111,9 +118,28 @@ export class ComboTracker {
   /** Per frame (real seconds). Banks the own chain once it has been idle on the snow for the window. */
   update(dt) {
     if (!this.live()) this.idle += dt;
+    this.feverStep(dt);
     if (this.source === 'own' && this.chain && this.idle >= this.C.window) this.bank();
     if (this.source === 'challenge' && this.mirror && this.idle > CHALLENGE_WINDOW + 0.3) this.mirror = null;   // the activity banks on its own clock
   }
+
+  /** FEVER timing: own chains only (flow maps have SEND IT; Challenge scoring stays fair). */
+  feverStep(dt) {
+    const F = this.C.fever;
+    if (this.source !== 'own') { if (this.feverT > 0) this.endFever(); return; }
+    if (this.feverT > 0) { this.feverT -= dt; if (this.feverT <= 0) this.endFever(); return; }
+    if (this.feverIn === undefined) this.feverIn = rnd(F.first);
+    if ((this.pl.speedRatio ?? 0) > F.minSpeed) this.feverIn -= dt;   // counts while actually riding
+    if (this.feverIn <= 0) this.startFever();
+  }
+
+  startFever() {
+    this.feverT = this.C.fever.length;
+    this.feverIn = rnd(this.C.fever.gap);
+    emit('juiceFever', { on: true, t: this.feverT });
+  }
+
+  endFever() { this.feverT = 0; emit('juiceFever', { on: false }); }
 
   bank() {
     const s = this.ownState();
@@ -154,4 +180,5 @@ export function moveKey(label) {
   return String(label).replace(/^(Perfect|Sketchy|Locked-in)\s+/i, '').replace(/\s*·.*$/, '').replace(/\d+(\.\d+)?\s*(s|m)\b/g, '').trim().toLowerCase();
 }
 
+const rnd = ([a, b]) => a + Math.random() * (b - a);
 export const trim = (m) => (Math.round(m * 100) / 100).toString();

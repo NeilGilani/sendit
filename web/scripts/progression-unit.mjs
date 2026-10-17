@@ -282,6 +282,18 @@ export async function run(test, assert) {
     for (let i = 0; i < 20; i++) emit('score', { label: 'Close shave', points: 15 });
     assert.ok(cb.state().mult < 2, `20 close shaves → ×${cb.state().mult}`);
     pl.state = 2;
+    // FEVER: the step doubles and the cap lifts; what was built stays when it ends.
+    emit('crashed', 'x'); pl.state = 1;
+    const fev = [];
+    const offF = on('juiceFever', (e) => fev.push(e.on));
+    cb.startFever();
+    for (const l of ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']) emit('score', { label: l, points: 10 });
+    assert.equal(cb.state().mult, 8, 'FEVER cap ×8');
+    assert.equal(cb.state().fever, true);
+    cb.update(13);   // the window ends (and the chain banks after its own window)
+    assert.deepEqual(fev, [true, false]);
+    offF();
+    pl.state = 2;
     assert.equal(moveKey('Perfect Left 540 Mute'), 'left 540 mute');
     assert.equal(moveKey('Boardslide · 6.2 m'), 'boardslide');
     offs.forEach((o) => o()); cb.dispose();

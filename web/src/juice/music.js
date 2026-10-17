@@ -35,6 +35,7 @@ export class MusicEnergy {
       }),
       on('juiceComboBanked', ({ mult }) => { if (mult >= 3) this.drop('combo', Math.min(1, mult / 6)); else this.burst = Math.min(1, this.burst + 0.15); }),
       on('juiceLevelUp', () => this.drop('levelUp', 1)),
+      on('juiceFever', ({ on: st }) => { if (st) this.drop('fever', 0.9); }),
       on('crashed', () => { this.burst = 0; this.level *= 0.5; }),
       on('mode', (m) => { if (m === Mode.MENU) { this.level = 0; this.burst = 0; this.release(); } }),
     ];
@@ -70,7 +71,8 @@ export class MusicEnergy {
     const sp = Math.max(0, Math.min(1, (r - C.speedFrom) / (C.speedFull - C.speedFrom)));
     const c = this.combo?.state();
     const combo = c ? Math.min(C.comboMax, (c.mult - 1) * C.comboPerMult) : 0;
-    return Math.min(1, sp * C.speedWeight + (pl.state === 2 ? C.airWeight : 0) + combo + (this.flowReal ? C.flowBonus : 0) + this.burst);
+    const hot = this.flowReal || (this.combo?.feverT > 0);   // SEND IT or FEVER
+    return Math.min(1, sp * C.speedWeight + (pl.state === 2 ? C.airWeight : 0) + combo + (hot ? C.flowBonus : 0) + this.burst);
   }
 
   update(dt) {

@@ -42,7 +42,7 @@ export function installJuice({ player, cam, sound, input, post, camera, fx, acti
       // A hot chain opens the lens a little (+0.75° per ×1 above ×1, at most +3°, scaled by the shake setting).
       const c = riding ? combo.state() : null;
       if (cam) cam.juiceFov = c ? Math.min(3, (c.mult - 1) * 0.75) * shakeAmount() : 0;
-      trail?.update(dt, c?.mult ?? 1, !!player.flow?.inState, riding);
+      trail?.update(dt, c?.mult ?? 1, !!player.flow?.inState || combo.feverT > 0, riding);
       hud?.update(dt);
       music.update(dt);
       speedfx?.update(dt, time, player.speedRatio ?? 0, riding, !!player.flow?.inState);
@@ -77,6 +77,7 @@ export function installJuice({ player, cam, sound, input, post, camera, fx, acti
     lastMult = m;
   };
   on('countdown', (n) => { if (n === 0) speedfx?.pulse('bank'); });   // GO!: a burst of rush lines
+  on('juiceFever', ({ on: st }) => { if (st) { speedfx?.pulse('flow'); cam?.kick?.({ fov: 4 * shakeAmount() }); } });
   // Rails: a light buzz on the lock-in and on each kink.
   on('grindStart', () => input?.rumble?.(0.15, 0.45, 90));
   on('grindKink', () => input?.rumble?.(0.3, 0.5, 70));

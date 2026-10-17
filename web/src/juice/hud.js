@@ -104,6 +104,11 @@ const CSS = /* css */`
 #juiceHud .rv { position: absolute; inset: 0; opacity: 0; transition: opacity .25s; box-shadow: inset 0 0 120px 26px rgba(255,61,154,.32); }
 #juiceHud.atrisk .rv { opacity: 1; animation: jhRisk .55s ease-in-out infinite alternate; }
 @keyframes jhRisk { from { opacity: .45; } to { opacity: 1; } }
+/* FEVER: a hot window (juice/combo.js) */
+#juiceHud .fe { position: absolute; inset: 0; opacity: 0; transition: opacity .4s; box-shadow: inset 0 0 150px 34px rgba(255,140,40,.38); }
+#juiceHud.fever .fe { opacity: 1; animation: jhRisk .4s ease-in-out infinite alternate; }
+#juiceHud .cb .fv { display: none; font-size: 13px; letter-spacing: .3em; color: #ff9a3d; margin-top: 3px; -webkit-text-stroke: 1px #1b1446; paint-order: stroke fill; }
+#juiceHud.fever .cb .fv { display: block; }
 /* flash + edge glow */
 #juiceHud .fl { position: absolute; inset: 0; background: #fff; opacity: 0; }
 #juiceHud .fl.show { animation: jhFlash .28s ease-out forwards; }
@@ -153,8 +158,8 @@ export function mountJuiceHud({ player, combo, input, camera }) {
   const root = document.createElement('div');
   root.id = 'juiceHud';
   root.innerHTML = `
-    <div class="rv"></div><div class="eg"></div><div class="fl"></div>
-    <div class="cb"><div><span class="m stroke">×1</span><span class="p stroke">0</span></div><div class="tr"></div><div class="it"></div><div class="tm"><i></i></div><div class="rk">LAND IT</div></div>
+    <div class="rv"></div><div class="fe"></div><div class="eg"></div><div class="fl"></div>
+    <div class="cb"><div><span class="m stroke">×1</span><span class="p stroke">0</span></div><div class="tr"></div><div class="fv"></div><div class="it"></div><div class="tm"><i></i></div><div class="rk">LAND IT</div></div>
     <div class="sp"><span></span><small>SPLIT</small></div>
     <div class="an"><div class="g"><span></span></div><div class="t"></div><div class="s"></div><div class="nw">NEW TRICK</div></div>
     <div class="air"><div class="d">0</div><div class="x"></div></div>
@@ -205,6 +210,12 @@ export function mountJuiceHud({ player, combo, input, camera }) {
   on('juiceComboBanked', ({ bonus, mult }) => {
     banner(`${mult >= 4 ? 'MONSTER ' : ''}COMBO ×${trim(mult)}  +${fmt(bonus)}`, mult >= 4 ? '#ff9a3d' : '#ffe14d');
     if (mult >= 2.5) edge('rgba(255,200,60,.5)');
+  });
+  // FEVER (juice/combo.js): a banner, a pulsing hot edge and a countdown on the combo panel.
+  const fv = $('.cb .fv');
+  on('juiceFever', ({ on: st }) => {
+    root.classList.toggle('fever', !!st && riding());
+    if (st) { banner('FEVER!  COMBOS ×2', '#ff9a3d'); edge('rgba(255,140,40,.6)'); input?.rumble?.(0.5, 0.9, 260); }
   });
   // Challenge splits vs the best run (juice/splits.js).
   const split = (d, label) => {
@@ -346,6 +357,7 @@ export function mountJuiceHud({ player, combo, input, camera }) {
       root.classList.toggle('atrisk', atRisk && s.mult >= JUICE_HUD.riskVignetteFrom && !reducedMotion());
       cb.classList.add('on');
     } else { cb.classList.remove('on', 'risk'); root.classList.remove('atrisk'); }
+    if (combo.feverT > 0) { const t = `FEVER ${Math.ceil(combo.feverT)}s`; if (fv.textContent !== t) fv.textContent = t; }
     // Live air: rotation in 180s, flips, grab.
     const inAir = player.state === 2 && player.airTime > JUICE_HUD.liveAirFrom && riding();
     const spin = Math.abs(player._spinTotal || 0);
