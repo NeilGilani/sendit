@@ -134,6 +134,7 @@ function mountRecap() {
     pending = null;
     if (s.xp <= 0) return;
     const rows = [
+      ...(s.best ? [['🏆', `Best trick: ${s.best.name} +${Math.round(s.best.pts).toLocaleString('en-US')}`]] : []),
       ...s.dailies.map((t) => ['✓', `Daily: ${t}`]),
       ...s.achievements.map((t) => ['★', t]),
       ...s.pbs.map((t) => ['▲', `New best: ${t}`]),

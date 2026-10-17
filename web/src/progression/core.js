@@ -339,7 +339,10 @@ export class Progression {
     if (!this.ride || !e.clean) return;
     const L = this.state.life;
     if (e.air > 0) { this.ride.air += e.air; L.air += e.air; this.bump('air', e.air); this.pbCheck('air', round1(e.air)); }
-    if (e.trick) { L.tricks++; this.bump('tricks'); this.recordTrickName(e.trick); }
+    if (e.trick) {
+      L.tricks++; this.bump('tricks'); this.recordTrickName(e.trick);
+      if ((e.points || 0) > (this.ride.best?.pts || 0)) this.ride.best = { name: trickKey(e.trick), pts: e.points };
+    }
     if (e.flips > 0) { L.flips += e.flips; this.bump('flips', e.flips); }
     if (e.spin > 0) {
       L.maxSpin = Math.max(L.maxSpin, e.spin);

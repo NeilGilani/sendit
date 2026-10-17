@@ -82,7 +82,7 @@ export function trackProgression({ player, getMapId }) {
     const spin = Number((String(e.trick || '').match(/(\d{3,4})(?!\s*m)/) || [])[1] || 0);
     const flips = /double|triple/i.test(e.trick || '') ? (/triple/i.test(e.trick) ? 3 : 2) : /flip|cork|misty|rodeo|wildcat|tamedog/i.test(e.trick || '') ? 1 : 0;
     const grade = !e.clean ? 'sketchy' : e.grade === 'stomped' || e.perfect ? 'stomped' : 'clean';
-    P.recordLanding({ clean: e.clean, trick: e.trick, air: e.air > 0.35 ? e.air : 0, grade, spin, flips });
+    P.recordLanding({ clean: e.clean, trick: e.trick, air: e.air > 0.35 ? e.air : 0, grade, spin, flips, points: e.points || 0 });
   });
   on('grindScore', ({ label }) => { if (open) { P.state.life.tricks++; P.bump('tricks'); if (!/^Sketchy/.test(label || '')) P.recordTrickName(label); } });
   on('grindEnd', ({ dist, reason }) => { if (open && reason !== 'bail') P.recordGrind(dist || 0); });
