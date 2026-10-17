@@ -195,8 +195,17 @@ export function report(r) {
 }
 
 if (process.argv[1] && process.argv[1].endsWith('map5-ride.mjs')) {
-  const [typeArg = 'both', lineArg = 'all', style = 'send'] = process.argv.slice(2);
+  const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+  const check = process.argv.includes('--check');
+  const [typeArg = 'both', lineArg = 'all', style = 'send'] = args;
   const types = typeArg === 'both' ? ['ski', 'snowboard'] : [typeArg];
   const keys = lineArg === 'all' ? Object.keys(LINES) : lineArg.split(',');
-  for (const k of keys) for (const ty of types) report(ride(ty, k, style, { spins: Number(process.env.SPINS || 2) }));
+  const bad = [];
+  for (const k of keys) for (const ty of types) {
+    const r = ride(ty, k, style, { spins: Number(process.env.SPINS || 2) });
+    report(r);
+    // --check: every line rides start to finish, at most one crash, at a real freeride pace (≥ 40 mph).
+    if (!r.finished || r.crashes > 1 || r.avg < 18) bad.push(`${k}/${ty}: ${r.finished ? '' : 'DNF '}${r.crashes} crashes, ${r.avg} m/s`);
+  }
+  if (check) { console.log(bad.length ? `\nFAIL: ${bad.join(' · ')}` : '\nPASS: every line rides start to finish'); process.exit(bad.length ? 1 : 0); }
 }

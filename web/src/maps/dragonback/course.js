@@ -21,6 +21,9 @@ import { attachSluff } from './sluff.js';
 
 const U_MIN = -7000, U_MAX = 9000;      // profile table range (1 m)
 const DEG = Math.PI / 180;
+// The Dragon's Back towers: [v, height above the start, flank slope, twist].
+const SUMMIT_TOWERS = [[-380, 170, 1.9, 0.3], [-280, 210, 2.0, 1.1], [-175, 165, 2.2, 0.6], [-95, 245, 1.8, 0.2], [20, 150, 2.3, 1.4],
+  [110, 200, 1.9, 0.8], [215, 175, 2.1, 0.4], [320, 225, 1.8, 1.2], [430, 160, 2.0, 0.9]];
 
 export class DragonbackCourse {
   constructor() {
@@ -49,6 +52,40 @@ export class DragonbackCourse {
     this.dropZones = DROP_ZONES.map(([name, u, v]) => ({ name, x: START_X + u, z: v, heading: -Math.PI / 2 }));
     this.challenge.flakes = this.placeFlakes();
     this.challenge.gates = this.placeGates();
+    this.placeProps();
+  }
+
+  /**
+   * Where the props stand (props.js draws them): bivouacs (they collide: course.obstacles), cairns at every
+   * notch lip and hop spur, prayer-flag strings at the Shoulder and over the finish, marker poles along the
+   * rollover, the summit cross on the Dragon's Back's highest tower. World x / z.
+   */
+  placeProps() {
+    const W = (u, v) => [START_X + u, v];
+    const bivouacs = [[8, -118, 0.15], [96, -330, -0.3], [1050, -300, 0.4], [640, 420, -0.2]].map(([u, v, yaw]) => { const [x, z] = W(u, v); return { x, z, yaw }; });
+    for (const b of bivouacs) this.obstacles.push([b.x, b.z, 3.0, 'tower']);
+    const cairns = [];
+    for (const r of this.ridges) {
+      for (const g of r.gaps) for (const sd of [-1, 1]) { const [x, z] = W(g.u - 5, r.crestAt(g.u - 5) + sd * (r.topAt(g.u) + 3.5)); cairns.push({ x, z, stick: sd > 0 }); }
+      if (r.end === 'prow' && !r.id.startsWith('hop')) { const [x, z] = W(r.u1 - 6, r.crestAt(r.u1) + r.topAt(r.u1) + 3); cairns.push({ x, z, size: 0.8 }); }
+    }
+    for (const h of this.hops) {
+      const sp = h.spur, side = Math.sign(sp.crestAt(sp.u1) - sp.crestAt(sp.u0));
+      const [x, z] = W(sp.u0 + 4, h.fromRidge.crestAt(sp.u0 + 4) - side * (h.fromRidge.topAt(sp.u0) + 3));
+      cairns.push({ x, z, stick: true, size: 1.2 });
+    }
+    for (let v = -300; v <= 330; v += 70) { const [x, z] = W(FINISH_U, v); if (Math.abs(v - 5) > 60) cairns.push({ x, z, size: 1.1 }); }
+    const flags = [
+      { a: W(8, -112), b: W(40, -58), h: 3.4, sag: 0.6 },
+      { a: W(30, -120), b: W(52, -10), h: 4.6, sag: 0.9 },
+      { a: W(26, 20), b: W(48, 110), h: 4.6, sag: 0.9 },
+      { a: W(FINISH_U, -55), b: W(FINISH_U, 65), h: 7, sag: 1.4 },
+    ];
+    const poles = [];
+    for (let v = -420; v <= 420; v += 26) { const u = 84 + 6 * Math.sin(v / 37); if (this.lineDist(u, v) > 6) { const [x, z] = W(u, v); poles.push({ x, z }); } }
+    let cross = null, best = -Infinity;
+    for (let u = -260; u <= -30; u += 4) for (let v = -200; v <= 200; v += 4) { const y = this.height(START_X + u, v); if (y > best) { best = y; cross = { x: START_X + u, z: v }; } }
+    this.props = { bivouacs, cairns, flags, poles, cross };
   }
 
   // ---------------------------------------------------------------- tables
@@ -206,9 +243,12 @@ export class DragonbackCourse {
     const top = base + tw;
     // Cross-section: steep both sides (rock), the face side meets the bowl.
     const prof = top - Math.abs(du) * (du > 0 ? 1.15 : 1.6) - Math.max(0, Math.abs(du) - 30) * 0.4;
-    if (prof <= e) return e;
     const k = sstep(-650, -250, -behind) * sstep(1100, 700, Math.abs(v));
-    return e + (prof - e) * smooth((prof - e) / 40) * k;
+    if (prof > e) e += (prof - e) * smooth((prof - e) / 40) * k;
+    // The towers: a row of lobed rock horns along the crest (the dragon's dorsal plates), tallest just left of
+    // the start; you see them serrate the sky behind you at the Shoulder.
+    for (const [tv, th, sl, tw] of SUMMIT_TOWERS) e = horn(e, START_X + u, v, START_X - 175 - 25 * Math.sin(tv / 210) + 14 * Math.sin(tv), tv, TOP + th, sl, tw);
+    return e;
   }
 
   /** Terrain without the snow details (no hits / pillows): the face and every ridge. */
@@ -440,9 +480,14 @@ export class DragonbackCourse {
     // Over a gap: the flake floats on the take-off line, high enough above the notch floor that you only
     // pick it up in the air (at the crest's take-off height, a little below).
     const gap = (id, k) => {
-      const r = R[id], g = r.gaps[k], u = g.u + g.N * 0.3 + g.L * 0.5, v = r.crestAt(u);
-      const lipY = H(g.u - 2, r.crestAt(g.u - 2)), floorY = H(u, v);
-      return on(u, v, Math.max(2, lipY - floorY - 2.5));
+      // On the flight line over the middle of the notch: the take-off's height, carried on down the crest's
+      // slope at the lip (a rider leaves along it), less the fall of a ~25 m/s flight, ~1 m below the rider's
+      // centre so it's picked up in the air (and nowhere near the notch floor).
+      const r = R[id], g = r.gaps[k], u = g.u + g.N * 0.18 + g.L * 0.5, v = r.crestAt(u);
+      const lipY = H(g.u - 1, r.crestAt(g.u - 1)), dydu = (H(g.u - 9, r.crestAt(g.u - 9)) - lipY) / 8;
+      const du = u - (g.u - 1), t = du / 25;
+      const y = lipY - dydu * du - 0.5 * 9.81 * t * t + 0.4;
+      return on(u, v, Math.max(2, y - H(u, v)));
     };
     const lip = (name) => { const r = this.hopByName[name].spur; return on(r.u1 - 3, r.crestAt(r.u1 - 3), 1.6); };
     return [

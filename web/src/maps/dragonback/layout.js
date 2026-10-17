@@ -169,7 +169,7 @@ export const DROP_ZONES = [
   ['The Keel', 100, 182],
   ['The Fork', 820, -56],
   ['The Staircase', 740, 112],
-  ['The Organ Pipes', 1140, -200],
+  ['The Organ Pipes', 1130, -230],
   ['The Knife', 1210, 138],
 ];
 
