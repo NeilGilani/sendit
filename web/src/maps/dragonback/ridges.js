@@ -171,7 +171,12 @@ export class Ridge {
     const d = Math.abs(dv) * this.tCos[i];
     if (d > W + top + 1) return lip;
     const x = (Math.sqrt(d * d + top * top) - top) / W;
-    return (x < 1 ? H * Math.pow(1 - x, this.p) : 0) + lip;
+    if (x >= 1) return lip;
+    // Rock fluting down the flanks: shallow ribs and runnels a few metres apart (never on the crest top, gone at
+    // the foot), so the flanks read as rock buttresses instead of smooth tents.
+    const flank = x > 0.05 ? Math.sin(Math.PI * Math.min(1, (x - 0.05) / 0.9)) : 0;
+    const flute = flank > 0 ? flank * Math.min(2.2, 0.07 * H) * (noise1(d / 7.5 + u / 90 + (dv < 0 ? 17 : 0), this.seed + 90) - 0.5) * 2 : 0;
+    return H * Math.pow(1 - x, this.p) + flute + lip;
   }
 
   /**

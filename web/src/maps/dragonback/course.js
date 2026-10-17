@@ -17,6 +17,7 @@ import {
 import { Ridge, cliff, smax } from './ridges.js';
 import { DRAGONBACK_PHYSICS, DRAGONBACK_CAMERA } from './tuning.js';
 import { attachRidgeScoring } from './scoring.js';
+import { attachSluff } from './sluff.js';
 
 const U_MIN = -7000, U_MAX = 9000;      // profile table range (1 m)
 const DEG = Math.PI / 180;
@@ -217,7 +218,11 @@ export class DragonbackCourse {
     if (Math.abs(x) > TILE.size * 0.5 + 60 || Math.abs(z) > TILE.size * 0.5 + 60) return e;
     // Low, long powder lumps (curvature radius ≳ 150 m at 30 m/s: they never throw you).
     e += (fbm(u / 90 + 3.1, v / 60, 3) - 0.5) * 1.8 + (vnoise(x / 13, z / 13) - 0.5) * 0.25;
-    e += this.ridgesAt(u, v);
+    const rg = this.ridgesAt(u, v);
+    e += rg;
+    // Sluff runnels in the gullies: shallow fall-line grooves (the snow the ridges shed), only where no ridge is.
+    const face = sstep(130, 220, u) * (1 - sstep(1650, 1800, u));
+    if (face > 0 && rg < 3) e += face * (1 - rg / 3) * 0.9 * (Math.abs(noise1(v / 11 + 0.4 * noise1(u / 140, 61), 62) * 2 - 1) - 0.5);
     e += this.spineField(u, v);
     e += this.hits(u, v);
     e += this.pillowsAt(u, v);
@@ -324,8 +329,22 @@ export class DragonbackCourse {
 
   roofAt() { return null; }
 
-  /** Per-rider hooks (player.js): ridge-to-ridge hops score on their own (scoring.js). */
-  onPlayer(pl) { attachRidgeScoring(this, pl); }
+  /** Per-rider hooks (player.js): ridge-to-ridge hops score on their own (scoring.js), gullies drag (sluff.js). */
+  onPlayer(pl) { attachRidgeScoring(this, pl); attachSluff(this, pl); }
+
+  /**
+   * How deep in a gully (x, z) is, 0..1: low (no ridge under you) with ridges standing on both sides within
+   * ~70 m, on the ridged part of the face. The sluffed powder piles up there (sluff.js).
+   */
+  gullyAt(x, z) {
+    const u = x - START_X;
+    if (u < 150 || u > 1680) return 0;
+    const here = this.ridgesAt(u, z);
+    if (here > 5) return 0;
+    let l = 0, r = 0;
+    for (const d of [24, 46, 70]) { l = Math.max(l, this.ridgesAt(u, z - d)); r = Math.max(r, this.ridgesAt(u, z + d)); }
+    return (1 - here / 5) * sstep(4, 12, Math.min(l, r));
+  }
 
   // ---------------------------------------------------------------- scatter hooks (trees, rocks, cornices)
   forestAt(x, z) {
