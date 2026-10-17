@@ -231,6 +231,7 @@ export const ANIM = {
   crossover: 0.2,             // rad the upper body leads into the new turn while the lean still points into the old one (skis)
   skiCounter: 0.1,            // counter-rotation: hips / shoulders face the outside of a carve by this × the lean (skis)
   skiStanceCarve: 0.035,      // m each ski moves out at full lean (wider stance in deep carves)
+  skiTipLead: 0.08,           // m the inside ski runs ahead of the outside one at full lean
   carveCrouch: 0.2,           // extra crouch (0..1 scale) at full lean: lower, more athletic in hard carves (skis and board)
   headLevel: 0.45,            // share of the body's roll the head takes back out (eyes nearer level)
   headLook: 0.2,              // rad of head turn into the carve per rad of lean (looking along the path ahead)

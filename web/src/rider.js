@@ -342,6 +342,9 @@ export class Rider {
     void camera;
   }
 
+  /** m the inside ski runs ahead in a carve (signed: + = the right ski, i.e. a right turn). */
+  skiTipLead() { const p = this.p; return ANIM.skiTipLead * THREE.MathUtils.clamp(p.lean / ANIM.maxLean, -1, 1) * (1 - p.air) * (1 - p.plow) * (1 - p.sit); }
+
   placeSkis(gearRoll, pl, dt) {
     const p = this.p;
     // Pole plant timing: a touch on the new inside whenever the edges change at speed.
@@ -361,8 +364,10 @@ export class Rider {
     const lift = 0.0 + p.air * 0.12 + p.grab * 0.1 + p.flipTuck * ANIM.flipTuckLift + this.skiPitchLift;
     const wide = ANIM.skiStance + p.plow * 0.1 + Math.abs(p.lean) / ANIM.maxLean * ANIM.skiStanceCarve * (1 - p.air);   // wider in deep carves (matches poseSki)
     const [L, R] = this.skis;
-    L.position.set(-wide, lift, 0.0); L.rotation.set(p.pitch, -p.plow * 0.28, gearRoll * -1, 'YXZ');
-    R.position.set(wide, lift, 0.0); R.rotation.set(p.pitch, p.plow * 0.28, gearRoll * -1, 'YXZ');
+    // Carving, the inside ski runs a little ahead (tip lead; + lean = right turn → the right ski, R).
+    const lead = this.skiTipLead();
+    L.position.set(-wide, lift, -Math.max(0, -lead)); L.rotation.set(p.pitch, -p.plow * 0.28, gearRoll * -1, 'YXZ');
+    R.position.set(wide, lift, -Math.max(0, lead)); R.rotation.set(p.pitch, p.plow * 0.28, gearRoll * -1, 'YXZ');
     // In the air with a grab, cross the skis a little (Japan / mute flavour).
     if (p.grab > 0.01) { L.rotation.y += p.grab * 0.25; R.rotation.y -= p.grab * 0.1; }
     // Tweaked: skis crossed hard (Japan / Mute / Safety), tips pulled up (Truck driver) or tails (Tail grab).
@@ -580,7 +585,7 @@ export class Rider {
       // Armature +X is the rider's left (visual −X): match the ski's lift so the boots stay clipped in.
       const wide = ANIM.skiStance + p.plow * 0.1 + Math.abs(p.lean) / ANIM.maxLean * ANIM.skiStanceCarve * (1 - p.air);
       const lx = -side * wide;
-      const ankle = new THREE.Vector3(side * wide, this.ankleH + p.air * 0.12 + p.grab * 0.1 + p.flipTuck * ANIM.flipTuckLift + (this.skiPitchLift || 0) + lx * Math.tan(p.lean), 0.0);
+      const ankle = new THREE.Vector3(side * wide, this.ankleH + p.air * 0.12 + p.grab * 0.1 + p.flipTuck * ANIM.flipTuckLift + (this.skiPitchLift || 0) + lx * Math.tan(p.lean), Math.max(0, -side * this.skiTipLead()));
       // Feet point down the skis; tips pinch together in a snowplough.
       this.leg(side, ankle, new THREE.Vector3(side * 0.12, 0, 1), -side * p.plow * 0.28);
       this.armSki(side, pl);
