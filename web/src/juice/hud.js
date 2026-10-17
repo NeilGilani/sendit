@@ -8,6 +8,7 @@
 //   below centre  small call-outs (CLOSE SHAVE ×n, rail names), banners (COMBO ×3 +1,200 / COMBO LOST)
 //   right         toasts (achievements, challenges, personal bests, level-ups: juice/toasts via toast())
 // Tunables: JUICE_HUD.
+import { Vector3 } from 'three';
 import { on, game, Mode } from '../state.js';
 import { PHYSICS as P } from '../config.js';
 import { trim } from './combo.js';
@@ -93,6 +94,10 @@ const CSS = /* css */`
 #juiceHud .bn.lost.show { animation: jhLost 1.4s ease-out forwards; }
 @keyframes jhBank { 0% { opacity: 0; transform: translateX(-50%) scale(.5); } 10% { opacity: 1; transform: translateX(-50%) scale(1.2); } 20% { transform: translateX(-50%) scale(1); } 78% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-30px) scale(.95); } }
 @keyframes jhLost { 0% { opacity: 0; transform: translateX(-50%) scale(1.3); } 8% { opacity: 1; transform: translateX(calc(-50% - 10px)); } 14% { transform: translateX(calc(-50% + 10px)); } 20% { transform: translateX(calc(-50% - 6px)); } 26% { transform: translateX(-50%); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(26px); } }
+/* floating score pops (minor scores rise off the rider) */
+#juiceHud .fp { position: absolute; left: 0; top: 0; font-size: 20px; white-space: nowrap; -webkit-text-stroke: 1.2px #1b1446; paint-order: stroke fill; color: #2ff5d6; pointer-events: none; animation: jhFloat .95s ease-out forwards; }
+#juiceHud .fp small { font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 900; font-size: 11px; letter-spacing: .14em; margin-left: 5px; color: #fffaf0; -webkit-text-stroke: 0; text-shadow: 0 1px 3px #1b1446; }
+@keyframes jhFloat { 0% { opacity: 0; transform: translate(var(--x), var(--y)) scale(.6); } 15% { opacity: 1; transform: translate(var(--x), calc(var(--y) - 10px)) scale(1.1); } 100% { opacity: 0; transform: translate(calc(var(--x) + var(--dx)), calc(var(--y) - 70px)) scale(.95); } }
 /* flash + edge glow */
 #juiceHud .fl { position: absolute; inset: 0; background: #fff; opacity: 0; }
 #juiceHud .fl.show { animation: jhFlash .28s ease-out forwards; }
@@ -131,7 +136,7 @@ body.fp #juiceHud .an { top: 34%; }
  * Mount the juice HUD. `combo` is a ComboTracker (juice/combo.js), `player` the Player.
  * Returns { root, toast(opts), banner(text, color), update(dt) }.
  */
-export function mountJuiceHud({ player, combo, input }) {
+export function mountJuiceHud({ player, combo, input, camera }) {
   const host = document.getElementById('hud') || document.body;
   const st = document.createElement('style');
   st.id = 'juiceHudCss';
@@ -263,6 +268,26 @@ export function mountJuiceHud({ player, combo, input }) {
     nearN = t - nearT < JUICE_HUD.nearStreakWindow ? nearN + 1 : 1;
     nearT = t;
     callout(nearN > 1 ? `CLOSE SHAVE ×${nearN}` : dist < 0.8 ? 'RAZOR CLOSE!' : 'CLOSE SHAVE', nearN >= 3 ? '#ffe14d' : '#2ff5d6');
+  });
+
+  // ------------------------------------------------------------------ floating score pops
+  // Small scores (close shaves, gates, snowflakes, carves…) rise off the rider; tricks have the announcer
+  // and distance markers stay in the notes. At most 4 alive.
+  const _v = new Vector3();
+  on('score', ({ label, points }) => {
+    if (!riding() || !camera || points <= 0 || points >= 100 || /^\d+ m$/.test(label || '') || /^(Combo|Line) ×/.test(label || '')) return;
+    if (root.querySelectorAll('.fp').length >= 4) return;
+    const p = player.renderPos;
+    const v = _v.set(p.x, p.y + 1.6, p.z).project(camera);
+    if (v.z > 1) return;
+    const el = document.createElement('div');
+    el.className = 'fp';
+    el.style.setProperty('--x', `${((v.x * 0.5 + 0.5) * innerWidth).toFixed(0)}px`);
+    el.style.setProperty('--y', `${((-v.y * 0.5 + 0.5) * innerHeight).toFixed(0)}px`);
+    el.style.setProperty('--dx', `${(Math.random() * 40 - 20).toFixed(0)}px`);
+    el.innerHTML = `+${points}<small>${esc(String(label).toUpperCase().slice(0, 18))}</small>`;
+    root.appendChild(el);
+    setTimeout(() => el.remove(), 1000);
   });
 
   // ------------------------------------------------------------------ toasts

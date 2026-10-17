@@ -18,7 +18,7 @@ import { game, Mode, on } from '../state.js';
 export function installJuice({ player, cam, sound, input, post, camera, fx, activities }) {
   const combo = new ComboTracker(player);
   const warp = new TimeWarp();
-  const hud = typeof document !== 'undefined' ? mountJuiceHud({ player, combo, input }) : null;
+  const hud = typeof document !== 'undefined' ? mountJuiceHud({ player, combo, input, camera }) : null;
   installImpact({ warp, cam, input, player });
   let speedfx = null;
   try { if (post) speedfx = installSpeedFx({ post, camera }); } catch (e) { console.warn('[juice] speed fx off', e); }
