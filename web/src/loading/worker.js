@@ -2,7 +2,6 @@
 // (loading/scene.js) on its own requestAnimationFrame, independent of the main thread (which is busy
 // booting the game). Messages in: init {canvas, width, height, dpr, opts}, resize, visible, outro.
 // Messages out: frame (first frame shown), shot {info}, stats, log, error.
-const T0 = performance.now();
 let errors = 0;
 let scene = null, running = false, last = 0, due = 0, visible = true, sentFrame = false;
 const post = (type, payload = {}) => self.postMessage({ type, ...payload });
@@ -39,8 +38,7 @@ self.onmessage = async (e) => {
     try {
       const ti = performance.now();
       const { LoadingScene } = await import('./scene.js');
-      post('log', { message: `worker up at ${Math.round(ti - T0)} ms (origin +${Math.round(performance.timeOrigin)}), modules ${Math.round(performance.now() - ti)} ms` });
-      scene = new LoadingScene(m.canvas, m, post);
+      scene = new LoadingScene(m.canvas, { ...m, opts: { ...m.opts, modulesMs: Math.round(performance.now() - ti) } }, post);
       await scene.init();
       running = true;
       self.requestAnimationFrame(loop);

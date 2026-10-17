@@ -37,6 +37,7 @@ export class LoadingScene {
     this.ft = [];
     this.scale = 1;
     this.stageP = 0;
+    this.timing = { modules: opts.modulesMs ?? 0 };
     this.simT = 0;
     this.screenT = 0;
   }
@@ -85,11 +86,10 @@ export class LoadingScene {
     const su = snowUniformsLite(noise, rockTex);
     const nearMat = terrainMaterial(su, atmo);
     const farMat = terrainMaterial(su, atmo, { far: true });
-    this.log(`pre-terrain ${Math.round(performance.now() - t0)} ms`);
     const terr = this.terrain = buildTerrain(height, sunDir, nearMat, farMat);
     scene.add(terr.near, terr.far);
     if (this.opts.debug === 'noterrshadow') terr.near.castShadow = false;
-    this.log(`terrain ${terr.stats.total} ms, ${terr.stats.verts} verts (${v.mtn}, ${v.tod})`);
+    this.timing.terrain = terr.stats.total;
     if (T.cloudSea || v.mountain.cloudSea) scene.add(this.cloudSea(v.mountain.seaLevel, terr.coarse));
 
     // Sun light with a tight shadow box that follows the action (crisp rider shadow on the snow).
@@ -132,7 +132,19 @@ export class LoadingScene {
     this.renderPass.scene = this.scene;
     await compiling;
     this.stats = { build: Math.round(tc - t0), compile: Math.round(performance.now() - tc) };
-    this.log(`build ${this.stats.build} ms, compile ${this.stats.compile} ms`);
+    this.checkPrograms();
+
+  }
+
+  /**
+   * A program that fails to link draws nothing, silently (shader error checks are off for speed). After
+   * the async compile the link status is free to read: report failures loudly (tests watch for them).
+   */
+  checkPrograms() {
+    const gl = this.renderer.getContext();
+    for (const p of this.renderer.info.programs || []) {
+      if (p.program && !gl.getProgramParameter(p.program, gl.LINK_STATUS)) this.post('shaderError', { message: `${p.name}: ${gl.getProgramInfoLog(p.program) || 'link failed'}` });
+    }
   }
 
   loadRockTexture(tex) {
@@ -252,10 +264,13 @@ export class LoadingScene {
     // Compile off-thread (behind the establishing shot) rather than as a hitch on the first trick frame.
     rider.update(0, this.camera);
     await this.renderer.compileAsync(rider.root, this.camera, this.scene);
+    this.checkPrograms();
     rider.root.visible = false;
     this.scene.add(rider.root);
     this.riderReady = true;
-    this.log(`rider ready (${v.gear}/${v.gearModel}) at ${Math.round(performance.now())} ms worker time`);
+    // One line per load: what was picked and what the startup cost (the rest is in __loading.stats()).
+    const T = this.timing;
+    this.log(`seed ${v.seed} · ${v.tod} · ${v.mtn} · ${v.gear}/${v.gearModel} — modules ${T.modules} ms, terrain ${T.terrain} ms, build ${this.stats?.build} ms, compile ${this.stats?.compile} ms, rider ready ${Math.round(performance.now())} ms`);
   }
 
   // ------------------------------------------------------------------ shots

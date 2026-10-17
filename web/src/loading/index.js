@@ -96,6 +96,8 @@ class LoadingScreen {
       this.sceneStats = m.stats;
     } else if (m.type === 'error') {
       this.fail(m.message);
+    } else if (m.type === 'shaderError') {
+      console.error('[loading] shader failed to link:', m.message);
     } else if (m.type === 'log') {
       console.log('[loading]', m.message);
     }

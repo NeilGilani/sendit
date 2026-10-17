@@ -96,15 +96,16 @@ export function makeHeight(v) {
     y += 0.12 * Math.max(0, z) * smooth(0, 600, z) * (1 - smooth(900, 2500, z));
     // Ranges: across the valley and down both sides, growing with distance.
     const big = ridged(x / 3400 + 11.3, z / 3400 + 4.1, 7);
-    const amp = (90 + 1700 * smooth(500, 7000, rr)) * M.range * M.peakScale;
-    const across = smooth(2800, 8000, u) + 0.75 * smooth(1800, 6000, ax) * (1 - smooth(-2000, 1500, -u));
+    const amp = (90 + 1900 * smooth(500, 7000, rr)) * M.range * M.peakScale;
+    // Ranges across the valley and on both sides (side views from the arete need peaks too).
+    const across = Math.max(smooth(2800, 8000, u), smooth(1500, 5200, ax));
     y += (Math.pow(big, 1.25) * 1.25 - 0.3) * amp * (0.35 + 0.65 * Math.min(1, across));
     y += fbm(x / 900 + 3.1, z / 900 + 9.7, 6) * 160 * smooth(300, 3000, rr);
     // We stand on an arete: the mountain falls away steeply to both sides of the line (so side views
     // look out across the void to the ranges), fading out a couple of kilometres away.
     const fall = 3 * Math.log1p(Math.exp((ax - 14) / 3));
     const near = (1 - smooth(900, 2600, rr)) * (1 - 0.6 * smooth(250, 900, z));
-    y -= Math.min(fall * 0.66, 520) * near;
+    y -= Math.min(fall * 0.66, 420) * near;
     // Spur-and-gully relief down both flanks (ribs run down the fall line, i.e. across x): rock
     // spurs between snow couloirs instead of one smooth white wedge.
     const rib = 1 - Math.abs(n3(ax / 70 + 2.1, z / 16));
@@ -141,6 +142,10 @@ export function makeHeight(v) {
     y -= 0.85 * spN * kN + 0.75 * spW * (1 - kN);
     // Detail: smooth on the line, rougher off it (rock buttresses, drifts).
     const off = smooth(4, 26, ax) + smooth(30, 90, z) + smooth(80, 200, -z);
+    // The rock band's face: ledges and buttresses (it is a heightfield, so roughness in y on a steep
+    // face reads as horizontal ledges), clear of the lip itself.
+    const face = smooth(0.8, 2.0, -z) * (1 - smooth(line.cliffLen, line.cliffLen + 4, -z));
+    if (face > 0) y += (fbm(x / 4.2 + 3.3, z / 2.2 + 1.1, 4) * 1.8 + fbm(x / 13, z / 5, 2) * 1.5) * face;
     // Rolls and pillows everywhere but the lip (a 35° apron that is a perfect plane reads as CG).
     y += fbm(x / 16 + 4.4, z / 16 + 2.2, 3) * 0.9 * smooth(5, 14, Math.abs(z + 2)) + fbm(x / 55, z / 55 + 8.1, 3) * 3.0 * smooth(10, 40, Math.abs(z));
     const det = fbm(x / 26 + 1.3, z / 26 + 7.7, 5) * (0.35 + 5.5 * Math.min(1, off)) + fbm(x / 7, z / 7, 3) * 0.12;
@@ -407,11 +412,11 @@ export function terrainMaterial(uniforms, atmo, { far = false } = {}) {
       .replace('sunMaskFactor = sm.r;', 'sunMaskFactor = sm.r * vVisT.x;')
       .replace('skyVis = sm.g;', 'skyVis = sm.g * vVisT.y;')
       .replace('#include <fog_fragment>', `gl_FragColor.rgb = aerial(gl_FragColor.rgb, vW);
-#if DEBUGVIEW == 1
+#if defined(DEBUGVIEW) && DEBUGVIEW == 1
 gl_FragColor.rgb = vec3(tRock, 0.2, 1.0 - tRock) * 3.0;
-#elif DEBUGVIEW == 2
+#elif defined(DEBUGVIEW) && DEBUGVIEW == 2
 gl_FragColor.rgb = (normalize(vWN) * 0.5 + 0.5) * 3.0;
-#elif DEBUGVIEW == 3
+#elif defined(DEBUGVIEW) && DEBUGVIEW == 3
 gl_FragColor.rgb = vec3(vVisT, 0.0) * 3.0;
 #endif
 `);
