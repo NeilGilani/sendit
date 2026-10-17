@@ -674,6 +674,10 @@ spot counts.
 | contended, back to back | voltage-park | 23.6 / 34.5 ms | 31.1 / 20.1 / 18.7 / 19.0 / 18.1 / 34.5 | 162–349 | 3.6–4.0 M |
 | contended, back to back | valcrest-gully | 32.2 / 41.9 ms | 41.9 / 37.4 / 31.4 / 24.7 / 26.7 / 30.8 | 172–387 | 2.8–3.1 M |
 
+After the 02:33 merge and the night final with its floodlight pools, quiet windows at q1 / 1600×900 give 13.9 ms
+with the pools and 12.4 ms without (they cost ~1.5 ms of additive fill). Contended runs that night ranged
+22–40 ms for both Voltage and Valcrest.
+
 Voltage sits in the 14–16 ms budget and under Valcrest. Under the same contention it costs about two-thirds of
 Valcrest. The triangles are summed over every pass (shadow cascades included). The park snow went to 0.75 m rows
 on the big jumps and 1.6 m columns on the level decks: 547k → 356k vertices (the old park had 289k), and
