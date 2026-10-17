@@ -118,6 +118,18 @@ export class FX {
     }
   }
 
+  /** One push stroke on the flat: skis double-pole (both tips, a crunchy shove); a board kicks with the back foot. */
+  push(when, board = 0) {
+    const G = this.T.push.gain;
+    if (board) {
+      this.noise(when, { buf: 'pink', f: rnd(1000, 1400), f2: 700, q: 0.8, gain: G, attack: 0.02, decay: 0.12 });
+      this.noise(when + 0.01, { f: rnd(2500, 3500), q: 1.2, gain: G * 0.4, decay: 0.03 });
+      return;
+    }
+    this.poleplant(when, 0.8, -0.3); this.poleplant(when + rnd(0.008, 0.025), 0.8, 0.3);
+    this.noise(when + 0.06, { buf: 'pink', f: rnd(1300, 1800), q: 0.9, gain: G * 0.7, attack: 0.03, decay: 0.15 });
+  }
+
   /** Face shot: deep powder flying up over the goggles and jacket — a soft whump and a fizz of flakes. */
   faceShot(when, k = 1) {
     const G = this.T.faceShot.gain * k;

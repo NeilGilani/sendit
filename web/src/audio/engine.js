@@ -301,6 +301,10 @@ export class AudioEngine {
     if (r.st === ST.AIR && r.grab > 0.5 && !this.grabbing) { this.grabbing = true; this.fx.grab(when); this.count('grab'); }
     if (this.grabbing && (r.grab < 0.25 || r.st !== ST.AIR)) { this.grabbing = false; if (r.st === ST.AIR) this.fx.grab(when, true); }
     if (prev && prev.st !== ST.CRASH && r.st === ST.CRASH) this.crashT = this.T.duck.crashHold;
+    // pushing on the flat: a stroke every ~0.65 s while W is held below push speed
+    if (r.push) { if ((this.pushT = (this.pushT ?? 0) - (when - (this.lastWhen ?? when))) <= 0) { this.pushT = F.push.period * (0.9 + Math.random() * 0.2); this.fx.push(when, r.board); this.count('push'); } }
+    else this.pushT = 0.12;   // the first stroke comes a beat after W goes down
+    this.lastWhen = when;
     // slash: the edge bites hard and fast while sliding a little → an exaggerated fan of spray (Steep does this)
     const SL = F.slash;
     if (grounded && prev && r.speed > SL.minSpeed && edge > SL.edge && this.last.edge < SL.edge - 0.02 && r.skid > SL.skid && when - (this.lastSlash ?? -9) > SL.minGap) {

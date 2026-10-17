@@ -43,5 +43,7 @@ export function readRider(p, o = {}) {
     grindV: g ? g.v || 0 : 0,
     grindKind: g ? g.rail?.kind || 'rail' : '',
     grindHop: g ? (g.hop ? 1 : 0) : 0,
+    // pushing / skating on the flat: W below the gear's push speed (the same test as physics/edge.js)
+    push: st === ST.GROUND && (p._ctrl?.up || 0) > 0.3 && (p.speed || 0) < (p.dyn?.C?.pushMaxSpeed ?? 6) && (p.stop || 0) < 0.2 ? 1 : 0,
   };
 }

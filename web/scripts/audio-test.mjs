@@ -117,6 +117,7 @@ add('music-energy-drop', { seconds: 7, music: true, tune: { mix: { snow: 0, wind
 add('fjord-and-bell', { seconds: 12, map: 'fjordline', tune: { ambience: { gulls: { every: [1, 2] } }, maps: { fjordline: { bell: 1 } } }, frames: frames(12, () => ({ speed: 0 })) });
 add('ridge-howl', { seconds: 16, map: 'ravenspire', tune: { wind: { gust: { tau: 1.2 } } }, frames: frames(16, () => ({ speed: 0 })) });
 add('camera-pulls-away', { seconds: 6, frames: frames(6, (t) => ({ speed: 14, ...carve(t, 2.6, 0.8, 14), camDist: t < 2 ? 5 : 5 + (t - 2) * 30 })) });
+add('push-off', { seconds: 4, frames: frames(4, (t) => ({ speed: ramp(t, 0, 4, 0.5, 5), push: 1, board: t > 2 ? 1 : 0 })) });
 if (traceDir) for (const type of ['ski', 'snowboard', 'bigmountain']) {
   const f = join(traceDir, `trace-${type}.json`);
   if (!existsSync(f)) continue;
@@ -177,6 +178,7 @@ if (has('skier-passes')) { const p = R['skier-passes'].rms; expect(Math.max(...p
 if (has('cold-slow-board')) expect((R['cold-slow-board'].events.squeak || 0) >= 5, 'cold snow squeaks when riding slowly');
 if (has('music-energy-drop')) { const r = R['music-energy-drop']; expect(r.centroid > 0 && (r.events.musicDrop || 0) === 1, 'music energy and drops drive the music'); }
 if (has('camera-pulls-away')) expect(lvl('camera-pulls-away', 5, 6) < lvl('camera-pulls-away', 0.5, 1.8) * 0.4, 'the rider fades when the camera pulls far away');
+if (has('push-off')) expect((R['push-off'].events.push || 0) >= 5, 'pushing off on the flat makes strokes');
 if (has('park-crowd')) expect(lvl('park-crowd', 3.2, 5) > lvl('park-crowd', 0.5, 2.5) * 1.5, 'a clean park landing gets a cheer');
 await browser.close();
 if (errors.length) { console.log('page errors:', errors.slice(0, 5)); fails++; }
