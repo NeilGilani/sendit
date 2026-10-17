@@ -40,9 +40,10 @@ export const AUDIO = {
   snow: {
     vRef: 20,             // speed where the speed curves reach 1
     vStart: 0.4,          // below this nothing slides
+    scMax: 1.15,          // cap on the snow speed curve (≈ 23 m/s): above it the wind carries the speed
     // glide hiss: pink noise band, centre rises with speed
     // (+7 dB per speed doubling ≈ v^1.15; centre ≈ 1.6 kHz · (v / 5)^0.45 — research-real.md §3)
-    hiss: { gain: 0.5, hp: 300, lp: 7000, lpMax: 15000, fExp: 0.45, white: 0.12, board: 0.38, boardGain: 0.55, flat: 0.4, exp: 1.15, powder: 0.18, ice: 0.8, park: 1.05 },
+    hiss: { gain: 0.5, hp: 300, lp: 7000, lpMax: 11000, fExp: 0.45, white: 0.12, board: 0.38, boardGain: 0.55, flat: 0.4, exp: 1.15, powder: 0.18, ice: 0.8, park: 1.05 },
     // groomer corduroy: fine ridges ~2.2 cm apart → a zippy AM at v / spacing on flat bases
     corduroy: { depth: 0.22, spacing: 0.022 },
     // crystal grains: Poisson clicks (fracturing snow) — the granular crunch that never loops
@@ -69,7 +70,7 @@ export const AUDIO = {
 
   // ---------------------------------------------------------------- wind (worklet 'sendit-wind')
   wind: {
-    vMax: 32,             // airspeed for full level
+    vMax: 28,             // airspeed for full level (beyond it up to ×1.4 — 70 mph roars)
     exp: 1.6,             // level ∝ (v / vMax)^exp: ~10 dB / doubling (helmets measure ~15.5; loudness grows ~U^1.7)
     floor: 0.03,          // a breath of air even when slow
     // helmet buffeting: < 150 Hz, fluttering

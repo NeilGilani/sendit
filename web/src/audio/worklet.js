@@ -98,7 +98,7 @@ class SnowProcessor extends AudioWorkletProcessor {
     const sink = clamp(p.sink, 0, 1), board = clamp(p.board, 0, 1), skid = clamp(p.skid, 0, 1.5), stop = clamp(p.stop, 0, 1);
     const mv = sstep(T.vStart, T.vStart + 1.6, speed);
     const s01 = Math.min(1.5, speed / T.vRef);
-    const sc = mv * Math.min(1.3, Math.pow(s01, T.hiss.exp));
+    const sc = mv * Math.min(T.scMax, Math.pow(s01, T.hiss.exp));   // capped: at big-mountain speed the wind takes over
     const hard = wG + wI + wK;
     const g = {};
     // flat, unweighted skis between turns are much quieter than a loaded edge (the groomed reference dips ~10 dB)
