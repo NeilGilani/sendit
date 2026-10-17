@@ -306,13 +306,15 @@ varying vec2 vQ2; varying float vA2;`)
       surf.y += Math.max(0, c.depth || 0);
       const at = (spread) => new THREE.Vector3().copy(surf)
         .addScaledVector(dir, (Math.random() - 0.5) * spread).addScaledVector(out, 0.05 + Math.random() * 0.12).addScaledVector(nrm, 0.04);
-      const intensity = load * (carve * (0.6 + 0.4 * soft) + skid * 1.6) * Math.min(1.6, speed / 10);
+      // Grows with speed up to ~24 m/s (a 70 mph carve throws a real rooster tail, not a few flecks).
+      const intensity = load * (carve * (0.6 + 0.4 * soft) + skid * 1.6) * Math.min(2.4, speed / 10);
+      const fast = Math.min(1, Math.max(0, (speed - 12) / 12));   // 0 at 12 m/s .. 1 at 24 m/s
       // Rooster-tail sheet off the edge on hard carves / skids.
       let n = this.count(`${id}s`, S.sheetRate * intensity * (0.5 + 0.5 * soft), dt);
       for (let i = 0; i < n; i++) {
         const k = speed * (0.18 + Math.random() * 0.22) * (0.6 + carve * 0.7 + skid * 0.6);
         const up = speed * (0.12 + Math.random() * 0.2) * (0.5 + carve) + 0.8;
-        this.spawn(K_SHEET, at(0.9), throwV(k, up, speed * 0.1), (0.12 + Math.random() * 0.18) * (0.7 + soft * 0.6), S.sheetLife * (0.6 + Math.random() * 0.6), { dens: 0.6 });
+        this.spawn(K_SHEET, at(0.9), throwV(k, up, speed * 0.1), (0.12 + Math.random() * 0.18) * (0.7 + soft * 0.6) * (1 + 0.35 * fast), S.sheetLife * (0.6 + Math.random() * 0.6), { dens: 0.6 });
       }
       // Curtain: the dense breaking wave right at the edge on hard carves and skids — big, short-lived
       // streaks that give the rooster tail a defined shape before it frays into sheet and mist.
