@@ -148,6 +148,10 @@ CS2's client waits ~2 s for the case and then scrolls 6.0 s on `cubic-bezier(0.0
 - **Ticks**: one per card crossing the marker, at least 55 ms apart, brighter while fast. Gaps grow
   from 67 ms to 230 ms (4 s), 450 ms and 680 ms (the last crossings).
 - **The lens**: a faintly brighter strip around the marker, like CS2's sharp centre over a dimmer reel.
+- **Rare cards passing**: from 3.5 s on, every red or ★ card that slides under the marker flashes it in
+  that colour with a soft shimmer note (the near-miss teaser included).
+- **Rumble** (gamepad): a light buzz per card once the reel is readable, a thump at the landing, and a
+  reveal kick that grows with the grade (up to ~0.6 s for gold).
 - **Skip**: Space or the Skip button jumps straight to the reveal. Esc closes the reveal. While the
   overlay is up the lobby's own keys (Q/E, A/D, Enter) are held back.
 - **Gamepad**: the opener takes the pad first (`Lobby.overlay`): A skips the spin or presses the focused
