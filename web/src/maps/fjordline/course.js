@@ -423,8 +423,9 @@ export class FjordlineCourse {
     if (H <= 0.05) return e;
     const t = (dv - hw) / C.mass;
     // Steep walls at the foot (quarter-pipe transition), a rough top, falling back to the face on the outside.
-    const w = t < 0.02 ? 0.12 * (t / 0.02) ** 2 : t < 0.16 ? 0.12 + 0.88 * smooth((t - 0.02) / 0.14) : 1 - sstep(0.55, 1, t);
-    const rough = 1 + 0.18 * (ridged(u / 25, v / 25, 2) - 0.5);
+    // (aretes along the couloir's lips, the rock mass falling away outside them, not a flat-topped block).
+    const w = t < 0.02 ? 0.12 * (t / 0.02) ** 2 : t < 0.16 ? 0.12 + 0.88 * smooth((t - 0.02) / 0.14) : 1 - 0.55 * sstep(0.16, 0.7, t) - 0.45 * sstep(0.6, 1, t);
+    const rough = 1 + 0.4 * (ridged(u / 22, v / 22, 2) - 0.5);
     return e + H * w * rough;
   }
 

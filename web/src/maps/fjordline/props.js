@@ -550,6 +550,7 @@ function buildWater(terrain) {
   m.name = 'FjordWater';
   m.frustumCulled = false;
   m.receiveShadow = false;
+  m.renderOrder = 5;   // after the terrain: early depth rejects the water the land hides
   m.onBeforeRender = () => {
     uniforms.time.value = globals.uTime.value;
     uniforms.lut.value = ATMO.tex;   // re-baked by the per-map atmosphere hook
