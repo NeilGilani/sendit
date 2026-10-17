@@ -4,34 +4,24 @@
 import { adaptMap } from './registry.js';
 
 // ---------------------------------------------------------------- Voltage Park (maps/voltage/)
-// Trails start at the park's drop zones (course.dropZones, matched by name prefix). Current Lane has
-// no drop zone yet: it falls back to `at` (world: START_X + 40 along the fall line, v = 125 across).
+// Voltage Park declares its own trails (maps/voltage/layout.js TRAILS + course.trailSpawn), so registry adaptMap()
+// keeps those and only takes the mountain card from here. The list below mirrors them for reference (same ids).
 adaptMap('voltage-park', {
   mountain: {
     id: 'voltage-park', name: 'Voltage Park', region: 'Event terrain park · night session',
-    blurb: 'Floodlit park built for contests: a slopestyle course, three lanes, a jib garden, a superpipe and a big air tower.',
+    blurb: 'A fast floodlit contest park: a slopestyle course to the Megawatt mega kicker and a road gap, stacked lanes, spines, a superpipe and a big air tower.',
     accent: '#ff3d9a',
   },
   trails: [
-    { id: 'slopestyle', name: 'Slopestyle Course', difficulty: 'park', featured: true, dropZone: 'Start Gate', length: 790, vertical: 230,
-      description: 'Three rail sections, then Lightning, Thunder and Voltage. The judges are watching.' },
-    { id: 'rail-surge', name: 'Rail Section 2 · Surge', difficulty: 'park', dropZone: 'Rail Section 2', length: 690, vertical: 200,
-      description: 'Drop in at the second rail section and keep the combo alive.' },
-    { id: 'rail-overload', name: 'Rail Section 3 · Overload', difficulty: 'park', dropZone: 'Rail Section 3', length: 620, vertical: 180,
-      description: 'The last and biggest rail section, then the jump line.' },
-    { id: 'jump-line', name: 'Jump Line', difficulty: 'park', featured: true, dropZone: 'Jump Line', length: 470, vertical: 140,
-      description: 'Lightning, Thunder, Voltage: three big tables back to back.' },
-    { id: 'big-air', name: 'The Tower · Big Air', difficulty: 'park', featured: true, dropZone: 'The Tower', length: 470, vertical: 150,
-      description: 'Drop off the scaffold deck into the biggest kicker in the park. One hit, make it count.' },
-    { id: 'superpipe', name: 'The Conduit · Superpipe', difficulty: 'park', dropZone: 'The Conduit', length: 440, vertical: 130,
-      description: 'A 22 ft pipe: pump the walls and go above the deck.' },
-    { id: 'spark-lane', name: 'Spark Lane', difficulty: 'park', dropZone: 'Spark Lane', level: 'small', length: 760, vertical: 210,
-      description: 'Small lane: little jumps and friendly boxes to learn on.' },
-    { id: 'current-lane', name: 'Current Lane', difficulty: 'park', dropZone: 'Current Lane', at: { x: -340, z: 125, heading: -Math.PI / 2 }, level: 'medium', length: 760, vertical: 210,
-      description: 'Medium lane: mid-size tables, step-ups and a hip.' },
-    { id: 'high-voltage', name: 'High Voltage', difficulty: 'park', dropZone: 'High Voltage', level: 'pro', length: 500, vertical: 150,
-      description: 'Pro lane: the big tables and the biggest rails outside the course.' },
-    { id: 'the-grid', name: 'The Grid · Jib Garden', difficulty: 'park', dropZone: 'The Grid', level: 'small', length: 750, vertical: 210,
-      description: 'A garden of rails, kinks and boxes. Link them.' },
+    { id: 'slopestyle', name: 'Slopestyle Course', difficulty: 'park', featured: true, dropZone: 'Start Ramp', length: 1145, vertical: 385,
+      description: 'Start ramp, three rail sections, Lightning, Thunder, Voltage, Megawatt and the road gap: the judged run.' },
+    { id: 'spark', name: 'Spark Lane', difficulty: 'green', length: 1110, vertical: 368, description: 'The flow lane: small tables, boxes, a stacked double, rollers, a side hit and a quarterpipe.' },
+    { id: 'current', name: 'Current Lane', difficulty: 'blue', dropZone: 'Triple Stack', length: 1110, vertical: 368, description: 'Rails on the benches, then the Triple Stack, a step-down and the transfer hip into High Voltage.' },
+    { id: 'high-voltage', name: 'High Voltage', difficulty: 'black', featured: true, dropZone: 'High Voltage', length: 1110, vertical: 368, description: 'Pro rails, two big tables, the Canal gap, a step-up and the 5 m quarterpipe.' },
+    { id: 'grid', name: 'The Grid', difficulty: 'park', length: 1100, vertical: 362, description: 'A jib garden: 16 boxes, tubes and rails in rows.' },
+    { id: 'stairway', name: 'The Stairway', difficulty: 'black', dropZone: 'The Stairway', length: 768, vertical: 271, description: 'Step-down, step-up, step-down, then over the Stairway Spine.' },
+    { id: 'hip-row', name: 'Hip Row', difficulty: 'blue', length: 680, vertical: 229, description: 'Four hips down the left side of the park.' },
+    { id: 'superpipe', name: 'The Conduit', difficulty: 'black', dropZone: 'The Conduit', length: 651, vertical: 219, description: 'A 22 ft superpipe, 240 m long.' },
+    { id: 'big-air', name: 'The Tower', difficulty: 'double-black', featured: true, dropZone: 'The Tower', length: 679, vertical: 228, description: 'A 33 m scaffold big air: 93 km/h on the in-run, 3 s in the air.' },
   ],
 });

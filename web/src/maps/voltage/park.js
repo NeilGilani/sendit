@@ -110,9 +110,14 @@ export function attachPark(course, pl) {
   offs.push(on('rideStarted', startRun), on('resetTop', startRun), on('dropZone', startRun));
   offs.push(on('takeoff', () => { if (mine()) { const nm = course.featureAt(pl.position.x, pl.position.z); if (nm) lane(nm); } }));
   offs.push(on('grindStart', (g) => { if (mine()) lane(g.name ?? g.rail?.name); }));
+  // (profile/tracker.js now emits a generic runCompleted for every map: whoever announces a finish first wins, so
+  // there is one event per run — the same rule the other maps use)
+  let lastEmit = -1e9;
+  offs.push(on('runCompleted', (e) => { if (e?.mapId === course.id) lastEmit = performance.now(); }));
   const complete = (judged) => {
     if (!mine() || run.done) return;
     run.done = true;
+    if (performance.now() - lastEmit < 2000) return;
     const trailId = course.trailFor(run.lanes);
     emit('runCompleted', { mapId: course.id, trailId, distance: Math.round(pl.position.x - START_X - run.u0), time: +run.t.toFixed(2), score: game.score, judged: judged ?? (trailId === 'slopestyle' ? course.judgeRun?.judge().total : undefined) });
   };

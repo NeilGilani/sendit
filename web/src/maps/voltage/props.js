@@ -381,7 +381,7 @@ function buildDressing(course, T, M) {
     lamps.push(led);
   };
   course.obstaclesExtra = [];
-  arch(-14, -11, 11, 'VOLTAGE PARK  ·  SLOPESTYLE  ·  START', '#ffe14d', '#140a3a', 4.5);
+  arch(-8, -11, 11, 'VOLTAGE PARK  ·  SLOPESTYLE  ·  START', '#ffe14d', '#140a3a', 4.5);
   arch(76, -22, 22, 'SECTION 1  ·  THE CIRCUIT', '#2ff5d6', '#1b1550');
   arch(160, -22, 22, 'SECTION 2  ·  SURGE', '#3d8bff', '#1b1550');
   arch(258, -24, 24, 'THE PLUNGE  ·  SECTION 3  ·  OVERLOAD', '#ff3d9a', '#1b1550', 7);
@@ -396,7 +396,7 @@ function buildDressing(course, T, M) {
   arch(GRID.u0 - 18, 226, 268, 'THE GRID  ·  JIB GARDEN', '#ffe14d', '#1b1550');
   arch(PIPE.u0 + 2, PIPE.v - 26, PIPE.v + 26, 'THE CONDUIT  ·  22 FT SUPERPIPE', '#2ff5d6', '#140a3a', 9);
   // --- start hut: a dark box with an LED band, the gate wand.
-  { const x = X(-21), y = H(x, 0); const hut = new THREE.BoxGeometry(6, 3.2, 9); hut.translate(x, y + 1.6, 0); darks.push(hut); const band = new THREE.BoxGeometry(6.1, 0.25, 9.1); band.translate(x, y + 2.9, 0); lamps.push(band); }
+  { const x = X(-14), v = -9, y = H(x, v); const hut = new THREE.BoxGeometry(6, 3.2, 5); hut.translate(x, y + 1.6, v); darks.push(hut); const band = new THREE.BoxGeometry(6.1, 0.25, 5.1); band.translate(x, y + 2.9, v); lamps.push(band); }
   // --- light towers along both sides of the course and the park
   const towers = [], pools = [];
   for (let u = 20; u <= FINISH_U + 40; u += 75) for (const v of [-46, 46, 100, 160, 220, -140, -205]) towers.push([u + (v % 3) * 7, v]);

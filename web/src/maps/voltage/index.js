@@ -28,9 +28,9 @@ export const VOLTAGE_THUMB = svg(`
 
 // Measured by course.trailInfo() (node -e … VoltageCourse().trailInfo()); map4-unit checks they still match.
 export const TRAIL_SIZE = {
-  slopestyle: { length: 1155, vertical: 395 }, spark: { length: 1110, vertical: 368 }, current: { length: 1110, vertical: 368 },
+  slopestyle: { length: 1145, vertical: 385 }, spark: { length: 1110, vertical: 368 }, current: { length: 1110, vertical: 368 },
   'high-voltage': { length: 1110, vertical: 368 }, grid: { length: 1100, vertical: 362 }, stairway: { length: 768, vertical: 271 },
-  'hip-row': { length: 680, vertical: 229 }, superpipe: { length: 236, vertical: 77 }, 'big-air': { length: 173, vertical: 89 },
+  'hip-row': { length: 680, vertical: 229 }, superpipe: { length: 651, vertical: 219 }, 'big-air': { length: 679, vertical: 228 },
 };
 
 registerMap({
@@ -52,5 +52,5 @@ registerMap({
   lobby: ({ course }) => course.lobbySpot(),
   // Mountain / trails contract: the park's lines as trails (course.trailSpawn(id) places a rider at one; length and
   // vertical are measured from the built course by course.trailInfo()).
-  trails: TRAILS.map(({ id, name, difficulty, description }) => ({ id, name, difficulty, description, ...TRAIL_SIZE[id] })),
+  trails: TRAILS.map(({ id, name, difficulty, description, featured }) => ({ id, name, difficulty, description, ...(featured ? { featured } : {}), ...TRAIL_SIZE[id] })),
 });
