@@ -101,7 +101,8 @@ mountain drops in pitch with time.
 | Pole plant (skis) | The same moment (85 % chance, 3–22 m/s, not tucked, ≥ 0.55 s apart), panned to the inside of the new turn |
 | Slash | Edge angle crosses 0.6 rad quickly while skidding, above 6 m/s: an exaggerated fan of spray, as Steep does |
 | Take-off | `takeoff` event: tail or tip tock, the snow flicked off, and a wind swell rising over ~0.3 s (bigger when faster). The old `jump_pop` sample sits underneath. |
-| Grab rustle | `player.grab` rises past 0.5 in the air (on release, a shorter rustle) |
+| Grab | `player.grab` rises past 0.5 in the air: the glove knocks the board or ski, then the jacket's nylon rustles (on release, a shorter rustle) |
+| Tuck | Dropping into a tuck above 6 m/s: the jacket bunches up (a short rustle) |
 | Landing | `landed` (rawImpact), shaped on CC0 snow-impact recordings: a broadband crack, a body thud at 120–200 Hz, a flat-base slap (board) or double clack (skis), crunchy debris grains thinning out over ~0.5 s, and the snow burst (short and bright on hardpack, long and fluffy in powder) |
 | Roof landing | `landingGrade` with a `roof` (Ravenspire's lift station and shacks; the village roofs on the Kitsune and Fjordline branches): the hollow timber structure booms (78–390 Hz modes), creaks, and snow slides off the eaves |
 | Stumble | `stumble`: an edge catches. Skis clatter (or the board slaps), with a quick scrape, cloth and a short spray; the old cue plays softer under it. |
