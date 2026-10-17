@@ -27,6 +27,7 @@ const CSS = /* css */`
 #xpLv { position: absolute; left: 50%; bottom: 17px; transform: translateX(calc(-50% - 104px)); text-shadow: 0 1px 4px rgba(0,0,0,.6); font: 800 11px "Inter", "Segoe UI", sans-serif; letter-spacing: .14em; color: rgba(250,248,243,.7); opacity: 0; transition: opacity .6s; }
 #xpLv.on { opacity: 1; }
 body.fp #xpMini, body.fp #xpLv { display: none; }
+body.lvlup #juiceHud .cb { opacity: 0 !important; transition: opacity .2s; }
 #rideRecap { position: fixed; right: clamp(16px, 3vw, 40px); top: 50%; z-index: 35; width: min(330px, 86vw); padding: 18px 20px 16px; border-radius: 16px;
   background: rgba(12,16,30,.72); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,.16); box-shadow: 0 18px 60px rgba(0,0,0,.4);
   font-family: "Inter", "Segoe UI", sans-serif; color: #fffaf0; transform: translate(120%, -50%); opacity: 0; transition: transform .55s cubic-bezier(.2,1.2,.4,1), opacity .35s; pointer-events: auto; cursor: pointer; }
@@ -87,6 +88,8 @@ export function mountProgressionUi({ juice }) {
     lv.querySelector('.rk').textContent = e.rankUp ? `NEW RANK · ${e.rank.name.toUpperCase()}` : e.rank.name.toUpperCase();
     lv.querySelector('.sub').textContent = nextUnlockText(e.level);
     lv.classList.remove('show'); void lv.offsetWidth; lv.classList.add('show');
+    document.body.classList.add('lvlup');
+    clearTimeout(play.t); play.t = setTimeout(() => document.body.classList.remove('lvlup'), 2900);
     sfx('medal', 0.8, e.rankUp ? 0.9 : 1.05);
     juice?.hud?.flash(0.3);
     setTimeout(play, 2400);
