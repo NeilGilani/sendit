@@ -22,8 +22,11 @@ All resort, lift, piste, gear and brand names in the game are invented.
 
 ## Sound & music (CC0)
 - All sound effects (powder, groomed swish, edge carve, wind, landing, birds) and the ambient piece "Golden Hour" were synthesized for this project with `tools/gen_audio.py` and are released under CC0 1.0.
-- The web game's snow, wind, trick, grind, lift, breath and ambience sounds are synthesized live in code (`web/src/audio/`, CC0 1.0); no third-party recordings are shipped.
-- These CC0 1.0 Freesound recordings were used only as listening and measurement references to calibrate the engine; they are not distributed. Thanks to Lydmakeren (#567839, groomed POV run), Nox_Sound (#667729, snowboard on ice), facemusic (#39082, creaky snow), kyles (#454092, Alpine gusts), cribbler (#592379, ski pass-by), Selector (#680075, skiers passing), musicbrain (#215690, snow crunch) and xkeril (#720302, Zermatt slope). See `docs/audio-research.md`.
+- The web game's snow, wind, trick, grind, lift, breath and ambience sounds are synthesized live in code (`web/src/audio/`, CC0 1.0).
+- Three short field-recording textures, granulated under the synthesis, are excerpts (cut at MP3 frame boundaries, not re-encoded) of CC0 1.0 recordings from Freesound:
+  - `assets/audio/tex_snow_ski.mp3` (4.5 s): "Alpine_ski_POV" by Lydmakeren, https://freesound.org/people/Lydmakeren/sounds/567839/
+  - `assets/audio/tex_snow_board.mp3` (4.5 s) and `tex_snow_skid.mp3` (3.3 s): "Snowboard_Sequence_Mono" by Nox_Sound, https://freesound.org/people/Nox_Sound/sounds/667729/
+- These CC0 1.0 Freesound recordings were also used as measurement references to calibrate the engine (only the three excerpts above are distributed): Lydmakeren (#567839, groomed POV run), Nox_Sound (#667729, snowboard on ice), facemusic (#39082, creaky snow), kyles (#454092, Alpine gusts), cribbler (#592379, ski pass-by), Selector (#680075, skiers passing), musicbrain (#215690, snow crunch), xkeril (#720302, Zermatt slope), 21100495 (#655371, rail grind), andriiperevodchyk (#519459, chairlift tower), dmartinp (#263134, chairlift), craigsmith (#675895, body fall in snow), Elements-Library (#683789, snow impact), bruno.auzet (#558792, resort descent). See `docs/audio-research.md`.
 
 ## Fonts
 - Godot's built-in default font (part of the engine).

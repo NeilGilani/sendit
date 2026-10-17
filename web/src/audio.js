@@ -117,9 +117,9 @@ export class SoundScape {
   }
 
   async load(name) {
-    for (const ext of ['ogg', 'mp3']) {
+    for (const ext of name.includes('.') ? [''] : ['.ogg', '.mp3']) {   // a name with an extension loads just that file
       try {
-        const r = await fetch(`/audio/${name}.${ext}`);
+        const r = await fetch(`/audio/${name}${ext}`);
         if (!r.ok) continue;
         return await this.ctx.decodeAudioData(await r.arrayBuffer());
       } catch { /* try next format */ }

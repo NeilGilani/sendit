@@ -5,8 +5,8 @@ import { AudioEngine } from './engine.js';
 import { AUDIO } from './tuning.js';
 
 async function loadBuffer(ctx, name) {
-  for (const ext of ['ogg', 'mp3']) {
-    try { const r = await fetch(`/audio/${name}.${ext}`); if (r.ok) return await ctx.decodeAudioData(await r.arrayBuffer()); } catch { /* next */ }
+  for (const ext of name.includes('.') ? [''] : ['.ogg', '.mp3']) {
+    try { const r = await fetch(`/audio/${name}${ext}`); if (r.ok) return await ctx.decodeAudioData(await r.arrayBuffer()); } catch { /* next */ }
   }
   return null;
 }

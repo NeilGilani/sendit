@@ -67,6 +67,9 @@ export const AUDIO = {
     // ice: thin harsh scrape on top of everything else
     ice: { gain: 0.38, hp: 2200, bp: 3800, q: 1.0,
       scrape: { gain: 3.0, q: 8, fMin: 2000, fMax: 6000, walk: 0.06 } },   // narrow edge-scrape peaks wandering 2–6 kHz
+    // field textures: grains of short CC0 recordings (tex_snow_*.mp3) mixed under the synthesis for the
+    // organic detail noise lacks — ski carve (Lydmakeren #567839), board glide and board skid (Nox_Sound #667729)
+    tex: { ski: 3.0, board: 3.5, skid: 3.0, powder: 0.25, rate0: 0.85, rateV: 0.3, rms: 0.12 },
     width: { ski: 0.75, board: 0.25 },   // stereo spread (two skis vs one board)
     out: 0.9,
   },

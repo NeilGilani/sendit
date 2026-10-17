@@ -56,6 +56,43 @@ function smoothInto(state, params, names, a) {
   }
 }
 
+/**
+ * Granular player over a short recording (CC0 field textures, posted in through the port): Hann-windowed
+ * grains of 50–90 ms from random positions, ~4 overlapping, each slightly detuned and panned, so a few
+ * seconds of real snow never repeat audibly. No allocation in process().
+ */
+class Granular {
+  constructor(seed) { this.rng = new Rng(seed); this.buf = null; this.N = 8; this.pos = new Float64Array(this.N); this.inc = new Float64Array(this.N); this.age = new Float64Array(this.N); this.len = new Float64Array(this.N).fill(0); this.pan = new Float64Array(this.N); this.next = 0; this.l = 0; this.r = 0; }
+  set(buf) { this.buf = buf; }
+  tick(gain, rate, fs, width) {
+    this.l = 0; this.r = 0;
+    const b = this.buf;
+    if (!b || gain < 1e-5) return;
+    if (--this.next <= 0) {
+      for (let k = 0; k < this.N; k++) if (this.len[k] === 0) {
+        const len = Math.floor(fs * (0.05 + 0.04 * this.rng.u()));
+        const inc = rate * (1 + 0.03 * this.rng.bi());
+        this.len[k] = len; this.age[k] = 0; this.inc[k] = inc;
+        this.pos[k] = this.rng.u() * Math.max(1, b.length - len * inc - 2);
+        this.pan[k] = 0.5 + this.rng.bi() * 0.5 * width;
+        this.next = Math.floor(len / 4);
+        break;
+      }
+      if (this.next <= 0) this.next = 64;
+    }
+    for (let k = 0; k < this.N; k++) {
+      const len = this.len[k];
+      if (len === 0) continue;
+      const a = this.age[k] / len, w = 0.5 - 0.5 * Math.cos(TAU * a);
+      const p = this.pos[k], i = p | 0, f = p - i;
+      const v = (b[i] * (1 - f) + b[i + 1] * f) * w * gain;
+      this.l += v * (1 - this.pan[k]); this.r += v * this.pan[k];
+      this.pos[k] += this.inc[k];
+      if (++this.age[k] >= len) this.len[k] = 0;
+    }
+  }
+}
+
 const P = (name, def = 0, min = -1e9, max = 1e9) => ({ name, defaultValue: def, minValue: min, maxValue: max, automationRate: 'k-rate' });
 
 // =====================================================================================================
@@ -88,6 +125,9 @@ class SnowProcessor extends AudioWorkletProcessor {
     this.prev = null;   // previous block's gains (for ramps)
     this.smoothA = 1 - Math.exp(-128 / (this.fs * 0.03));
     this.active = 0;
+    // real snow textures (tex_snow_*.mp3, CC0), posted in by the engine: { tex: 'ski' | 'board' | 'skid', data }
+    this.tex = { ski: new Granular(11), board: new Granular(22), skid: new Granular(33) };
+    this.port.onmessage = (e) => { const d = e.data; if (d?.tex && this.tex[d.tex]) this.tex[d.tex].set(d.data); };
   }
 
   gains() {
@@ -122,6 +162,12 @@ class SnowProcessor extends AudioWorkletProcessor {
     g.grainRate = Math.min(T.grains.max, g.grainRate) * clamp(p.rate, 0.2, 1.5) * lerp(1, T.grains.boardRate, board);
     g.grainDecay = lerp(1, T.grains.boardDecay, board);   // a board's wide base: fewer, coarser, choppier grains
     g.grainAmp = T.grains.gain * (wG + wK + wI * 0.8 + wP * 0.6) * (0.55 + 0.45 * Math.min(1, s01)) * (1 - 0.5 * sink) * lerp(1, T.grains.boardAmp, board) * lerp(0.7, 1, weight);
+    // field-recording grains under the synthesis: the same speed / weight curves as the hiss
+    const X = T.tex, texSurf = (wG + wK + wI * 0.8 + wP * X.powder) * (1 - 0.5 * sink) * ground;
+    g.texSki = X.ski * (1 - board) * sc * weight * texSurf;
+    g.texBoard = X.board * board * sc * weight * texSurf;
+    g.texSkid = X.skid * Math.min(1, skid + stop) * sk * (hard + 0.5 * wP) * ground;
+    g.texRate = (X.rate0 + X.rateV * Math.min(1, s01)) * clamp(p.rate, 0.25, 2);
     g.width = lerp(T.width.ski, T.width.board, board);
     g.board = board;
     g.out = T.out * p.gain;
@@ -154,7 +200,7 @@ class SnowProcessor extends AudioWorkletProcessor {
     const g = this.gains();
     const a = this.prev || g;
     this.prev = g;
-    const loud = g.squeal + g.hiss + g.carve + g.skid + g.powder + g.ice + g.base + g.growl + g.spray + g.grainAmp * Math.min(1, g.grainRate / 500);
+    const loud = g.texSki + g.texBoard + g.texSkid + g.squeal + g.hiss + g.carve + g.skid + g.powder + g.ice + g.base + g.growl + g.spray + g.grainAmp * Math.min(1, g.grainRate / 500);
     if (loud < 1e-5 && this.active <= 0) { L.fill(0); if (R !== L) R.fill(0); return true; }
     this.active = loud > 1e-5 ? fs * 0.3 : this.active - n;   // keep running for a tail after it falls silent
     // slow wobble of the carve bands (random walk toward new targets)
@@ -193,6 +239,9 @@ class SnowProcessor extends AudioWorkletProcessor {
       const skid = a.skid * it + g.skid * t, spray = a.spray * it + g.spray * t, powder = a.powder * it + g.powder * t;
       const base = a.base * it + g.base * t, ice = a.ice * it + g.ice * t, grainAmp = a.grainAmp * it + g.grainAmp * t;
       const squeal = (a.squeal ?? 0) * it + g.squeal * t;
+      const tSki = a.texSki * it + g.texSki * t, tBoard = a.texBoard * it + g.texBoard * t, tSkid = a.texSkid * it + g.texSkid * t;
+      this.tex.ski.tick(tSki, g.texRate, fs, width); this.tex.board.tick(tBoard, g.texRate, fs, width); this.tex.skid.tick(tSkid, g.texRate * (1.15 - 0.25 * g.board), fs, width);
+      const texL = this.tex.ski.l + this.tex.board.l + this.tex.skid.l, texR = this.tex.ski.r + this.tex.board.r + this.tex.skid.r;
       const cord = a.cord * it + g.cord * t, chat = a.chatter * it + g.chatter * t, outG = a.out * it + g.out * t;
       // corduroy: zippy AM at ridge rate, jittered
       this.cordPh += cordInc * this.cordJit;
@@ -241,6 +290,7 @@ class SnowProcessor extends AudioWorkletProcessor {
         s += (c.iceB.bp(c.iceH.hp(w)) * 2.2 + (c.scr1.bp(w) + c.scr2.bp(w) * 0.7) * S.gain) * ice * chatAM;
         const gsum = ci === 0 ? gl : gr;
         s += c.grain.bp(gsum * w) * 2.4 + gsum * w * T.grains.raw;
+        s += ci === 0 ? texL : texR;
         c.absorb += (s - c.absorb) * absA;
         if (ci === 0) this._l = c.absorb; else this._r = c.absorb;
       }

@@ -31,6 +31,23 @@ function softClipCurve(knee = 0.75, ceil = 0.89) {
   return c;
 }
 
+/** Mono, 100 Hz high-passed, RMS-normalised copy of a texture buffer (for the worklet's grains). */
+function prepTexture(buf, rms) {
+  const n = buf.length, out = new Float32Array(n + 2), chs = buf.numberOfChannels;
+  let prev = 0, hp = 0, e = 0;
+  const a = Math.exp(-2 * Math.PI * 100 / buf.sampleRate), data = Array.from({ length: chs }, (_, c) => buf.getChannelData(c));
+  for (let i = 0; i < n; i++) {
+    let x = 0;
+    for (let c = 0; c < chs; c++) x += data[c][i];
+    x /= chs;
+    hp = a * (hp + x - prev); prev = x;
+    out[i] = hp; e += hp * hp;
+  }
+  const k = rms / Math.max(1e-6, Math.sqrt(e / n));
+  for (let i = 0; i < n; i++) out[i] *= k;
+  return out;
+}
+
 const WORKLET_URL = new URL('./worklet.js', import.meta.url);
 
 export class AudioEngine {
@@ -98,6 +115,11 @@ export class AudioEngine {
         this.startLegacy();
       };
       this.snow.onprocessorerror = onErr; this.wind.onprocessorerror = onErr;
+      // field textures for the snow worklet's granular layer (mono, high-passed, RMS-normalised)
+      if (this.loadBuffer) await Promise.all([['ski', 'tex_snow_ski.mp3'], ['board', 'tex_snow_board.mp3'], ['skid', 'tex_snow_skid.mp3']].map(async ([k, n]) => {
+        const b = this.buffers[n] || await this.loadBuffer(n).catch(() => null);
+        if (b && b.length > 4096) this.snow.port.postMessage({ tex: k, data: prepTexture(b, this.T.snow.tex.rms) });
+      }));
     } catch (e) {
       console.warn('[audio] worklet unavailable, using sample loops', e);
       this.worklet = false;

@@ -58,6 +58,17 @@ rock / scraped as "ice", and park on maps flagged `park`), deep-snow sink, and s
 | Ice | High-passed, band-passed scrape at 3.8 kHz with chatter, plus two narrow edge-scrape resonances (Q 8) wandering 2–6 kHz |
 | Edge squeal | Stick-slip in hard skids on hard or icy snow: a jittered sawtooth at 330–520 Hz (rising with speed) band-passed at 1.8 kHz, latching on and off. The resulting harmonic ladder is visible in a CC0 resort descent. | Rock / scraped surface weight |
 
+**Field textures.** Grains of three short CC0 recordings are mixed under the synthesis for the organic
+detail that noise models lack:
+- `tex_snow_ski.mp3`: a groomed carve run;
+- `tex_snow_board.mp3`: board glide;
+- `tex_snow_skid.mp3`: a board skid.
+
+They are granular: Hann grains of 50–90 ms from random positions, about four overlapping, detuned ±3 %. Their
+playback rate follows speed (0.85–1.15), and their level follows the same speed and edge-weight curves as the
+hiss. The skid texture follows skid and stop. The engine posts them to the worklet mono, high-passed at 100 Hz and
+RMS-normalised. Set them with `snow.tex`; 0 turns them off.
+
 Stereo width is 0.75 for skis (two contacts, two independent noise streams) and 0.25 for a board.
 
 ## The wind (`sendit-wind`)
