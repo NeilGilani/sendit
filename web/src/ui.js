@@ -8,6 +8,7 @@ import { State } from './player.js';
 import { HUD } from './config.js';
 import { moveFocus, focusFirst, handleArrowKey, nudgeRange } from './lobby/nav.js';
 import { fmtTime } from './activities.js';
+import { loadingScreen } from './loading/index.js';
 
 const $ = (id) => document.getElementById(id);
 const BASES = ['loading', 'lobby', 'pause'];
@@ -185,15 +186,14 @@ export class UI {
     }
   }
 
+  /** Boot progress (0..1) + stage message → the loading screen (loading/index.js). */
   loading(p, msg) {
-    $('loadbar').style.width = `${Math.round(p * 100)}%`;
-    if (msg) $('loadmsg').textContent = msg;
+    loadingScreen.progress(p, msg);
   }
 
+  /** Loading finished: the loading screen dissolves into the lobby (resolves when it is gone). */
   doneLoading() {
-    const el = this.screens.loading;
-    el.style.opacity = 0;
-    setTimeout(() => el.classList.add('hidden'), 1200);
+    return loadingScreen.finish();
   }
 
   fade(toBlack, duration) {
