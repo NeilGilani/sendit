@@ -78,8 +78,8 @@ index.html ── paints #loading at once (inline CSS): sky gradient, SVG ridges
                        Player that the real Rider rig (rider.js) reads
          powderfx.js   take-off curtain, landing explosion, slash spray, glints (particles.js)
          shots.js      camera moves + clearance / line-of-sight solver, pitch clamp, focus pull
-         post          postprocessing: MSAA 4× HDR → DOF (focus on the rider) → bloom + the game's
-                       GradeEffect (gfx/post.js) + film grain
+         post          postprocessing: HDR → (DOF with ?loadq=high) → bloom + the game's GradeEffect
+                       (gfx/post.js) + film grain → SMAA
 ```
 
 Why a worker: an OffscreenCanvas worker commits frames straight to the compositor, so the scene keeps
@@ -132,12 +132,15 @@ centimetre-scale drone sway, and pitch is clamped (−13°, −24° for the orbi
 
 URL flags (all optional): `?loadseed=<n>` `?loadtod=golden|alpenglow|bluebird|dawn|storm|aurora`
 `?loadmtn=spires|ranges|inversion` `?loadgear=ski|snowboard` `?loadtrick=<id>` `?loadcam=<id>`
-`?loadscene=0` (static screen only) `?loadhold` (never hand off; for captures)
+`?loadscene=0` (static screen only) `?loadhold` (never hand off; for captures) `?loadq=low|high`
 `?loaddebug=cam:px,py,pz,tx,ty,tz,fov` (pinned camera).
 
 ### Resolution and frame rate
-Render size = CSS size × min(devicePixelRatio, 2), capped at 2560×1440 rendered pixels, MSAA 4× on a
-half-float HDR target, DOF at half resolution. The worker watches its own frame intervals and scales
+Render size = CSS size × min(devicePixelRatio, 2), capped at 2560×1440 rendered pixels, HDR half-float
+target, SMAA (high) for crisp edges, ~60 fps cap at any refresh rate (120 Hz would double the load).
+Real depth of field (postprocessing DOF at half resolution) only with `?loadq=high`: on a laptop GPU it
+cost seconds of boot time; by default the shallow-focus look comes from the snowflake bokeh and long
+lenses. Portrait screens drop the bars, add scrims and widen the vertical FOV. The worker watches its own frame intervals and scales
 the render down 15 % at a time if the median goes over 19 ms (the game is compiling and rendering on
 the same GPU), creeping back up while it holds vsync.
 
@@ -154,14 +157,63 @@ static screen stays (it is underneath all along), with the same overlay and prog
 forces it.
 
 ## Numbers
-(filled in from `scripts/loadtime.mjs` and the worker stats; see the table at the end of this file)
+
+All on this laptop (Intel Core Ultra 5 236V, Arc 130V iGPU, Chrome via Playwright, ANGLE D3D11), 1280×720,
+dev server, **with ~10 other sessions running builds and browsers (CPU at 100 %)**, so single runs swing
+by ±5 s. Every comparison is interleaved run by run (`node scripts/loadtime.mjs <url> 6 "loadscene=0;"`):
+`loadscene=0` = the painted static screen only (no worker), i.e. the old loading cost.
+
+**Boot to lobby, final version (6 interleaved pairs):**
+
+| | median | min | worker fps while booting |
+|---|---|---|---|
+| static screen only | 8.58 s | 6.47 s | – |
+| live scene (default) | 9.34 s | 7.55 s | 50–55 (26 on the cold-shader run) |
+
+Paired deltas (warm pairs): −2.1, −0.7, +0.6, −0.1, +3.8 s, inside this machine's noise; call it
+**+0–0.8 s (≈ +5–9 %)**. Earlier in the night, with the old bar-only screen, boot measured 10.4–11.8 s
+(warm) under similar load.
+
+**What cost what (earlier A/B rounds):**
+
+| variant | median boot, live vs static | scene fps |
+|---|---|---|
+| 4× MSAA + DOF, full res | 12.7–13.0 s vs 9.9–11.2 s | 19–48, stalls up to 3.4 s |
+| no MSAA, no DOF (`loadq=low`) | 10.25 s vs 9.92 s | 50–55 |
+| SMAA + DOF until the last stage | 12.74 s vs 11.21 s | 20–50 |
+| **SMAA, no DOF (shipped)** | **9.34 s vs 8.58 s** | **50–55** |
+
+The scene's own startup (production build, `vite preview`): worker created 0.38 s after navigation,
+module graph 0.58 s, terrain 0.5–0.9 s, shader compile ~1.3 s cold / 0.07 s warm, so the first live frame
+comes ≈ 1.7–2.3 s after open with a warm GPU shader cache and 4–7 s cold (Playwright always starts cold; a
+returning player has Chrome's shader disk cache). The painted static screen is up at first paint
+(FCP 50–120 ms).
+
+**Why the scene still dips during the boot:** Chrome executes every WebGL context's commands on one
+GPU-process thread. The game's prewarm links its shaders synchronously (`renderer.compile` + the first
+draws), which holds that thread for 1–5 s at a time on a cold cache, and the worker's frames wait behind
+it (worst frame 0.3–0.8 s warm, 2–3 s cold). Moving the boot's compile to `renderer.compileAsync`
+(KHR_parallel_shader_compile) would remove that; it is the graphics owner's code (gfx/prewarm.js,
+main.js), so it is a recommendation in the hand-over note, not part of this change.
 
 ## Assets and credits
 No new assets. Everything is procedural or reused from the game: the rider glTF and outfits,
 equipment models, the CC0 Poly Haven `rock_face_03` packed texture (already credited in CREDITS.md),
 the game's noise texture generator and post grade.
 
+## Tests and tools
+- `node scripts/loading-unit.mjs`: choreography + camera checks (24 variants × both gears × every trick ×
+  every move: lands past the band, upright, forward or switch as expected, flips go inverted, feet never
+  under the snow, speed ramp, cameras clear the snow). 7080 checks.
+- `GPU=1 node scripts/lobbytest.mjs <url>`: the lobby flow plus the loading hand-off (overlay gone, worker
+  canvas removed, no curtain left, progress reached 100 %, a live frame was shown).
+- `node scripts/loadingshot.mjs <url | …/loading.html> <outDir> "<q1>;<q2>" "<t1,t2>" WxH`: frame captures.
+- `node scripts/loadtime.mjs <url> <runs> "loadscene=0;"`: interleaved boot timing + worker pacing.
+- `web/loading.html?loadseed=…&finish=12`: the screen alone (no game boot), optionally with the hand-off.
+
 ## Known issues / ideas
+- The scene still dips while the game links shaders synchronously (see Numbers); fixable on the game side.
+- On a cold GPU shader cache the live scene appears late (4–7 s); the static screen covers it.
 - The first live frame waits for the worker's module graph and shader compiles (~1–2 s with a warm GPU
   shader cache, ~4–6 s cold on this laptop under load); the painted screen covers it.
 - The worker duplicates three.js and the rig modules (a second copy in memory while loading; the
