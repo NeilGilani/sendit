@@ -178,7 +178,8 @@ export const DECALS = { none: 0, stripe: 1, flames: 2, stars: 3, checker: 4, bol
 export function resolveOutfit(slots = {}) {
   const garments = {}, colors = {};
   for (const slot of OUTFIT_SLOTS) {
-    const s = slots[slot] || {};
+    // No face piece given (an outfit from before the face slot): it follows the jacket's colourway.
+    const s = slots[slot] || (slot === 'face' && slots.jacket?.colorway ? { colorway: slots.jacket.colorway } : {});
     const gid = GARMENTS[slot][s.garment] ? s.garment : DEFAULT_GARMENTS[slot];
     garments[slot] = { id: gid, ...GARMENTS[slot][gid] };
     const cw = COLORWAYS[s.colorway] || COLORWAYS[DEFAULT_COLORWAY];
