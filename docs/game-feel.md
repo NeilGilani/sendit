@@ -331,3 +331,13 @@ The progression state never touches the profile files (web/src/profile/). It has
   - The air read-out and the landing announcer.
   - The combo bank and the speed rush.
   - A level-up, the toasts, the lobby badge and the Progress tab.
+
+The other scripts (all real GPU; screenshots go outside the repo):
+
+| Script | What it checks |
+|---|---|
+| `juice-flowshots.mjs <url> <out> <mapId>` | The HUD next to a map's own HUD, with a staged chain, announcement and bank pushed through the real bus. Used on Voltage Park and Blackspruce. |
+| `juice-chalshots.mjs <url> <out>` | A Challenge run against a seeded best: split deltas at the gates, and the style combo with its tier word. |
+| `juice-impactcheck.mjs <url> [kicker]` | The per-frame warp, rider travel and camera punch springs after a real landing. |
+| `juice-perf.mjs <url> [quality]` | A/B frame cost of the speed rush pass. |
+| `juice-pauseshot.mjs <url> <out.png>` | The pause screen with the progression line. |
