@@ -92,7 +92,7 @@ add('box-grind-ski', { seconds: 5, map: 'voltage-park',
   frames: frames(5, (t) => (t < 1 ? { speed: 7 } : t < 3.5 ? { st: 5, speed: 7, grindV: 7, grindKind: 'box' } : { speed: 6 })),
   events: [{ t: 1, name: 'grindStart', d: { kind: 'box' } }, { t: 3.5, name: 'grindEnd', d: { reason: 'end' } }] });
 add('forest-ambience', { seconds: 12, map: 'blackspruce', frames: frames(12, () => ({ speed: 0 })) });
-add('park-crowd', { seconds: 10, map: 'voltage-park', frames: frames(10, () => ({ speed: 0 })), events: [{ t: 3, name: 'parkLanding', d: { clean: true, dist: 18 } }] });
+add('park-crowd', { seconds: 10, tune: { ambience: { pa: { every: [1, 2] } } }, map: 'voltage-park', frames: frames(10, () => ({ speed: 0 })), events: [{ t: 3, name: 'parkLanding', d: { clean: true, dist: 18 } }] });
 add('slowmo-air', { seconds: 5, opts: { slow: 0.35 }, frames: frames(5, (t) => (t < 1 ? { speed: 14 } : { st: 2, speed: 14, air: t - 1, spin: 4 })) });
 add('extreme-inputs', { seconds: 4, frames: frames(4, (t) => ({ speed: 80 * (t % 1), edge: 3, load: 9, skid: 9, stop: 1, groomed: 1, powder: 1, rock: 1, sink: 2, spin: 60, flip: 60, st: t % 1 < 0.5 ? 1 : 2, air: 3, board: t > 2 ? 1 : 0 })),
   events: [{ t: 0.5, name: 'landed', d: { impact: 40 } }, { t: 1, name: 'crashed' }, { t: 1.1, name: 'crashed' }, { t: 1.2, name: 'landed', d: { impact: 30 } }] });
@@ -125,7 +125,7 @@ const fail = (msg) => { fails++; console.log('  FAIL', msg); };
 const db = (x) => (x > 0 ? (20 * Math.log10(x)).toFixed(1) : '-inf');
 for (const s of S) {
   const t0 = Date.now();
-  const r = await page.evaluate((spec) => window.renderScenario(spec), { ...s, wav: !!wavDir, tune: s.tune || tune });
+  const r = await page.evaluate((spec) => window.renderScenario(spec), { ...s, wav: !!wavDir, tune: [s.tune, tune].filter(Boolean) });
   R[s.name] = r;
   if (wavDir && r.wav) writeFileSync(join(wavDir, `${s.name}.wav`), Buffer.from(r.wav, 'base64'));
   const loud = [...r.rms].sort((a, b) => a - b)[Math.floor(r.rms.length * 0.9)] || 0;
@@ -157,6 +157,7 @@ if (has('forest-ambience', 'idle-alpine')) expect(lvl('forest-ambience') > lvl('
 if (has('lift-ride')) expect(Math.max(...R['lift-ride'].pk.slice(20, 30)) > Math.max(...R['lift-ride'].pk.slice(40, 60)) * 1.5, 'a lift tower rattles over the rope hum');
 if (has('breath-after-run')) expect((R['breath-after-run'].events.breath || 0) >= 3 && !R['groomed-carve-ski']?.events.breath, 'the rider catches their breath after a hard run');
 if (has('powder-faceshot-fp')) expect((R['powder-faceshot-fp'].events.faceShot || 0) >= 2, 'deep powder turns throw face shots');
+if (has('park-crowd')) expect((R['park-crowd'].events.pa || 0) >= 2, 'the park PA speaks up');
 if (has('park-crowd')) expect(lvl('park-crowd', 3.2, 5) > lvl('park-crowd', 0.5, 2.5) * 1.5, 'a clean park landing gets a cheer');
 await browser.close();
 if (errors.length) { console.log('page errors:', errors.slice(0, 5)); fails++; }

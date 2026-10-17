@@ -155,6 +155,7 @@ export class AudioEngine {
     this.lift.update(when, dt, r.st === ST.LIFT && !o.menu);
     if (!quiet) this.breath.update(when, dt, r, persp.breath);
     if (this.breath.n) this.stats.events.breath = this.breath.n;
+    if (this.amb.paN) this.stats.events.pa = this.amb.paN;
     // ---- music duck
     this.crashT -= dt;
     const D = T.duck;

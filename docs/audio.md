@@ -15,7 +15,9 @@ the numbers and the comparisons with real recordings are in `docs/audio-research
 | `web/src/audio/rider.js` | `readRider(player)` turns `player.js` state into the numbers the engine uses. Read-only. |
 | `web/src/audio/fx.js` | One-shot synthesis: pole plant, edge change, slash, take-off, landing, grab rustle, crash tumble, near-miss pass-by, hard brake, tree creak, crowd cheer. |
 | `web/src/audio/grind.js` | Rail and box grind: a modal metal scrape plus the `grind_loop` sample, lock-on clang, kink ticks and pop-off. |
-| `web/src/audio/ambience.js` | Per-map beds: forest soughing and creaks, park crowd babble and cheers. The distant wind lives in the wind worklet. |
+| `web/src/audio/ambience.js` | Per-map beds: forest soughing and creaks, park crowd babble, cheers and a distant PA announcer. The distant wind lives in the wind worklet. |
+| `web/src/audio/lift.js` | Chairlift: rope hum and cable sing, chair creaks, and the grip rattling over each tower's sheaves. |
+| `web/src/audio/breath.js` | The rider's breathing: an exertion meter, catching breath after hard runs, and huffs on crashes. |
 | `web/src/audio/tuning.js` | Every parameter, in one place. |
 | `web/src/audio/harness.{html,js}` | Offline render and analysis harness for the tests. Dev only; nothing imports it. |
 | `web/scripts/audio-test.mjs` | Headless test that renders ~25 scripted rides and checks levels, clipping, NaNs and sound-design relations, optionally writing WAVs. |
@@ -86,7 +88,11 @@ mountain drops in pitch with time.
 | Near miss | `nearMiss`: pink band sweeping 2.6 kHz → 650 Hz (Doppler) with a 4 → 9 → 4 ms comb sweep, panned to the obstacle's side from the travel direction; trees add needle rustle |
 | Hard brake | `hardBrake`: spray fan and rough scrape onset (the worklet carries the sustained stop) |
 | Grinds | `grindStart` (modal clang, modes retuned ±3 % per rail), the frame's grind speed (continuous scrape and sample), `grindKink` (tick), `grindHop` / `grindEnd` (pop-off). Boxes are duller and lower. |
-| Crowd cheer | Park map: `parkLanding` (clean) or a perfect / stomped `landed` |
+| Crowd cheer | Park map: `parkLanding` (clean) or a perfect / stomped `landed`; the PA announcer reacts ~1.4 s later |
+| Face shot | Deep powder (sunk in) at a turn above 7 m/s: a soft whump and a fizz of flakes over the goggles. Full in first person, ×0.4 in the chase cam. |
+| Gate clack (skis) | `gate` (pass): a hollow plastic pole knocked aside, as two short modes and a flex thud. The old `gate` cue still plays on the UI bus. |
+| Lift tower | Each tower the chair passes (`player._lift.supports`): 6–9 roller thunks, louder mid-train, with a low metal ring |
+| Breathing | Exertion fills with speed, turn load and stops, and drains at rest. When the rider slows below 3.5 m/s after a hard run: exhales and inhales (formant-filtered noise) that slow and fade. Huffs on crashes and very hard landings. Full in first person, ×0.35 in the chase cam. |
 
 ## Ambience per map (`AUDIO.maps`)
 
@@ -95,7 +101,8 @@ mountain drops in pitch with time.
 | Valcrest | Gentle alpine air, birds, an occasional creak |
 | Blackspruce | Wind soughing in the conifers (gusty mid band), trunks creaking (stick-slip pulses through woody resonances), birds, tree plops |
 | Ravenspire | Strong, gusty high-altitude wind, ravens, cold snow (squeakier grains when slow), the heli |
-| Voltage Park | Calmer wind, a crowd (procedural voiced babble of 24 "voices", looped on two decorrelated players) and cheers on clean landings |
+| Voltage Park | Calmer wind, a crowd (procedural voiced babble of 24 "voices", looped on two decorrelated players), cheers on clean landings, and a far-off PA announcer every 25–50 s. The announcer is unintelligible on purpose: one formant voice through a 400 Hz–3 kHz horn band with 90 / 190 / 310 ms stadium slaps. |
+| Every map | Riding a chairlift: rope hum and tower rattles |
 
 ## Mix and perspective
 

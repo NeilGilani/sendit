@@ -121,12 +121,13 @@ export const AUDIO = {
     'valcrest-gully': { wind: 0.3, windF: 620, birds: 1, trees: 0.2, crowd: 0, cold: 0.2, gustiness: 1 },
     blackspruce: { wind: 0.28, windF: 820, birds: 0.8, trees: 1, crowd: 0, cold: 0.35, gustiness: 0.8, sough: 0.6 },
     ravenspire: { wind: 0.6, windF: 560, birds: 0.25, trees: 0, crowd: 0, cold: 0.7, gustiness: 1.6 },
-    'voltage-park': { wind: 0.22, windF: 700, birds: 0.4, trees: 0, crowd: 1, cold: 0.15, gustiness: 0.7, park: 1 },
+    'voltage-park': { wind: 0.22, windF: 700, birds: 0.4, trees: 0, crowd: 1, pa: 1, cold: 0.15, gustiness: 0.7, park: 1 },
     'lake-tahoe': { wind: 0.35, windF: 680, birds: 1, trees: 0.4, crowd: 0, cold: 0.25, gustiness: 1 },
   },
   ambience: {
     creak: { gain: 0.16, every: [6, 16] },       // tree creaks (stick-slip squeal), seconds between
     crowd: { gain: 0.22, cheer: 1.6 },
     sough: { gain: 0.3 },
+    pa: { gain: 0.08, every: [25, 50] },          // the park announcer, far off (horn band + slap echoes)
   },
 };

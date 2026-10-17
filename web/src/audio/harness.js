@@ -19,7 +19,7 @@ window.renderScenario = async function renderScenario(spec) {
   const sr = spec.sr || 48000, secs = spec.seconds;
   // spec.tune: a partial AUDIO tree merged in for this render only (A/B tests of tunables)
   const saved = JSON.parse(JSON.stringify(AUDIO));
-  if (spec.tune) merge(AUDIO, spec.tune);
+  for (const t of [].concat(spec.tune || [])) merge(AUDIO, t);   // one partial tree or several, applied in order
   try { return await render(spec, sr, secs); } finally { restore(AUDIO, saved); }
 };
 
