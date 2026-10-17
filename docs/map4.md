@@ -261,12 +261,17 @@ far LOD and the tree scatter are untouched by the park.
   - `registerMap({ trails })` lists nine trails: slopestyle (park), Spark (green), Current (blue), High Voltage
     (black), the Grid (park), the Stairway (black), Hip Row (blue), the Conduit (black) and the Tower
     (double-black).
-  - Each has `{ id, name, difficulty, description, length, vertical }`. Length and vertical are measured by
-    `course.trailInfo()`, and map4-unit checks they still match `TRAIL_SIZE` in index.js after a layout change.
+  - Each has `{ id, name, difficulty, description, length, vertical, featured? }`. Length and vertical are
+    measured from the start to the finish line on the snow, as `scripts/trails-check.mjs` does, by
+    `course.trailInfo()`. map4-unit checks they still match `TRAIL_SIZE` in index.js after a layout change.
+  - `maps/adapters.js` (the trails session's block) keeps the mountain card. Its trail list mirrors these; the
+    registry uses the map's own.
   - `course.trailSpawn(id) → { x, z, heading }`: a drop zone, or the top of the lane. The data is `TRAILS` in
     layout.js.
 - **`runCompleted`** `{ mapId, trailId, distance, time, score, judged? }` goes out on the state.js bus when a run
   reaches the finish (zen `runComplete` or Challenge `runFinished`) — park.js.
+  - `profile/tracker.js` also emits it for every map. The park only announces a finish nobody announced in the
+    last 2 s (the rule the other maps use), so there is one event per run.
   - The trail is the one most of the run's features (takeoffs and grinds) were on, else the trail it started on.
   - The clock and distance start at the top, at a drop zone or at the spawn.
 - **Atmosphere — the night final** (`VOLTAGE_ATMOSPHERE` in tuning.js, applied by `world.js applyMapAtmosphere`).
@@ -713,7 +718,9 @@ What it costs:
   don't collide (riding under a rail passes through).
 - **Non-twin skis.** Skis that aren't twin tips (anything but the park skis) can't land switch. Straight airs in
   the pipe and QPs then need a 180.
-- **Night lighting.** The night final is one key light plus a bright ambient. The floodlight heads glow but don't
-  pool light on the snow; real light cones would need local lights (a graphics feature).
+- **Night lighting.** The night final is one key light plus a bright ambient.
+  - Under each light tower a warm additive glow on the snow fakes the floodlight pool (props.js `lightPools`, one
+    draw).
+  - It doesn't light riders or features; real light cones would need local lights (a graphics feature).
 - **Merge watch-list.** player.js, physics/edge.js, config.js, rider.js (pose functions), activities.js, ui.js,
   physics/flow.js, maps/builtin.js (one line).
