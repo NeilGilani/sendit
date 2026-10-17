@@ -11,7 +11,7 @@ export const AUDIO = {
     fx: 0.85,             // one-shots: landings, whooshes, pole plants, crashes, grinds
     ui: 0.8,              // game / UI cues (gates, medals, tokens, combo)
     verb: 1.0,            // the place: per-map reverb send level × maps[id].verb
-    music: 0.85,
+    music: 2.4,           // music sits ~6 dB under the riding sound (research: 4–6 LU under SFX) at the default volumes
     glueThresholdDb: -12, glueKneeDb: 8, glueRatio: 1.6, glueAttack: 0.01, glueRelease: 0.2,   // SFX bus glue (gentle: Chrome adds make-up gain, which would lift the quiet bits)
     limiterThresholdDb: -2,   // limiter on the master (DynamicsCompressor, ratio 20, no look-ahead)…
     limiterKneeDb: 0,

@@ -42,6 +42,11 @@ async function render(spec, sr, secs) {
   eng.setView(spec.view || 'chase');
   eng.setVolumes(spec.volumes || { master: 0.8, sfx: 0.8, music: 0.6 }, 0);
   if (spec.solo) for (const b of ['snowBus', 'windBus', 'ambBus', 'fxBus', 'uiBus']) if (b !== spec.solo) eng[b].gain.value = 0;
+  // the real Zen track at the level audio.js plays it (musicLevel 0.85^1.6), for mix-balance checks
+  if (spec.music) {
+    const m = await loadBuffer(ctx, spec.music === true ? 'music_golden_hour' : spec.music);
+    const s = ctx.createBufferSource(); s.buffer = m; s.loop = true; const g = ctx.createGain(); g.gain.value = 0.85 ** 1.6; s.connect(g); g.connect(eng.duck); s.start(0, 20);
+  }
   // a steady 'music' tone so ducking shows up in the stats
   if (spec.musicTone) {
     const o = ctx.createOscillator(); o.frequency.value = 220; const g = ctx.createGain(); g.gain.value = 0.2; o.connect(g); g.connect(eng.duck); o.start();

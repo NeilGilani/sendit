@@ -136,6 +136,13 @@ Tune it with `maps[id].verb`, `verbTime`, `verbPre` and `verbDark`.
 
 ## Mix and perspective
 
+- **Balance at the default volumes:**
+  - riding (carving at 14 m/s) is about −18 dBFS RMS;
+  - the Zen music is about −24 dBFS, sitting ~6 dB under the riding sound (the research suggests music 4–6 LU
+    under SFX);
+  - standing still is about −45 dBFS, the quiet alpine air.
+
+  `mix.music` (2.4) sets the music. The old audio had music ~4 dB under its quieter snow loops.
 - **Ducking (`AUDIO.duck`):** music −5 dB after 0.5 s of air, −9 dB on a crash (1.6 s), −4 dB toward 30 m/s, −3 dB
   on rails, −5 dB for 0.35 s on hard landings. Attack 0.25 s, release 1.6 s.
 - **Music low-pass:** 1.2 kHz in big air after 0.4 s, 400 Hz on a bail, opening over ~0.5 s.
