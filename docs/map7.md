@@ -20,6 +20,7 @@ http://localhost:5196/?map=fjordline&trail=kvalneset&ride    a trail's top (skar
 node web/scripts/map7-ride.mjs both all send --check         bot rides every trail on skis and snowboard (styles: send, carve, trick, control)
 node web/scripts/map7-unit.mjs                               contracts, terrain, roofs / decks / walls, water, runCompleted (69 checks)
 node web/scripts/map7-fuzz.mjs 40 40                         random inputs from random starts (face, roofs, decks, into the fjord)
+node web/scripts/map7-e2e.mjs http://localhost:5196          in the real game: trail start, splash + fade + dry respawn, one runCompleted per finish
 node web/scripts/map7-shots.mjs http://localhost:5196 <dir> all 1600 900    GPU screenshots of fixed views
 node web/scripts/map3-perf.mjs http://localhost:5196 1600 900 1 60 fjordline
 node web/scripts/gfxpopin.mjs http://localhost:5196 fjordline 1 25
@@ -252,13 +253,18 @@ run finishes with 0 crashes; on skis the forced turns scrub the gentle lower slo
 out at 300 s (no crashes) — a bot artefact, but it says the bottom 300 m is flat enough that you need to let the
 skis run.
 
-### Unit, fuzz
+### Unit, fuzz, end to end
 
 `map7-unit.mjs`: 69/69 (registry contract, trail numbers vs the lines, spawns on snow facing downhill, finishes at
 the water's edge, atmosphere shape, choke width and couloir angle, the coast wet / dry, the headland steps and
 bands, roofs and decks, walls, the pier splash and dry respawn, runCompleted once with the contract fields).
 `map7-fuzz.mjs 40 40`: 96k frames, no NaN, never below the snow / a roof / a deck, never stuck, 5–6 splashes all
 respawned on dry land (every fifth run is launched at the water from the beach).
+
+`map7-e2e.mjs` (real game, GPU): `?trail=brygga` starts at the Brygga top; riding into the fjord splashes, fades
+and puts the rider on the beach; crossing the line gives RUN COMPLETE, the quay run-out slows the rider, and exactly
+one `runCompleted` for fjordline goes out (the ride tracker's, with `trailId` = the trail board `fjordline/brygga`;
+the map's own is deduplicated). No console errors.
 
 Shared suite on the integrated branch: unittest 52/52, physics-fuzz, physics-tricks, jumps-valcrest --check,
 map2-bot --verify, map3-unit 32/32, map3-fuzz, map4-unit 15/15 all pass; GPU lobbytest (GPU=1, :5196): all checks passed.
