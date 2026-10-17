@@ -149,9 +149,9 @@ export const FJORD = { farShore: 6400, depth: 60, shelf: 0.9 };
 export const BUILDINGS = [
   // The roof-hop row on the jump line (Brygga): long axis down the fall line, ridge across it.
   // Each roof is a kicker: ride the drift up the uphill slab, air off the ridge, land on the downhill slab or past the eave.
-  { id: 'hus1', name: 'Kjøpmannshuset', u: 2205, v: -112, L: 13, W: 10, roof: 'gable', pitch: 27, eave: 3.6, drift: 0.62, driftSlope: 0.05, ramp: 3.2, colour: 'white', chimney: [0.25, 0.62] },
+  { id: 'hus1', name: 'Kjøpmannshuset', u: 2205, v: -112, L: 13, W: 10, roof: 'gable', pitch: 27, eave: 3.6, drift: 0.62, driftSlope: 0.05, ramp: 3.2, colour: 'red', chimney: [0.25, 0.62] },
   { id: 'hus2', name: 'Bakeriet', u: 2262, v: -108, L: 12, W: 9, roof: 'gable', pitch: 28, eave: 3.4, drift: 0.62, driftSlope: 0.05, ramp: 3.2, colour: 'ochre', chimney: null },
-  { id: 'hus3', name: 'Postkontoret', u: 2318, v: -106, L: 12, W: 9.5, roof: 'gable', pitch: 26, eave: 3.4, drift: 0.62, driftSlope: 0.05, ramp: 3.2, colour: 'red', chimney: [-0.3, -0.62] },
+  { id: 'hus3', name: 'Postkontoret', u: 2318, v: -106, L: 12, W: 9.5, roof: 'gable', pitch: 26, eave: 3.4, drift: 0.62, driftSlope: 0.05, ramp: 3.2, colour: 'white', chimney: [-0.3, -0.62] },
   // Naust: the boathouse at the top of the beach (jump it: Naustgapet).
   { id: 'naust', name: 'Naustgapet', u: 2400, v: -110, L: 8, W: 7, roof: 'gable', pitch: 32, eave: 2.4, drift: 0.92, driftSlope: 0.04, ramp: 3, colour: 'tar', chimney: null, yaw: 0 },
   // Village houses off the line.

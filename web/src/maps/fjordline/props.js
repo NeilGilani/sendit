@@ -511,14 +511,18 @@ void main() {
   vec3 N = normalize(vec3(-g.x * calm, 1.0, -g.y * calm));
   vec3 R = reflect(-V, N);
   R.y = abs(R.y) + 0.002;
-  vec3 sky = skyLUT(lut, R);
+  // Reflected sky: a fjord's horizon reflects the far shore's dark mountains, not the bright horizon sky, so
+  // the reflection reads higher, bluer sky, dimmed toward the horizon.
+  vec3 Rs = normalize(vec3(R.x, max(R.y, 0.0) * 0.8 + 0.22, R.z));
+  vec3 sky = skyLUT(lut, Rs) * mix(0.55, 0.9, smoothstep(0.02, 0.3, R.y));
   float ndv = max(dot(N, V), 0.0);
   float fr = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
   // Water body: deep blue-green, lit by the sky; the shallows by the shore turn teal over the pale shingle.
   float u = vWp.x - startX;
   float sh = 1.0 - smoothstep(0.0, 45.0, abs(u - shoreU));
-  vec3 body = mix(deep, shallow, sh * 0.6) * (skyAmb * 0.9 + sunCol * max(sunDir.y, 0.0) * 0.25);
-  vec3 col = mix(body, sky * 0.92, fr);
+  float skyL = dot(skyAmb, vec3(0.2126, 0.7152, 0.0722));
+  vec3 body = mix(deep, shallow, sh * 0.6) * (skyL * 1.1 + 0.15);   // lit by the sky's brightness, keeps its own blue
+  vec3 col = mix(body, sky, fr * 0.8);
   // The sun's glitter path: sharp specular on the ripples, broader warm sheen.
   float sd = max(dot(R, sunDir), 0.0);
   col += sunCol * (pow(sd, 900.0) * 60.0 + pow(sd, 90.0) * 1.2) * (0.6 + 0.4 * calm);

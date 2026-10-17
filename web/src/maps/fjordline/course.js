@@ -384,7 +384,8 @@ export class FjordlineCourse {
   hits(u, v) {
     let add = 0;
     for (const [hu, hv, L, H, kind] of HITS) {
-      const du = u - hu, dv = Math.abs(v - hv);
+      // Long rollers wander across the slope (a ruler-straight 600 m roller reads as a terrace from the fjord).
+      const du = u - hu - (L > 100 ? 22 * (noise1(v / 110, hu) * 2 - 1) : 0), dv = Math.abs(v - hv);
       if (du < -60 || du > 30 || dv > L + 25) continue;
       const lat = 1 - sstep(L - 14, L + 10, dv);
       if (lat <= 0) continue;
@@ -402,7 +403,8 @@ export class FjordlineCourse {
     if (dv > R.half + 10) return 0;
     const lat = 1 - sstep(R.half - 50, R.half + 10, dv);
     let add = 0;
-    for (const ur of R.us) { const t = (u - ur) / R.width; if (Math.abs(t) < 3.5) add += R.h * Math.exp(-t * t); }
+    const wob = 14 * (noise1(v / 70, 5) * 2 - 1);
+    for (const ur of R.us) { const t = (u - ur - wob) / R.width; if (Math.abs(t) < 3.5) add += R.h * Math.exp(-t * t); }
     return add * lat;
   }
 
@@ -471,7 +473,7 @@ export class FjordlineCourse {
       return 'Skaret';
     }
     if (u > SPINES.u0 && u < SPINES.u1 && v > SPINES.v0 - 10 && v < SPINES.v1 + 10) return 'Sølvryggene';
-    for (const [hu, hv, L, , kind, name] of HITS) if (u > hu - 22 && u < hu + 6 && Math.abs(v - hv) < L) return name || (kind === 'lip' ? 'Wind Lip' : 'Roller');
+    for (const [hu, hv, L, , kind, name] of HITS) if (u > hu - (L > 100 ? 45 : 22) && u < hu + (L > 100 ? 28 : 6) && Math.abs(v - hv) < L) return name || (kind === 'lip' ? 'Wind Lip' : 'Roller');
     if (Math.abs(v - SHOULDER.crest(u)) < SHOULDER_ROLLERS.half && SHOULDER_ROLLERS.us.some((r) => Math.abs(u - r) < 18)) return 'Fjordryggen Roller';
     if (u < 70) return 'The Col';
     return null;
