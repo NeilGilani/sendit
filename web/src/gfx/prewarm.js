@@ -68,6 +68,7 @@ export async function prewarm({ renderer, scene, camera, post, scatter, terrain,
   for (const pool of scatter.trees.pools || []) { const a = pool.im.instanceMatrix; a.clearUpdateRanges(); a.needsUpdate = true; }
   scatter.trees.last.set(1e9, 0, 0);
   warmShadowVariants(renderer, scene, post);
+  compileHidden(renderer, scene, camera);
   // Let the driver finish (a 1-pixel read waits for the GPU) so the cost lands behind the loading screen.
   const gl = renderer.getContext();
   gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
@@ -102,6 +103,29 @@ function warmShadowVariants(renderer, scene, post) {
   scene.remove(group);
   box.dispose();
   for (const x of made) if (x.isInstancedMesh) x.dispose();
+}
+
+/**
+ * renderer.compile only walks visible objects. Meshes hidden at load (e.g. lift parts or props shown
+ * by distance later) get proxies in a temporary scene, compiled against the game scene's lights / fog.
+ */
+function compileHidden(renderer, scene, camera) {
+  const temp = new THREE.Scene();
+  const seen = new Set();
+  const visibleChain = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
+  scene.traverse((o) => {
+    if (!(o.isMesh || o.isPoints || o.isLine) || visibleChain(o)) return;
+    for (const m of [].concat(o.material || [])) {
+      const key = m.uuid + (o.isInstancedMesh ? 'i' : '') + (o.isSkinnedMesh ? 's' : '');
+      if (seen.has(key) || o.isSkinnedMesh) continue;
+      seen.add(key);
+      const proxy = o.isInstancedMesh ? new THREE.InstancedMesh(o.geometry, m, 1) : o.isPoints ? new THREE.Points(o.geometry, m) : o.isLine ? new THREE.Line(o.geometry, m) : new THREE.Mesh(o.geometry, m);
+      proxy.receiveShadow = o.receiveShadow; proxy.castShadow = o.castShadow;
+      temp.add(proxy);
+    }
+  });
+  if (temp.children.length) renderer.compile(temp, camera, scene);
+  for (const x of temp.children) if (x.isInstancedMesh) x.dispose();
 }
 
 const keep = [];
