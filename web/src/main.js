@@ -6,6 +6,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PostStack } from './gfx/post.js';
 import { PERF } from './gfx/perf.js';
+import { prewarm, warmQualityVariants } from './gfx/prewarm.js';
+import { rockTextureReady } from './gfx/snow.js';
 import { patchShaderChunks, globals, makeNoiseTexture } from './world.js';
 import { HUD } from './config.js';
 import { ATMOSPHERE, col, createSnowfall } from './scene.js';
@@ -169,6 +171,11 @@ async function boot() {
   onResize();
   terrain.update(terrain.getSpawn().position, Infinity);   // full detail around the start before the first frame
   renderer.compile(scene, camera);
+  // Warm-up behind the loading screen (gfx/prewarm.js): textures, every shader variant, LOD around start + lobby.
+  await rockTextureReady();
+  const ls = lobbySpot(currentMap.map, course, terrain);
+  console.log('[gfx] prewarm', (await prewarm({ renderer, scene, camera, post, scatter, terrain, fx, spots: [terrain.getSpawn().position, new THREE.Vector3(ls.x, 0, ls.z)] })).toFixed(0), 'ms');
+  setTimeout(() => warmQualityVariants({ renderer, camera, scene, current: settings.quality, makeVariants: (q) => terrain.qualityMaterials(q) }), 1500);
   ui.loading(1, '');
   ui.doneLoading();
   ui.fade(false, 2.0);

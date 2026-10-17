@@ -9,6 +9,21 @@ import { PERF, perfQ } from './gfx/perf.js';
 import { snowUniforms, SNOW_COMMON_PARS, SNOW_PARS_GLSL, SNOW_FRAG_GLSL, SNOW_BAND_GLSL, FAR_SNOW_FRAG_GLSL } from './gfx/snow.js';
 
 const CHUNK = 128;
+
+// Geomorph (vertex): slide toward the next-coarser LOD's surface over the last stretch before a swap.
+const TERRAIN_MORPH_PARS = /* glsl */`
+attribute vec2 aMorph;
+uniform vec4 uMorphEnd; uniform vec4 uMorphLen; uniform vec3 uMorphEye;
+`;
+const TERRAIN_MORPH_GLSL = /* glsl */`
+  {
+    float ml = aMorph.y;
+    float mEnd = ml < 0.5 ? uMorphEnd.x : ml < 1.5 ? uMorphEnd.y : ml < 2.5 ? uMorphEnd.z : uMorphEnd.w;
+    float mLen = ml < 0.5 ? uMorphLen.x : ml < 1.5 ? uMorphLen.y : ml < 2.5 ? uMorphLen.z : uMorphLen.w;
+    float mk = clamp((distance(transformed.xz, uMorphEye.xz) - mEnd + mLen) / mLen, 0.0, 1.0);
+    transformed.y += aMorph.x * mk;
+  }
+`;
 const LODS = 5;
 
 export class Terrain {
@@ -18,6 +33,13 @@ export class Terrain {
     this.chunks = [];
     this.cache = new Map();
     this.lodDistances = [280, 600, 1200, 2400];
+    // Geomorphing (no LOD pops): every vertex of a chunk at LOD l slides to the surface LOD l+1 would
+    // draw while it is still [uMorphEnd - uMorphLen, uMorphEnd] from the camera, so by the time the
+    // chunk swaps to the coarser grid it already looks exactly like it.
+    this.morph = { uMorphEnd: { value: new THREE.Vector4() }, uMorphLen: { value: new THREE.Vector4() }, uMorphEye: { value: new THREE.Vector3() } };
+    this.geomorph = true;
+    this.vel = new THREE.Vector2();
+    this._lastCam = null;
     this.features = null;     // optional { heightAt(x, z) -> number | null }
   }
 
@@ -261,32 +283,65 @@ export class Terrain {
     blank.needsUpdate = true;
     terrainUniforms.uTreeMask.value = blank;
     this.terrainUniforms = terrainUniforms;
-    this.material = toonMaterial({
-      name: 'terrainSnow', uniforms: terrainUniforms,
+    // Far forest band: real mountains use their own treeline and keep forest to the horizon.
+    const farU = snowUniforms();
+    if (this.course?.treeline) farU.uFarForest.value.set(this.course.treeline, 350, 1e6);
+    this.farUniforms = { ...farU, noiseTex: { value: tex.noise } };
+    this.material = this.makeMaterial();
+    this.material.defines = { SNOW_TRACKS: 2, SNOW_SPARKLE: 1, SNOW_TREEMASK: 1, SNOW_FLUTES: 1 };
+    this.farMaterial = this.makeFarMaterial();
+    this.farMaterial.defines = { ROCK_FAR: 1 };
+  }
+
+  makeMaterial() {
+    const m = toonMaterial({
+      name: 'terrainSnow', uniforms: { ...this.terrainUniforms, ...this.morph },
       fragPars: SNOW_COMMON_PARS + SNOW_PARS_GLSL, frag: SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
+      vertPars: TERRAIN_MORPH_PARS, vertPre: TERRAIN_MORPH_GLSL,
     });
-    const prev = this.material.onBeforeCompile;
-    this.material.onBeforeCompile = (shader, r) => {
+    const prev = m.onBeforeCompile;
+    m.onBeforeCompile = (shader, r) => {
       prev(shader, r);
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(tN, 0.0)).xyz);');
     };
-    this.material.defines = { SNOW_TRACKS: 2, SNOW_SPARKLE: 1, SNOW_TREEMASK: 1, SNOW_FLUTES: 1 };
+    return m;
+  }
 
-    // Far forest band: real mountains use their own treeline and keep forest to the horizon.
-    const farU = snowUniforms();
-    if (this.course?.treeline) farU.uFarForest.value.set(this.course.treeline, 350, 1e6);
-    this.farMaterial = toonMaterial({
-      name: 'terrainFarSnow', uniforms: { ...farU, noiseTex: { value: tex.noise } },
+  makeFarMaterial() {
+    const m = toonMaterial({
+      name: 'terrainFarSnow', uniforms: this.farUniforms,
       fragPars: SNOW_COMMON_PARS + 'vec3 tN;', frag: FAR_SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
     });
-    this.farMaterial.defines = { ROCK_FAR: 1 };
-    const prevFar = this.farMaterial.onBeforeCompile;
-    this.farMaterial.onBeforeCompile = (shader, r) => {
-      prevFar(shader, r);
+    const prev = m.onBeforeCompile;
+    m.onBeforeCompile = (shader, r) => {
+      prev(shader, r);
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(tN, 0.0)).xyz);');
     };
+    return m;
+  }
+
+  /** Shader defines of the terrain / backdrop materials for a quality level. */
+  qualityDefines(q) {
+    const T = PERF.terrain[perfQ(q)];
+    // Quality tiers: low = no glints / plain normal-mapped tracks / no fine wind detail;
+    // medium = glints, cheaper rock; high = parallax trenches, full rock, fall-line flutes.
+    const d = { SNOW_TRACKS: T.tracks, SNOW_TREEMASK: 1 };
+    if (T.rockLite) d.ROCK_LITE = 1;
+    if (T.sparkle) d.SNOW_SPARKLE = 1;
+    if (q === 2) d.SNOW_FLUTES = 1;          // fall-line flutes on steep snow: high only
+    // Backdrop + mid ring cover much of the screen: full faceted rock / flutes on high only.
+    const far = q === 2 ? { ROCK_FAR: 1 } : { FAR_LITE: 1, ROCK_LITE: 1 };
+    return { terrain: d, far };
+  }
+
+  /** Fresh terrain + backdrop materials set up as quality q would (for background shader warm-up). */
+  qualityMaterials(q) {
+    const { terrain, far } = this.qualityDefines(q);
+    const a = this.makeMaterial(), b = this.makeFarMaterial();
+    a.defines = terrain; b.defines = far;
+    return [a, b];
   }
 
   build() {
@@ -398,6 +453,8 @@ export class Terrain {
     const N = this.res, sp = this.spacing, half = this.half;
     let k = 0;
     const drop = 6 + 5 * lod;
+    const morph = new Float32Array(w * w * 2);
+    const Hc = (a, b) => this.heights[Math.min(N - 1, Math.max(0, b)) * N + Math.min(N - 1, Math.max(0, a))];
     for (let j = -1; j <= n + 1; j++) {
       for (let i = -1; i <= n + 1; i++) {
         const ci = Math.min(Math.max(i, 0), n), cj = Math.min(Math.max(j, 0), n);
@@ -407,6 +464,15 @@ export class Terrain {
         const edge = gi === 0 || gj === 0 || gi === N - 1 || gj === N - 1;
         const x = -half + gi * sp, z = -half + gj * sp;
         let y = this.heights[gj * N + gi];
+        // Height of the next-coarser grid here (its triangles split along the (i+1, j)-(i, j+1) diagonal).
+        let yc = y;
+        if (lod < LODS - 1) {
+          const oi = ci & 1, oj = cj & 1;
+          if (oi && !oj) yc = (Hc(gi - step, gj) + Hc(gi + step, gj)) / 2;
+          else if (!oi && oj) yc = (Hc(gi, gj - step) + Hc(gi, gj + step)) / 2;
+          else if (oi && oj) yc = (Hc(gi + step, gj - step) + Hc(gi - step, gj + step)) / 2;
+        }
+        morph[(k / 3) * 2] = yc - y; morph[(k / 3) * 2 + 1] = lod;
         if (skirt) y -= edge ? 160 : drop;
         pos[k] = x; pos[k + 1] = y; pos[k + 2] = z;
         const o = (gj * N + gi) * 2;
@@ -418,6 +484,7 @@ export class Terrain {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    g.setAttribute('aMorph', new THREE.BufferAttribute(morph, 2));
     g.setIndex(this.indices[lod]);
     g.computeBoundingSphere();
     g.computeBoundingBox();
@@ -534,44 +601,77 @@ export class Terrain {
     const s = T.lod;
     this.lodDistances = [280 * s, 600 * s, 1200 * s, 2400 * s];
     this.midLodDistances = MIDTERRAIN.lodDist.map((d) => d * s);
+    // A chunk switches when its centre distance minus half its size passes the LOD distance; a vertex
+    // can be up to ~0.42 x half a chunk closer than that, so the morph completes that much earlier.
+    const slack = this.chunkSize ? this.chunkSize * 0.5 * 0.42 + 2 : 36;
+    const ends = this.lodDistances.map((d) => d - slack);
+    this.morph.uMorphEnd.value.fromArray(ends);
+    this.morph.uMorphLen.value.fromArray(ends.map((e) => Math.max(10, e * PERF.terrainMorph)));
     if (this.material) {
-      // Quality tiers: low = no glints / plain normal-mapped tracks / no fine wind detail;
-      // medium = glints, cheaper rock; high = parallax trenches, full rock, fall-line flutes.
-      const d = { SNOW_TRACKS: T.tracks, SNOW_TREEMASK: 1 };
-      if (T.rockLite) d.ROCK_LITE = 1;
-      if (T.sparkle) d.SNOW_SPARKLE = 1;
-      if (q === 2) d.SNOW_FLUTES = 1;          // fall-line flutes on steep snow: high only
-      this.material.defines = d;
+      const { terrain, far } = this.qualityDefines(q);
+      this.material.defines = terrain;
       this.material.needsUpdate = true;
       this.terrainUniforms.uDetail.value = q;
-      // Backdrop + mid ring cover much of the screen: full faceted rock / flutes on high only.
-      this.farMaterial.defines = q === 2 ? { ROCK_FAR: 1 } : { FAR_LITE: 1, ROCK_LITE: 1 };
+      this.farMaterial.defines = far;
       this.farMaterial.needsUpdate = true;
     }
     this._lastFocus = null;
   }
 
-  /** Pick each chunk's LOD; new geometry is built nearest-first within a per-frame budget. */
+  /** LOD a chunk wants for a camera at (x, z). */
+  chunkLod(mesh, x, z) {
+    const { cx, cz } = mesh.userData;
+    const ccx = -this.half + (cx + 0.5) * this.chunkSize, ccz = -this.half + (cz + 0.5) * this.chunkSize;
+    const d = Math.max(0, Math.hypot(ccx - x, ccz - z) - this.chunkSize * 0.5);
+    for (let l = 0; l < this.lodDistances.length; l++) if (d < this.lodDistances[l]) return [l, d];
+    return [LODS - 1, d];
+  }
+
+  /**
+   * Pick each chunk's LOD (geomorphed, so a swap is invisible). Geometry the camera will need within
+   * PERF.terrainLookahead seconds (along its velocity) is built ahead of time within a per-frame budget,
+   * and recently used LODs stay cached, so a swap never waits for a build.
+   */
   update(camPos, budget = 6) {
-    const todo = [];
+    this.morph.uMorphEye.value.copy(camPos);
+    const now = performance.now();
+    if (this._lastCam) {
+      const dt = Math.max(1e-3, (now - this._lastT) / 1000);
+      const vx = (camPos.x - this._lastCam.x) / dt, vz = (camPos.z - this._lastCam.z) / dt;
+      if (Math.hypot(vx, vz) < 120) this.vel.lerp(new THREE.Vector2(vx, vz), Math.min(1, dt * 4));   // ignore teleports
+    } else this._lastCam = new THREE.Vector3();
+    this._lastCam.copy(camPos); this._lastT = now;
+    const todo = [], ahead = [];
+    const look = PERF.terrainLookahead;
+    const px = camPos.x + this.vel.x * look, pz = camPos.z + this.vel.y * look;
     for (const mesh of this.chunks) {
-      const { cx, cz } = mesh.userData;
-      const ccx = -this.half + (cx + 0.5) * this.chunkSize, ccz = -this.half + (cz + 0.5) * this.chunkSize;
-      const d = Math.max(0, Math.hypot(ccx - camPos.x, ccz - camPos.z) - this.chunkSize * 0.5);
-      let lod = LODS - 1;
-      for (let l = 0; l < this.lodDistances.length; l++) if (d < this.lodDistances[l]) { lod = l; break; }
+      const [lod, d] = this.chunkLod(mesh, camPos.x, camPos.z);
       if (lod !== mesh.userData.lod) todo.push([d, mesh, lod]);
+      if (look > 0) {
+        const [la, da] = this.chunkLod(mesh, px, pz);
+        if (la !== lod && la !== mesh.userData.lod) ahead.push([da, mesh, la]);
+      }
     }
     todo.sort((a, b) => a[0] - b[0]);
     for (const [, mesh, lod] of todo) {
       const { cx, cz } = mesh.userData;
       const key = `${cx}_${cz}_${lod}`;
       if (!this.cache.has(key)) { if (budget-- <= 0) continue; }
-      const old = `${cx}_${cz}_${mesh.userData.lod}`;
       mesh.geometry = this.chunkGeometry(cx, cz, lod);
-      if (mesh.userData.lod < 3 && this.cache.has(old)) { this.cache.get(old).dispose(); this.cache.delete(old); }
+      this.touch(key);
       mesh.userData.lod = lod;
     }
+    // Build ahead: the LOD each chunk will want at the predicted camera position.
+    ahead.sort((a, b) => a[0] - b[0]);
+    for (const [, mesh, lod] of ahead) {
+      const { cx, cz } = mesh.userData;
+      const key = `${cx}_${cz}_${lod}`;
+      if (this.cache.has(key)) { this.touch(key); continue; }
+      if (budget-- <= 0) break;
+      this.chunkGeometry(cx, cz, lod);
+      this.touch(key);
+    }
+    this.trimCache();
     // Mid ring LOD (cheap to build: ~4k vertices a chunk).
     if (this.midChunks) {
       let mb = Math.max(2, budget + 2);
@@ -584,6 +684,29 @@ export class Terrain {
         mesh.geometry = this.midGeometry(u.cx, u.cz, lod);
         u.lod = lod;
       }
+    }
+  }
+
+  /** LRU bookkeeping for detailed chunk geometry (LOD 0-2); coarse LODs are small and always kept. */
+  touch(key) {
+    this._lru ??= new Map();
+    this._lru.delete(key);
+    this._lru.set(key, true);
+  }
+
+  trimCache() {
+    if (!this._lru || this._lru.size <= PERF.terrainCache) return;
+    // Keep every geometry in use plus the PERF.terrainCache most recently used spare ones (built-ahead
+    // or just left behind); dispose older spare ones.
+    const inUse = new Set(this.chunks.map((m) => m.geometry));
+    let spare = 0;
+    for (const key of this._lru.keys()) { const g = this.cache.get(key); if (g && !inUse.has(g)) spare++; }
+    for (const key of this._lru.keys()) {
+      if (spare <= PERF.terrainCache) break;
+      const g = this.cache.get(key);
+      if (!g) { this._lru.delete(key); continue; }
+      if (inUse.has(g) || Number(key.split('_')[2]) >= 3) continue;
+      g.dispose(); this.cache.delete(key); this._lru.delete(key); spare--;
     }
   }
 

@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { PERF, perfQ } from './gfx/perf.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { toonMaterial, outlineMaterial, mulberry32 } from './world.js';
+import { toonMaterial, outlineMaterial, mulberry32, withDistanceFade } from './world.js';
 import { SPAWN, TREES, col } from './scene.js';
 import { TreeSystem } from './gfx/trees.js';
 import { buildCornices } from './gfx/cornices.js';
@@ -27,6 +27,10 @@ export class Scatter {
     this.buckets = new Map();
     this.treeDistance = 3000;
     this.rockDistance = 1400;
+    // Per-instance distance fade (screen-door) so boulders / fences / ice never pop in by whole cells.
+    this.fadeEye = { value: new THREE.Vector3() };
+    this.fadeRock = { value: new THREE.Vector2(1400, 200) };    // (fade-out end, band) in metres
+    this.fadeSmall = { value: new THREE.Vector2(980, 150) };
   }
 
   async load(_loader, data) {
@@ -46,6 +50,9 @@ export class Scatter {
     iceMat.flatShading = true;
     const woodMat = toonMaterial({ name: 'fence', vertexColors: true });
     woodMat.flatShading = true;
+    withDistanceFade(rockMat, this.fadeEye, this.fadeRock);
+    withDistanceFade(iceMat, this.fadeEye, this.fadeSmall);
+    withDistanceFade(woodMat, this.fadeEye, this.fadeSmall);
     this.mats = { rock: rockMat, ice: iceMat, post: woodMat, rail: woodMat };
 
     const q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), m = new THREE.Matrix4();
@@ -86,8 +93,9 @@ export class Scatter {
       im.computeBoundingSphere();
       im.castShadow = true;
       im.receiveShadow = true;
-      im.userData = { kind: b.kind, center: new THREE.Vector2(b.cx / b.list.length, b.cz / b.list.length),
-        hi: this.geos[b.kind][b.variant], lo: this.geos[b.kind + 'Lo']?.[b.variant] };
+      const bs = im.boundingSphere;
+      im.userData = { kind: b.kind, center: new THREE.Vector2(bs.center.x, bs.center.z), radius: bs.radius,
+        hi: this.geos[b.kind][b.variant], lo: this.geos[b.kind + 'Lo']?.[b.variant], fadeEnd: 0 };
       this.group.add(im);
       this.cells.push(im);
     }
@@ -398,23 +406,29 @@ export class Scatter {
   }
 
   setQuality(q) {
-    this.trees.setQuality(q);
-    // A dense map may shrink the near / mid tree pools (course.perf = { treeNear, treeMid } × the tier's radii).
-    if (this.perfHint) { this.trees.near *= this.perfHint.treeNear ?? 1; this.trees.mid *= this.perfHint.treeMid ?? 1; }
+    // A dense map may shrink the near / mid tree pools (course.perf = { treeNear, treeMid } x the tier's
+    // radii); the tree system keeps the hand-over bands and the shadow range valid either way.
+    this.trees.setQuality(q, this.perfHint);
     this.treeDistance = PERF.treeDistance[perfQ(q)];   // perf tiers: gfx/perf.js
     this.rockDistance = PERF.rockDistance[perfQ(q)];
+    const band = PERF.scatterFadeBand;
+    this.fadeRock.value.set(this.rockDistance, this.rockDistance * band);
+    this.fadeSmall.value.set(this.rockDistance * 0.7, this.rockDistance * 0.7 * band);
   }
 
   update(cam) {
     this.trees.update(cam);
+    this.fadeEye.value.copy(cam);
     for (const im of this.cells) {
-      const c = im.userData.center;
-      const d = Math.hypot(c.x - cam.x, c.y - cam.z) - CELL * 0.7;
-      const kind = im.userData.kind;
-      im.visible = d < (kind === 'rock' ? this.rockDistance : this.rockDistance * 0.7);
-      // Boulder LOD per cell: full detail only for the cell(s) around the camera.
-      if (im.userData.lo) {
-        const g = d < 120 ? im.userData.hi : im.userData.lo;
+      const u = im.userData;
+      // Nearest possible instance of the cell. Instances fade out (dither) before the cell is culled.
+      const d = Math.hypot(u.center.x - cam.x, u.center.y - cam.z) - u.radius;
+      u.fadeEnd = u.kind === 'rock' ? this.rockDistance : this.rockDistance * 0.7;
+      im.visible = d < u.fadeEnd;
+      // Boulder LOD per cell: the low-poly version only once every rock in the cell is beyond
+      // PERF.boulderLoDistance (a few pixels across), so the swap is never visible.
+      if (u.lo) {
+        const g = d < PERF.boulderLoDistance ? u.hi : u.lo;
         if (im.geometry !== g) im.geometry = g;
       }
     }

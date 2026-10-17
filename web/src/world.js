@@ -176,6 +176,38 @@ ${opts.frag || ''}`)
 }
 
 /**
+ * Per-instance distance fade-out for an instanced toonMaterial (scatter boulders, fences, ice): over
+ * the last `fade.y` metres before `fade.x` (horizontal distance from `eye`) each instance shrinks into
+ * the snow (a few pixels across at that range, so it reads as fading), and it is collapsed beyond it.
+ * Culling whole cells therefore never pops. Vertex-only: no discard, so early-z stays intact.
+ * `eye` / `fade` are shared uniform objects ({ value: Vector3 } / { value: Vector2 }).
+ */
+export function withDistanceFade(m, eye, fade) {
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (shader, r) => {
+    prev(shader, r);
+    shader.uniforms.uFadeEye = eye;
+    shader.uniforms.uFade = fade;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uFadeEye; uniform vec2 uFade;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+  {
+    #ifdef USE_INSTANCING
+      vec3 fip = (modelMatrix * vec4(instanceMatrix[3].xyz, 1.0)).xyz;
+    #else
+      vec3 fip = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+    #endif
+    float ft = clamp((distance(fip.xz, uFadeEye.xz) - uFade.x + uFade.y) / max(uFade.y, 1e-3), 0.0, 1.0);
+    transformed *= 1.0 - ft;
+    if (ft >= 1.0) transformed = vec3(0.0, -1e4, 0.0);
+  }`);
+  };
+  const key = m.customProgramCacheKey;
+  m.customProgramCacheKey = () => key() + '|dfade';
+  return m;
+}
+
+/**
  * Inverted-hull outline with a constant screen-space thickness: back faces are pushed out along
  * their projected normal by `px` CSS pixels, so the silhouette line stays crisp at any distance.
  */

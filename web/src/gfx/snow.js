@@ -13,7 +13,12 @@ const lin = (hex) => new THREE.Color(hex);   // three converts sRGB hex → line
 
 // Packed rock detail (CC0 Poly Haven rock_face_03 at 1K: rg = GL normal xy, b = luminance), shared by
 // every terrain material. A flat grey placeholder is bound until the JPEG arrives.
-let rockTex = null;
+let rockTex = null, rockReady = null;
+/** Resolves once the rock detail JPEG is decoded (or after `timeout` ms), so loading can wait for it. */
+export function rockTextureReady(timeout = 8000) {
+  rockTexture();
+  return Promise.race([rockReady, new Promise((r) => setTimeout(r, timeout))]);
+}
 function rockTexture() {
   if (rockTex) return rockTex;
   const c = document.createElement('canvas');
@@ -25,11 +30,12 @@ function rockTexture() {
   rockTex.colorSpace = THREE.NoColorSpace;
   rockTex.wrapS = rockTex.wrapT = THREE.RepeatWrapping;
   rockTex.needsUpdate = true;
-  new THREE.ImageLoader().load('/textures/web/rock_face_03_packed_1k.jpg', (img) => {
+  rockReady = new Promise((resolve) => new THREE.ImageLoader().load('/textures/web/rock_face_03_packed_1k.jpg', (img) => {
     rockTex.image = img;
     rockTex.anisotropy = 4;
     rockTex.needsUpdate = true;
-  });
+    resolve();
+  }, undefined, () => resolve()));
   return rockTex;
 }
 
