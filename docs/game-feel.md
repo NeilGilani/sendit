@@ -119,6 +119,13 @@ Tunables (`JUICE_HUD`):
 | Combo bank | FOV +3° × mult/2. |
 | Popped take-off | FOV +1.6°. |
 
+**Measured in the real game.** `node web/scripts/juice-impactcheck.mjs <url> 2` rides a scripted Safety grab off Valcrest kicker 2 (1.8 s air, PERFECT, impact about 11 m/s) and logs each frame after touchdown:
+
+- The physics clock: one frozen frame (k 0, the rider moves 0 m), then 0.48×, 0.81×, and 1× after about 200 ms.
+- The landing punch: the lens snaps −2.7° and the camera dips 0.19 m. Both settle within about 0.4 s with a small overshoot.
+
+At least one frame is always frozen, so a long frame on a busy GPU can't swallow the freeze.
+
 **Combo build-up.** While a chain is live, the lens opens by +0.75° per ×1 above ×1, up to +3°. It is eased (rate 1.5/s), scaled by the shake setting, and set through `cam.juiceFov`.
 
 These are separate from the existing trauma shake, which is unchanged.
