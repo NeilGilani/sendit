@@ -73,7 +73,7 @@ class SnowProcessor extends AudioWorkletProcessor {
     this.p = {};
     this.ch = [0, 1].map((c) => ({
       rng: new Rng(1234567 + c * 7919), pink: new Pink(), brown: 0,
-      hiss: new SVF(), c1: new SVF(), c2: new SVF(), growl: new SVF(), skid: new SVF(), spray: new SVF(), powder: new SVF(),
+      hiss: new SVF(), hissLP: new SVF(), powHP: new SVF(), c1: new SVF(), c2: new SVF(), growl: new SVF(), skid: new SVF(), spray: new SVF(), powder: new SVF(),
       base: new SVF(), iceH: new SVF(), iceB: new SVF(), grain: new SVF(), absorb: 0,
     }));
     this.rng = new Rng(424242);
@@ -118,7 +118,10 @@ class SnowProcessor extends AudioWorkletProcessor {
     g.out = T.out * p.gain;
     // filter frequencies (rate = slow-motion pitch)
     const r = clamp(p.rate, 0.25, 2);
-    g.fHiss = T.hiss.f0 * Math.pow(Math.max(speed, 1) / 5, T.hiss.fExp) * (1 - 0.4 * wP) * r;
+    // glide hiss: pink noise between a high-pass and a low-pass that both rise with speed (≈ flat octave
+    // bands 500 Hz – 8 kHz like the groomed reference); a board's base keeps it darker
+    const hb = Math.pow(Math.max(speed, 1) / 5, T.hiss.fExp) * (1 - 0.4 * wP) * lerp(1, T.hiss.board, board) * r;
+    g.fHiss = T.hiss.hp * hb; g.fHissLP = Math.min(T.hiss.lpMax, T.hiss.lp * hb);
     const bf = lerp(1, T.carve.boardF, board);
     g.f1 = T.carve.f1 * (1 + T.carve.fSpeed * Math.min(1, s01)) * bf * (1 + 0.15 * wI) * r;
     g.f2 = T.carve.f2 * (1 + T.carve.fSpeed * Math.min(1, s01)) * bf * (1 + 0.25 * wI) * r;
@@ -127,7 +130,7 @@ class SnowProcessor extends AudioWorkletProcessor {
     g.fPowder = (T.powder.f0 + T.powder.fPerV * speed) * r;
     let fg = wG * T.grains.fGroomed + wK * T.grains.fGroomed + wI * T.grains.fIce + wP * T.grains.fPowder;
     fg = lerp(fg, T.grains.fCold, clamp(p.cold, 0, 1) * 0.5 * (1 - sstep(4, 12, speed)));   // squeak only when slow (friction melts it)
-    g.fGrain = fg * r;
+    g.fGrain = fg * lerp(1, T.grains.board, board) * r;
     g.fAbsorb = lerp(16000, T.powder.absorbF, T.powder.absorbMax * wP * Math.min(1, 0.35 + sink * 3)) * r;
     g.cordF = speed / T.corduroy.spacing * r;
     g.chF = r;
@@ -153,9 +156,9 @@ class SnowProcessor extends AudioWorkletProcessor {
     const w1 = 1 + T.carve.wobble * this.wob1, w2 = 1 + T.carve.wobble * this.wob2;
     const width = g.width;
     for (const c of this.ch) {
-      c.hiss.set(g.fHiss, T.hiss.q, fs);
+      c.hiss.set(g.fHiss, 0.6, fs); c.hissLP.set(g.fHissLP, 0.6, fs); c.powHP.set(T.powder.hp * g.r, 0.7, fs);
       c.c1.set(g.f1 * w1, T.carve.q1, fs); c.c2.set(g.f2 * w2, T.carve.q2, fs);
-      c.growl.set(g.fGrowl, 0.9, fs);
+      c.growl.set(g.fGrowl, 0.8, fs);
       c.skid.set(g.fSkid, T.skid.q, fs); c.spray.set(T.skid.sprayF * g.r, 0.6, fs);
       c.powder.set(g.fPowder, T.powder.q, fs);
       c.base.set(T.base.f * g.r, 0.7, fs);
@@ -206,15 +209,15 @@ class SnowProcessor extends AudioWorkletProcessor {
         const w = c.rng.bi(), pk = c.pink.next(w);
         c.brown = (c.brown + 0.02 * w) / 1.02;
         const br = c.brown * 3.5;
-        let s = c.hiss.bp(pk) * hiss * 1.8 * cordAM;
+        let s = c.hissLP.lp(c.hiss.hp(pk * 0.8 + w * T.hiss.white)) * hiss * 1.8 * cordAM;
         s += (c.c1.bp(w) * 1.3 + c.c2.bp(w)) * carve * chatAM;
-        s += c.growl.lp(br) * growl;
+        s += c.growl.bp(br) * growl * 1.6;
         s += c.skid.bp(w) * skid * roughEnv * chatAM + c.spray.lp(pk) * spray * roughEnv;
-        s += c.powder.lp(br + pk * 0.5) * powder * 1.5;
-        s += c.base.lp(br) * base * 2.0;
+        s += c.powder.lp(c.powHP.hp(br + pk * T.powder.shh)) * powder * 1.5;
+        s += c.base.bp(br) * base * 3.0;
         s += c.iceB.bp(c.iceH.hp(w)) * ice * 2.2 * chatAM;
         const gsum = ci === 0 ? gl : gr;
-        s += c.grain.bp(gsum * w) * 2.4 + gsum * w * 0.25;
+        s += c.grain.bp(gsum * w) * 2.4 + gsum * w * T.grains.raw;
         c.absorb += (s - c.absorb) * absA;
         if (ci === 0) this._l = c.absorb; else this._r = c.absorb;
       }

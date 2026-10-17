@@ -14,6 +14,7 @@ const base = (process.argv[2] || 'http://localhost:5192/').replace(/\/?$/, '/');
 const wavDir = process.argv[3] && process.argv[3] !== '-' ? process.argv[3] : null;
 const traceDir = process.argv[4] && process.argv[4] !== '-' ? process.argv[4] : null;
 const only = process.argv[5] || '';
+const tune = process.env.TUNE ? JSON.parse(process.env.TUNE) : null;   // e.g. TUNE='{"snow":{"grains":{"gain":0}}}'
 if (wavDir) mkdirSync(wavDir, { recursive: true });
 
 // ---------------------------------------------------------------- scenario builders
@@ -116,7 +117,7 @@ const fail = (msg) => { fails++; console.log('  FAIL', msg); };
 const db = (x) => (x > 0 ? (20 * Math.log10(x)).toFixed(1) : '-inf');
 for (const s of S) {
   const t0 = Date.now();
-  const r = await page.evaluate((spec) => window.renderScenario(spec), { ...s, wav: !!wavDir });
+  const r = await page.evaluate((spec) => window.renderScenario(spec), { ...s, wav: !!wavDir, tune: s.tune || tune });
   R[s.name] = r;
   if (wavDir && r.wav) writeFileSync(join(wavDir, `${s.name}.wav`), Buffer.from(r.wav, 'base64'));
   const loud = [...r.rms].sort((a, b) => a - b)[Math.floor(r.rms.length * 0.9)] || 0;
