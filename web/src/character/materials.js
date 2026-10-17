@@ -126,7 +126,7 @@ vec3 chPrint(float pat, vec2 q, float K, vec3 base, vec3 A, vec3 B, float bandY,
     float tl = topo * 7.0;
     float contour = 1.0 - smoothstep(0.0, fwidth(tl) * 1.2 + 0.04, 0.5 - abs(fract(tl) - 0.5));
     ink = contour;
-    return mix(base, mix(base, vec3(0.85, 0.82, 0.74), 0.4), contour * 0.75);
+    return mix(base, A, contour * 0.6);
   }
   if (pat < 12.5) {                                 // 12 skull jaw (gaiter): teeth, jaw and cheekbones on the front
     float x = uc * 0.5;                             // ~arc metres around the face, 0 = front
@@ -726,7 +726,7 @@ export function applyLook({ fabric, helmet, lens }, C) {
   const J = C.jacket || {}, P = C.pants || {}, G = C.face || {}, M = C.gloves || {}, Hm = C.helmet || {}, Gg = C.goggles || {};
   F.uJPat.value.set(pat(J), J.patScale || 1, fin(J), 0); set(F.uJPatA, J.patA, J.accent); set(F.uJPatB, J.patB, J.panel);
   F.uPPat.value.set(pat(P), P.patScale || 1, fin(P), 0); set(F.uPPatA, P.patA, P.cuff); set(F.uPPatB, P.patB, P.cuff);
-  F.uGPat.value.set(pat(G, PATTERNS.topo), G.patScale || 1, 0, 0); set(F.uGPatA, G.patA, '#e9e6dc'); set(F.uGPatB, G.patB, '#888888');
+  F.uGPat.value.set(pat(G, PATTERNS.topo), G.patScale || 1, 0, 0); set(F.uGPatA, G.patA, '#a8a291'); set(F.uGPatB, G.patB, '#888888');
   F.uMPat.value.set(pat(M), 1, fin(M), 0); set(F.uMPatA, M.patA, M.cuff);
   if (G.base) F.uGaiter.value.set(G.base);
   H.uHFin.value.set(FINISHES[Hm.finish] ?? 0, DECALS[Hm.decal] ?? 0, 0, 0); set(H.uHDecal, Hm.decalCol, Hm.accent);

@@ -17,6 +17,9 @@ const LOOKS = {
   board: ['jacket-tuff-shell-hood:blaze', 'board-inferno:legend', 'helmet-tuff:flames'],
   aurora: ['jacket-retro-suit:ice-cream', 'board-aurora:legend', 'helmet-tuff:pearl'],
   galaxy: ['jacket-tuff-shell:nightshift', 'skis-galaxy:legend', 'skis-inferno:legend'],
+  topo: ['jacket-tuff-shell:topo', 'pants-cargo:desert', 'helmet-tuff:copper-chrome', 'goggles-tuff:amber-iridium', 'face-balaclava:skull'],
+  lights: ['jacket-tuff-shell-hood:northern-lights', 'pants-tuff-bib:avalanche', 'helmet-tuff:bronze', 'gloves-tuff-mitt:expedition'],
+  alpine: ['jacket-retro-suit:alpine-78', 'helmet-tuff:summit-stars', 'goggles-tuff:ice-blue', 'face-gaiter:topo-olive'],
 };
 
 const [url = 'http://localhost:5193/', outDir = 'looks', which = 'all'] = process.argv.slice(2);
