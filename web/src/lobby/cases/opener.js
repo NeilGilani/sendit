@@ -163,7 +163,7 @@ class Opener {
         this.lastCell = cell;
       }
       if (k > 0.55 && !this.tense) { this.tense = true; this.el.classList.add('tense'); }
-      if (k > 0.3 && !this.stopRiser && !this.frozen) this.stopRiser = caseSfx.riser(T.spinDur * 0.7);
+      if (k > 0.3 && k < 0.9 && !this.stopRiser && !this.frozen && !this.skipped) this.stopRiser = caseSfx.riser(T.spinDur * 0.7);
       this.trace.push({ t: +t.toFixed(4), x: +x.toFixed(2), v: +v.toFixed(1), card: cell });
       if (k >= 1 && this.phase === 'spin') { this.phase = 'hold'; this.holdAt = t; this.land(); }
     }
@@ -184,7 +184,8 @@ class Opener {
   }
 
   skip() {
-    if (this.phase === 'reveal' || this.phase === 'closing') return;
+    if (!['case', 'lid', 'reelIn', 'spin'].includes(this.phase)) return;
+    this.skipped = true;
     this.t0 = performance.now() - (TIMING.spin + TIMING.spinDur) * 1000;
     this.el.classList.add('lid', 'reel');
     this.phase = 'spin';
@@ -198,6 +199,8 @@ class Opener {
     const rv = this.el.querySelector('.cr-reveal');
     const col = profileStore.collection();
     const more = profileStore.unopened.length;
+    const eqd = profileStore.equipped(res.item.slot);
+    const worn = eqd?.item.id === res.item.id && eqd?.variant.id === res.variant.id;
     this.el.style.setProperty('--rc', r.color);
     this.el.classList.add('revealed', `rv-${r.id}`);
     rv.hidden = false;
@@ -212,7 +215,7 @@ class Opener {
           : '<p class="cr-new">NEW · added to your locker</p>'}
         <p class="cr-col">Collection ${col.owned} / ${col.total} · ${Math.round(col.pct * 100)} %</p>
         <div class="cr-actions">
-          ${res.dupe ? '' : '<button type="button" class="cr-btn primary" data-act="equip">Equip now</button>'}
+          ${worn ? '' : `<button type="button" class="cr-btn${res.dupe ? '' : ' primary'}" data-act="equip">Equip now</button>`}
           ${more ? `<button type="button" class="cr-btn${res.dupe ? ' primary' : ''}" data-act="next">Open next <small>${more} left</small></button>` : ''}
           <button type="button" class="cr-btn ghost" data-act="close">Close</button>
         </div>
