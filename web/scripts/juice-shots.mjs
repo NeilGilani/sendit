@@ -18,7 +18,7 @@ page.on('pageerror', (e) => { errors++; console.log('[pageerror]', e.message); }
 page.on('console', (m) => { if (m.type() === 'error') { errors++; console.log('[error]', m.text().slice(0, 300)); } });
 const shot = async (name) => { const f = `${outDir}/${name}.png`; await page.screenshot({ path: f }); console.log('shot', f); };
 const map = process.env.MAP ? `&map=${process.env.MAP}` : '';
-await page.goto(`${base.replace(/\/?$/, '/')}?kicker=${kick}&equip=${equip}${map}`);
+await page.goto(`${base.replace(/\/?$/, '/')}?kicker=${kick}&equip=${equip}${map}`, { timeout: 300000, waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => window.__sendit?.lobby?.visible, null, { timeout: 400000 });
 await page.waitForTimeout(1500);
 if (!process.env.SKIP_LOBBY) await shot('lobby-badge');

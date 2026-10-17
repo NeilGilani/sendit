@@ -148,10 +148,11 @@ export function mountJuiceHud({ player, combo, input }) {
     bn.textContent = text; bn.style.color = color;
     bn.classList.toggle('lost', lost);
     restart(bn);
+    bnT = performance.now();
   };
 
   // ------------------------------------------------------------------ combo chain
-  let lastMult = 1, chainOn = false;
+  let lastMult = 1, chainOn = false, bnT = 0;
   on('juiceCombo', (s) => {
     chainOn = !!s;
     cb.classList.toggle('on', chainOn && riding() && s?.mult > 1.01);
@@ -270,7 +271,7 @@ export function mountJuiceHud({ player, combo, input }) {
   };
 
   /** True while a trick is being announced or the rider is in the air (big celebrations wait). */
-  const busy = () => (riding() && player.state === 2) || performance.now() - annT < (JUICE_HUD.announceHold + 0.3) * 1000;
+  const busy = () => (riding() && player.state === 2) || performance.now() - annT < (JUICE_HUD.announceHold + 0.3) * 1000 || performance.now() - bnT < 1700;
   return { root, toast, banner, callout, flash, edge, announce, update, busy };
 }
 

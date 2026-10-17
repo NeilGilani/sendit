@@ -59,6 +59,8 @@ export function mountProgressionUi({ juice }) {
   hud?.appendChild(bar); hud?.appendChild(lab);
   const fill = bar.firstChild;
 
+  // One-shots through audio.js's public API (no-op before audio is unlocked).
+  const sfx = (name, gain, rate) => { const s = juice?.music?.sound; if (s?.ctx) s.oneShot?.(name, gain, rate)?.catch?.(() => {}); };
   let showT = 0;
   const paint = () => {
     const p = progression.getProgress();
@@ -85,6 +87,7 @@ export function mountProgressionUi({ juice }) {
     lv.querySelector('.rk').textContent = e.rankUp ? `NEW RANK · ${e.rank.name.toUpperCase()}` : e.rank.name.toUpperCase();
     lv.querySelector('.sub').textContent = nextUnlockText(e.level);
     lv.classList.remove('show'); void lv.offsetWidth; lv.classList.add('show');
+    sfx('medal', 0.8, e.rankUp ? 0.9 : 1.05);
     juice?.hud?.flash(0.3);
     setTimeout(play, 2400);
   };
@@ -92,6 +95,9 @@ export function mountProgressionUi({ juice }) {
 
   mountRecap();
   const toast = (o) => juice?.toast(o);
+  on('achievement', () => sfx('token', 0.6, 1.08));
+  on('challengeDone', () => sfx('medal', 0.55, 1.25));
+  on('personalBest', () => { if (game.mode === Mode.RIDING) sfx('combo_bank', 0.45, 1.3); });
   on('achievement', (a) => toast({ kind: 'Achievement unlocked', title: a.title, sub: `${a.desc}${a.xp ? ` · +${a.xp} XP` : ''}`, icon: a.icon || '★', c1: '#ffe14d', c2: '#ff9a3d', hold: 4.2 }));
   on('challengeDone', ({ challenge: c }) => toast({ kind: 'Daily complete', title: c.title, sub: `+${c.xp} XP`, icon: '✓', c1: '#2ff5d6', c2: '#7a5cff', progress: 1, hold: 4.2 }));
   on('dailySweep', ({ xp }) => toast({ kind: 'All dailies done', title: 'Clean sweep!', sub: `+${xp} XP · new ones at midnight`, icon: '✦', c1: '#ff9a3d', c2: '#ff3d9a', hold: 4.6 }));
