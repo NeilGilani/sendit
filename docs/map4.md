@@ -99,7 +99,7 @@ Three rail sections, each with three parallel options (pick your line), then fiv
 | lane | v | identity · what is there |
 |---|---|---|
 | **Spark Lane** (green ●) | 70 | **flow.** Small tables on the bench (6–10 m), a box, a fat tube and a ledge, a down box, pump rollers. Under the Launch a **stacked double** (two 14 m tables back to back), a butter box, two more tables (16 / 18 m), three rollers, a **side hit**, the **Spark QP** (3.2 m) |
-| **Current Lane** (blue ■) | 125 | **the Triple Stack.** A table, flat-down / box / kink / tube on the benches. Under the Launch **three 18–19 m tables back to back**, ridden upright at ~14.5 m/s (each landing runs straight into the next in-run). The **Current Transfer** (a hip at v 148 that sends you into High Voltage), a **step-down**, a **side hit** on the lane's line (10° skew) and a 22 m table |
+| **Current Lane** (blue ■) | 125 | **the Triple Stack.** A table, flat-down / box / kink / tube on the benches. Under the Launch **three 18–19 m tables back to back**, ridden upright at ~14.5 m/s (each landing runs straight into the next in-run). The **Current Transfer** (a hip at v 148 that sends you into High Voltage), a **step-down** and a 22 m table |
 | **High Voltage** (pro, black ◆) | 186 | down-flat-down, rainbow rail, 13 m down rail, a kink; under the Launch two pro tables (22 / 27 m, 16–17.5 m/s), a side hit, **the Canal** (a 14 m-wide ice-blue channel, then a 9 m landing mound), a **step-up**, the **Voltage QP** (5.2 m) |
 | **The Grid** (jib garden, orange ⬭) | 236–258, u 50–262 | 16 jibs in seven rows every 30–33 m, three columns: boxes, tubes, rails, a flat box, an A-frame, a 14 m rail, a kink, an S-rail, a rainbow box, a down box, a ledge, a battleship, a cannon, a finale DFD |
 | **The Stairway** (step line) | 245, under the Grid | **Stair Drop 1** (a step-down: the deck falls away 6°, 20 m table), **Stair Up** (a 32° kicker over a 7 m table to a deck 1.8 m above the lip), **Stair Drop 2** (24 m), the **Stairway Hip** |
@@ -145,8 +145,8 @@ Three rail sections, each with three parallel options (pick your line), then fiv
    the Canal, the step-up and the 5.2 m QP.
 3. **Lane hopper.** Spark Ledge → Down Box → Spark Double → **the Spine** → **Current Transfer** → the Canal →
    the step-up: three lanes in one run.
-4. **The Triple Stack.** Drop zone 7. Three tables back to back, upright, no speed check, then the step-down,
-   the side hit and Current 3.
+4. **The Triple Stack.** Drop zone 7. Three tables back to back, upright, no speed check, then the step-down
+   and Current 3.
 5. **The Stairway.** Drop zone 9: step-down, step-up, step-down, then over the **Stairway Spine** into High
    Voltage's step-up.
 6. **Megawatt.** Drop zone 4: down Voltage's landing, Megawatt (2.4–2.8 s, slow motion), the road gap.
@@ -605,7 +605,7 @@ zone), every spine crossed clean. The lines:
 - **the slopestyle course:** A, B, C (three rail sections + Lightning, Thunder, Voltage, Megawatt, the Gap);
 - **Spark:** all its tables, the double, the rails, the side hit, the QP;
 - **the lane hopper:** Spark → the Spine → Current Transfer → the Canal → the step-up → the QP;
-- **Current** and **Current Box:** the Triple Stack, the side hit, the step-down, Current 3;
+- **Current** and **Current Box:** the Triple Stack, the step-down, Current 3;
 - **High Voltage:** four rails, two pro tables, the side hit, the Canal, the step-up, the QP;
 - **the Stairway**, and the **Stairway → Stairway Spine → step-up** line;
 - **five Grid lines** (every other row; together all 16 jibs);

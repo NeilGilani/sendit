@@ -40,7 +40,7 @@ registerMap({
   thumbnail: VOLTAGE_THUMB,
   order: 4,
   tags: ['handmade', 'park', 'slopestyle', 'rails'],
-  describe: () => 'Terrain park · slopestyle, mega kicker, gaps, spines, superpipe, big air · 38 jibs, 34 jumps',
+  describe: () => 'Terrain park · slopestyle, mega kicker, gaps, spines, superpipe, big air · 38 jibs, 33 jumps',
   load: async () => {
     const course = new VoltageCourse();
     // Meshes and the HUD need the renderer-side modules: loaded only in the browser.

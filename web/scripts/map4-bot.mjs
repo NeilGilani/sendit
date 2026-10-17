@@ -29,7 +29,7 @@ export const LINES = {
   spark: { start: [40, 70], feats: [jump('Spark 1'), jib('Spark Box'), jump('Spark 2'), jib('Spark Tube'), jib('Spark Down Box'), jump('Spark Double 1'), jump('Spark Double 2', 'spin360'), jib('Spark Butter Box'), jump('Spark 3'), jump('Spark 4'), jump('Spark Side Hit'), { kind: 'qp', name: 'Spark QP' }] },
   // Spark → the Spine → Current → the transfer hip → High Voltage: three lanes in one run.
   transfer: { start: [100, 78], feats: [jib('Spark Ledge'), jib('Spark Down Box'), jump('Spark Double 1'), spine('The Spine', 632, -1), jump('Current Transfer'), jump('The Canal'), { kind: 'stepup', name: 'Step-Up' }, { kind: 'qp', name: 'Voltage QP' }] },
-  current: { start: [50, 125], feats: [jump('Current 1'), jib('Current Flat-Down'), jib('Current Kink'), jib('Current Tube'), jump('Stack 1', 'spin360'), jump('Stack 2'), jump('Stack 3', 'spin360'), jump('Step-Down'), jump('Current Side Hit'), jump('Current 3')] },
+  current: { start: [50, 125], feats: [jump('Current 1'), jib('Current Flat-Down'), jib('Current Kink'), jib('Current Tube'), jump('Stack 1', 'spin360'), jump('Stack 2'), jump('Stack 3', 'spin360'), jump('Step-Down'), jump('Current 3')] },
   currentBox: { start: [110, 128], feats: [jib('Current Box'), jib('Current Tube'), jump('Stack 1'), jump('Stack 2'), jump('Stack 3'), jump('Step-Down'), jump('Current 3')] },
   high: { start: [60, 186], feats: [jib('High DFD'), jib('High Rainbow'), jib('High Down Rail'), jib('High Kink'), jump('High Voltage 1', 'spin360'), jump('High Voltage 2', 'flip'), jump('High Side Hit'), jump('The Canal'), { kind: 'stepup', name: 'Step-Up' }, { kind: 'qp', name: 'Voltage QP' }] },
   stair: { zone: 8, feats: [jump('Stair Drop 1'), { kind: 'stepup', name: 'Stair Up' }, jump('Stair Drop 2'), jump('Stairway Hip')] },
@@ -176,7 +176,7 @@ function ride(type, key, sty) {
       const d = Math.atan2(Math.sin(want - travel), Math.cos(want - travel));
       c.steer = Math.max(-1, Math.min(1, -d * 3.2));
       // Just landed: absorb it before carving (full lock at 70 km/h on touchdown swings the gear 90°).
-      if (t - landT < 0.5) c.steer = Math.max(-0.35, Math.min(0.35, c.steer));
+      if (t - landT < LAND_EASE) c.steer = Math.max(-0.35, Math.min(0.35, c.steer));
     }
     dbgT = [tgt[0], tgt[1], c.steer];
     // Speed: jumps → aim for the sweet spot; rails → 7–10 m/s; else tuck.
@@ -286,6 +286,7 @@ function ride(type, key, sty) {
  * A speed check like a rider's: a plough (skis) or short skid (board) for a little too fast, hard hockey-stop /
  * slide pulses for much too fast (each pulse a quarter second, so the gear comes back in line between them).
  */
+const LAND_EASE = +(process.env.LAND_EASE ?? 0);   // (s of eased steering after touchdown; 0 since the high-speed carve model no longer washes out)
 const UP = 0.12;   // riding upright: a touch on the edges (no auto-tuck)
 function check(c, over) {
   const pulse = Math.floor((c._t || 0) * 4) % 2 === 0;   // simulated time: deterministic

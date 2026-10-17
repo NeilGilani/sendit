@@ -133,7 +133,6 @@ export const HIPS = [
   { name: 'Hip Four', lane: 'hips', u: 995, v: -242, turn: 28, lipDeg: 28, R: 13, kickH: 3.2, table: 16, vMax: 24, hw: 3.2, deckHw: 7, landHw: 9, maxDeg: 40 },
   { name: 'Current Transfer', lane: 'current', u: 745, v: 148, turn: 26, lipDeg: 27, R: 12, kickH: 2.8, table: 13, vMax: 23, hw: 3, deckHw: 6, landHw: 8, maxDeg: 40 },
   { name: 'Spark Side Hit', lane: 'spark', u: 1012, v: 62, turn: 14, lipDeg: 25, R: 10, kickH: 2.0, table: 10, vMax: 21, hw: 2.4, deckHw: 4, landHw: 5.5, maxDeg: 40 },
-  { name: 'Current Side Hit', lane: 'current', u: 962, v: 129, turn: -10, lipDeg: 25, R: 10, kickH: 2.0, table: 10, vMax: 21, hw: 2.4, deckHw: 4, landHw: 5.5, maxDeg: 40 },
   { name: 'High Side Hit', lane: 'high', u: 735, v: 176, turn: 14, lipDeg: 25, R: 10, kickH: 2.0, table: 10, vMax: 21, hw: 2.4, deckHw: 4, landHw: 5.5, maxDeg: 40 },
   { name: 'Stairway Hip', lane: 'stair', u: 995, v: 250, turn: -25, lipDeg: 27, R: 12, kickH: 2.9, table: 14, vMax: 23, hw: 3, deckHw: 6, landHw: 8, maxDeg: 40 },
 ];
