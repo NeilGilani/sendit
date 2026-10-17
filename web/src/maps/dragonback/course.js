@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { vnoise, noise1, fbm, ridged, smooth, sstep, hash1 } from '../ravenspire/noise.js';
 import {
-  TILE, START_X, TOP, FINISH_U, PROFILE, BEHIND, FACE, RIDGES, HOPS, SPINE_FIELD, HITS, PILLOWS, DROP_ZONES, LINE_GOALS, RIDE_LINES,
+  TILE, START_X, TOP, FINISH_U, PROFILE, BEHIND, FACE, RIDGES, HOPS, SPINE_FIELD, HITS, PILLOWS, DROP_ZONES, LINE_GOALS, RIDE_LINES, TRAILS,
 } from './layout.js';
 import { Ridge, smax } from './ridges.js';
 import { DRAGONBACK_PHYSICS, DRAGONBACK_CAMERA } from './tuning.js';
@@ -461,6 +461,23 @@ export class DragonbackCourse {
     }
     return pts;
   }
+
+  /**
+   * Trails (docs/maps.md contract): where a trail starts — world { x, z, heading } (heading = rider yaw, 0 = facing
+   * −z), or null for the normal spawn (the first trail). On a ridge's crest the rider faces down the crest.
+   */
+  trailSpawn(trailId) {
+    const t = TRAILS.find((x) => x[0] === trailId);
+    if (!t || !t[4]) return null;
+    if (Array.isArray(t[4])) return { x: START_X + t[4][0], z: t[4][1], heading: -Math.PI / 2 };
+    const [id, uStr] = t[4].slice(1).split(':'), u = Number(uStr), r = this.ridgeById[id];
+    if (!r) return null;
+    const dvdu = (r.crestAt(u + 3) - r.crestAt(u - 3)) / 6;
+    return { x: START_X + u, z: r.crestAt(u), heading: Math.atan2(-1, -dvdu) };
+  }
+
+  /** Every trail ends at the valley: the course's own finish line (u = FINISH_U). */
+  trailFinish() { return null; }
 
   /** The lobby plinth: on the Keel's broad crest, looking west across the Comb's fins and gullies. */
   lobbySpot() { return { x: START_X + 240, z: this.ridgeById.keel.crestAt(240), heading: -0.35 }; }

@@ -1,6 +1,7 @@
 // Dragonback (map 5): registration, lobby spot and thumbnail. Imported once from maps/builtin.js.
 import { registerMap } from '../registry.js';
 import { DragonbackCourse } from './course.js';
+import { TRAILS } from './layout.js';
 
 const svg = (body) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 90">${body}</svg>`)}`;
 
@@ -28,6 +29,22 @@ export const DRAGONBACK_THUMB = svg(`
   <path d="M10 44 Q30 49 52 44" stroke="#3b3b3b" stroke-width="0.4" fill="none"/>
   <g><circle cx="16" cy="45.6" r="0.9" fill="#2f63c8"/><circle cx="22" cy="46.6" r="0.9" fill="#f4f4f0"/><circle cx="28" cy="47.1" r="0.9" fill="#cc2b24"/><circle cx="34" cy="47.1" r="0.9" fill="#258c4d"/><circle cx="40" cy="46.6" r="0.9" fill="#f2c526"/><circle cx="46" cy="45.6" r="0.9" fill="#2f63c8"/></g>`);
 
+// Trail lengths / verticals (m, start → the finish line along the line): measured by scripts/map5-trails.mjs.
+const TRAIL_STATS = {
+  'ride-the-dragon': [2910, 1580],
+  'twin-hop': [2760, 1500],
+  'scale-jump': [2720, 1490],
+  'bladerunner': [2760, 1540],
+  'the-blade': [2740, 1540],
+  'dragons-tooth': [2950, 1540],
+  'wishbone': [2820, 1540],
+  'the-staircase': [1890, 980],
+  'the-knife': [1280, 610],
+  'organ-pipes': [1420, 710],
+  'the-gullies': [2690, 1520],
+  'the-slot': [2760, 1550],
+};
+
 registerMap({
   id: 'dragonback',
   name: 'Dragonback',
@@ -38,10 +55,21 @@ registerMap({
   describe: () => 'Ridge-to-ridge freeride · 1,600 m vertical · arêtes, gaps, spines',
   load: async () => {
     const course = new DragonbackCourse();
-    // Props (bivouacs, cairns, prayer flags, the helicopter) need the renderer: loaded only in the browser.
+    // Props (bivouacs, cairns, prayer flags, marker poles, the summit cross) need the renderer: browser only.
     const { buildDragonbackProps } = await import('./props.js');
     course.buildProps = (ctx) => buildDragonbackProps(course, ctx);
     return course;
   },
   lobby: ({ course }) => course.lobbySpot(),   // on the Keel's crest, looking across the Comb
+  // Mountains + trails (docs/maps.md): one trail per signature line; the first is the default start.
+  mountain: {
+    id: 'dragonback',
+    name: 'Dragonback',
+    region: 'Serrated range · wild',
+    blurb: 'A face combed into arêtes under a serrated summit ridge: ride the crests, fly the gaps, hop ridge to ridge.',
+    accent: '#ff7a1a',
+  },
+  trails: TRAILS.map(([id, name, difficulty, , , description, featured]) => ({
+    id, name, difficulty, description, length: TRAIL_STATS[id]?.[0], vertical: TRAIL_STATS[id]?.[1], ...(featured ? { featured: true } : {}),
+  })),
 });

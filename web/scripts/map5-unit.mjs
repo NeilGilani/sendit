@@ -13,7 +13,7 @@ globalThis.localStorage = { getItem: () => null, setItem: () => {} };
 globalThis.addEventListener = () => {};
 const { DragonbackCourse } = await import('../src/maps/dragonback/course.js');
 const { Ridge, cliff } = await import('../src/maps/dragonback/ridges.js');
-const { START_X, TILE, LINE_GOALS, HOPS } = await import('../src/maps/dragonback/layout.js');
+const { START_X, TILE, LINE_GOALS, HOPS, TRAILS, RIDE_LINES } = await import('../src/maps/dragonback/layout.js');
 const { PHYSICS, applyMapTuning } = await import('../src/config.js');
 const { emit, on, game } = await import('../src/state.js');
 
@@ -88,6 +88,18 @@ for (const h of c.hops) {
   ok('challenge gates are placed along the hero path', c.challenge.gates.length >= 10 && c.challenge.gates.every((g, i, a) => i === 0 || g.at > a[i - 1].at));
 }
 function slope(x, z) { const e = 2, a = c.height(x + e, z) - c.height(x - e, z), b = c.height(x, z + e) - c.height(x, z - e); return Math.atan(Math.hypot(a, b) / (2 * e)) * DEG; }
+
+// ------------------------------------------------------------------ trails (docs/maps.md contract)
+{
+  const ids = TRAILS.map((t) => t[0]);
+  const diffs = new Set(['green', 'blue', 'black', 'double-black', 'park']);
+  ok('trails: unique ids, valid difficulties, each on a canonical line', new Set(ids).size === ids.length && TRAILS.every((t) => diffs.has(t[2]) && RIDE_LINES[t[3]]));
+  ok('the first trail is the default start (trailSpawn → null)', c.trailSpawn(ids[0]) === null && c.trailSpawn('no-such-trail') === null);
+  const starts = TRAILS.slice(1).map((t) => c.trailSpawn(t[0]));
+  ok('every other trail starts on the snow inside the tile, facing downhill', starts.every((s) => s && [s.x, s.z, s.heading].every(Number.isFinite) && Math.abs(s.x) < TILE.size / 2 - 50 && Math.abs(s.z) < TILE.size / 2 - 50 && slope(s.x, s.z) < 44 && Math.cos(s.heading + Math.PI / 2) > 0.7),
+    starts.map((s) => s && `${(s.x - START_X).toFixed(0)},${s.z.toFixed(0)}`).join(' '));
+  ok('trails finish at the course finish (trailFinish → null)', ids.every((id) => c.trailFinish(id) === null));
+}
 
 // ------------------------------------------------------------------ gullies
 {
