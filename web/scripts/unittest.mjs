@@ -22,6 +22,9 @@ async function test(name, fn) {
   try { await fn(); passed++; console.log(`PASS  ${name}`); } catch (e) { failed++; console.log(`FAIL  ${name}\n      ${e.message}`); }
 }
 
+// Progression + juice (game-feel): scripts/progression-unit.mjs (own storage key, runs first).
+await (await import('./progression-unit.mjs')).run(test, assert);
+
 // ---------------------------------------------------------------- schema
 await test('default profile is valid v1 with a full loadout', () => {
   const p = schema.defaultProfile();
@@ -177,8 +180,6 @@ await test('catalog: gear items point at real equipment models', () => {
   assert.equal(profileStore.gearModel('snowboard'), 'park');
   assert.equal(profileStore.gearModel('skis'), 'allmountain');
 });
-
-await (await import('./progression-unit.mjs')).run(test, assert);   // progression + juice (game-feel)
 
 console.log(failed ? `\n${failed} failed, ${passed} passed` : `\nall ${passed} passed`);
 process.exit(failed ? 1 : 0);
