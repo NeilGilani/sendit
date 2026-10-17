@@ -33,11 +33,11 @@ export const KITSUNE_THUMB = svg(`
 /** Every trail's numbers (layout.js TRAILS + the measured length / vertical; map6-unit checks they match the course). */
 export const TRAIL_STATS = {
   okama: { length: 2730, vertical: 1145 },
-  kazan: { length: 2710, vertical: 1140 },
+  kazan: { length: 2720, vertical: 1140 },
   makura: { length: 2060, vertical: 780 },
-  shirakaba: { length: 2440, vertical: 760 },
+  shirakaba: { length: 2180, vertical: 760 },
   kitsunebi: { length: 2300, vertical: 920 },
-  senbon: { length: 1130, vertical: 325 },
+  senbon: { length: 1070, vertical: 325 },
 };
 
 export const KITSUNE_TRAILS = TRAILS.map(({ id, name, difficulty, description }) => ({ id, name, difficulty, description, ...TRAIL_STATS[id] }));

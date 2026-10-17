@@ -18,7 +18,14 @@ export function buildKitsuneProps(course, { terrain }) {
   group.name = 'KitsuneProps';
   const M = materials(terrain);
   const glow = [];   // [x, y, z, size, warmth] light sources for the glow sprites
-  for (const s of course.structures) group.add(buildStructure(s, M, terrain, glow));
+  // Every building's parts, binned by material and merged: one draw per material for the whole village.
+  const bins = new Map();
+  const bin = (mat) => { if (!bins.has(mat)) bins.set(mat, []); return bins.get(mat); };
+  for (const s of course.structures) buildStructure(s, M, terrain, glow, bin);
+  const village = new THREE.Group();
+  village.name = 'Buildings';
+  for (const [mat, list] of bins) village.add(merged(list, mat, `buildings:${mat.name}`));
+  group.add(village);
   group.add(buildTorii(course, M, terrain, glow));
   group.add(buildPagoda(M, terrain, glow));
   group.add(buildLanterns(course, M, terrain, glow));
@@ -28,8 +35,36 @@ export function buildKitsuneProps(course, { terrain }) {
   group.add(buildOnsen(M, terrain, glow));
   group.add(buildSteam(course, terrain));
   group.add(buildGlow(glow));
+  const statics = mergeStatic(group);
+  group.add(statics);
   group.traverse((o) => { if (o.isMesh && !o.material.transparent && o.userData.shadow !== false) { o.castShadow = true; o.receiveShadow = true; } });
   return group;
+}
+
+/**
+ * Draw-call diet: every plain static mesh in the props (not instanced, not animated) is pulled out and
+ * merged with the others of the same material — the whole village, the torii, the pagoda, the lanterns and
+ * the gondola towers come to one draw per material.
+ */
+function mergeStatic(root) {
+  const bins = new Map(), drop = [];
+  root.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || o.onBeforeRender !== THREE.Object3D.prototype.onBeforeRender || o.material.transparent) return;
+    o.updateWorldMatrix(true, false);
+    const geo = stripAttrs(ni(o.geometry.clone())).applyMatrix4(o.matrixWorld);
+    if (!bins.has(o.material)) bins.set(o.material, []);
+    bins.get(o.material).push(geo);
+    drop.push(o);
+  });
+  for (const o of drop) o.parent.remove(o);
+  const g = new THREE.Group();
+  g.name = 'StaticProps';
+  for (const [mat, list] of bins) {
+    const m = new THREE.Mesh(mergeGeometries(list), mat);
+    m.name = `static:${mat.name}`;
+    g.add(m);
+  }
+  return g;
 }
 
 // ------------------------------------------------------------------ materials
@@ -187,9 +222,8 @@ function curvedBeam(L, h, d, rise, segs = 12) {
 }
 
 // ------------------------------------------------------------------ buildings
-function buildStructure(s, M, terrain, glow) {
-  const g = new THREE.Group();
-  g.name = `Building:${s.id}`;
+function buildStructure(s, M, terrain, glow, bin) {
+  const g = { add: (mesh) => bin(mesh.material).push(mesh.geometry) };
   const W = (a, b) => s.world(a, b, [0, 0]);
   const wallMat = s.colour === 'shrine' ? M.shrineWall : s.colour === 'station' ? M.boards : M.plaster;
   const walls = [];
@@ -197,7 +231,7 @@ function buildStructure(s, M, terrain, glow) {
   for (const [a0, b0, a1, b1] of edges) walls.push(wallStrip(s, a0, b0, a1, b1, W));
   g.add(merged(walls, wallMat, 'walls'));
   g.add(new THREE.Mesh(roofSlab(s, W), M.roof));
-  g.add(new THREE.Mesh(roofSnow(s, W), M.snow));
+  g.add(new THREE.Mesh(stripAttrs(roofSnow(s, W).toNonIndexed()), M.snow));
   // Pillars: vermilion on the shrine (every ~3 m round the walls), dark timber elsewhere (corners).
   const posts = [];
   const pillar = new THREE.CylinderGeometry(s.colour === 'shrine' ? 0.32 : 0.22, s.colour === 'shrine' ? 0.36 : 0.22, 1, 10);
@@ -256,7 +290,6 @@ function buildStructure(s, M, terrain, glow) {
     }
     g.add(merged(ch, M.black, 'chigi'));
   }
-  return g;
 }
 
 /** A wall strip between two footprint corners: bottom = foundations, top = under the roof. */
@@ -568,7 +601,7 @@ function buildBirches(course, M, terrain) {
   const g = new THREE.Group();
   g.name = 'Birches';
   const { wood, twigs } = birchGeometries();
-  const CH = 260, chunks = new Map();
+  const CH = 420, chunks = new Map();
   for (const b of course.forest.birches) {
     const k = `${Math.floor(b[0] / CH)},${Math.floor(b[1] / CH)}`;
     if (!chunks.has(k)) chunks.set(k, []);

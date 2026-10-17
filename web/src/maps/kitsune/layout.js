@@ -87,6 +87,11 @@ export const HITS = [
   [360, 40, 30, 2.6, 'lip', 'Okama Wind Lip'],
   [470, -190, 22, 2.2, 'lip', 'Okama Wind Lip'],
   [560, 100, 50, 1.8, 'roller'],
+  // Birch hits: small lips on the Shirakaba Weave's apexes (where the line runs down the fall line).
+  [865, -97, 7, 1.4, 'lip', 'Birch Hit'],
+  [975, -13, 7, 1.4, 'lip', 'Birch Hit'],
+  [1195, -13, 7, 1.5, 'lip', 'Birch Hit'],
+  [1305, -97, 7, 1.5, 'lip', 'Birch Hit'],
   [1440, -40, 30, 2.8, 'lip', 'Shrine Lip'],
   [1600, -70, 18, 2.4, 'lip', 'Lantern Kicker'],
   [1660, -30, 14, 1.8, 'lip', 'Lantern Kicker'],
@@ -119,7 +124,7 @@ export const PAGODA = { name: 'Gojū-no-tō', u: 1825, v: -115, base: 8.5, tiers
 // a corridor of gates along a gentle S through the village (you ride through it).
 export const OTORII = [
   { name: 'Ō-torii', u: 1505, v: 40, span: 11, height: 10.5 },
-  { name: 'Finish Torii', u: FINISH_U, v: 60, span: 14, height: 11 },
+  { name: 'Finish Torii', u: FINISH_U, v: 15, span: 14, height: 11 },
 ];
 export const TUNNEL = {
   name: 'Senbon Torii', u0: 1545, u1: 1705, every: 5, span: 5.4, height: 4.4,

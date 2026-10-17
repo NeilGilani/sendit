@@ -672,7 +672,7 @@ export class KitsuneCourse {
       g(800, 1), g(1150, -1),                // the gully walls
       on(TUNNEL.u1 - 20, TUNNEL.centre(TUNNEL.u1 - 20), 1.0),   // inside the torii tunnel
       roof('haiden'), roof('tsuki'),
-      lip(1355, -250, 12),                   // Fox Ledge
+      lip(1355, -372, 12),                   // Fox Ledge (on the Makura line)
       on(2150, 300, 1.5),                    // a fir lip
     ];
   }

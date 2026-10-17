@@ -7,7 +7,7 @@
 //   • Juhyo (snow monsters): rime-plastered firs on the upper bowl's flanks and round the crater.
 // Hitboxes are fair: a birch collides with its trunk only; a fir with its trunk and dense inner crown
 // (the same rule as Blackspruce), well inside the branch tips; a snow monster with its packed core.
-import { START_X, FACE, KAZAN, GULLY, BUILDINGS, PAGODA, ONSEN, TUNNEL, OTORII, WEAVE, CRATER } from './layout.js';
+import { START_X, FACE, KAZAN, GULLY, BUILDINGS, PAGODA, ONSEN, TUNNEL, OTORII, WEAVE, CRATER, BANDS } from './layout.js';
 import { fbm, noise1, mulberry32 } from './noise.js';
 
 export const FIR_WELL = { radius: 3.0, depth: 0.9 };   // per unit fir scale: a soft dish, 0.9 m deep at the trunk
@@ -36,6 +36,7 @@ export function planForest(course) {
     if (ld < (onWeave ? lane : lane + 5)) return false;
     for (const b of BUILDINGS) if (Math.hypot(u - b.u, v - b.v) < Math.hypot(b.L, b.W) / 2 + 14) return false;
     if (Math.hypot(u - PAGODA.u, v - PAGODA.v) < 16) return false;
+    for (const B of BANDS) if (u > B.uc - 30 && u < B.uc + 22 && v > B.v0 - 10 && v < B.v1 + 10) return false;   // cliff lips and landings stay clean
     if (Math.hypot(u - ONSEN.u, v - ONSEN.v) < ONSEN.r + 12) return false;
     for (const t of OTORII) if (Math.hypot(u - t.u, v - t.v) < 18) return false;
     if (u > TUNNEL.u0 - 25 && u < TUNNEL.u1 + 45 && Math.abs(v - TUNNEL.centre(Math.min(TUNNEL.u1, Math.max(TUNNEL.u0, u)))) < 12) return false;

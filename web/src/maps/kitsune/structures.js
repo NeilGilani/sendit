@@ -10,8 +10,8 @@
 const OVERHANG = 1.6;      // deep Japanese eaves (m past the walls)
 const SNOW = 1.0;          // snow load on the roof (m): Hokkaido roofs carry a lot
 const EDGE = 0.8;          // snow rounds off over this distance at the eaves (m)
-const CURVE = 0.32;        // sori: share of the slope the roof loses toward the eave (0 = straight)
-const UPTURN = 0.35;       // m the eave tips turn up over the last TIP m
+const CURVE = 0.4;         // sori: share of the slope the roof loses toward the eave (0 = straight)
+const UPTURN = 0.45;       // m the eave tips turn up over the last TIP m
 const TIP = 1.1;
 
 export class Structure {
