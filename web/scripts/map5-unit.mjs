@@ -82,7 +82,7 @@ for (const h of c.hops) {
   ok('nine drop zones (keys 1–9), all in the tile, none on a steep rock face', c.dropZones.length === 9 && c.dropZones.every((d) => inTile(d.x, d.z) && slope(d.x, d.z) < 43),
     c.dropZones.map((d) => `${d.name} ${slope(d.x, d.z).toFixed(0)}°`).join(', '));
   const fl = c.challenge.flakes;
-  ok('12 golden snowflakes, in the tile, 1–35 m above the snow (gap flakes float over the notch)', fl.length === 12 && fl.every((f) => inTile(f.x, f.z) && f.y >= 1 && f.y <= 35), fl.map((f) => f.y.toFixed(1)).join(' '));
+  ok('12 golden snowflakes, in the tile, 1–45 m above the snow (gap flakes float over the notch)', fl.length === 12 && fl.every((f) => inTile(f.x, f.z) && f.y >= 1 && f.y <= 45), fl.map((f) => f.y.toFixed(1)).join(' '));
   const s = c.spawnPoint();
   ok('the start is on the Shoulder (gentle, not on a ridge)', slope(s.x, s.z) < 20 && c.ridgesAt(s.x - START_X, s.z) < 0.5, `${slope(s.x, s.z).toFixed(0)}°`);
   ok('challenge gates are placed along the hero path', c.challenge.gates.length >= 10 && c.challenge.gates.every((g, i, a) => i === 0 || g.at > a[i - 1].at));

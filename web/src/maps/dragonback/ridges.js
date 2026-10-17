@@ -13,6 +13,7 @@
 import { smooth, sstep, noise1 } from '../ravenspire/noise.js';
 
 const LIP_ROLL = 0.2, LIP_ROLL_LEN = 24;     // Ravenspire's lip roll-over (slope, metres)
+const GAP_KICK = 1.4;                        // m: the wind-lip kick at a notch's take-off
 
 /**
  * A cliff at `uc` of height h with a bench of length L above it (Ravenspire's shape): the approach
@@ -73,7 +74,7 @@ export class Ridge {
     this.head = this.rise > 0 ? 0 : 40;          // a ridge from the summit ridge blends back into it
     this.tail = this.end === 'fade' ? 0 : 4;
     this.prowName = def.prowName ?? `${this.name} Prow`;
-    this.gaps = this.gaps.map(([u, N, L, S, name]) => ({ u, N, L, S, name: name ?? `${this.name}'s Notch` }));
+    this.gaps = this.gaps.map(([u, N, L, S, name, kick]) => ({ u, N, L, S, kick: kick ?? GAP_KICK, name: name ?? `${this.name}'s Notch` }));
     this.lips = this.lips.map(([u, side, h]) => ({ u, side, h }));
     this.steps = this.steps.map(([u, D]) => ({ u, D }));
     // Tables per metre over [u0 − head, u1 + tail + 2].
@@ -117,7 +118,12 @@ export class Ridge {
     let H = knotAt(this.knots, u, 2) * (0.92 + 0.16 * noise1(u / 70, this.seed + 60));
     for (const s of this.steps) H += cliff(u, s.u, s.D, Math.max(30, s.D * 4));
     for (const g of this.gaps) {
-      H += cliff(u, g.u, g.S, Math.max(30, g.S * 4));
+      // The take-off: a bench S m high (the far crest is S lower) with NO roll-over — a cliff's rolled lip
+      // points you down at the landing below it, but over a notch it dives you into the far wall — and a
+      // small wind-lip kick (≈ 8° over the last ~10 m) so a 20+ m/s rider clears the notch without a pop.
+      const Lb = Math.max(30, g.S * 4);
+      if (u < g.u && u > g.u - Lb) H += g.S * Math.pow((u - (g.u - Lb)) / Lb, 1.25) + g.kick * Math.exp(-(((u - g.u) / 5) ** 2));
+      else if (u >= g.u && u < g.u + 2) H += (g.S + g.kick) * (1 - smooth((u - g.u) / 2));
       const wN = Math.max(2, g.N * 0.18), Lf = Math.max(12, g.N * 1.4);
       const a = g.u, b = a + wN, c = b + g.L, d = c + Lf;
       let k = 0;

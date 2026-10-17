@@ -13,6 +13,8 @@ export const DRAGONBACK_PHYSICS = {
     slowmo: { ...R.common.slowmo, minAir: 3.0, minDrop: 14 },
     // Sluffed powder in the gully floors (sluff.js): × speed per second, so the low line is slower than the crests.
     sluffDrag: 0.035,
+    // Respawning on a knife-edge crest (respawn.js): set on the crest, already rolling down it at this m/s.
+    respawnRoll: 8,
   },
   ski: { ...R.ski },
   snowboard: { ...R.snowboard },

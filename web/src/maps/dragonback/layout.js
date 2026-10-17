@@ -44,8 +44,9 @@ export const FACE = {
 //   steps    [[u, D]]: gendarme step-downs on the crest — the crest flattens into a rounded lip and drops D m
 //            (Ravenspire's cliff shape: bench L = max(4·D, 30), a lip that rolls over so the take-off
 //            points down the landing)
-//   gaps     [[u, N, L, S, name]]: a notch across the ridge at u: the crest drops N m into it over a short
-//            wall, the floor is L m long, the far wall climbs back to a crest S m lower than the take-off side.
+//   gaps     [[u, N, L, S, name, kick]]: a notch across the ridge at u: the take-off is a bench with a small
+//            wind-lip kick (1.4 m by default), the crest drops N m into the notch over a short wall, the floor is
+//            L m long, the far wall climbs back to a crest S m lower than the take-off side.
 //            Fly it at speed and you land on the crest beyond, falling away at the face angle; come up short
 //            and you land on the far wall; miss it and you ride the notch out sideways into the gully
 //   lips     [[u, side, h]]: a wind lip on the crest's edge (side −1 left / +1 right), aimed 30° off the fall
@@ -63,7 +64,7 @@ export const RIDGES = [
     knots: [[470, -200, 8, 22], [560, -197, 12, 24], [660, -193, 14, 24], [730, -190, 12, 22]] },
   { id: 'spine', name: "Dragon's Spine", top: 5, p: 1.9, rise: 70, end: 'fade', seed: 3,
     knots: [[86, -96, 28, 52], [300, -84, 38, 58], [500, -70, 42, 62], [700, -58, 38, 60], [880, -50, 30, 56], [1010, -44, 18, 50]],
-    steps: [[170, 6], [430, 7]], gaps: [[560, 16, 6, 5, 'The Little Gap'], [790, 22, 10, 7, "The Spine's Gap"]] },
+    steps: [[170, 6], [430, 7]], gaps: [[560, 16, 6, 5, 'The Little Gap'], [790, 24, 16, 8, "The Spine's Gap"]] },
   { id: 'scale', name: 'The Scales', top: 3, p: 1.6, rise: 60, end: 'prow', seed: 9,
     knots: [[300, -40, 8, 22], [390, -36, 12, 24], [520, -30, 16, 26], [600, -26, 14, 24]] },
   { id: 'twinL', name: 'Left Twin', top: 3, p: 1.6, rise: 50, end: 'prow', seed: 4,
@@ -89,7 +90,7 @@ export const RIDGES = [
   // ---- the Sentinel: a tall lone ridge down the right side, a notch in its middle
   { id: 'sentinel', name: 'The Sentinel', top: 4, p: 1.9, asym: 1.1, rise: 60, end: 'prow', seed: 17,
     knots: [[640, 352, 18, 46], [760, 356, 32, 52], [900, 362, 36, 54], [1040, 368, 30, 50], [1120, 372, 26, 46]],
-    steps: [[800, 6]], gaps: [[960, 16, 6, 5, 'The Sentinel Notch']], lips: [[880, -1, 2.4]] },
+    steps: [[800, 6]], gaps: [[960, 18, 10, 6, 'The Sentinel Notch']], lips: [[880, -1, 2.4]] },
   // ---- the Wishbone: two ridges in the lower Hollow that converge and merge into one
   { id: 'wishL', name: 'The Wishbone', top: 4, p: 1.8, rise: 60, end: 'fade', seed: 18,
     knots: [[900, -440, 12, 34], [1000, -420, 20, 38], [1080, -392, 22, 40], [1130, -382, 18, 40]] },
@@ -111,7 +112,7 @@ export const RIDGES = [
   // arête), the Slot (a deep couloir between the Knife and the East Wall)
   { id: 'knife', name: 'The Knife', top: 2.2, p: 1.6, rise: 70, end: 'prow', seed: 21,
     knots: [[1230, 138, 16, 34], [1340, 146, 26, 40], [1470, 154, 30, 42], [1600, 164, 24, 40]],
-    steps: [[1320, 5], [1440, 6], [1545, 5]], gaps: [[1390, 12, 5, 4]] },
+    steps: [[1320, 5], [1470, 6], [1550, 5]], gaps: [[1390, 12, 5, 4, null, 0.5]] },
   { id: 'wyrm', name: 'The Wyrm', top: 4, p: 1.8, rise: 70, end: 'prow', seed: 24,
     knots: [[1160, 62, 14, 40], [1260, 72, 30, 46], [1380, 80, 34, 48], [1500, 76, 30, 46], [1610, 84, 24, 42]],
     steps: [[1440, 6]] },
@@ -200,6 +201,7 @@ export const RIDE_LINES = {
   spine: { name: "Dragon's Spine (crest, two gaps, the Fork)", pts: [[0, -30], [60, -70], [100, '@spine'], [860, '@spine'], [900, '@forkL'], [1170, '@forkL'], [1300, -200], [1700, -60], [2400, 0]] },
   scales: { name: 'Scale Jump → the Tail → Wyrm Leap → the Knife', pts: [[0, -30], [60, -70], [100, '@spine'], '>Scale Jump', [400, '@scale'], [600, '@scale'], [800, -10], [880, '@tail'], [1130, '@tail'], [1170, 64], [1200, '@wyrm'], '>Wyrm Leap', [1395, '@knife'], [1600, '@knife'], [1700, 170], [2000, 120], [2400, 60]] },
   blade: { name: 'The Blade → Blade Leap → the Shard', pts: [[0, -30], [60, -150], [100, '@blade'], '>Blade Leap', [580, '@shard'], [730, '@shard'], [900, -260], [1140, -200], [1650, -200], [1800, -230], [2400, -100]] },
+  bladecrest: { name: 'The Blade end to end (knife edge, the notch)', pts: [[0, -30], [60, -150], [100, '@blade'], [770, '@blade'], [900, -250], [1140, -200], [1650, -200], [1800, -230], [2400, -100]] },
   twins: { name: 'Twin Hop, back again → the Staircase', pts: [[0, -30], [60, 10], [140, '@twinL'], '>Twin Hop', [370, '@twinR'], '>Twin Hop Back', [630, '@twinL'], [680, '@twinL'], [720, 62], [750, 90], [790, '@stair1'], '>Stair Hop 1', [1010, '@stair2'], '>Stair Hop 2', [1140, '@stair3'], '>Stair Hop 3', [1270, '@stair4'], [1370, '@stair4'], [1500, 220], [1800, 140], [2400, 60]] },
   keel: { name: 'The Keel → Keel Leap → the Sentinel', pts: [[0, -30], [60, 120], [100, '@keel'], '>Keel Leap', [535, '@splinter'], [680, '@splinter'], [720, 300], [780, '@sentinel'], [1120, '@sentinel'], [1200, 374], [1330, 330], [1440, '@eastwall'], [1630, '@eastwall'], [1720, 282], [1850, 210], [2400, 80]] },
   wishbone: { name: 'West Fin → the Wishbone → West Buttress', pts: [[0, -30], [60, -200], [100, '@westfin'], [640, '@westfin'], [760, -360], [920, '@wishR'], [1130, '@wishR'], [1180, '@westwall'], [1660, '@westwall'], [1730, -446], [1820, -380], [2400, -150]] },

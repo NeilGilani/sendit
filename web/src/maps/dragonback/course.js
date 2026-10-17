@@ -18,6 +18,7 @@ import { Ridge, cliff, smax } from './ridges.js';
 import { DRAGONBACK_PHYSICS, DRAGONBACK_CAMERA } from './tuning.js';
 import { attachRidgeScoring } from './scoring.js';
 import { attachSluff } from './sluff.js';
+import { attachRespawn } from './respawn.js';
 
 const U_MIN = -7000, U_MAX = 9000;      // profile table range (1 m)
 const DEG = Math.PI / 180;
@@ -361,8 +362,11 @@ export class DragonbackCourse {
 
   roofAt() { return null; }
 
-  /** Per-rider hooks (player.js): ridge-to-ridge hops score on their own (scoring.js), gullies drag (sluff.js). */
-  onPlayer(pl) { attachRidgeScoring(this, pl); attachSluff(this, pl); }
+  /**
+   * Per-rider hooks (player.js): ridge-to-ridge hops score on their own (scoring.js), gullies drag (sluff.js), a
+   * respawn on a ridge sets you on its crest, rolling (respawn.js).
+   */
+  onPlayer(pl) { attachRidgeScoring(this, pl); attachSluff(this, pl); attachRespawn(this, pl); }
 
   /**
    * How deep in a gully (x, z) is, 0..1: low (no ridge under you) with ridges standing on both sides within
