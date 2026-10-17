@@ -10,19 +10,20 @@ In-ride juice runs on every map, and session-to-session progression sits on top 
 | `web/src/juice/speedfx.js` | Speed-rush post pass: edge zoom blur, chromatic fringe and rush lines. |
 | `web/src/juice/music.js` | Music energy and drops. |
 | `web/src/juice/splits.js` | Challenge split deltas against the best run. |
+| `web/src/juice/trail.js` | The hot-combo neon trail. |
 | `web/src/juice/settings.js` | Shake, hit-stop and speed-rush rows in the settings grid. |
 | `web/src/juice/index.js` | `installJuice()`, which main.js calls once. |
-| `web/src/progression/core.js` | Pure logic: XP curve, levels, dailies, achievements and personal bests. |
+| `web/src/progression/core.js` | Pure logic: XP curve, levels, ranks, dailies, the weekly, the daily bonus, achievements, the trick book and personal bests. |
 | `web/src/progression/index.js` | Public API and the ride tracker. Storage key: `sendit.progression`. |
-| `web/src/progression/ui.js` | Level-up celebration, toasts and the in-ride XP bar. |
-| `web/src/progression/lobby.js` | The lobby's **Progress** tab, and the level badge on the profile chip. |
+| `web/src/progression/ui.js` | Level-up celebration, toasts, the in-ride XP bar and the ride recap card. |
+| `web/src/progression/lobby.js` | The lobby's **Progress** tab, the TODAY strip, and the level badge on the profile chip. |
 
 Shared files have small, additive edits only:
 
-- `main.js`: install, the physics clock × `juice.timeScale(dt)`, and the per-frame update.
-- `camera.js`: `kick()`, plus springs on the chase camera.
-- `ui.js`: the old PERFECT, CLOSE SHAVE and challenge-combo pops give way to the juice HUD.
-- `scripts/unittest.mjs`: one line, which runs `scripts/progression-unit.mjs`.
+- `main.js`: install, the physics clock × `juice.timeScale(dt)`, the activity timer × `warp.k`, and the per-frame update.
+- `camera.js`: `kick()`, springs on the chase camera, the `juiceFov` build-up, and shake scaled by the setting.
+- `ui.js`: the old PERFECT, CLOSE SHAVE and challenge-combo pops give way to the juice HUD. It also adds the pause-screen progression line and the XP row on the results screen.
+- `scripts/unittest.mjs`: one line, which runs `scripts/progression-unit.mjs` (31 tests in all).
 
 ## 1. Combo chain (every map)
 
