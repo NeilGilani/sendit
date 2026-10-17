@@ -252,7 +252,7 @@ export function buildTerrain(height, sunDir, material, farMaterial) {
     const l = Math.hypot(nx, ny, nz);
     out[k] = nx / l; out[k + 1] = ny / l; out[k + 2] = nz / l;
   };
-  const geo = (pos, idx, seam) => {
+  const geo = (pos, idx, seam, gridW = 0) => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setIndex(idx);
@@ -270,17 +270,21 @@ export function buildTerrain(height, sunDir, material, farMaterial) {
       // Sun: the steepest horizon toward the sun (fine grid first, then coarse), soft penumbra.
       // Facing away from the sun: Lambert already has it dark, skip the march.
       const ndl = nor[i * 3] * sx + nor[i * 3 + 1] * sy + nor[i * 3 + 2] * sz;
-      let maxT = -1e9, d = Math.max(1.5, rr * 0.01);
+      // Heights are compared on the march grid itself (its surface can sit a metre off the detailed mesh,
+      // which made vertices shadow themselves in blotches); start a few cells out.
+      const inFine = Math.abs(x) < 690 && Math.abs(z) < 690;
+      const y0 = Math.max(y, inFine ? fine.at(x, z) : coarse.at(x, z));
+      let maxT = -1e9, d = Math.max(inFine ? 10 : 150, rr * 0.01);
       if (ndl < -0.15) d = 1e9;
       while (d < 30000) {
         const px = x + dxs * d, pz = z + dzs * d;
         const near = Math.abs(px) < 690 && Math.abs(pz) < 690;
         const hh = near ? fine.at(px, pz) : coarse.at(px, pz);
-        const tt = (hh - y - 0.6) / d;
+        const tt = (hh - y0 - 0.6) / d;
         if (tt > maxT) maxT = tt;
         d *= near ? 1.2 : 1.3;
       }
-      const sunVis = smooth(-0.035, 0.035, tanSun - maxT);
+      const sunVis = smooth(-0.07, 0.07, tanSun - maxT);
       // Sky: average openness over six azimuths (a cheap horizon-based AO).
       let open = 0;
       for (const [cx, cz] of dirs) {
@@ -296,16 +300,30 @@ export function buildTerrain(height, sunDir, material, farMaterial) {
       }
       vis[i * 2] = sunVis; vis[i * 2 + 1] = Math.pow(open / dirs.length, 1.3);
     }
+    // Near grid: two 3×3 box passes over the baked visibility (it comes from a 7 m height grid and would
+    // otherwise show as blocky, grid-aligned shadow shapes on the snow).
+    if (gridW) for (let pass = 0; pass < 2; pass++) {
+      const src = vis.slice(), H2 = n / gridW;
+      for (let j = 1; j < H2 - 1; j++) for (let i = 1; i < gridW - 1; i++) {
+        for (let c = 0; c < 2; c++) {
+          let a = 0;
+          for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) a += src[((j + dj) * gridW + i + di) * 2 + c];
+          vis[(j * gridW + i) * 2 + c] = a / 9;
+        }
+      }
+    }
     g.setAttribute('aVis', new THREE.BufferAttribute(vis, 2));
     g.computeBoundingSphere();
     return g;
   };
   const seamN = [];
   for (let k = 0; k < NN; k++) seamN.push(k, (NN - 1) * NN + k, k * NN, k * NN + NN - 1);
-  const near = new THREE.Mesh(geo(nPos, nIdx, seamN), material);
+  const near = new THREE.Mesh(geo(nPos, nIdx, seamN, NN), material);
   near.name = 'loadingTerrainNear';
   near.receiveShadow = true;
-  near.castShadow = true;
+  // Only the rider casts into the shadow map: the terrain's own bumps cast faceted, blocky shadows at
+  // low sun (and cost a shadow pass); its self-shadowing comes from the baked visibility instead.
+  near.castShadow = false;
   const far = new THREE.Mesh(geo(fPos, fIdx, [...Array(P).keys()]), farMaterial);
   far.name = 'loadingTerrainFar';
   far.frustumCulled = false;

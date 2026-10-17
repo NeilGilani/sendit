@@ -112,7 +112,8 @@ export class LoadingScene {
     this.powder = new Powder(5000, pu);
     this.fx = new PowderFX(this.powder, r);
     scene.add(this.powder.mesh);
-    this.snow = new Snowfall(Math.round(900 + 2600 * T.snowfall), {});
+    this.snow = new Snowfall(Math.round(900 + 4200 * T.snowfall), {});
+    if (T.snowfall >= 0.9) this.snow.uniforms.uWind.value.set(3.2, -1.4, 1.2);   // storm: driven snow
     this.snow.uniforms.uAmount.value = 0.35 + 0.65 * Math.min(1, T.snowfall * 1.6);
     this.snow.uniforms.uSnowCol.value.set(T.sun[0] * 0.25 + T.sky[0] * 1.6, T.sun[1] * 0.25 + T.sky[1] * 1.6, T.sun[2] * 0.25 + T.sky[2] * 1.6);
     scene.add(this.snow.mesh);
@@ -387,6 +388,7 @@ export class LoadingScene {
     su.uFocus.value = this.rig.focus || 12;
     su.uPx.value = (this.size.height * this.ratio * 0.5) / Math.tan((cam.fov * Math.PI) / 360);
     su.uCoc.value = 5.0 * su.uPx.value / 400;
+    su.uMinPx.value = 1.6 * Math.max(1, this.ratio);   // flakes keep their CSS size at high DPI
     // Depth of field: focus on the rider; long lenses get a shallower range.
     if (com) {
       this.dof.target = com;

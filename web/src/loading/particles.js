@@ -134,7 +134,7 @@ export class Powder {
 
 const SNOW_VERT = /* glsl */`
 attribute vec2 corner; attribute vec4 aSeed;
-uniform float uTime; uniform vec3 uBox; uniform vec3 uWind; uniform float uFocus; uniform float uCoc; uniform float uPx;
+uniform float uTime; uniform vec3 uBox; uniform vec3 uWind; uniform float uFocus; uniform float uCoc; uniform float uPx; uniform float uMinPx;
 varying vec2 vUv; varying float vA;
 void main() {
   vec3 p = aSeed.xyz * uBox;
@@ -148,7 +148,7 @@ void main() {
   float d = -mv.z;
   // Circle of confusion (in px) → quad size; energy spreads so big discs are faint.
   float coc = abs(1.0 / max(d, 0.05) - 1.0 / uFocus) * uCoc;
-  float px = max(1.6, coc) * (0.8 + aSeed.w * 0.6);
+  float px = max(uMinPx, coc) * (0.8 + aSeed.w * 0.6);
   float world = px / uPx * d;     // px → metres at this depth
   mv.xy += corner * world;
   vUv = corner;
@@ -177,7 +177,7 @@ export class Snowfall {
     g.instanceCount = n;
     this.uniforms = {
       uTime: { value: 0 }, uBox: { value: new THREE.Vector3(36, 24, 36) }, uWind: { value: new THREE.Vector3(0.8, -0.9, 0.3) },
-      uFocus: { value: 10 }, uCoc: { value: 60 }, uPx: { value: 1000 }, uSnowCol: { value: new THREE.Vector3(1.4, 1.45, 1.6) }, uAmount: { value: 1 },
+      uFocus: { value: 10 }, uCoc: { value: 60 }, uPx: { value: 1000 }, uMinPx: { value: 1.6 }, uSnowCol: { value: new THREE.Vector3(1.4, 1.45, 1.6) }, uAmount: { value: 1 },
       ...uniforms,
     };
     const m = new THREE.ShaderMaterial({

@@ -47,7 +47,10 @@ class LoadingScreen {
     this.msg = $('loadmsg');
     this.caption = $('loadcap');
     this.buildTips();
-    if (params.get('loadscene') !== '0') this.startScene();
+    // Reduced motion: no flips and swooping cameras, just the painted screen (its snow is CSS and
+    // stops too). ?loadscene=1 forces the live scene anyway.
+    const reduce = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (params.get('loadscene') === '1' || (params.get('loadscene') !== '0' && !reduce)) this.startScene();
     else this.root.classList.add('static');
   }
 
