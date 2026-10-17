@@ -91,6 +91,10 @@ export function installImpact({ warp, cam, input, player }) {
     on('juiceComboBanked', ({ mult }) => { kick({ fov: I.bankFov * Math.min(2, mult / 2) }); if (mult >= 3) warp.hit(I.bank); input?.rumble?.(0.25, 0.6, 140); }),
     on('takeoff', ({ popped }) => { if (popped) kick({ fov: I.takeoffFov }); }),
     on('juiceLevelUp', () => input?.rumble?.(0.6, 1, 420)),
+    on('achievement', () => input?.rumble?.(0.3, 0.6, 140)),
+    on('challengeDone', () => input?.rumble?.(0.3, 0.6, 140)),
+    // Challenge start: the lens punches open on GO.
+    on('countdown', (n) => { if (n === 0) kick({ fov: 5 }); }),
   ];
   return () => offs.forEach((o) => o());
 }

@@ -72,6 +72,7 @@ export function installJuice({ player, cam, sound, input, post, camera, fx, acti
     }
     lastMult = m;
   };
+  on('countdown', (n) => { if (n === 0) speedfx?.pulse('bank'); });   // GO!: a burst of rush lines
   // Rails: a light buzz on the lock-in and on each kink.
   on('grindStart', () => input?.rumble?.(0.15, 0.45, 90));
   on('grindKink', () => input?.rumble?.(0.3, 0.5, 70));
