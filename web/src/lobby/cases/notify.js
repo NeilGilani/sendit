@@ -56,7 +56,7 @@ export function installCaseNotifications() {
     const riding = game.mode !== Mode.MENU;
     caseSfx.earned();
     show(`${caseArt(c.series)}<div class="cn-text"><b>${cases.length > 1 ? `${cases.length} cases earned!` : 'Case earned!'}</b>
-      <small>${esc(S.name)}${source === 'duplicate' ? ' · from duplicates' : source === 'rank' ? ' · new rank!' : ''}</small>
+      <small>${esc(S.name)}${source === 'duplicate' ? ' · from duplicates' : source === 'rank' ? ' · new rank!' : source === 'collection' ? ' · collection complete!' : ''}</small>
       <small>${riding ? 'Open it in the lobby · Cases' : 'Open it in the Cases tab'}</small></div>`, 'case', 6000);
     soon();
   });

@@ -232,6 +232,7 @@ class Opener {
           ? `<p class="cr-dupe">Duplicate · converted to <b>+${res.dupeXp} case XP</b> (${pct} % of a case)${res.cases.length ? ' · <b>a new case!</b>' : ''}</p>`
           : '<p class="cr-new">NEW · added to your locker</p>'}
         <p class="cr-col">Collection ${col.owned} / ${col.total} · ${Math.round(col.pct * 100)} %</p>
+        ${res.completed ? `<p class="cr-new">${esc(SERIES[res.completed].name.replace(/ Case$/, ''))} collection complete! +${res.cases.length} cases</p>` : ''}
         <div class="cr-actions">
           ${worn ? '' : `<button type="button" class="cr-btn${res.dupe ? '' : ' primary'}" data-act="equip">Equip now</button>`}
           ${more ? `<button type="button" class="cr-btn${res.dupe ? ' primary' : ''}" data-act="next">Open next <small>${more} left</small></button>` : ''}

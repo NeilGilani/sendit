@@ -39,6 +39,8 @@ export const MILESTONE_EVERY = 100000;
  * stays at its 0.3 %; red goes from 1.3 % to about 2.1 % overall.
  */
 export const PITY = 60;
+/** Cases for owning every skin of a case series (the gold items are not needed). */
+export const COLLECTION_BONUS = 2;
 const HISTORY = 40;
 
 export function defaultRewards() {
@@ -55,6 +57,7 @@ export function defaultRewards() {
     best: null,                 // rarest pull: { key, rarity, at }
     dupeXp: 0,
     sinceRed: 0,                // openings since the last red or gold (bad-luck protection, PITY)
+    completed: [],              // case series whose every skin you own (each pays COLLECTION_BONUS once)
   };
 }
 
@@ -74,6 +77,7 @@ export function sanitizeRewards(r) {
   while (nextMilestone(out).m <= out.distance) out.milestone = nextMilestone(out).m;
   out.maps = (Array.isArray(r.maps) ? r.maps : []).filter((x) => typeof x === 'string');
   out.trails = (Array.isArray(r.trails) ? r.trails : []).filter((x) => typeof x === 'string');
+  out.completed = (Array.isArray(r.completed) ? r.completed : []).filter((x) => SERIES[x]);
   out.history = (Array.isArray(r.history) ? r.history : []).filter((h) => h && typeof h.key === 'string').slice(-HISTORY);
   out.best = r.best && typeof r.best.key === 'string' ? r.best : null;
   out.lastDay = typeof r.lastDay === 'string' ? r.lastDay : null;
@@ -277,11 +281,23 @@ export function openCase(p, caseId, rng = Math.random, now = Date.now()) {
     r.dupeXp += dupeXp;
     cases = addXp(p, dupeXp, 'duplicate', now);
   } else inv[res.key] = { at: now, n: 1, seen: false };
+  // A finished collection: every skin of the series owned (gold excluded) pays COLLECTION_BONUS cases once.
+  let completed = null;
+  const s = res.variant.series;
+  if (!dupe && SERIES[s] && !r.completed.includes(s)) {
+    const pool = casePool(s);
+    const all = RARITIES.filter((x) => x.id !== 'gold').every((x) => pool[x.id].every((e) => inv[e.key]));
+    if (all) {
+      r.completed.push(s);
+      completed = s;
+      for (let k = 0; k < COLLECTION_BONUS; k++) cases.push(grantCase(p, 'collection', now));
+    }
+  }
   r.opened += 1;
   r.history.push({ at: now, key: res.key, rarity: res.rarity, dupe, series: c.series });
   if (r.history.length > HISTORY) r.history.splice(0, r.history.length - HISTORY);
   if (!r.best || rarityOf(res.rarity).rank > rarityOf(r.best.rarity).rank) r.best = { key: res.key, rarity: res.rarity, at: now };
-  return { case: c, key: res.key, item: res.item, variant: res.variant, rarity: res.rarity, dupe, dupeXp, cases, reel, pity };
+  return { case: c, key: res.key, item: res.item, variant: res.variant, rarity: res.rarity, dupe, dupeXp, cases, reel, pity, completed };
 }
 
 // ------------------------------------------------------------------ collection

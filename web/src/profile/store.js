@@ -165,7 +165,7 @@ class ProfileStore {
       told = true;
       emit('profile', { profile: this.data, reason: 'case' });
       emit('rewards', { reason: 'open', result: res, cases: res.cases });
-      if (res.cases.length) emit('caseEarned', { cases: res.cases, source: 'duplicate' });
+      if (res.cases.length) emit('caseEarned', { cases: res.cases, source: res.completed ? 'collection' : 'duplicate' });
     };
     if (!defer) res.announce();
     return res;

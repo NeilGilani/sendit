@@ -405,6 +405,25 @@ await test('progression: milestones and first-run bonuses pay once; dupes become
   assert.equal(p.rewards.opened, 300 + fromDupes);
 });
 
+await test('collection bonus: owning every skin of a case pays two cases once', () => {
+  const p = schema.defaultProfile();
+  const pool = rewards.casePool('night-park');
+  const keys = RARITIES.filter((r) => r.id !== 'gold').flatMap((r) => pool[r.id].map((e) => e.key));
+  const last = keys.pop();
+  for (const k of keys) p.inventory.items[k] = { at: 1, n: 1, seen: true };
+  // Force the last missing skin out of a case: a seeded RNG that rolls it.
+  let res = null;
+  for (let seed = 1; seed < 50000 && !res?.completed; seed++) {
+    const q = JSON.parse(JSON.stringify(p));
+    rewards.grantCase(q, 'test', Date.now(), 'night-park');
+    const r = rewards.openCase(q, null, rewards.seeded(seed));
+    if (r.key === last) { res = r; Object.assign(p, q); }
+  }
+  assert.ok(res && res.completed === 'night-park', 'completes the Night Park collection');
+  assert.equal(res.cases.filter((c) => c.source === 'collection').length, rewards.COLLECTION_BONUS);
+  assert.deepEqual(p.rewards.completed, ['night-park']);
+});
+
 await test('bad-luck protection: red or gold at least every PITY cases', () => {
   const p = schema.defaultProfile();
   const rng = rewards.seeded(99);

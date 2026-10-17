@@ -9,7 +9,7 @@ import { lastGains } from '../cases/notify.js';
 import { caseSfx } from '../cases/sfx.js';
 import { RARITIES, rarityOf } from '../../profile/rarity.js';
 import { SERIES, SERIES_ORDER } from '../../profile/items.js';
-import { CASE_XP, EARN, PITY, casePool, caseOdds, nextMilestone, skin } from '../../profile/rewards.js';
+import { CASE_XP, EARN, PITY, COLLECTION_BONUS, casePool, caseOdds, nextMilestone, skin } from '../../profile/rewards.js';
 
 const ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M3 12h18M9 8V6a3 3 0 0 1 6 0v2M10 12v2h4v-2"/></svg>';
 // The XP bar fills from where you last saw it (e.g. back from a ride), wrapping through 100 % for each
@@ -57,7 +57,7 @@ registerLobbyTab({
         <div class="cs-hero${pick ? '' : ' empty'}">
           ${caseArt(series, { count: pick ? cases.filter((c) => c.series === series).length : 0 })}
           <div class="cs-hero-text"><b>${esc(S.name)}</b><small>${esc(S.blurb)}</small>
-            ${pick ? `<small>From: ${esc({ run: 'a finished run', distance: 'distance ridden', duplicate: 'duplicates', welcome: 'welcome gift', veteran: 'your riding so far', milestone: 'a milestone', rank: 'a new rank' }[pick.source] || pick.source)}</small>` : ''}</div>
+            ${pick ? `<small>From: ${esc({ run: 'a finished run', distance: 'distance ridden', duplicate: 'duplicates', welcome: 'welcome gift', veteran: 'your riding so far', milestone: 'a milestone', rank: 'a new rank', collection: 'a finished collection' }[pick.source] || pick.source)}</small>` : ''}</div>
         </div>
         <button type="button" class="cs-open${pick ? ' pulse' : ''}" ${pick ? '' : 'disabled'} data-autofocus>
           ${pick ? `Open case <small>${cases.length > 1 ? `· ${cases.length} ready` : ''}</small>` : 'No case ready'}
@@ -81,6 +81,7 @@ registerLobbyTab({
           <span>First run on each map · new trail</span><b>+${EARN.firstMap} · +${EARN.firstTrail}</b>
           <span>Next milestone: ${esc(ms.label)} (${fmtKm(Math.max(0, ms.m - r.distance))} to go)</span><b>+${ms.xp} XP</b>
           <span>Duplicates turn into progress</span><b>+10 % to a whole case</b>
+          <span>Collect every skin of a case (gold not needed)</span><b>${COLLECTION_BONUS} cases</b>
           ${globalThis.__progression ? '<span>Every new rank (level 5, 10, 20, 35, 60)</span><b>a case</b>' : ''}
         </div>
 
