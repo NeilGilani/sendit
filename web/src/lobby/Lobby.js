@@ -150,8 +150,8 @@ export class Lobby {
   }
 
   /** Mountain + trail shown next to the Ride button. `trail` = the registry trail object. */
-  setMapInfo({ map, variant, course, description, trail = null }) {
-    this.mapInfo = { map, variant, course, trail };
+  setMapInfo({ map, variant, course, description, trail = null, starts = [], heightAt = null }) {
+    this.mapInfo = { map, variant, course, trail, starts, heightAt };
     const m = map.mountain;
     this.el.mapMtn.textContent = m?.name || 'Map';
     if (trail) {

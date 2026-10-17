@@ -209,7 +209,20 @@ function applyTrailSpawn(trailId) {
 
 function updateLobbyMapInfo() {
   const { map, variant, trail } = currentMap;
-  lobby?.setMapInfo({ ...currentMap, trail: getTrail(map, trail) ?? defaultTrail(map), description: describeSelection(map, variant, course) });
+  lobby?.setMapInfo({
+    ...currentMap, trail: getTrail(map, trail) ?? defaultTrail(map), description: describeSelection(map, variant, course),
+    // The Maps tab's piste map: the course's own height function (valid beyond the terrain tile) if it has one.
+    starts: trailStarts(), heightAt: typeof course.height === 'function' ? (x, z) => course.height(x, z) : (x, z) => terrain.getHeight(x, z),
+  });
+}
+
+/** Where each of the loaded map's trails starts (trails on another variant are skipped): [{ id, x, z, difficulty }]. */
+function trailStarts() {
+  if (!defaultSpawn) return [];
+  const fb = { position: { x: defaultSpawn.position[0], z: defaultSpawn.position[2] }, heading: defaultSpawn.heading };
+  return currentMap.map.trails
+    .filter((t) => !needsReload(currentMap, currentMap.map.id, t.id))
+    .map((t) => ({ id: t.id, difficulty: t.difficulty, ...trailSpawnFor(course, t.id, fb, t) }));
 }
 
 /**

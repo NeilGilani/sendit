@@ -23,9 +23,9 @@ body.fp #trail-toast { top: 64px; }
 let el = null, timer = 0;
 
 function ensure() {
-  if (el) return el;
   const hud = document.getElementById('hud');
-  if (!hud) return null;
+  if (el?.isConnected || !hud) return el?.isConnected ? el : null;
+  if (el) { hud.appendChild(el); return el; }   // re-attach if the HUD was rebuilt
   const style = document.createElement('style');
   style.textContent = CSS;
   document.head.appendChild(style);

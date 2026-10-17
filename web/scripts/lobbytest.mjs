@@ -247,7 +247,7 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   // Ride starts at the trail's top, with the trail toast.
   await page.click('.lb-ride');
   await page.waitForFunction(() => window.__sendit.game.mode === 1, null, { timeout: T });
-  await page.waitForTimeout(1500);
+  await page.waitForFunction(() => document.getElementById('trail-toast')?.classList.contains('on'), null, { timeout: 8000 }).catch(() => {});
   t = await page.evaluate(() => {
     const s = window.__sendit, sp = s.course.trailSpawn('middle-drops');
     const el = document.getElementById('trail-toast');

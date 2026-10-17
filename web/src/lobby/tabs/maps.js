@@ -13,6 +13,7 @@ import { esc } from './common.js';
 import { listMountains, getMountain, getTrail, needsReload, trailBoardId, DIFFICULTIES, DIFFICULTY_IDS } from '../../maps/registry.js';
 import { difficultyBadge, trailStats } from '../../maps/badges.js';
 import { storage } from '../../services/storage.js';
+import { pisteMap } from './pistemap.js';
 import './maps.css';
 
 const VIEW_KEY = 'sendit.lobby.mountain';
@@ -94,11 +95,12 @@ registerLobbyTab({
         <div class="mt-head" style="${thumbStyle(m)}">
           <button type="button" class="mt-back" aria-label="All mountains">${BACK}<span>Mountains</span><span class="g-kb"><kbd>Esc</kbd></span><span class="g-pad"><kbd>B</kbd></span></button>
           <div class="mt-hero">
-            <small>${esc(m.region)}${here ? ' · <b>You are here</b>' : ''}</small>
-            <h2>${esc(m.name)}</h2>
+            <small>${esc(m.region)}</small>
+            <h2>${esc(m.name)}${here ? '<span class="mt-here-pill">You are here</span>' : ''}</h2>
             <p>${esc(m.blurb)}</p>
             ${spreadHtml(m, { bar: true })}
           </div>
+          <div class="mt-pm"></div>
         </div>
         ${segs.length > 1 ? `<div class="tr-filters" role="radiogroup" aria-label="Difficulty">
           <button type="button" role="radio" data-f="all">All <b>${m.trails.length}</b></button>
@@ -109,7 +111,28 @@ registerLobbyTab({
       el.querySelector('.mt-back').addEventListener('click', () => { ctx.sfx?.('ui_click', 0.3, 0.95); open(null, { focus: true }); });
       el.querySelectorAll('[data-f]').forEach((b) => b.addEventListener('click', () => { filter = b.dataset.f; fillTrails(m); markFilters(); }));
       markFilters();
+      mountPisteMap(m);
       fillTrails(m);
+    };
+
+    // The piste map: only for the loaded mountain (it needs the course and the terrain).
+    let pm = null;
+    const mountPisteMap = (m) => {
+      pm = null;
+      const host = el.querySelector('.mt-pm');
+      const c = cur();
+      if (!host || m.id !== curMountainId() || !c?.course?.path?.length || !c.heightAt) { host?.remove(); return; }
+      try {
+        pm = pisteMap({ key: `${c.map.id}:${JSON.stringify(c.variant ?? null)}`, path: c.course.path, finishAt: c.course.finishAt,
+          heightAt: c.heightAt, starts: c.starts || [], accent: m.accent });
+      } catch (e) { console.warn('[maps] piste map failed', e); host.remove(); return; }
+      host.appendChild(pm.el);
+      el.querySelector('.mt-head').classList.add('has-pm');
+      pm.select(c.trail?.id);
+      pm.el.querySelectorAll('.pm-mk').forEach((mk) => mk.addEventListener('click', () => {
+        const t = getTrail(c.map.id, mk.dataset.trail);
+        if (t) pick(t);
+      }));
     };
 
     const markFilters = () => el.querySelectorAll('[data-f]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.f === filter)));
@@ -161,6 +184,11 @@ registerLobbyTab({
       });
       row.querySelector('.tr-pick').addEventListener('dblclick', () => ride(t));
       row.querySelector('.tr-ride').addEventListener('click', () => ride(t));
+      const hot = (on) => pm?.highlight(on ? t.id : null);
+      row.addEventListener('pointerenter', () => hot(true));
+      row.addEventListener('pointerleave', () => hot(false));
+      row.addEventListener('focusin', () => hot(true));
+      row.addEventListener('focusout', () => hot(false));
       return row;
     };
 
