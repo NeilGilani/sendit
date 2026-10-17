@@ -2,7 +2,7 @@
 
 Everything the rider hears is synthesized live from the physics. The snow under the skis or board, the wind,
 spins, landings, grinds and the mountain ambience are not looped samples, so nothing repeats. The only
-recordings are three short CC0 snow textures, granulated under the synthesis. The research behind
+recordings are four short CC0 textures (three of snow, one of wind), granulated under the synthesis. The research behind
 the numbers and the comparisons with real recordings are in `docs/audio-research.md`. Every tunable lives in
 `web/src/audio/tuning.js`.
 
@@ -87,7 +87,7 @@ carve leans up to 22 % toward the outside, loaded ski (turning right, the left s
 | Tuck | Rush −6 dB and a darker low-pass (the lee of the body) |
 | Spin / flip whoosh | In the air, by rotation rate: the ears alternate facing the airflow, so each half turn pans and swells the rush and sweeps its filter, with a whoosh pulse (up to about +7 dB and brighter) as the face swings through the wind |
 | Gusts | Ornstein–Uhlenbeck processes (2.2 s rider-relative, ~5 s ambient) modulate level and relative airspeed |
-| Map wind | Distant wind over the ridges: band-passed brown noise at the map's `windF`, plus hiss, swelling with the gusts and sweeping across the stereo field (±3 dB, as in Farnell's moving gusts). Level and tone are set per map. |
+| Map wind | Distant wind over the ridges: band-passed brown noise at the map's `windF`, plus hiss, plus grains of a CC0 Alpine-gust recording (`tex_wind.mp3`; the bed now matches that recording's profile), swelling with the gusts and sweeping across the stereo field (±3 dB, as in Farnell's moving gusts). Level and tone are set per map. |
 | Ridge howl | On exposed maps (`maps[id].howl`: Ravenspire, Dragonback) the strongest ambient gusts moan through rock edges: two narrow resonances (Q 14, a fifth apart) gliding in 220–420 Hz, rising with the gust |
 
 Slow motion (the apex slow-mo event) scales every filter and modulation rate by 0.55 + 0.45·scale, so the

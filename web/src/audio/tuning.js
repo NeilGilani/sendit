@@ -113,7 +113,7 @@ export const AUDIO = {
     // ridge howl: the strongest ambient gusts moan through rock edges on exposed peaks (maps[id].howl)
     howl: { gain: 0.3, from: 0.6, fMin: 220, fMax: 420, q: 14 },
     // map ambience wind (independent of the rider): distant, over ridges
-    ambient: { gain: 0.25, f: 650, q: 0.5, hiss: 0.4, hissF: 1800, travel: 0.35, travelTau: 3.5 },   // travel: gusts sweep across (±3 dB)   // alpine gust reference: flat to 2 kHz
+    ambient: { gain: 0.25, f: 650, q: 0.5, hiss: 0.4, hissF: 1800, travel: 0.35, travelTau: 3.5, tex: 5.0 },   // tex: CC0 gust grains under it   // travel: gusts sweep across (±3 dB)   // alpine gust reference: flat to 2 kHz
     out: 0.227,           // internal output level (×3.0 on the bus): headroom inside the worklet
   },
 

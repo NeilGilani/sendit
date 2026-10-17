@@ -132,6 +132,10 @@ export class AudioEngine {
         const b = this.buffers[n] || await this.loadBuffer(n).catch(() => null);
         if (b && b.length > 4096) this.snow.port.postMessage({ tex: k, data: prepTexture(b, this.T.snow.tex.rms) });
       }));
+      if (this.loadBuffer) {
+        const w = this.buffers['tex_wind.mp3'] || await this.loadBuffer('tex_wind.mp3').catch(() => null);
+        if (w && w.length > 4096) this.wind.port.postMessage({ tex: 'wind', data: prepTexture(w, this.T.snow.tex.rms) });
+      }
     } catch (e) {
       console.warn('[audio] worklet unavailable, using sample loops', e);
       this.worklet = false;
