@@ -242,8 +242,10 @@ export class FX {
   }
 
   /** Jacket nylon swish as the hand goes for the grab (or lets go). */
-  grab(when, release = false) {
+  grab(when, release = false, board = 0) {
     const G = this.T.grab.gain * (release ? 0.6 : 1), n = release ? 2 : 3 + Math.floor(Math.random() * 2);
+    // the glove meeting the board / ski: a short knock (the board's wood core lower than a ski's topsheet)
+    if (!release) { this.thump(when + 0.05, { f: board ? rnd(240, 300) : rnd(380, 460), f2: board ? 160 : 260, gain: G * 0.9, decay: 0.035 }); this.noise(when + 0.05, { f: board ? 900 : 1500, q: 1.2, gain: G * 0.5, decay: 0.015 }); }
     let t = when;
     for (let i = 0; i < n; i++) {
       this.noise(t, { f: rnd(2000, 3800), q: 0.9, gain: G * rnd(0.5, 1), attack: rnd(0.01, 0.03), decay: rnd(0.04, 0.09), type2: 'highpass', ff2: 900 });
