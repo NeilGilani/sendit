@@ -133,7 +133,12 @@ centimetre-scale drone sway, and pitch is clamped (−13°, −24° for the orbi
 URL flags (all optional): `?loadseed=<n>` `?loadtod=golden|alpenglow|bluebird|dawn|storm|aurora`
 `?loadmtn=spires|ranges|inversion` `?loadgear=ski|snowboard` `?loadtrick=<id>` `?loadcam=<id>`
 `?loadscene=0` (static screen only) `?loadhold` (never hand off; for captures) `?loadq=low|high|idle` (idle = build but never render, for cost measurements)
-`?loaddebug=cam:px,py,pz,tx,ty,tz,fov` (pinned camera).
+`?loaddebug=cam:px,py,pz,tx,ty,tz,fov` (pinned camera) · `?loaddebug=view1|2|3` (near terrain: rock mask /
+normals / baked sun+sky visibility).
+
+Shader safety: shader error checks are off for speed, so after each async compile the worker reads every
+program's link status and reports a failure as a console error (`[loading] shader failed to link`) — a
+program that fails to link otherwise just draws nothing (this caught a far-terrain regression).
 
 ### Resolution and frame rate
 Render size = CSS size × min(devicePixelRatio, 2), capped at 2560×1440 rendered pixels, HDR half-float
