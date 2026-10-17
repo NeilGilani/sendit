@@ -569,7 +569,7 @@ The old park ran 15–19 m/s on its jump line and 9–10 m/s on its rails.
 | Lightning | 18.6–21.6 m/s | 19.2–19.9 | 69–72 | 2.1–2.5 s | sweet ×6 |
 | Thunder | 19.1–22.0 | 19.2–20.5 | 69–74 | 2.1–2.6 s | sweet ×4, knuckle → deep / sweet ×2 |
 | Voltage | 19.7–22.4 | 20.9–21.0 | 75–76 | 2.6–2.7 s | sweet ×6 |
-| Megawatt | 20.5–23.1 | 20.7–22.1 | 75–80 | 2.2–2.8 s | sweet ×4, knuckle ×1, cased ×1 (the table was 38 m: three of six cased at 20.8 m/s; now 35 m) |
+| Megawatt | 20.5–23.1 | 20.7–22.1 | 75–80 | 2.2–2.8 s | sweet ×3, knuckle ×1, cased ×2 at 20.7 m/s (boards: their tucked terminal on 18° is lower) |
 | The Gap | 19.0–21.3 | 19.6–20.1 | 71–72 | 2.4–2.7 s | sweet ×6 |
 | The Tower | 19.8–22.1 | 20.2–20.9 | 73–75 | 2.4–2.8 s (tucked, no check: 3.3–3.5 s) | sweet / knuckle |
 | High Voltage 1 / 2 | 15.3–17.8 / 17.0–19.4 | 16.2 / 17.7–18.0 | 58 / 64 | 2.2 / 2.4–2.5 s | sweet |
