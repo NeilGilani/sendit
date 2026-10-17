@@ -70,6 +70,11 @@ export function trackProgression({ player, getMapId }) {
   const start = () => { if (open) P.endRide(); P.startRide(getMapId()); open = true; lastDist = game.distance || 0; };
   const end = () => { if (!open) return null; open = false; return P.endRide(); };
   on('rideStarted', start);
+  // First rides: one line on how XP works (the trick tips and drop-zone hints come earlier).
+  on('rideStarted', () => {
+    if (P.state.life.rides >= 2) return;
+    setTimeout(() => { if (open && game.mode === Mode.RIDING) emit('hint', "Tricks, combos, close shaves and dailies all earn XP · level up in the lobby's Progress tab"); }, 15000);
+  });
   on('rideEnded', () => { const s = end(); if (s) emit('progressRideSummary', s); });
   on('score', ({ points }) => { if (open) P.recordScore(points); });
   on('landed', (e) => {

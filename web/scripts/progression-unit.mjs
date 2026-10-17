@@ -196,6 +196,22 @@ export async function run(test, assert) {
     assert.equal(p.weekly().value, 0);
   });
 
+  await test('progression API: the public surface works over localStorage', async () => {
+    const { progression } = await import('../src/progression/index.js');
+    for (const k of ['getLevel', 'getXP', 'getProgress', 'getChallenges', 'rerollChallenge', 'rerollsLeft', 'getWeekly', 'getAchievements', 'getPersonalBests', 'getTrickBook', 'addXP', 'onLevelUp', 'onAchievement', 'onChallengeDone', 'onXP']) assert.equal(typeof progression[k], 'function', k);
+    const ups = [];
+    const off = progression.onLevelUp((e) => ups.push(e.level));
+    const l0 = progression.getLevel();
+    progression.addXP(core.xpToNext(l0) + 1, 'test');
+    assert.equal(progression.getLevel(), l0 + 1);
+    assert.deepEqual(ups, [l0 + 1]);
+    off();
+    progression.addXP(core.xpToNext(l0 + 1) + 1, 'test');
+    assert.deepEqual(ups, [l0 + 1], 'unsubscribed');
+    assert.equal(progression.getChallenges().length, 3);
+    assert.ok(JSON.parse(globalThis.localStorage.getItem(core.PROGRESSION_KEY)).xp > 0, 'persisted under its own key');
+  });
+
   // ---------------------------------------------------------------- juice: combo chain + time warp
   await test('juice combo: own chain grows per different move, banks a bonus, loses on crash', () => {
     const pl = { state: 1, flow: null };
