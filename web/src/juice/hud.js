@@ -278,9 +278,14 @@ export function mountJuiceHud({ player, combo, input, camera }) {
   // Small scores (close shaves, gates, snowflakes, carves…) rise off the rider; tricks have the announcer
   // and distance markers stay in the notes. At most 4 alive.
   const _v = new Vector3();
+  let popT = 0, popLabel = '';
   on('score', ({ label, points }) => {
     if (!riding() || !camera || points <= 0 || points >= 100 || /^\d+ m$/.test(label || '') || /^(Combo|Line) ×/.test(label || '')) return;
     if (root.querySelectorAll('.fp').length >= 4) return;
+    // Not spammy: one pop per 0.4 s, and a repeat of the same move within 1 s is left to the call-out (CLOSE SHAVE ×n).
+    const now = performance.now();
+    if (now - popT < 400 || (label === popLabel && now - popT < 1000)) return;
+    popT = now; popLabel = label;
     const p = player.renderPos;
     const v = _v.set(p.x, p.y + 1.6, p.z).project(camera);
     if (v.z > 1) return;
