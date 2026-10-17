@@ -227,22 +227,30 @@ never a duplicate.
 
 | trail | gear | time | avg speed | max | crashes | stumbles | air (longest) | line goals |
 |---|---|---|---|---|---|---|---|---|
-| Skaret | ski | 112 s | 24.9 m/s (56 mph) | 37.0 | 0 | 1 | 24.1 s (3.3 s) | Skarvtind Classic, Wave Rider |
-| Skaret | snowboard | 121 s | 23.3 m/s (52 mph) | 35.8 | 0 | 0 | 21.9 s (2.7 s) | Skarvtind Classic, Wave Rider |
-| Kvalneset | ski | 96 s | 24.7 m/s (55 mph) | 31.2 | 0 | 0 | 9.4 s (2.5 s) | Stairway to the Sea |
-| Kvalneset | snowboard | 108 s | 21.8 m/s (49 mph) | 28.6 | 0 | 0 | 9.5 s (2.6 s) | Stairway to the Sea |
-| Sølvryggene | ski | 112 s | 23.9 m/s (53 mph) | 34.8 | 0 | 0 | 26.9 s (3.5 s) | Silver Lining, Wave Rider |
-| Sølvryggene | snowboard | 119 s | 22.6 m/s (51 mph) | 32.5 | 0 | 1 | 27.2 s (3.2 s) | Silver Lining, Wave Rider |
-| Fjordløypa | ski | 140 s | 19.7 m/s (44 mph) | 33.3 | 0 | 0 | 14.9 s (1.7 s) | (Rollercoaster) |
-| Fjordløypa | snowboard | 148 s | 18.9 m/s (42 mph) | 31.6 | 0 | 0 | 12.8 s (1.6 s) | (Rollercoaster) |
-| Brygga | ski | 56 s | 17.2 m/s (38 mph) | 27.0 | 0 | 0 | 14.0 s (2.7 s) | Rorbu Hopper, Naustgapet |
-| Brygga | snowboard | 59 s | 16.3 m/s (36 mph) | 26.2 | 0 | 0 | 13.1 s (2.6 s) | Rorbu Hopper, Naustgapet |
+| Skaret | ski | 110 s | 25.5 m/s (57 mph) | 36.3 | 0 | 1 | 21.5 s (2.7 s) | Skarvtind Classic, Wave Rider |
+| Skaret | snowboard | 119 s | 23.5 m/s (53 mph) | 36.0 | 0 | 0 | 23.5 s (2.8 s) | Skarvtind Classic, Wave Rider |
+| Kvalneset | ski | 95 s | 24.7 m/s (55 mph) | 31.2 | 0 | 0 | 9.4 s (2.5 s) | Stairway to the Sea |
+| Kvalneset | snowboard | 108 s | 21.8 m/s (49 mph) | 28.7 | 0 | 0 | 9.5 s (2.6 s) | Stairway to the Sea |
+| Sølvryggene | ski | 123 s | 23.2 m/s (52 mph) | 34.8 | 1 | 0 | 28.8 s (3.5 s) | Silver Lining, Wave Rider |
+| Sølvryggene | snowboard | 118 s | 22.7 m/s (51 mph) | 33.9 | 0 | 1 | 27.6 s (3.5 s) | Silver Lining, Wave Rider |
+| Fjordløypa | ski | 140 s | 19.6 m/s (44 mph) | 33.3 | 0 | 0 | 14.8 s (1.7 s) | Rollercoaster |
+| Fjordløypa | snowboard | 148 s | 18.9 m/s (42 mph) | 31.9 | 0 | 0 | 13.3 s (1.6 s) | Rollercoaster |
+| Brygga | ski | 55 s | 17.4 m/s (39 mph) | 27.3 | 0 | 0 | 13.8 s (2.8 s) | Rorbu Hopper, Naustgapet |
+| Brygga | snowboard | 58 s | 16.5 m/s (37 mph) | 26.4 | 0 | 0 | 13.5 s (2.6 s) | Rorbu Hopper, Naustgapet |
 | Sjøsiden | ski | 44 s | 15.0 m/s (34 mph) | 23.0 | 0 | 0 | 0 | – |
-| Sjøsiden | snowboard | 48 s | 13.8 m/s (31 mph) | 21.2 | 0 | 0 | 0 | – |
+| Sjøsiden | snowboard | 47 s | 13.9 m/s (31 mph) | 21.2 | 0 | 0 | 0 | – |
 
-All 12 reach the sea with **0 crashes**; every one emits exactly one `runCompleted` with the right `trailId`.
-Judged scores 88–96 on the double-blacks and the black. The biggest drops are 17–22 m (Hammaren's peak, Neskanten,
-the nest). Max speed is the instant after a big drop; sustained speeds on the face are 25–31 m/s (56–70 mph).
+All 12 reach the sea (`--check` PASS: every ride finishes with ≤ 1 crash and exactly one `runCompleted` with the
+right `trailId`); the one crash is a spine crest on Sølvryggene at full tuck. Judged scores 88–96 on the
+double-blacks and the black; the biggest drops are 17–22 m (Hammaren's peak, Neskanten, the nest). Max speed is the
+instant after a big drop; sustained speeds on the face are 25–31 m/s (56–70 mph).
+
+**Trick style** (spins off every real air, no tuck): 12 / 12 finish, **0 crashes**, 1 stumble; the village line at
+10–12 m/s (that is what the beach slope and the lower boathouse were tuned for: a slow rider used to stall on the
+boathouse ramp and stop on a dead-flat beach). **Carve style** (forced linked turns every 1.5 s): every snowboard
+run finishes with 0 crashes; on skis the forced turns scrub the gentle lower slopes to a crawl and 6 runs time
+out at 300 s (no crashes) — a bot artefact, but it says the bottom 300 m is flat enough that you need to let the
+skis run.
 
 ### Unit, fuzz
 
@@ -250,7 +258,10 @@ the nest). Max speed is the instant after a big drop; sustained speeds on the fa
 the water's edge, atmosphere shape, choke width and couloir angle, the coast wet / dry, the headland steps and
 bands, roofs and decks, walls, the pier splash and dry respawn, runCompleted once with the contract fields).
 `map7-fuzz.mjs 40 40`: 96k frames, no NaN, never below the snow / a roof / a deck, never stuck, 6 splashes all
-respawned on dry land.
+respawned on dry land (every fifth run is launched at the water from the beach).
+
+Shared suite on the integrated branch: unittest 52/52, physics-fuzz, physics-tricks, jumps-valcrest --check,
+map2-bot --verify, map3-unit 32/32, map3-fuzz, map4-unit 15/15 all pass.
 
 ### Performance
 
