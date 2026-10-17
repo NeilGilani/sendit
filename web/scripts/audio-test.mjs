@@ -132,12 +132,32 @@ if (traceDir) for (const type of ['ski', 'snowboard', 'bigmountain']) {
 
 // ---------------------------------------------------------------- run
 const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
-const page = await browser.newPage();
 const errors = [];
-page.on('pageerror', (e) => errors.push(String(e)));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-await page.goto(base + 'src/audio/harness.html');
-await page.waitForFunction(() => window.harnessReady, null, { timeout: 30000 });
+let page;
+async function openHarness() {
+  page = await browser.newPage();
+  page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  await page.goto(base + 'src/audio/harness.html');
+  await page.waitForFunction(() => window.harnessReady, null, { timeout: 30000 });
+}
+await openHarness();
+// Under heavy machine load headless Chromium now and then never finishes an offline render (scenarios take ≤ 8 s):
+// give each one 60 s, then retry once on a fresh page instead of hanging the whole run.
+async function render(spec) {
+  for (let attempt = 0; ; attempt++) {
+    let timer;
+    const stall = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('render stalled')), 60000); });
+    try {
+      return await Promise.race([page.evaluate((sp) => window.renderScenario(sp), spec), stall]);
+    } catch (e) {
+      if (attempt || e.message !== 'render stalled') throw e;
+      console.log(`  (${spec.name}: render stalled, retrying on a fresh page)`);
+      await page.close().catch(() => {});
+      await openHarness();
+    } finally { clearTimeout(timer); }
+  }
+}
 const R = {};
 let fails = 0;
 const fail = (msg) => { fails++; console.log('  FAIL', msg); };
@@ -145,7 +165,7 @@ const db = (x) => (x > 0 ? (20 * Math.log10(x)).toFixed(1) : '-inf');
 for (const s of S) {
   const t0 = Date.now();
   // LISTEN=1: renders for listening — no 220 Hz test tone (the ducking checks that use it are skipped)
-  const r = await page.evaluate((spec) => window.renderScenario(spec), { ...s, ...(process.env.LISTEN ? { musicTone: false } : {}), wav: !!wavDir, tune: [s.tune, tune].filter(Boolean) });
+  const r = await render({ ...s, ...(process.env.LISTEN ? { musicTone: false } : {}), wav: !!wavDir, tune: [s.tune, tune].filter(Boolean) });
   R[s.name] = r;
   if (wavDir && r.wav) writeFileSync(join(wavDir, `${s.name}.wav`), Buffer.from(r.wav, 'base64'));
   const loud = [...r.rms].sort((a, b) => a - b)[Math.floor(r.rms.length * 0.9)] || 0;
