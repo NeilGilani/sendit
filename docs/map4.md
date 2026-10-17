@@ -99,7 +99,7 @@ Three rail sections, each with three parallel options (pick your line), then fiv
 | lane | v | identity · what is there |
 |---|---|---|
 | **Spark Lane** (green ●) | 70 | **flow.** Small tables on the bench (6–10 m), a box, a fat tube and a ledge, a down box, pump rollers. Under the Launch a **stacked double** (two 14 m tables back to back), a butter box, two more tables (16 / 18 m), three rollers, a **side hit**, the **Spark QP** (3.2 m) |
-| **Current Lane** (blue ■) | 125 | **the Triple Stack.** A table, flat-down / box / kink / tube on the benches. Under the Launch **three 18–19 m tables back to back**, ridden upright at ~14.5 m/s (each landing runs straight into the next in-run). Then a **side hit**, a **step-down**, a 22 m table, and the **Current Transfer**: a hip at v 148 that sends you into High Voltage |
+| **Current Lane** (blue ■) | 125 | **the Triple Stack.** A table, flat-down / box / kink / tube on the benches. Under the Launch **three 18–19 m tables back to back**, ridden upright at ~14.5 m/s (each landing runs straight into the next in-run). The **Current Transfer** (a hip at v 148 that sends you into High Voltage), a **step-down**, a **side hit** on the lane's line (10° skew) and a 22 m table |
 | **High Voltage** (pro, black ◆) | 186 | down-flat-down, rainbow rail, 13 m down rail, a kink; under the Launch two pro tables (22 / 27 m, 16–17.5 m/s), a side hit, **the Canal** (a 14 m-wide ice-blue channel, then a 9 m landing mound), a **step-up**, the **Voltage QP** (5.2 m) |
 | **The Grid** (jib garden, orange ⬭) | 236–258, u 50–262 | 16 jibs in seven rows every 30–33 m, three columns: boxes, tubes, rails, a flat box, an A-frame, a 14 m rail, a kink, an S-rail, a rainbow box, a down box, a ledge, a battleship, a cannon, a finale DFD |
 | **The Stairway** (step line) | 245, under the Grid | **Stair Drop 1** (a step-down: the deck falls away 6°, 20 m table), **Stair Up** (a 32° kicker over a 7 m table to a deck 1.8 m above the lip), **Stair Drop 2** (24 m), the **Stairway Hip** |
@@ -145,8 +145,8 @@ Three rail sections, each with three parallel options (pick your line), then fiv
    the Canal, the step-up and the 5.2 m QP.
 3. **Lane hopper.** Spark Ledge → Down Box → Spark Double → **the Spine** → **Current Transfer** → the Canal →
    the step-up: three lanes in one run.
-4. **The Triple Stack.** Drop zone 7. Three tables back to back, upright, no speed check, then the side hit, the
-   step-down and Current 3.
+4. **The Triple Stack.** Drop zone 7. Three tables back to back, upright, no speed check, then the step-down,
+   the side hit and Current 3.
 5. **The Stairway.** Drop zone 9: step-down, step-up, step-down, then over the **Stairway Spine** into High
    Voltage's step-up.
 6. **Megawatt.** Drop zone 4: down Voltage's landing, Megawatt (2.4–2.8 s, slow motion), the road gap.
@@ -269,8 +269,13 @@ far LOD and the tree scatter are untouched by the park.
   reaches the finish (zen `runComplete` or Challenge `runFinished`) — park.js.
   - The trail is the one most of the run's features (takeoffs and grinds) were on, else the trail it started on.
   - The clock and distance start at the top, at a drop zone or at the spawn.
-- **Atmosphere:** `course.atmosphere` isn't set yet. The park is ready for a night-lit look (neon, floodlight heads,
-  emissive banners) once the graphics hook's shape is fixed.
+- **Atmosphere — the night final** (`VOLTAGE_ATMOSPHERE` in tuning.js, applied by `world.js applyMapAtmosphere`).
+  - It starts from the `night` preset.
+  - A white-blue key light (the floodlights, intensity 0.15) shines high from the ESE, down the run.
+  - The horizon has a violet event glow (#26204c), with fog #8a8fd0, exposure 2.2 and ambient 3.6.
+  - The sky is dark and the landings stay readable; the neon, the lamp heads and the banners carry the colour.
+  - It was picked from six `?atmo` previews: night, a magenta dusk (too pink), a lavender blue hour (washed out),
+    and three night variants (the two brightest read as daytime).
 
 ### Hooks into shared files (all opt-in; the other maps behave exactly as before)
 
@@ -708,7 +713,7 @@ What it costs:
   don't collide (riding under a rail passes through).
 - **Non-twin skis.** Skis that aren't twin tips (anything but the park skis) can't land switch. Straight airs in
   the pipe and QPs then need a 180.
-- **Daylight.** The world lighting is global (scene.js), so the "night final" look is suggested with neon,
-  floodlight heads and emissive banners rather than a night sky.
+- **Night lighting.** The night final is one key light plus a bright ambient. The floodlight heads glow but don't
+  pool light on the snow; real light cones would need local lights (a graphics feature).
 - **Merge watch-list.** player.js, physics/edge.js, config.js, rider.js (pose functions), activities.js, ui.js,
   physics/flow.js, maps/builtin.js (one line).
