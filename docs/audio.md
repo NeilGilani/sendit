@@ -264,6 +264,11 @@ event counts. `window.__senditAudio` is the SoundScape and `.engine` the AudioEn
 
 ## Tuning tips
 
+All levels, thresholds, rates, filter curves and map moods are in `tuning.js` (`AUDIO`), the one place to tune. The
+fine shape of each one-shot (the exact mode frequencies of a clang, the timing inside a landing) is written in its
+function in `fx.js`, `grind.js`, `lift.js` and `ambience.js`, with a comment saying what it imitates.
+
+
 - **Too much or too little snow:** `mix.snow`, then the per-layer `gain`s in `snow`.
 - **Brightness:** `snow.hiss.hp` / `lp` and `grains.fGroomed`.
 - **Wind at top speed:** `wind.exp` (steeper means quieter when slow and louder when fast) and `wind.vMax`.
