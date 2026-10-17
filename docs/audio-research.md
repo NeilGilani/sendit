@@ -90,6 +90,8 @@ levels in dB relative to the loudest band, for the loudest 15 % of seconds.
 | Skiers passing a recordist (Selector #680075) | −5 | 0 | −3 | −7 | −5 | −4 | −4 | −4 | −11 | 1.8 kHz |
 | Our other-skier pass (first build) | −33 | −14 | −3 | 0 | −3 | −6 | −9 | −18 | −36 | 0.9 kHz, too dark |
 | Our other-skier pass (tuned) | −35 | −20 | −8 | 0 | 0 | −4 | −6 | −7 | −17 | 1.8 kHz |
+| Our standing-still bed, synthetic only | — | — | — | — | — | — | — | — | — | 0.5 kHz, too dark |
+| Our standing-still bed + CC0 gust grains | −15 | −8 | −5 | −3 | 0 | −4 | −13 | −23 | −35 | 1.0 kHz (the Alpine gusts reference: 1.1 kHz) |
 
 **What changed because of the comparison:**
 - The glide hiss became pink noise between a rising high-pass and low-pass. Pink noise is flat in octave bands,
@@ -112,11 +114,11 @@ levels in dB relative to the loudest band, for the loudest 15 % of seconds.
   - **Creaky snow under a board (facemusic #39082):** a stream of short creaks, formant-like blobs at
     300 Hz–1.2 kHz. This became the cold-snow squeak, which is noise jerked at 40–90 Hz through two band-passes.
     The first attempt used a pure pulse train, which buzzed.
-- **Field textures:** three of these CC0 recordings are excerpted (14 s in total) and granulated under the
-  synthesis:
+- **Field textures:** four CC0 excerpts (20 s in total) are granulated under the synthesis:
   - the groomed run;
   - the board glide;
-  - the board skid.
+  - the board skid;
+  - 6 s of the Alpine gusts, for the map wind.
 
   With them, the board render's profile matches its reference within ~3 dB from 125 Hz to 2 kHz.
 
