@@ -259,6 +259,11 @@ export async function run(test, assert) {
     assert.equal(p.state.life.runs, 2);
     assert.ok(of('achievement').some((a) => a.id === 'clean-run'));
     assert.equal(of('cleanRun').length, 1);
+    assert.deepEqual(p.mapStars('valcrest-gully').stars, [true, true, false]);
+    p.recordCombo(4.5, 900);
+    assert.equal(p.mapStars('valcrest-gully').count, 3);
+    assert.ok(of('achievement').some((a) => a.id === 'master-1'));
+    assert.equal(p.mapStars('ravenspire').count, 0);
   });
 
   // ---------------------------------------------------------------- juice: combo chain + time warp

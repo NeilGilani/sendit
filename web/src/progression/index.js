@@ -13,6 +13,7 @@
 //   progression.getAchievements()     → [{ id, title, desc, xp, icon, unlocked (ms or 0) }]
 //   progression.getPersonalBests(mapId) → { score, air, spin, kmh, combo }
 //   progression.getTrickBook()        → [{ name, n }] every trick / rail combo landed clean, with counts
+//   progression.getMapStars(mapId)    → { stars: [ridden, clean run, ×4 combo], count }
 //   progression.addXP(amount, reason) → XP actually added
 //   progression.onLevelUp(fn)         → unsubscribe; fn({ level, prev, rank, rankUp })
 //   progression.onAchievement(fn)     → unsubscribe; fn({ id, title, desc, xp, icon })
@@ -53,6 +54,7 @@ export const progression = {
   getAchievements: () => C().achievements(),
   getPersonalBests: (mapId) => C().pbs(mapId),
   getTrickBook: () => C().trickBook(),
+  getMapStars: (mapId) => C().mapStars(mapId),
   addXP: (n, reason) => C().addXP(n, reason),
   onLevelUp: (fn) => subscribe('levelUp', fn),
   onAchievement: (fn) => subscribe('achievement', fn),

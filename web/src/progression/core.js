@@ -159,6 +159,7 @@ export const ACHIEVEMENTS = [
   { id: 'book-30', title: 'Trick Encyclopedia', desc: 'Land 30 different tricks', xp: 600, icon: '📚', test: (s) => Object.keys(s.life.trickBook || {}).length >= 30 },
   { id: 'clean-run', title: 'Clean Sheet', desc: 'Finish a run top to bottom without crashing', xp: 250, icon: '✓', test: (s) => s.life.cleanRuns >= 1 },
   { id: 'clean-10', title: 'Untouchable', desc: 'Finish 10 runs without crashing', xp: 600, icon: '◎', test: (s) => s.life.cleanRuns >= 10 },
+  { id: 'master-1', title: 'Mountain Master', desc: 'Three stars on a map: ridden, a clean run and a ×4 combo', xp: 400, icon: '⛰', test: (s) => Object.entries(s.life.mapStats || {}).some(([id, m]) => s.life.maps?.[id] && m.clean > 0 && m.mult >= 4) },
   { id: 'meat-10', title: 'Hall of Meat', desc: 'Wipe out 10 times', xp: 150, icon: '✚', test: (s) => s.life.wipeouts >= 10 },
   { id: 'yard-sale', title: 'Yard Sale', desc: 'Tumble 15 m in one wipeout', xp: 200, icon: '☄', test: (s) => s.life.maxTumble >= 15 },
   { id: 'level-10', title: 'Double Digits', desc: 'Reach level 10', xp: 0, icon: '⬆', test: (s, p) => p.level >= 10 },
@@ -176,7 +177,7 @@ export const PB_STATS = {
 export function defaultState() {
   return {
     version: PROGRESSION_VERSION, xp: 0,
-    life: { rides: 0, tricks: 0, flips: 0, stomps: 0, near: 0, meters: 0, air: 0, grindM: 0, maxSpin: 0, bestMult: 0, topKmh: 0, golds: 0, dailySweeps: 0, wipeouts: 0, maxTumble: 0, runs: 0, cleanRuns: 0, maps: {}, trickBook: {} },
+    life: { rides: 0, tricks: 0, flips: 0, stomps: 0, near: 0, meters: 0, air: 0, grindM: 0, maxSpin: 0, bestMult: 0, topKmh: 0, golds: 0, dailySweeps: 0, wipeouts: 0, maxTumble: 0, runs: 0, cleanRuns: 0, maps: {}, mapStats: {}, trickBook: {} },
     daily: null,           // { day, list: [3 challenges], rerolls: {slot: n}, rerollsLeft, progress: {stat: n}, done: {id: true}, swept }
     weekly: null,          // { week, progress: {stat: n}, done }
     achievements: {},      // id → unlock time (ms)
@@ -190,7 +191,8 @@ export function sanitizeState(raw) {
   const num = (v, f = 0) => (Number.isFinite(v) && v >= 0 ? v : f);
   const s = { ...d, xp: num(raw.xp) };
   s.life = { ...d.life };
-  for (const k of Object.keys(d.life)) if (k !== 'maps' && k !== 'trickBook') s.life[k] = num(raw.life?.[k]);
+  for (const k of Object.keys(d.life)) if (k !== 'maps' && k !== 'trickBook' && k !== 'mapStats') s.life[k] = num(raw.life?.[k]);
+  s.life.mapStats = raw.life?.mapStats && typeof raw.life.mapStats === 'object' && !Array.isArray(raw.life.mapStats) ? JSON.parse(JSON.stringify(raw.life.mapStats)) : {};
   s.life.maps = raw.life?.maps && typeof raw.life.maps === 'object' ? { ...raw.life.maps } : {};
   s.life.trickBook = raw.life?.trickBook && typeof raw.life.trickBook === 'object' && !Array.isArray(raw.life.trickBook) ? { ...raw.life.trickBook } : {};
   s.achievements = raw.achievements && typeof raw.achievements === 'object' ? { ...raw.achievements } : {};
@@ -417,6 +419,15 @@ export class Progression {
 
   trickBook() { return Object.entries(this.state.life.trickBook).map(([name, n]) => ({ name, n })); }
 
+  mapStat(mapId) { return (this.state.life.mapStats[mapId] ||= { clean: 0, mult: 0 }); }
+
+  /** Map mastery: three stars per map: ridden, a clean run, a ×4 combo. */
+  mapStars(mapId) {
+    const ms = this.state.life.mapStats[mapId] || { clean: 0, mult: 0 };
+    const stars = [!!this.state.life.maps[mapId], ms.clean > 0, ms.mult >= 4];
+    return { stars, count: stars.filter(Boolean).length };
+  }
+
   /** A run starts (a ride, a reset to the top) / is finished: clean runs count when no crash happened in between. */
   startRun() { if (this.ride) this.ride.runCrashes = 0; }
   crashInRun() { if (this.ride) this.ride.runCrashes = (this.ride.runCrashes || 0) + 1; }
@@ -425,7 +436,7 @@ export class Progression {
     const L = this.state.life;
     L.runs++;
     const clean = !this.ride.runCrashes;
-    if (clean) { L.cleanRuns++; this.bump('cleanRuns'); this.emit('cleanRun', { runs: L.cleanRuns }); }
+    if (clean) { L.cleanRuns++; this.bump('cleanRuns'); this.mapStat(this.ride.mapId).clean++; this.emit('cleanRun', { runs: L.cleanRuns }); }
     this.ride.runCrashes = 0;
     this.checkAchievements();
     return clean;
@@ -455,6 +466,7 @@ export class Progression {
     if (!this.ride) return;
     this.state.life.bestMult = Math.max(this.state.life.bestMult, mult);
     for (const g of [2.5, 3, 4]) if (mult >= g) this.bump(`combo${g}`, 1, { max: true });
+    const ms = this.mapStat(this.ride.mapId); ms.mult = Math.max(ms.mult, mult);
     if (mult >= 3) this.bump('combo3n');
     this.pbCheck('combo', bonus);
     this.checkAchievements();

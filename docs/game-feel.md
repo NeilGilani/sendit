@@ -269,7 +269,7 @@ The Progress tab shows it under the dailies. API: `progression.getWeekly()`. Eve
 
 ### Achievements
 
-There are 28 (`ACHIEVEMENTS`), including:
+There are 29 (`ACHIEVEMENTS`), including:
 
 - First ride, first trick, 360, 540, 720 and 1080, and a flip.
 - 1 and 50 stomps, 100 close shaves.
@@ -282,6 +282,10 @@ Each one unlocks once, with a toast and XP.
 ### Clean runs (mastery)
 
 A run is a ride start, a reset to the top or a Challenge (re)start, through to the finish line (Zen `runComplete`, Challenge `runFinished`). A run with no crash counts as clean: a "CLEAN RUN · NO CRASHES" call-out shows, there is a daily type for it, and **Clean Sheet** (1) and **Untouchable** (10) are achievements. Event: `cleanRun {runs}`.
+
+### Map mastery
+
+Each map has three stars: ridden, a clean run on it, and a ×4 combo banked on it. They are listed in the Progress tab for every map in the registry, so maps added later appear automatically. **Mountain Master** is the achievement for three stars on any map. API: `progression.getMapStars(mapId)` returns `{ stars: [ridden, clean, combo], count }`.
 
 ### Wipeouts (Hall of Meat lite)
 
@@ -316,6 +320,7 @@ progression.getWeekly()             // → this week's challenge { id, title, de
 progression.getAchievements()       // → [{ id, title, desc, xp, icon, unlocked (ms or 0) }]
 progression.getPersonalBests(mapId) // → { score?, air?, spin?, kmh?, combo? }
 progression.getTrickBook()          // → [{ name, n }] every trick / rail combo landed clean
+progression.getMapStars(mapId)      // → { stars: [ridden, clean run, ×4 combo], count }
 progression.addXP(amount, reason)   // → XP added (fires level-ups)
 progression.onLevelUp(fn)           // → unsubscribe; fn({ level, prev, rank, rankUp })
 progression.onAchievement(fn)       // → unsubscribe; fn({ id, title, desc, xp, icon })

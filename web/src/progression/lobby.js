@@ -49,6 +49,10 @@ const CSS = /* css */`
 .pg-book { display: flex; flex-wrap: wrap; gap: 0.35em; font-size: 0.78em; }
 .pg-book span { padding: 0.25em 0.6em; border-radius: 999px; background: rgba(255,255,255,0.08); font-weight: 700; }
 .pg-book small { color: var(--lb-dim); }
+.pg-maps { display: grid; gap: 0.25em; font-size: 0.85em; }
+.pg-map { display: flex; justify-content: space-between; align-items: center; padding: 0.3em 0.6em; border-radius: 0.6em; background: rgba(255,255,255,0.05); }
+.pg-map b i { font-style: normal; color: rgba(255,255,255,0.18); margin-left: 0.1em; }
+.pg-map b i.on { color: var(--lb-gold); text-shadow: 0 0 8px rgba(255,211,77,0.6); }
 .pg-pb { display: grid; grid-template-columns: 1fr auto; gap: 0.3em 1em; font-size: 0.9em; }
 .pg-pb span { color: var(--lb-dim); }
 .pg-pb b { font-weight: 800; text-align: right; }
@@ -104,6 +108,7 @@ registerLobbyTab({
       const nr = nextRank(p.level);
       const book = progression.getTrickBook();
       const wk = progression.getWeekly();
+      const maps = (ctx.maps?.list?.() || []).filter((m) => !m.hidden);
       el.innerHTML = `
         <h2 class="lp-title">Progress</h2>
         <p class="lp-sub">Level up by riding: style points, distance, dailies and achievements all give XP.</p>
@@ -131,6 +136,8 @@ registerLobbyTab({
         <div class="pg-adet">Hover or select a badge to see what it takes.</div>
         <div class="pg-h">Trick book <small>${book.length} landed</small></div>
         <div class="pg-book">${book.length ? book.sort((a, b) => b.n - a.n).slice(0, 14).map((t) => `<span title="landed ${t.n}×">${esc(t.name)}</span>`).join('') : '<small>Land tricks to fill the book: every new one pays XP.</small>'}</div>
+        <div class="pg-h">Map mastery <small>★ ridden · ★ clean run · ★ ×4 combo</small></div>
+        <div class="pg-maps">${maps.map((m) => { const st = progression.getMapStars(m.id); return `<div class="pg-map"><span>${esc(m.name)}</span><b>${st.stars.map((x) => `<i class="${x ? 'on' : ''}">★</i>`).join('')}</b></div>`; }).join('')}</div>
         <div class="pg-h">Personal bests <small>${esc(ctx.maps?.current?.()?.map?.name || 'this map')}</small></div>
         <div class="pg-pb">${Object.entries(PB_STATS).map(([k, S]) => `<span>${S.label}</span><b>${pb[k] ? S.fmt(pb[k]) : '—'}</b>`).join('')}</div>`;
       const det = el.querySelector('.pg-adet');
