@@ -75,7 +75,8 @@ registerLobbyTab({
         <h3 class="lp-h3">How to earn</h3>
         <div class="cs-ways">
           <span>Every km on skis or a board</span><b>+${EARN.perKm} XP</b>
-          <span>Finish a run (reach the bottom)</span><b>+${EARN.finish} XP</b>
+          <span>Finish a run (reach the bottom, ${EARN.minRun} m or more)</span><b>+${EARN.finish} XP</b>
+          <span>First finished run of the day</span><b>+${EARN.firstToday} XP</b>
           <span>Challenge medal bronze / silver / gold</span><b>+${EARN.medal.bronze} / ${EARN.medal.silver} / ${EARN.medal.gold}</b>
           <span>First run on each map · new trail</span><b>+${EARN.firstMap} · +${EARN.firstTrail}</b>
           <span>Next milestone: ${esc(ms.label)} (${fmtKm(Math.max(0, ms.m - r.distance))} to go)</span><b>+${ms.xp} XP</b>
