@@ -1,6 +1,7 @@
 // Voltage Park (map 4): registration, lobby spot and thumbnail. Imported once from maps/builtin.js.
 import { registerMap } from '../registry.js';
 import { VoltageCourse } from './course.js';
+import { TRAILS } from './layout.js';
 
 const svg = (body) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 90">${body}</svg>`)}`;
 
@@ -25,14 +26,21 @@ export const VOLTAGE_THUMB = svg(`
   <g fill="#fffbe0"><rect x="4" y="21" width="8" height="4" rx="1"/><rect x="148" y="7" width="8" height="4" rx="1"/></g>
   <circle cx="8" cy="23" r="10" fill="#fff6c0" opacity="0.18"/><circle cx="152" cy="9" r="10" fill="#fff6c0" opacity="0.18"/>`);
 
+// Measured by course.trailInfo() (node -e … VoltageCourse().trailInfo()); map4-unit checks they still match.
+export const TRAIL_SIZE = {
+  slopestyle: { length: 1155, vertical: 395 }, spark: { length: 1110, vertical: 368 }, current: { length: 1110, vertical: 368 },
+  'high-voltage': { length: 1110, vertical: 368 }, grid: { length: 1100, vertical: 362 }, stairway: { length: 768, vertical: 271 },
+  'hip-row': { length: 680, vertical: 229 }, superpipe: { length: 236, vertical: 77 }, 'big-air': { length: 173, vertical: 89 },
+};
+
 registerMap({
   id: 'voltage-park',
   name: 'Voltage Park',
-  description: 'An event terrain park: an Olympic-style slopestyle course, rails everywhere, three lanes, a 22 ft superpipe and a big air tower. Grind it, spin it, stomp it.',
+  description: 'A fast event terrain park: drop off the start ramp into an Olympic-style slopestyle course that ends on the Megawatt mega kicker and a road gap, rails everywhere, stacked lanes, spines, hips, a 22 ft superpipe and a 33 m big air tower. Grind it, spin it, send it.',
   thumbnail: VOLTAGE_THUMB,
   order: 4,
   tags: ['handmade', 'park', 'slopestyle', 'rails'],
-  describe: () => 'Terrain park · slopestyle, rails, superpipe, big air · 38 jibs, 17 jumps',
+  describe: () => 'Terrain park · slopestyle, mega kicker, gaps, spines, superpipe, big air · 38 jibs, 34 jumps',
   load: async () => {
     const course = new VoltageCourse();
     // Meshes and the HUD need the renderer-side modules: loaded only in the browser.
@@ -42,4 +50,7 @@ registerMap({
     return course;
   },
   lobby: ({ course }) => course.lobbySpot(),
+  // Mountain / trails contract: the park's lines as trails (course.trailSpawn(id) places a rider at one; length and
+  // vertical are measured from the built course by course.trailInfo()).
+  trails: TRAILS.map(({ id, name, difficulty, description }) => ({ id, name, difficulty, description, ...TRAIL_SIZE[id] })),
 });

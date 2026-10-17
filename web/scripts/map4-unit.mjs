@@ -31,7 +31,7 @@ await test('registered as map 4 with a thumbnail and a lobby spot', () => {
 await test('per-map tuning applies and resets cleanly', () => {
   applyMapTuning(course);
   assert.equal(PHYSICS.wallAlign, true);
-  assert.equal(PHYSICS.ski.maxVelocity, 21);
+  assert.equal(PHYSICS.ski.maxVelocity, 27);
   assert.equal(PHYSICS.hardLanding, 9);
   applyMapTuning({});
   assert.equal(PHYSICS.wallAlign, false);
@@ -57,6 +57,7 @@ await test('features sit on the snow (never below it, never NaN) across the park
 await test('designed landings are soft: ≤ 4.6 m/s into the slope from the knuckle to the sweet spot (EFH ≤ 1.1 m), ≤ 7.5 (2.9 m: heavy, still clean) to the end', () => {
   const g = 9.81, k = PHYSICS.airDrag;
   for (const f of course.features.filter((q) => q.jump?.land)) {
+    const efh = f.kind !== 'stepup';   // the step-up's deck is not a constant-EFH landing: only the overall cap applies
     const J = f.jump, Ld = J.land, th = J.lipDeg * Math.PI / 180;
     let worst = 0, sweetWorst = 0, n = 0;
     for (let v = Ld.vMin + 0.4; v <= Ld.vMax - 0.1; v += 0.15) {
@@ -79,7 +80,7 @@ await test('designed landings are soft: ≤ 4.6 m/s into the slope from the knuc
       }
     }
     assert.ok(n >= (Ld.vMax - Ld.vMin > 1.5 ? 4 : 2), `${f.name}: flights tested`);
-    assert.ok(sweetWorst <= 4.6, `${f.name}: ${sweetWorst.toFixed(2)} m/s into the landing up to the sweet spot`);
+    if (efh) assert.ok(sweetWorst <= 4.6, `${f.name}: ${sweetWorst.toFixed(2)} m/s into the landing up to the sweet spot`);
     assert.ok(worst <= 7.5, `${f.name}: ${worst.toFixed(2)} m/s into the landing`);
   }
 });
@@ -211,15 +212,41 @@ await test('the judge: a clean full slopestyle run scores in the 80s–90s, a cr
   const j = course.judgeRun;
   j.reset();
   for (const s of ['Section 1', 'Section 2', 'Section 3']) j.run.sec[s] = 9;
-  for (const s of ['Lightning', 'Thunder', 'Voltage']) j.run.sec[s] = 8.5;
-  for (const k of ['a', 'b', 'c', 'd', 'e', 'f']) j.move(k);
-  j.run.sweet = 3; j.run.speedSum = 13 * 60; j.run.speedT = 60;
+  for (const s of ['Lightning', 'Thunder', 'Voltage', 'Megawatt', 'The Gap']) j.run.sec[s] = 8.5;
+  for (const k of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) j.move(k);
+  j.run.sweet = 3; j.run.speedSum = 18 * 60; j.run.speedT = 60;
   const good = j.judge();
   assert.ok(good.total >= 80 && good.total <= 100, `total ${good.total}`);
   assert.equal(good.medal, good.total >= MEDALS.gold ? 'gold' : 'silver');
   j.run.crashes = 1;
   assert.ok(j.judge().total < good.total - 8);
   assert.ok(Array.isArray(good.rows) && good.rows.length >= 7);
+});
+
+await test('trails contract: registerMap trails match the course; trailSpawn lands on the park; runCompleted at the finish', async () => {
+  const m = registry.getMap('voltage-park');
+  const info = course.trailInfo();
+  assert.equal(m.trails.length, info.length);
+  for (const t of m.trails) {
+    assert.ok(['green', 'blue', 'black', 'double-black', 'park'].includes(t.difficulty), t.id);
+    const i = info.find((q) => q.id === t.id);
+    assert.ok(i && i.length === t.length && i.vertical === t.vertical, `${t.id}: ${JSON.stringify(i)} vs ${t.length} / ${t.vertical} (update TRAIL_SIZE in index.js)`);
+    const s = course.trailSpawn(t.id);
+    assert.ok(s && T.isInside(s.x, s.z, 50) && Number.isFinite(s.heading), t.id);
+  }
+  assert.equal(course.trailSpawn('nope'), null);
+  // A rider who finishes after riding Current's features completes the Current trail.
+  const { emit, on } = await import('../src/state.js');
+  const p = L.makePlayer(T, 'ski', 'park');
+  const sp = course.trailSpawn('current');
+  p.place({ x: sp.x, z: sp.z }, sp.heading);
+  emit('dropZone', {});
+  p.parkRun.lanes = { current: 3, slope: 1 };
+  let got = null; const off = on('runCompleted', (e) => { got = e; });
+  emit('runComplete');
+  off();
+  assert.ok(got && got.mapId === 'voltage-park' && got.trailId === 'current' && Number.isFinite(got.distance) && Number.isFinite(got.time) && Number.isFinite(got.score), JSON.stringify(got));
+  p.grind.dispose();
 });
 
 await test('drop zones and snowflakes are on the park', () => {
