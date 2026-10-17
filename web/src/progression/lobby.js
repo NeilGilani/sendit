@@ -34,8 +34,11 @@ const CSS = /* css */`
 #lobby .pg-ch button.pg-rr:hover, #lobby .pg-ch button.pg-rr:focus-visible { background: rgba(255,255,255,0.22); }
 .pg-ch.wk { background: linear-gradient(100deg, rgba(255,211,77,0.16), rgba(255,95,176,0.08)); border: 1px solid rgba(255,211,77,0.3); }
 .pg-ach { display: grid; grid-template-columns: repeat(auto-fill, minmax(2.6em, 1fr)); gap: 0.4em; }
-.pg-a { aspect-ratio: 1; border-radius: 0.7em; display: grid; place-items: center; font-size: 1.15em; background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.28); filter: grayscale(1); }
-.pg-a.on { background: linear-gradient(135deg, rgba(255,211,77,0.45), rgba(255,95,176,0.3)); color: #fff; filter: none; box-shadow: 0 0 0 1px rgba(255,211,77,0.5); }
+#lobby .pg-a { aspect-ratio: 1; border-radius: 0.7em; display: grid; place-items: center; font-size: 1.15em; background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.28); filter: grayscale(1); }
+.pg-adet { font-size: 0.78em; color: var(--lb-dim); margin-top: 0.5em; min-height: 1.3em; }
+.pg-adet b { color: #fff; } .pg-adet i { color: var(--lb-gold); font-style: normal; font-weight: 800; }
+#lobby button.pg-a { width: 100%; font-size: 1.15em; }
+#lobby .pg-a.on { background: linear-gradient(135deg, rgba(255,211,77,0.45), rgba(255,95,176,0.3)); color: #fff; filter: none; box-shadow: 0 0 0 1px rgba(255,211,77,0.5); }
 .pg-book { display: flex; flex-wrap: wrap; gap: 0.35em; font-size: 0.78em; }
 .pg-book span { padding: 0.25em 0.6em; border-radius: 999px; background: rgba(255,255,255,0.08); font-weight: 700; }
 .pg-book small { color: var(--lb-dim); }
@@ -115,11 +118,15 @@ registerLobbyTab({
           <div class="pg-bar"><i style="width:${Math.min(100, (wk.value / wk.goal) * 100).toFixed(1)}%"></i></div>
         </div>
         <div class="pg-h">Achievements <small>${got} / ${ach.length}</small></div>
-        <div class="pg-ach">${ach.map((a) => `<div class="pg-a${a.unlocked ? ' on' : ''}" title="${esc(a.title)}: ${esc(a.desc)}${a.xp ? ` (+${a.xp} XP)` : ''}">${a.icon}</div>`).join('')}</div>
+        <div class="pg-ach">${ach.map((a, i) => `<button type="button" class="pg-a${a.unlocked ? ' on' : ''}" data-i="${i}" aria-label="${esc(a.title)}: ${esc(a.desc)}">${a.icon}</button>`).join('')}</div>
+        <div class="pg-adet">Hover or select a badge to see what it takes.</div>
         <div class="pg-h">Trick book <small>${book.length} landed</small></div>
         <div class="pg-book">${book.length ? book.sort((a, b) => b.n - a.n).slice(0, 14).map((t) => `<span title="landed ${t.n}×">${esc(t.name)}</span>`).join('') : '<small>Land tricks to fill the book: every new one pays XP.</small>'}</div>
         <div class="pg-h">Personal bests <small>${esc(ctx.maps?.current?.()?.map?.name || 'this map')}</small></div>
         <div class="pg-pb">${Object.entries(PB_STATS).map(([k, S]) => `<span>${S.label}</span><b>${pb[k] ? S.fmt(pb[k]) : '—'}</b>`).join('')}</div>`;
+      const det = el.querySelector('.pg-adet');
+      const showAch = (i) => { const a = ach[i]; if (a) det.innerHTML = `<b>${esc(a.title)}</b> · ${esc(a.desc)}${a.xp ? ` · +${n(a.xp)} XP` : ''}${a.unlocked ? ' · <i>unlocked</i>' : ''}`; };
+      el.querySelectorAll('.pg-a').forEach((b) => { b.addEventListener('mouseenter', () => showAch(Number(b.dataset.i))); b.addEventListener('focus', () => showAch(Number(b.dataset.i))); });
       el.querySelectorAll('.pg-rr').forEach((b) => b.addEventListener('click', () => {
         const c = progression.rerollChallenge(Number(b.dataset.slot));
         if (c) ctx.toast?.(`New daily: ${c.title}`);
