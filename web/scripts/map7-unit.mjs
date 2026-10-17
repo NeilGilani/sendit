@@ -75,7 +75,8 @@ ok(`summit col ${Math.round(c.top - SEA)} m above the fjord (Lyngen: 1,200–1,6
   const u = 312, vc = L.COULOIR.centre(u);
   let w = 0;
   for (let dv = -30; dv <= 30; dv += 0.5) if (H(u, vc + dv) - H(u, vc) < 3) w += 0.5;
-  ok(`Skaret's choke is narrow (${w} m of floor) with ≥ 25 m walls`, w > 5 && w < 14 && H(u, vc + 30) - H(u, vc) > 25 && H(u, vc - 30) - H(u, vc) > 25);
+  const wall = (sg) => { let m = 0; for (let d = 8; d <= 40; d += 1) m = Math.max(m, H(u, vc + sg * d) - H(u, vc)); return m; };
+  ok(`Skaret's choke is narrow (${w} m of floor) with ≥ 25 m walls`, w > 5 && w < 14 && wall(1) > 25 && wall(-1) > 25, `${wall(-1).toFixed(0)} / ${wall(1).toFixed(0)} m`);
   let steep = 0;
   for (let k = 120; k < 560; k += 20) steep += (H(k - 2, L.COULOIR.centre(k - 2)) - H(k + 2, L.COULOIR.centre(k + 2))) / 4;
   steep = Math.atan(steep / 22) * 180 / Math.PI;

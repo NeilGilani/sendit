@@ -141,7 +141,9 @@ export function finishCoastU(v) {
 }
 
 // The fjord beyond: the far shore, and how deep the water gets.
-export const FJORD = { farShore: 6400, depth: 60, shelf: 0.9 };
+// depth 44: the seabed stays above features.js's valley-fog threshold (mistTop − 150 = 1800), so no fog pocket
+// billboard is planted on the shallow shelf, where it poked through the water as a hazy rectangle.
+export const FJORD = { farShore: 6400, depth: 44, shelf: 0.9 };
 
 // Buildings. u, v = centre; yaw = rotation of the long axis away from the fall line (rad); L along it, W across;
 // roof: 'gable' (ridge across the long axis), 'mono'; stilts: m of stilts on the water side (rorbuer).

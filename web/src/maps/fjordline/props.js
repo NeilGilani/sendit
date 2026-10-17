@@ -521,7 +521,7 @@ void main() {
   float u = vWp.x - startX;
   float sh = 1.0 - smoothstep(0.0, 45.0, abs(u - shoreU));
   float skyL = dot(skyAmb, vec3(0.2126, 0.7152, 0.0722));
-  vec3 body = mix(deep, shallow, sh * 0.6) * (skyL * 1.1 + 0.15);   // lit by the sky's brightness, keeps its own blue
+  vec3 body = mix(deep, shallow, sh * 0.6) * (skyL * 2.2 + 0.35);   // lit by the sky's brightness, keeps its own blue (it must survive the warm haze)
   vec3 col = mix(body, sky, fr * 0.8);
   // The sun's glitter path: sharp specular on the ripples, broader warm sheen.
   float sd = max(dot(R, sunDir), 0.0);
@@ -536,7 +536,7 @@ function buildWater(terrain) {
   const uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
     lut: { value: ATMO.tex }, noiseTex: { value: noise }, sunDir: { value: globals.uSunDir.value }, sunCol: { value: globals.uSunCol.value },
     skyAmb: { value: globals.uSkyAmb.value }, time: { value: 0 },
-    deep: { value: new THREE.Color(0x0d2b44).convertSRGBToLinear() }, shallow: { value: new THREE.Color(0x2d7a80).convertSRGBToLinear() },
+    deep: { value: new THREE.Color(0x1b4d78).convertSRGBToLinear() }, shallow: { value: new THREE.Color(0x2f8a8f).convertSRGBToLinear() },
     shoreU: { value: SHORE_U }, startX: { value: START_X },
   }]);
   uniforms.noiseTex.value = noise;
