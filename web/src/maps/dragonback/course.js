@@ -462,7 +462,8 @@ export class DragonbackCourse {
     return pts;
   }
 
-  lobbySpot() { return { x: START_X + 10, z: -54, heading: -Math.PI / 2 - 0.1 }; }
+  /** The lobby plinth: on the Keel's broad crest, looking west across the Comb's fins and gullies. */
+  lobbySpot() { return { x: START_X + 240, z: this.ridgeById.keel.crestAt(240), heading: -0.35 }; }
 
   /**
    * Golden snowflakes (activities.js `course.challenge.flakes`): the hard spots. Over the middle of the big

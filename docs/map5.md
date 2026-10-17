@@ -109,7 +109,8 @@ serrated like a dragon's back.
 
 ```
 web/src/maps/dragonback/
-  index.js     registerMap (id 'dragonback', order 5), thumbnail (inline SVG), lobby spot; loads props.js lazily
+  index.js     registerMap (id 'dragonback', order 5), thumbnail (inline SVG), lobby spot (on the Keel's crest,
+               looking across the Comb); loads props.js lazily
   layout.js    every feature in one place: PROFILE, FACE, RIDGES, HOPS, SPINE_FIELD, HITS, PILLOWS, DROP_ZONES,
                LINE_GOALS, RIDE_LINES (tunables)
   ridges.js    the Ridge primitive (crest spline, steps, gaps, lips, prow / kicker ends, flank fluting), cliff(), smax()

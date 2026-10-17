@@ -43,5 +43,5 @@ registerMap({
     course.buildProps = (ctx) => buildDragonbackProps(course, ctx);
     return course;
   },
-  lobby: ({ course }) => course.lobbySpot(),
+  lobby: ({ course }) => course.lobbySpot(),   // on the Keel's crest, looking across the Comb
 });
