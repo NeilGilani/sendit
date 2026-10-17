@@ -32,7 +32,7 @@ export const KITSUNE_THUMB = svg(`
 
 /** Every trail's numbers (layout.js TRAILS + the measured length / vertical; map6-unit checks they match the course). */
 export const TRAIL_STATS = {
-  okama: { length: 2730, vertical: 1145 },
+  okama: { length: 2730, vertical: 1150 },
   kazan: { length: 2720, vertical: 1140 },
   makura: { length: 2060, vertical: 780 },
   shirakaba: { length: 2180, vertical: 760 },

@@ -9,7 +9,7 @@
 //                       fir gullies → the base village and the finish torii (u 2440)
 
 export const TILE = { size: 3072, res: 2049, farSize: 30000, farRes: 512 };
-export const START_X = -1250;          // world x of the crater-rim saddle (u = 0)
+export const START_X = -1150;          // world x of the crater-rim saddle (u = 0): the whole crater fits in the tile
 export const TOP = 3000;               // m elevation at the start (base ≈ 1850 m: just above the engine's valley mist)
 export const FINISH_U = 2440;          // "run complete" (metres down the fall line)
 
@@ -30,7 +30,7 @@ export const BEHIND = [[22, 4], [9000, -24]];   // behind the start (the cone's 
 
 // The volcano. The crater's centre is behind the start; its rim is lowest on the face side (the saddle
 // you drop from) and rises toward the back. Outside the face the cone falls away radially (~33°).
-export const CRATER = { u: -250, v: 10, R: 225, floor: 95, rimRise: 190, coneSlope: 0.66 };
+export const CRATER = { u: -178, v: 10, R: 165, floor: 85, rimRise: 175, coneSlope: 0.66 };
 
 // Face width: ridge crest distance from the centre line, and the ridge height above the centre.
 export const FACE = {

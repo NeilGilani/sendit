@@ -247,10 +247,13 @@ export class KitsuneCourse {
     const av = Math.abs(v), a = av / W;
     if (a <= 1) e += Rh * Math.pow(a, FACE.bowlPower);
     else {
-      // Past the crest: a rounded flank into the neighbouring drainage, then the next soft ridges.
+      // Past the crest: a rounded flank into the neighbouring drainage, then up the next ridge. The ground
+      // climbs again toward the tile edge so the playable tile's skirt is never seen from the face.
       const d = av - W;
-      e += Rh - d * 0.55 * (1 - 0.5 * sstep(0, 600, d)) + 60 * (vnoise(d / 160 + 3.7, u / 280 + sd * 9) - 0.5) * sstep(0, 220, d);
+      e += Rh - 130 * smooth(d / 280) + 300 * sstep(330, 1050, d) + 60 * (vnoise(d / 160 + 3.7, u / 280 + sd * 9) - 0.5) * sstep(0, 220, d);
     }
+    // Past the base the valley climbs into a wooded bowl (same reason: the east tile edge sits uphill).
+    e += 120 * sstep(2560, 3400, u) * (1 - sstep(4200, 5200, u));
     // The volcano: a cone around the crater (≈33°), merged with the face by a smooth max, and the crater cut in.
     const cx = START_X + CRATER.u, cz = CRATER.v;
     const dx = x - cx, dz = z - cz, r = Math.hypot(dx, dz);
