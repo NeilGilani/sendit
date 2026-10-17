@@ -511,8 +511,15 @@ export class VoltageCourse {
     const overLip = (f, up) => { const [x, z] = f.world(f.jump.lipA + 6); return { x, z, y: up }; };
     const J = this.features.filter((f) => f.kind === 'jump' && f.lane === 'slope');
     for (const f of J) out.push(overLip(f, 4.5));
-    const railMid = (name, up = 1.4) => { const r = this.rails.find((q) => q.name === name); const p = r.pts[Math.floor(r.pts.length / 2)]; return { x: p[0], z: p[2], y: p[1] - this.base(p[0], p[2]) + up }; };
-    out.push(railMid('Circuit Flat-Down'), railMid('Surge Rainbow'), railMid('Overload C-Rail'), railMid('Grid Finale DFD'), railMid('High DFD'));
+    // Off the end of a rail, where you fly after popping (or rolling) off it — never on the rail itself: the
+    // pick-up puff (activities.js) would hang around a slow grinding rider like a cloud.
+    const railOut = (name, out = 3.5, up = 1.3) => {
+      const r = this.rails.find((q) => q.name === name), e = r.pts[r.pts.length - 1], q = r.pts[r.pts.length - 2];
+      const dx = e[0] - q[0], dz = e[2] - q[2], l = Math.hypot(dx, dz) || 1, dy = (e[1] - q[1]) / l;
+      const x = e[0] + dx / l * out, z = e[2] + dz / l * out;
+      return { x, z, y: Math.max(1.2, e[1] + dy * out - this.base(x, z) + up - 0.6) };
+    };
+    out.push(railOut('Circuit Flat-Down'), railOut('Surge Rainbow'), railOut('Overload C-Rail'), railOut('Grid Finale DFD'), railOut('High DFD'));
     const [px, pz] = this.pipe.world(120, this.pipe.F + this.pipe.wallRun - 0.5);
     out.push({ x: px, z: pz, y: 3.5 });
     out.push(overLip(this.bigAir, 7));
