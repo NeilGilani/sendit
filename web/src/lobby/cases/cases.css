@@ -67,7 +67,7 @@
 .cr-overlay.tense:not(.landed) .cr-marker::before { animation: crTense .7s ease-in-out infinite; }
 @keyframes crTense { 50% { box-shadow: 0 0 18px #fff3a0, 0 0 46px rgba(255, 229, 90, .9); } }
 @keyframes crTick { from { box-shadow: 0 0 16px #fff, 0 0 34px #ffe55a; } }
-.cr-overlay.landed .cr-card:not(.win) { filter: brightness(.45) saturate(.6); transition: filter .4s; }
+.cr-overlay.landed .cr-strip .cr-card:not(.win) { filter: brightness(.45) saturate(.6); transition: filter .4s; }
 .cr-card.win { animation: crWin .6s ease-out forwards; z-index: 2; }
 @keyframes crWin { 40% { transform: scale(1.09); } 100% { transform: scale(1.05); box-shadow: 0 0 0 2px var(--rc), 0 0 30px var(--rc); } }
 

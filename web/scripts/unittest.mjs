@@ -372,6 +372,34 @@ await test('bad-luck protection: red or gold at least every PITY cases', () => {
   assert.ok(pities > 0 && pities < 50, `${pities} pity pulls in 3000`);
 });
 
+await test('tracker: finished runs emit runCompleted and earn case XP; leaving credits the rest', async () => {
+  const st = await import('../src/state.js');
+  const { installRideTracker } = await import('../src/profile/tracker.js');
+  profileStore.reset();
+  installRideTracker({ getMapId: () => 'blackspruce', getTrailBoard: () => 'blackspruce/main' });
+  const runs = [];
+  const off = on('runCompleted', (e) => runs.push(e));
+  st.resetScore();
+  st.emit('rideStarted', { mapId: 'blackspruce', equipment: 'skis' });
+  st.game.distance = 1800; st.game.score = 900;
+  st.emit('runComplete');                                   // Zen finish line
+  st.game.distance = 3000;
+  st.emit('runFinished', { medal: 'gold', score: 1500 });   // Challenge finish
+  st.game.distance = 3400;
+  st.emit('rideEnded', st.scoreSnapshot());
+  await new Promise((r) => setTimeout(r, 20));
+  off();
+  assert.equal(runs.length, 2);
+  assert.deepEqual([runs[0].mapId, runs[0].trailId, Math.round(runs[0].distance), runs[0].mode], ['blackspruce', 'blackspruce/main', 1800, 'zen']);
+  assert.deepEqual([Math.round(runs[1].distance), runs[1].mode, runs[1].medal, runs[1].score], [1200, 'challenge', 'gold', 1500]);
+  assert.ok(typeof runs[0].time === 'number' && runs[0].time >= 0);
+  const r = profileStore.rewards;
+  assert.equal(Math.round(r.distance), 3400, 'all 3.4 km credited once');
+  const want = 3.4 * rewards.EARN.perKm + 2 * rewards.EARN.finish + rewards.EARN.medal.gold + rewards.EARN.firstMap + rewards.EARN.firstTrail + 50;   // + the first-km milestone
+  assert.ok(Math.abs(r.xpTotal - want) < 1e-6, `xp ${r.xpTotal} vs ${want}`);
+  assert.equal(profileStore.profile.stats.runsCompleted, 2);
+});
+
 await test('store: openCase persists the pull and emits rewards / caseEarned', () => {
   profileStore.reset();
   const seen = [];
