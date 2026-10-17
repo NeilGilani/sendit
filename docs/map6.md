@@ -16,7 +16,8 @@ http://localhost:5195/?map=kitsune-peak&trail=senbon&ride     any trail by id (t
 node web/scripts/map6-ride.mjs both all send --check          bot rides every trail, skis and board (styles: send, control, carve, trick)
 node web/scripts/map6-unit.mjs                                87 checks: contracts, trails, terrain, roofs / walls, features, wells
 node web/scripts/map6-fuzz.mjs 40 40                          random inputs from random starts (a third in the village)
-OUT=<dir> node web/scripts/map6-shots.mjs http://localhost:5195 all   real-GPU screenshots at 15 viewpoints
+OUT=<dir> node web/scripts/map6-shots.mjs http://localhost:5195 all   real-GPU screenshots at 18 viewpoints
+OUT=<dir> node web/scripts/map6-e2e.mjs senbon skis          end to end in the real game: one runCompleted, summary, no errors
 node web/scripts/map3-perf.mjs http://localhost:5195 1600 900 1 60 kitsune-peak
 node web/scripts/gfxpopin.mjs http://localhost:5195 kitsune-peak 1 25
 ```
@@ -151,8 +152,8 @@ Ravenspire's base tuning was adapted for deep light powder and a gentler mountai
 - **Whoop chain**: consecutive clean airs off the Kazan Rim score `Whoop ×n` (40 × n each).
 - **Close shaves** on the birches and firs (the engine's near-miss scoring) fill the flow meter.
 - **Challenge**: medal speeds 23 / 19 / 15 m/s (gold / silver / bronze) over the 2,440 m fall line, generic gates,
-  and 13 hand-placed golden snowflakes (bowl, Okama Lip, Kazan crest and Gap 2, the pillows, Makura Cliff, the
-  weave, both gully walls, inside the tunnel, the shrine and Tsuki roofs, Fox Ledge, a fir lip).
+  and 12 hand-placed golden snowflakes (Okama Lip, Kazan crest and Gap 2, the pillows, Makura Cliff, the
+  weave, both gully walls, inside the tunnel, the shrine and Tsuki roofs, Fox Ledge).
 - **Run summary**: the flow layer's card (line, fluidity, control, style).
 
 ## 5. Tunables
@@ -195,6 +196,12 @@ Ravenspire's base tuning was adapted for deep light powder and a gentler mountai
   - Senbon on skis has 1 crash.
 
   Pick your spins there.
+
+### End to end in the real game (map6-e2e.mjs: dev server, GPU, real scatter / props / HUD / ride tracker)
+- `senbon skis`: 0 crashes, exactly one `runCompleted` (from the tracker: trailId `kitsune-peak/senbon`,
+  850 m, 69 s). Pilgrimage and Roof Hopper goals. Run summary 91/100. 0 console errors.
+- `kazan snowboard`: 0 crashes, one `runCompleted` (`kitsune-peak/kazan`, 2.26 km). Rim Rider. Summary 82/100
+  at 80 km/h average and 115 km/h top. The Clean Sheet and Mountain Master achievements fired. 0 errors.
 
 ### Fuzz, units
 - map6-fuzz 40 × 40 s (96k frames): no NaN, never below the snow or a roof, never stuck, never over 45 m/s (max

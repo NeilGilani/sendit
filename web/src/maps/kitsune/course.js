@@ -644,7 +644,7 @@ export class KitsuneCourse {
   lobbySpot() { return { x: START_X + 22, z: -14, heading: -Math.PI / 2 - 0.12 }; }
 
   /**
-   * Golden snowflakes (activities.js `course.challenge.flakes`): one or two on every trail, on the lips,
+   * Golden snowflakes (activities.js `course.challenge.flakes`, which uses 12): one or two on every trail, on the lips,
    * roofs and walls you'd hit anyway. [{ x, z, y above the snow }]
    */
   placeFlakes() {
@@ -668,7 +668,6 @@ export class KitsuneCourse {
       return on(u, c + side * w, 1.4);
     };
     return [
-      on(330, -40),                          // Okama Bowl
       lip(600, -60, 12),                     // Okama Lip
       on(700, this.kazanCrest(700), 1.6),    // Kazan Rim crest
       lip(KAZAN.gaps[1][0], this.kazanCrest(KAZAN.gaps[1][0]), 10),   // Kazan Gap 2
@@ -679,7 +678,6 @@ export class KitsuneCourse {
       on(TUNNEL.u1 - 20, TUNNEL.centre(TUNNEL.u1 - 20), 1.0),   // inside the torii tunnel
       roof('haiden'), roof('tsuki'),
       lip(1355, -372, 12),                   // Fox Ledge (on the Makura line)
-      on(2150, 300, 1.5),                    // a fir lip
     ];
   }
 
