@@ -290,13 +290,17 @@ export class LoadingScene {
     let trick = v.trick || r.pick(pool);
     if (!v.trick && trick === this.lastTrick) trick = r.pick(pool);
     // Night skies are the show: those loads favour the moves that look up or across (sky in frame).
-    const cams = v.time.aurora ? { dolly: CAMERAS.dolly, low: CAMERAS.low, follow: CAMERAS.follow, orbit: { w: 0.5 } } : CAMERAS;
-    let cam = v.cam || r.weighted(cams, 'w');
+    const cams = v.time.aurora ? { close: CAMERAS.close, dolly: CAMERAS.dolly, low: CAMERAS.low, follow: CAMERAS.follow, orbit: { w: 0.5 } } : CAMERAS;
+    // Most boots end during the first trick: open with a hero move and get to the lip quickly.
+    const first = !this.shotCount;
+    this.shotCount = (this.shotCount || 0) + 1;
+    let cam = v.cam || (first ? r.pick(v.time.aurora ? ['close', 'dolly', 'low'] : ['close', 'close', 'dolly', 'low', 'follow']) : r.weighted(cams, 'w'));
     if (!v.cam && cam === this.lastCam) cam = r.weighted(cams, 'w');
     this.lastTrick = trick; this.lastCam = cam;
     const shot = this.shot = new Shot({ H: this.height.H, line: this.height.line, trick, gear: v.gear, r });
     this.move = planMove(cam, shot, this.sunDir, r, this.height.H);
     if (this.move.t0 != null) shot.tStart = Math.max(shot.tStart, this.move.t0);
+    if (first) shot.tStart = Math.max(shot.tStart, -1.2);
     if (this.move.endAfterLanding != null) shot.tEnd = Math.min(shot.tEnd, shot.Ta + this.move.endAfterLanding);
     this.simT = shot.tStart;
     this.shotScreen = 0;
@@ -333,7 +337,7 @@ export class LoadingScene {
       cam.lookAt(this.est.look.clone().lerp(this.est.look1, e));
       if (cam.fov !== 54) { cam.fov = 54; cam.updateProjectionMatrix(); }
       this.simT += dt;
-      if (this.riderReady && this.estT > 2.6) this.nextShot();
+      if (this.riderReady && this.estT > 1.8) this.nextShot();
     }
     if (this.mode === 'shot') {
       const sh = this.shot;
