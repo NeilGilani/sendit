@@ -106,6 +106,7 @@ add('breath-after-run', { seconds: 26, view: 'fp',
 add('powder-faceshot-fp', { seconds: 8, view: 'fp', frames: frames(8, (t) => ({ groomed: 0, powder: 1, deep: 1, sink: 0.22, speed: 11, ...carve(t, 2.2, 0.7, 11) })) });
 add('slalom-gates', { seconds: 6, frames: frames(6, (t) => ({ speed: 14, ...carve(t, 1.6, 0.9, 14) })), events: [0.8, 1.6, 2.4, 3.2, 4.0, 4.8].map((t) => ({ t, name: 'gate', d: { pass: true } })) });
 add('skier-passes', { seconds: 8, solo: 'fxBus', frames: frames(8, () => ({ speed: 0 })), others: [{ x: 3, z: -50, vz: 12, speed: 12, wig: 2 }, { x: -6, z: -120, vz: 14, speed: 14, wig: 3 }] });
+add('fallback-no-worklet', { seconds: 6, noWorklet: true, frames: frames(6, (t) => ({ speed: ramp(t, 0, 3, 4, 15), ...carve(t, 2.6, 1.0, 15) })) });
 if (traceDir) for (const type of ['ski', 'snowboard', 'bigmountain']) {
   const f = join(traceDir, `trace-${type}.json`);
   if (!existsSync(f)) continue;
@@ -133,7 +134,8 @@ for (const s of S) {
   const loud = [...r.rms].sort((a, b) => a - b)[Math.floor(r.rms.length * 0.9)] || 0;
   console.log(`${s.name.padEnd(26)} peak ${db(r.peak).padStart(6)} dBFS  rms ${db(r.rmsAll).padStart(6)}  p90 ${db(loud).padStart(6)}  centroid ${r.centroid.toFixed(0).padStart(5)} Hz  ${Date.now() - t0} ms  ${JSON.stringify(r.events)}`);
   if (process.env.BANDS) console.log('      bands dB ' + Object.entries(r.bands).map(([f, v]) => `${f}:${v}`).join(' '));
-  if (!r.worklet) fail(`${s.name}: worklet did not load`);
+  if (!r.worklet && !s.noWorklet) fail(`${s.name}: worklet did not load`);
+  if (s.noWorklet && (r.worklet || r.rmsAll < 0.003)) fail(`${s.name}: the sample-loop fallback is silent or did not engage`);
   if (r.nan) fail(`${s.name}: ${r.nan} non-finite samples`);
   if (r.paramNaN) fail(`${s.name}: ${r.paramNaN} non-finite parameters`);
   if (r.peak > 0.9) fail(`${s.name}: peak above −1 dBFS (${r.peak.toFixed(3)})`);

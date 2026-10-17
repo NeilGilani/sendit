@@ -31,7 +31,8 @@ function restore(dst, src) { for (const k in src) { if (src[k] && typeof src[k] 
 async function render(spec, sr, secs) {
   const ctx = new OfflineAudioContext(2, Math.ceil(sr * secs), sr);
   const buffers = { grind_loop: await loadBuffer(ctx, 'grind_loop') };
-  const eng = await new AudioEngine(ctx, { buffers }).init();
+  if (spec.noWorklet) Object.defineProperty(ctx.audioWorklet, 'addModule', { value: () => Promise.reject(new Error('worklet disabled for the test')) });
+  const eng = await new AudioEngine(ctx, { buffers, load: (n) => loadBuffer(ctx, n) }).init();
   eng.setMap(spec.map || 'default');
   eng.setView(spec.view || 'chase');
   eng.setVolumes(spec.volumes || { master: 0.8, sfx: 0.8, music: 0.6 }, 0);
