@@ -164,7 +164,8 @@ function materials(terrain) {
     prev(shader, r);
     shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(kN, 0.0)).xyz);');
   };
-  const glowMat = (name, rgb, k) => toonMaterial({ name, color: new THREE.Color(...rgb), frag: `toonEmissive = vec3(${rgb.map((c) => (c * k).toFixed(3)).join(', ')}) * (0.92 + 0.08 * sin(uTime * 7.0 + vW.x * 1.3 + vW.z));` });
+  // Lantern paper: a warm flicker and the bamboo ribs of a chōchin (dark bands every ~12 cm up the body).
+  const glowMat = (name, rgb, k, ribs = 0) => toonMaterial({ name, color: new THREE.Color(...rgb), frag: `toonEmissive = vec3(${rgb.map((c) => (c * k).toFixed(3)).join(', ')}) * (0.92 + 0.08 * sin(uTime * 7.0 + vW.x * 1.3 + vW.z)) * (1.0 - ${ribs.toFixed(2)} * smoothstep(0.35, 0.5, abs(fract(vW.y * 8.0) - 0.5)));` });
   return {
     snow,
     plaster: toonMaterial({ name: 'kPlaster', map: plasterTexture() }),
@@ -181,8 +182,8 @@ function materials(terrain) {
     bamboo: toonMaterial({ name: 'kBamboo', color: 0x9c8a4e }),
     shoji: toonMaterial({ name: 'kShoji', map: shojiTexture(), frag: 'toonEmissive = diffuseColor.rgb * vec3(1.5, 1.05, 0.55);' }),
     flame: glowMat('kFlame', LANTERN, 2.6),
-    chochin: glowMat('kChochin', [1.0, 0.35, 0.18], 2.2),
-    chochinWhite: glowMat('kChochinW', [1.0, 0.82, 0.55], 2.0),
+    chochin: glowMat('kChochin', [1.0, 0.35, 0.18], 2.2, 0.45),
+    chochinWhite: glowMat('kChochinW', [1.0, 0.82, 0.55], 2.0, 0.4),
     cabin: toonMaterial({ name: 'kCabin', color: 0xc23a2a }),
     cabinGlass: glowMat('kCabinGlass', [1.0, 0.78, 0.5], 1.2),
     water: toonMaterial({ name: 'kOnsen', color: 0x1e4a4c, frag: 'toonEmissive = vec3(0.10, 0.16, 0.14) + vec3(0.9, 0.5, 0.2) * 0.18 * (0.5 + 0.5 * sin(uTime * 0.8 + vW.x * 0.7 + vW.z * 0.5));' }),

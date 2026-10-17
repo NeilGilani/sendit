@@ -85,6 +85,8 @@ export const PILLOWS = [
 export const HITS = [
   [230, -110, 26, 2.4, 'lip', 'Okama Wind Lip'],
   [360, 40, 30, 2.6, 'lip', 'Okama Wind Lip'],
+  [285, -32, 22, 2.6, 'lip', 'Okama Wind Lip'],
+  [455, -52, 22, 2.8, 'lip', 'Okama Wind Lip'],
   [470, -190, 22, 2.2, 'lip', 'Okama Wind Lip'],
   [560, 100, 50, 1.8, 'roller'],
   // Birch hits: small lips on the Shirakaba Weave's apexes (where the line runs down the fall line).

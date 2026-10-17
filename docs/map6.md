@@ -39,7 +39,7 @@ engine's fixed valley-mist band (1,350–1,950 m), so only the base is a little 
 |---|---|---|---|
 | −340…0 | **the crater** | | a 165 m-radius crater, 85 m deep, lowest at the saddle and rising 175 m round the back; fumaroles steam on the inner wall; snow monsters (juhyō) on the rim |
 | 0…60 | saddle + rollover | 9° → 25° | spawn at u = 25 |
-| 60…540 | **Okama Bowl** | 33° | wind lips (u 230, 360, 470), the **Mochi Field** pillow domes (left), the **Kazan Rim** ridge starts (right) |
+| 60…540 | **Okama Bowl** | 33° | wind lips (u 230, 285, 360, 455, 470; two right on the Okama line), the **Mochi Field** pillow domes (left), the **Kazan Rim** ridge starts (right) |
 | 600 | **Okama Lip** | | a 6 m lip across the centre, with a ramp-around at v 20 |
 | 540…900 | mid-mountain | 28° | **Makura Pillows** (left), **Ash Steps**, the **Shirakaba** birch glade begins, the **Kitsunebi Gully** (right) |
 | 900…1330 | the steeps | 31° | the **Makura Cliff** (9 m, u 990), **Makura Stacks**, the weave through the birches, the gully's ledges |
@@ -179,7 +179,7 @@ Ravenspire's base tuning was adapted for deep light powder and a gentler mountai
 
 | trail | skis (send) | board (send) |
 |---|---|---|
-| okama | 111 s, avg 89 km/h, max 101, 0 crashes | 122 s, avg 81, max 96, 0 crashes |
+| okama | 108 s, avg 91 km/h, max 108, 0 crashes | 121 s, avg 81, max 103, 0 crashes |
 | kazan | 106 s, avg 87, max 122, air 19.8 s, Rim Rider, 0 crashes | 116 s, avg 80, max 120, air 17.1 s, Rim Rider, 0 crashes |
 | makura | 100 s, avg 77, max 99, air 35 s, Pillow Talk, 0 crashes | 102 s, avg 72, max 108, air 32 s, Pillow Talk, 0 crashes |
 | shirakaba | 104 s, avg 76, max 95, 0 crashes | 111 s, avg 71, max 88, 0 crashes |
