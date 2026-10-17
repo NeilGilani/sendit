@@ -206,6 +206,23 @@ The best source we found is the CS2 client UI code itself. SteamDB's GameTrackin
 
 ## 8. What we implement
 
+> **As built** (details and the numbers that ship: [rewards.md](rewards.md)). We follow the research on
+> the reel (6.0 s on CS2's `cubic-bezier(0.075, 0.82, 0.165, 1)` after a ~2 s case open, 60 cards with
+> the winner at index 50, a 10–90 % stop point, a tick per card crossing at least 55 ms apart, a 0.6 s
+> hold), the six grade colours, escalating reveal sounds, particles and shake by grade, and duplicates
+> as case progress. Where we deviate, on purpose:
+> - **The gold ★ card and near misses are in the reel.** CS2's filler never shows gold; the brief asked
+>   for a visible golden "rare special item" slot and near misses. Gold filler cards are anonymous, the
+>   result is rolled before the reel is built, and the odds are shown up front.
+> - **Bad-luck protection at 60 cases forces a red only**, never gold, so gold stays at 0.3 %.
+> - **Duplicates:** grey 10 %, blue 15 %, purple 25 %, pink 40 %, red 70 % of a case, gold two cases.
+> - **Pacing:** no lower threshold for case 1; first-run and first-km bonuses make the first case arrive
+>   at about 13 minutes for a typical rider, then every ~16 minutes.
+> - Sets with badges, an inspect view and multiplayer showcase are not built yet.
+>
+> The recommendations as researched follow.
+
+
 ### Reel
 - **Duration:** 6.0 s scroll with CS2's curve `cubic-bezier(0.075, 0.82, 0.165, 1)`. If testers find the last 3 s too static, a softer fallback is `cubic-bezier(0.12, 0.72, 0.16, 1)`; in our tests its last card crossing lands around 4 s instead of 3.7 s.
 - **Pre-roll:** about 1 s case-open animation (CS2 uses 2 s; we can be snappier).

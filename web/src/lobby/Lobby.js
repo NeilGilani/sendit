@@ -325,6 +325,7 @@ export class Lobby {
   /** Gamepad actions routed by the UI while the lobby is the active screen. Returns true if used. */
   onAction(action) {
     if (!this.visible) return false;
+    if (this.overlay?.onAction(action)) return true;   // a full-screen overlay (the case opener) takes the pad first
     switch (action) {
       case 'prevTab': this.cycleTab(-1); return true;
       case 'nextTab': this.cycleTab(1); return true;

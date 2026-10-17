@@ -81,6 +81,8 @@ class Opener {
     this.raf = requestAnimationFrame((n) => this.frame(n));
     this.onKey = (e) => this.key(e);
     addEventListener('keydown', this.onKey, true);
+    this.lobby = globalThis.__sendit?.lobby;
+    if (this.lobby) this.lobby.overlay = this;
     caseSfx.open();
   }
 
@@ -160,6 +162,7 @@ class Opener {
         if (nm && k > 0.6 && Math.abs(cell - (this.result.reel.winAt + nm.side)) <= 0) caseSfx.tease();
         this.lastCell = cell;
       }
+      if (k > 0.55 && !this.tense) { this.tense = true; this.el.classList.add('tense'); }
       this.trace.push({ t: +t.toFixed(4), x: +x.toFixed(2), v: +v.toFixed(1), card: cell });
       if (k >= 1 && this.phase === 'spin') { this.phase = 'hold'; this.holdAt = t; this.land(); }
     }
@@ -243,9 +246,23 @@ class Opener {
     if (e.code === 'Enter' && this.phase !== 'reveal') { e.stopPropagation(); e.preventDefault(); }
   }
 
+  /** Gamepad (via Lobby.onAction): A skips / presses, d-pad moves between buttons, B closes. Eats the rest. */
+  onAction(a) {
+    if (!this.el || this.phase === 'closing') return true;
+    if (this.phase !== 'reveal') { if (a === 'accept' || a === 'back' || a === 'alt2') this.skip(); return true; }
+    const btns = [...this.el.querySelectorAll('.cr-btn')];
+    const i = btns.indexOf(document.activeElement);
+    if (a === 'left' || a === 'up') btns[Math.max(0, i - 1)]?.focus();
+    else if (a === 'right' || a === 'down') btns[Math.min(btns.length - 1, i + 1)]?.focus();
+    else if (a === 'accept') (btns[i] || btns[0])?.click();
+    else if (a === 'back') this.close();
+    return true;
+  }
+
   close(then) {
     if (this.phase === 'closing') return;
     this.phase = 'closing';
+    if (this.lobby?.overlay === this) this.lobby.overlay = null;
     removeEventListener('keydown', this.onKey, true);
     this.el.classList.add('out');
     const el = this.el;
