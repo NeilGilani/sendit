@@ -43,7 +43,8 @@ export function planMove(kind, shot, sun, r, H) {
       m.fov = r.range(40, 48);
       m.pos = (s) => { const a = a0 + (a1 - a0) * ease(s); return V(A.x + Math.sin(a) * R, A.y + h - s * 1.5, A.z + Math.cos(a) * R); };
       m.look = (s, com) => com.clone().lerp(A, 0.3);
-      m.minPitch = -24;
+      m.minPitch = -18;
+      m.targets = [A, M];                  // from behind the lip the touchdown is hidden: don't climb to see it
       break;
     }
     case 'low': {
