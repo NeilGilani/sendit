@@ -96,7 +96,6 @@ export function sanitize(p) {
   const out = { ...d, ...p, version: PROFILE_VERSION };
   out.stats = { ...d.stats, ...(p.stats || {}) };
   out.links = { ...d.links, ...(p.links || {}) };
-  out.unlocks = { items: Array.isArray(p.unlocks?.items) ? p.unlocks.items.filter((x) => typeof x === 'string') : [] };
   out.inventory = { items: {} };
   for (const [k, v] of Object.entries(p.inventory?.items || {})) {
     const [id, vid] = k.split(':');
@@ -105,6 +104,7 @@ export function sanitize(p) {
   }
   out.rewards = sanitizeRewards(p.rewards);
   delete out.fresh;
+  out.unlocks = { items: Array.isArray(p.unlocks?.items) ? p.unlocks.items.filter((x) => typeof x === 'string') : [] };
   out.map = p.map && typeof p.map.id === 'string' ? { id: p.map.id, variant: p.map.variant ?? null, trail: typeof p.map.trail === 'string' ? p.map.trail : null } : d.map;
   const lo = p.loadout || {};
   const slots = {};
