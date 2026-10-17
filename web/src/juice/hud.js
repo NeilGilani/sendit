@@ -19,6 +19,7 @@ export const JUICE_HUD = {
   minAirToAnnounce: 0.5,     // s — shorter airs don't get a grade unless they were a named trick
   announceHold: 1.35,        // s the trick name stays up
   liveAirFrom: 0.45,         // s of air before the live rotation read-out appears
+  hangFrom: 1.0,             // s of air before a straight air shows its hang time
   nearStreakWindow: 2.6,     // s between close shaves that still count as a streak
   stompedImpact: 0.55,       // × PHYSICS.hardLanding: a perfect landing this soft is STOMPED
 };
@@ -337,18 +338,21 @@ export function mountJuiceHud({ player, combo, input, camera }) {
     const halves = Math.floor((spin + 0.35) / Math.PI);
     const flips = Math.floor((Math.abs(player.flip || 0) + 0.6) / (Math.PI * 2));
     const grab = player.grabName && player.grab > 0.6 ? player.grabName : '';
-    const show = inAir && (halves > 0 || flips > 0 || grab);
+    // Big straight airs show the hang time instead (from 1 s), so drops build anticipation too.
+    const hang = inAir && player.airTime > JUICE_HUD.hangFrom;
+    const show = inAir && (halves > 0 || flips > 0 || grab || hang);
     if (show !== airOn) { air.classList.toggle('on', show); airOn = show; }
     if (show) {
       const deg = halves * 180;
-      const txt = deg ? String(deg) : flips ? 'FLIP' : '';
+      const txt = deg ? String(deg) : flips ? 'FLIP' : `${player.airTime.toFixed(1)}s`;
       if (airD.textContent !== txt) {
         airD.textContent = txt;
         if (halves > lastHalf) restart(airD, 'tick');
         // The number heats up with the rotation: white → cyan → gold → orange.
         airD.style.color = deg >= 1080 ? '#ff9a3d' : deg >= 720 ? '#ffe14d' : deg >= 360 ? '#2ff5d6' : '#fffaf0';
       }
-      const x = [flips ? `${flips > 1 ? `${flips}× ` : ''}FLIP` : '', grab.toUpperCase()].filter(Boolean).join(' · ');
+      const drop = player._maxAbove || 0;
+      const x = [flips ? `${flips > 1 ? `${flips}× ` : ''}FLIP` : '', grab.toUpperCase(), drop >= 4 ? `${Math.round(drop)} M` : ''].filter(Boolean).join(' · ');
       if (airX.textContent !== x) airX.textContent = x;
     }
     lastHalf = inAir ? halves : 0;
