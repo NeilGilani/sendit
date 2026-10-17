@@ -151,6 +151,16 @@ The audio reads these events (read-only): `takeoff`, `jumped`, `landed`, `crashe
 `PHYSICS.windRoar` (used by the old audio for Ravenspire) is no longer read. The wind worklet covers big-mountain
 speed on every map, and Ravenspire's gustier, louder map wind comes from `AUDIO.maps.ravenspire`.
 
+## CPU
+
+Measured by `audio-dsp.mjs` in Node (same V8 as Chrome's audio thread), on a loaded machine:
+- the snow worklet costs about 4 % of one core;
+- the wind worklet about 2 %;
+- the main-thread `frame()` about 0.08 ms per frame.
+
+One-shots are short-lived node graphs: a landing is about 30 nodes and a crowd cheer about 400, released when
+they end.
+
 ## Fallback
 
 If a worklet processor throws (`processorerror`), the engine counts it (the test fails on it) and switches live to the sample loops, so a DSP bug can never silence the mountain.

@@ -101,6 +101,18 @@ levels in dB relative to the loudest band, for the loudest 15 % of seconds.
     tower sound was rebuilt that way.
   - **Snow impacts:** the real ones are a broadband crack followed by scattered crunchy debris, so landings now
     have crack, thud, debris and spray instead of a sine boom.
+  - **Resort descent (bruno.auzet #558792):** a skid on hard snow shows a stick-slip squeal, a harmonic ladder on
+    a ~400 Hz fundamental for about 0.5 s. This became the edge-squeal layer.
+  - **Creaky snow under a board (facemusic #39082):** a stream of short creaks, formant-like blobs at
+    300 Hz–1.2 kHz. This became the cold-snow squeak, which is noise jerked at 40–90 Hz through two band-passes.
+    The first attempt used a pure pulse train, which buzzed.
+- **Field textures:** three of these CC0 recordings are excerpted (14 s in total) and granulated under the
+  synthesis:
+  - the groomed run;
+  - the board glide;
+  - the board skid.
+
+  With them, the board render's profile matches its reference within ~3 dB from 125 Hz to 2 kHz.
 
 Envelope modulation in the references is low (0.2–0.6 % for the groomed run, 1–2 % on the icy board), so the
 continuous layers stay smooth and the "events" (edges, plants, slashes) carry the rhythm.

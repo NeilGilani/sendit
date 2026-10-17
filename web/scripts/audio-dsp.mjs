@@ -71,5 +71,12 @@ for (const [k, f] of Object.entries(windCases)) {
   if (r.nan) fail(`wind / ${k}: ${r.nan} non-finite samples`);
   if (r.pinned > (k === 'extreme params' ? 4800 : 0)) fail(`wind / ${k}: ${r.pinned} samples into the output safety knee`);
 }
+// CPU: how much of one core the busiest realistic case needs (both processors run on the audio thread)
+for (const [name, T, f] of [['sendit-snow', AUDIO.snow, (t) => ({ ...carve(t, 15), skid: 0.4, cold: 0.5, chatter: 0.5, groomed: 0.6, ice: 0.4 })], ['sendit-wind', AUDIO.wind, () => ({ v: 25, air: 1, spin: 8, ambient: 0.5, buffet: 1, whistle: 1, flap: 1 })]]) {
+  const t0 = performance.now();
+  run(name, T, 10, f);
+  const ms = performance.now() - t0;
+  console.log(`  cpu ${name}: ${(ms / 100).toFixed(2)} % of one core (10 s rendered in ${ms.toFixed(0)} ms)`);
+}
 console.log(fails ? `\n${fails} FAILURE(S)` : '\nworklet DSP ok');
 process.exit(fails ? 1 : 0);
