@@ -293,7 +293,7 @@ class SnowProcessor extends AudioWorkletProcessor {
         env[k] = grainAmp * (0.12 + 0.88 * u * u * u);
         const tau = lerp(T.grains.decayMin, T.grains.decayMax, this.rng.u()) * g.grainDecay;
         dec[k] = Math.exp(-1 / (tau * fs));
-        pan[k] = width > 0.5 ? (this.rng.u() < 0.5 ? 0.15 : 0.85) + this.rng.bi() * 0.12 : 0.5 + this.rng.bi() * 0.2;
+        pan[k] = g.board < 0.5 ? (this.rng.u() < 0.5 ? 0.15 : 0.85) + this.rng.bi() * 0.12 : 0.5 + this.rng.bi() * 0.2;   // skis: two contacts
       }
       let gl = 0, gr = 0;
       for (let k = 0; k < K; k++) {
