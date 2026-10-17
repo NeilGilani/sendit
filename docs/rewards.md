@@ -281,9 +281,13 @@ Add a variant to an item in `web/src/profile/items.js`:
 
 ## Known issues and limits
 
-- The world keeps rendering under the opening overlay. On a busy GPU the reel can drop frames; its
-  position is time-based, so the timing and the landing stay exact, and ticks never fire faster than
-  every 55 ms.
+- The world keeps rendering under the opening overlay. In headless runs on the shared GPU (other
+  sessions benchmarking at the same time) the reel ran well below the lobby's frame rate with stalls of
+  0.4–2 s that we could not pin on one element: hiding the card art, the streaks or the audio changed
+  nothing reliably, while an empty overlay ran at 60 fps. Three real costs were removed (a mask-image
+  that re-rastered the cards, a CSS variable that restyled them every frame, a forced reflow per tick).
+  The reel is time-based, so timing and the landing stay exact at any frame rate; it still needs a check
+  on a quiet machine, and pausing the world render while the overlay covers it (main.js) would help.
 - Item cards are flat SVG drawings in the item's colours and print, not renders of the 3D garment.
   Prints on the card are approximations of the shader prints.
 - New garment cuts (Retro One-Piece, Cargo Pant, Pipe Glove) are small variations of the existing cuts:
