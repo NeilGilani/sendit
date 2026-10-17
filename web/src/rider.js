@@ -198,6 +198,12 @@ export class Rider {
     }
     const st = pl.state;
     const ground = st === State.GROUNDED, air = st === State.AIR, sit = st === State.LIFT, crashed = st === State.CRASH;
+    // On a rail (physics/grind.js): balance lean, arms out, the upper body looking down the rail in a slide.
+    const grind = st === State.GRIND, gt = pl.grindTilt;
+    p.grind = (p.grind || 0) + ((grind ? 1 : 0) - (p.grind || 0)) * (1 - Math.exp(-14 * dt));
+    p.gPitch = (p.gPitch || 0) + ((grind && gt ? THREE.MathUtils.clamp(gt.pitch, -1.2, 1.2) : 0) - (p.gPitch || 0)) * (1 - Math.exp(-16 * dt));
+    p.gRoll = (p.gRoll || 0) + ((grind && gt ? THREE.MathUtils.clamp(gt.roll, -1.2, 1.2) : 0) - (p.gRoll || 0)) * (1 - Math.exp(-16 * dt));
+    p.gTravel = (p.gTravel || 0) + ((grind && gt?.slide ? THREE.MathUtils.clamp(gt.travel, -1.7, 1.7) : 0) - (p.gTravel || 0)) * (1 - Math.exp(-10 * dt));
     const ratio = pl.speedRatio;
     const k = (r) => 1 - Math.exp(-r * dt);
     const board = this.isBoard;
@@ -210,6 +216,7 @@ export class Rider {
     const layoutT = air && Math.abs(pl.flipRate || 0) > 1.2 ? (1 - flipTuckPhys) * (1 - pl.grab) : 0;
     p.layout = (p.layout || 0) + (layoutT - (p.layout || 0)) * k(6);
     if (air) crouchT = 0.35 + pl.grab * 0.5 + flipTuckPhys * 0.5 - p.layout * 0.25;
+    if (grind) crouchT = 0.5 + pl.squat * 0.5 + pl.grab * 0.35 + Math.abs(p.gRoll) * 0.15;
     p.crouch += (Math.min(1, crouchT) - p.crouch) * k(10);
     p.tuck += ((ground ? pl.tuck : 0) - p.tuck) * k(ANIM.tuckResponse);
     p.air += ((air ? 1 : 0) - p.air) * k(5);
@@ -218,9 +225,9 @@ export class Rider {
     p.stumble += ((pl.stumbleT > 0 ? 1 : 0) - p.stumble) * k(10);
     p.plow += ((ground ? pl.plow : 0) - p.plow) * k(8);
     p.stop += ((ground ? pl.stop : 0) - p.stop) * k(8);
-    p.press += ((ground ? pl.press : 0) - p.press) * k(12);
+    p.press += ((ground || grind ? pl.press : 0) - p.press) * k(12);
     p.flipLoad = (p.flipLoad || 0) + (((ground ? pl.flipLoad : 0) || 0) - (p.flipLoad || 0)) * k(10);
-    p.grab += ((air ? pl.grab : 0) - p.grab) * k(14);
+    p.grab += ((air || grind ? pl.grab : 0) - p.grab) * k(14);
     // Tweak: a grab held past ~0.4 s gets style — the board is pushed out / the skis cross, the body arches.
     const grabT = pl.dyn?.takeoff?.grabT || 0;
     p.tweak = (p.tweak || 0) + ((air && pl.grab > 0.6 && PHYSICS.trickStyle ? THREE.MathUtils.smoothstep(grabT, 0.35, 0.9) : 0) - (p.tweak || 0)) * k(6);   // opt-in (trickStyle)
@@ -237,7 +244,7 @@ export class Rider {
     // Players driven by physics lean on the real contact force; preview players (lobby) that only set
     // turnInput get a matching lean from it.
     const lat = ground ? (pl.simulated ? pl.gearLatAccel : (pl.turnInput || 0) * 4) : 0;
-    const leanT = THREE.MathUtils.clamp(Math.atan2(lat, PHYSICS.gravity), -ANIM.maxLean, ANIM.maxLean);
+    const leanT = grind ? THREE.MathUtils.clamp(p.gRoll * 0.5, -0.6, 0.6) : THREE.MathUtils.clamp(Math.atan2(lat, PHYSICS.gravity), -ANIM.maxLean, ANIM.maxLean);
     // Steer let go: the body comes back up faster than it tips into a turn.
     const released = Math.abs(pl._ctrl?.steer || 0) < 0.05;
     p.lean += (leanT - p.lean) * k(released && Math.abs(leanT) < Math.abs(p.lean) ? ANIM.rollRelease : ANIM.rollResponse);
@@ -280,7 +287,7 @@ export class Rider {
 
     // Visual roll about the gear's long axis (−lean: + lean = to the nose's right).
     this.visual.quaternion.setFromAxisAngle(Z, -p.lean)
-      .multiply(_q.setFromAxisAngle(X, p.crashRoll * 0.6))
+      .multiply(_q.setFromAxisAngle(X, p.crashRoll * 0.6 - p.gPitch * 0.4 * p.grind))
       .multiply(_q2.setFromAxisAngle(Z, p.crashRoll));
     this.visual.position.set(0, -p.sit * (this.pelvisH - 0.14), 0);
     this.body.rotation.y = p.stanceYaw;
@@ -542,8 +549,9 @@ export class Rider {
     const wob = p.stumble * Math.sin(p.t * 9) * 0.25;
     // Riding switch (twin tips): twist the torso and look back over the shoulder down the path.
     const back = (1 - p.look) * 0.5 * ns;
-    this.trunk(off, twist * 0.45 + counter * 0.3 + back * 0.25, hipPitch * 0.55 + p.hip * 0.5, bend + p.hip * 0.6, twist * 0.55 + counter * 0.7 + back * 0.6, -angul * 1.3 + wob,
-      -counter * 0.6 + back * 1.15, -(hipPitch * 0.55 + bend) * 0.95 * (1 - back * 0.6));
+    const gT = p.gTravel || 0;   // rail slide: hips stay with the skis, shoulders and head turn down the rail
+    this.trunk(off, twist * 0.45 + counter * 0.3 + back * 0.25 + gT * 0.25, hipPitch * 0.55 + p.hip * 0.5, bend + p.hip * 0.6, twist * 0.55 + counter * 0.7 + back * 0.6 + gT * 0.55, -angul * 1.3 + wob,
+      -counter * 0.6 + back * 1.15 + gT * 0.35, -(hipPitch * 0.55 + bend) * 0.95 * (1 - back * 0.6));
     for (const side of [1, -1]) {
       // Armature +X is the rider's left (visual −X): match the ski's lift so the boots stay clipped in.
       const lx = -side * (ANIM.skiStance + p.plow * 0.1);
@@ -579,8 +587,10 @@ export class Rider {
     // A preloaded backflip arches the chest up and back (the shoulders throw first).
     const bend = (0.1 + p.crouch * BA.crouchHinge * 0.8 - p.toe * 0.04 + p.heel * 0.12 + p.grab * 0.26) * ns - p.flipLoad * ANIM.flipLoadArch - (p.tweak || 0) * 0.3;
     // Head: look down the direction of travel (nose, or over the back shoulder when switch).
-    const headYaw = (nx * p.look * BA.headTurn - nx * BA.shoulderOpen - lead - nx * 0.5 * sk) * ns;
-    this.trunk(off, hipYaw + nx * 0.3 * sk, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist, wob - p.lean * 0.15, headYaw, -(hipPitch + bend) * 0.6);
+    // Boardslide / lipslide: the head (and a little of the shoulders) look down the rail instead of over the nose.
+    const gT = p.gTravel || 0, gS = Math.min(1, Math.abs(gT) / 1.2);
+    const headYaw = (nx * p.look * BA.headTurn - nx * BA.shoulderOpen - lead - nx * 0.5 * sk) * ns * (1 - gS) + gS * (gT - nx * BA.shoulderOpen) * 0.85;
+    this.trunk(off, hipYaw + nx * 0.3 * sk, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist + gT * 0.2, wob - p.lean * 0.15, headYaw, -(hipPitch + bend) * 0.6);
     // Legs: feet in the bindings across the board, knees toward the toe edge and a little duck.
     const w = st.width / 2;
     const feet = [[nx, st.front], [-nx, st.back]];   // [armature x sign, binding angle]
@@ -689,6 +699,7 @@ export class Rider {
     let u = upS.lerp(upP, p.push).lerp(upT, p.tuck).lerp(upA, p.air * (1 - g)).lerp(upF, p.flipTuck).lerp(upG, g);
     let l = loS.lerp(loP, p.push).lerp(loT, p.tuck).lerp(loA, p.air * (1 - g)).lerp(loF, p.flipTuck).lerp(loG, g);
     this.armSpin(side, u, l, 1 - g);
+    this.armGrind(side, u, l, 1 - g);
     [u, l] = this.armOverlays(side, u, l);
     this.armAim(side, u, l);
     // First person: turn the gloves into a pole grip (palms in, knuckles forward).
@@ -757,8 +768,24 @@ export class Rider {
       u.lerp(d.clone().add(V(0, 0, 0.15)), p.grab);
       l.lerp(d, p.grab);
     }
+    this.armGrind(side, u, l, 1 - p.grab);
     [u, l] = this.armOverlays(side, u, l);
     this.armAim(side, u, l);
+  }
+
+  /**
+   * On a rail the arms go out wide for balance, the one on the high side reaching up and out as the rider
+   * tips (p.gRoll / p.gPitch: the fall in the gear frame). `side` = the arm's armature sign (+ = left).
+   */
+  armGrind(side, u, l, w) {
+    const p = this.p, gw = (p.grind || 0) * w;
+    if (gw < 0.01) return;
+    const t = p.t, wave = Math.sin(t * 4.3 + side) * 0.08;
+    // + = this arm is on the high side (skis: arms across the fall; a board's arms point along it, to nose / tail).
+    const nx = this.equip?.stance === 'goofy' ? -1 : 1;
+    const tip = this.isBoard ? side * nx * (p.gPitch || 0) : side * (p.gRoll || 0);
+    u.lerp(_v2.set(side * 0.95, -0.15 + tip * 0.55 + wave, 0.2 + (p.gPitch || 0) * 0.3 * side), gw);
+    l.lerp(_v3.set(side * 0.85, 0.15 + tip * 0.45 - wave, 0.3), gw);
   }
 
   /** Poles from the gloves down to the snow: trailing while skiing, planted on edge changes, tucked. */
