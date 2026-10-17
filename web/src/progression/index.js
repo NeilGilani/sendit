@@ -92,6 +92,7 @@ export function trackProgression({ player, getMapId }) {
   on('grindScore', ({ label }) => { if (open) { P.state.life.tricks++; P.bump('tricks'); if (!/^Sketchy/.test(label || '')) P.recordTrickName(label); } });
   on('grindEnd', ({ dist, reason }) => { if (open && reason !== 'bail') P.recordGrind(dist || 0); });
   on('nearMiss', () => { if (open) P.recordNearMiss(); });
+  on('juiceWipeout', ({ tumble, speed }) => { if (!open) return; const xp = P.recordWipeout(tumble, speed); if (xp) emit('progressWipeout', { tumble, xp }); });
   on('juiceComboBanked', ({ mult, bonus }) => { if (open) P.recordCombo(mult, bonus); });
   on('runFinished', ({ medal }) => P.recordMedal(medal));
   globalThis.addEventListener?.('pagehide', () => { if (open) end(); P.save(); });

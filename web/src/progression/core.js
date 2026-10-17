@@ -17,6 +17,7 @@ export const XP_SOURCES = {
   allDailies: 300,        // bonus for finishing all three dailies of a day
   newTrick: 40,           // first time a trick (or rail combo) lands clean
   dailyBonus: 500,        // the first this-many XP earned while riding each day count double
+  wipeout: { base: 5, perM: 1.5, perMs: 0.5, max: 60 },   // a crash pays a little (the tumble and the speed it came at)
 };
 
 export const RANKS = [
@@ -155,6 +156,8 @@ export const ACHIEVEMENTS = [
   { id: 'gold', title: 'Golden', desc: 'Earn a gold medal', xp: 350, icon: '🥇', test: (s) => s.life.golds >= 1 },
   { id: 'book-10', title: 'Bag of Tricks', desc: 'Land 10 different tricks', xp: 250, icon: '📖', test: (s) => Object.keys(s.life.trickBook || {}).length >= 10 },
   { id: 'book-30', title: 'Trick Encyclopedia', desc: 'Land 30 different tricks', xp: 600, icon: '📚', test: (s) => Object.keys(s.life.trickBook || {}).length >= 30 },
+  { id: 'meat-10', title: 'Hall of Meat', desc: 'Wipe out 10 times', xp: 150, icon: '✚', test: (s) => s.life.wipeouts >= 10 },
+  { id: 'yard-sale', title: 'Yard Sale', desc: 'Tumble 15 m in one wipeout', xp: 200, icon: '☄', test: (s) => s.life.maxTumble >= 15 },
   { id: 'level-10', title: 'Double Digits', desc: 'Reach level 10', xp: 0, icon: '⬆', test: (s, p) => p.level >= 10 },
 ];
 
@@ -170,7 +173,7 @@ export const PB_STATS = {
 export function defaultState() {
   return {
     version: PROGRESSION_VERSION, xp: 0,
-    life: { rides: 0, tricks: 0, flips: 0, stomps: 0, near: 0, meters: 0, air: 0, grindM: 0, maxSpin: 0, bestMult: 0, topKmh: 0, golds: 0, dailySweeps: 0, maps: {}, trickBook: {} },
+    life: { rides: 0, tricks: 0, flips: 0, stomps: 0, near: 0, meters: 0, air: 0, grindM: 0, maxSpin: 0, bestMult: 0, topKmh: 0, golds: 0, dailySweeps: 0, wipeouts: 0, maxTumble: 0, maps: {}, trickBook: {} },
     daily: null,           // { day, list: [3 challenges], rerolls: {slot: n}, rerollsLeft, progress: {stat: n}, done: {id: true}, swept }
     weekly: null,          // { week, progress: {stat: n}, done }
     achievements: {},      // id → unlock time (ms)
@@ -410,6 +413,18 @@ export class Progression {
   }
 
   trickBook() { return Object.entries(this.state.life.trickBook).map(([name, n]) => ({ name, n })); }
+
+  /** A wipeout: XP for the tumble (m) and the speed (m/s) it happened at. Returns the XP paid. */
+  recordWipeout(tumble = 0, speed = 0) {
+    if (!this.ride) return 0;
+    const W = XP_SOURCES.wipeout, L = this.state.life;
+    L.wipeouts++;
+    L.maxTumble = Math.max(L.maxTumble, tumble);
+    const xp = Math.round(Math.min(W.max, W.base + tumble * W.perM + speed * W.perMs));
+    const paid = this.addXP(xp, 'Wipeout');
+    this.checkAchievements();
+    return paid;
+  }
 
   recordNearMiss() {
     if (!this.ride) return;

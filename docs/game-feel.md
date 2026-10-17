@@ -257,7 +257,7 @@ The Progress tab shows it under the dailies. API: `progression.getWeekly()`. Eve
 
 ### Achievements
 
-There are 24 (`ACHIEVEMENTS`), including:
+There are 26 (`ACHIEVEMENTS`), including:
 
 - First ride, first trick, 360, 540, 720 and 1080, and a flip.
 - 1 and 50 stomps, 100 close shaves.
@@ -266,6 +266,13 @@ There are 24 (`ACHIEVEMENTS`), including:
 - All four maps, a clean sweep of the dailies, a gold medal, and level 10.
 
 Each one unlocks once, with a toast and XP.
+
+### Wipeouts (Hall of Meat lite)
+
+A crash pays a little XP once the rider is back up: 5 + 1.5 per m of tumble + 0.5 per m/s of speed, up to 60 (`XP_SOURCES.wipeout`). The tumble is measured from the crash point to the furthest point before the respawn. A "WIPEOUT · 14 M TUMBLE +XP" call-out shows, and the combo chain is still lost, so crashing costs more than it pays but stops feeling like pure loss (Skate's Hall of Meat).
+
+- Achievements: **Hall of Meat** (10 wipeouts) and **Yard Sale** (a 15 m tumble).
+- Events: `juiceWipeout {kind, tumble, speed}` (juice) and `progressWipeout {tumble, xp}` (progression).
 
 ### Trick book
 

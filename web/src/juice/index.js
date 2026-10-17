@@ -14,7 +14,7 @@ import { MusicEnergy } from './music.js';
 import { mountJuiceSettings } from './settings.js';
 import { SplitTracker } from './splits.js';
 import { HotTrail } from './trail.js';
-import { game, Mode, on } from '../state.js';
+import { game, Mode, on, emit } from '../state.js';
 
 export function installJuice({ player, cam, sound, input, post, camera, fx, activities, scene }) {
   const combo = new ComboTracker(player);
@@ -38,7 +38,7 @@ export function installJuice({ player, cam, sound, input, post, camera, fx, acti
     },
     update(dt, time) {
       const riding = game.mode === Mode.RIDING;
-      if (riding) combo.update(dt * warp.k);
+      if (riding) { combo.update(dt * warp.k); juice.trackWipe?.(); }
       // A hot chain opens the lens a little (+0.75° per ×1 above ×1, at most +3°, scaled by the shake setting).
       const c = riding ? combo.state() : null;
       if (cam) cam.juiceFov = c ? Math.min(3, (c.mult - 1) * 0.75) * shakeAmount() : 0;
@@ -80,6 +80,16 @@ export function installJuice({ player, cam, sound, input, post, camera, fx, acti
   // Rails: a light buzz on the lock-in and on each kink.
   on('grindStart', () => input?.rumble?.(0.15, 0.45, 90));
   on('grindKink', () => input?.rumble?.(0.3, 0.5, 70));
+  // Wipeouts (Hall of Meat lite): measure the tumble from the crash to the respawn; progression pays a little XP.
+  let wipe = null;
+  on('crashed', (kind) => { if (game.mode === Mode.RIDING) wipe = { kind, x: player.position.x, z: player.position.z, speed: player.speed || 0, far: 0 }; });
+  on('respawned', () => {
+    if (!wipe) return;
+    const w = wipe; wipe = null;
+    emit('juiceWipeout', { kind: w.kind, tumble: Math.round(w.far * 10) / 10, speed: w.speed });
+  });
+  on('rideStarted', () => { wipe = null; });
+  juice.trackWipe = () => { if (wipe && player.state === 3) wipe.far = Math.max(wipe.far, Math.hypot(player.position.x - wipe.x, player.position.z - wipe.z)); };
   if (typeof window !== 'undefined') window.__juice = juice;
   return juice;
 }

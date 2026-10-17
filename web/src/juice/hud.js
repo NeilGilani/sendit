@@ -263,6 +263,8 @@ export function mountJuiceHud({ player, combo, input, camera }) {
   on('crashed', () => { stompRun = 0; cleanRun = 0; });
   on('grindScore', ({ label, points }) => announce(/^Sketchy/.test(label) ? 'sketchy' : null, shortLabel(label).toUpperCase(), `+${fmt(points)}`));
   on('grindLost', () => callout('RAIL LOST', '#ff6bb0'));
+  // Wipeouts pay a little XP (progression): say so once the rider is back up.
+  on('progressWipeout', ({ tumble, xp }) => callout(`WIPEOUT${tumble >= 2 ? ` · ${Math.round(tumble)} M TUMBLE` : ''}  +${xp} XP`, '#ff9a3d'));
   // Trick book (progression): the first clean landing of a trick gets a NEW TRICK ribbon on its announcement.
   on('newTrick', ({ xp }) => {
     if (performance.now() - annT > 400) return;

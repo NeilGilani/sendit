@@ -231,6 +231,22 @@ export async function run(test, assert) {
     assert.equal(p.ensureDay().bonusLeft, B, 'fresh bonus tomorrow');
   });
 
+  await test('progression: wipeouts pay a little XP (capped) and count towards Hall of Meat', () => {
+    const { p, of } = make('2026-10-22T09:00:00');
+    p.startRide('valcrest-gully');
+    p.ensureDay().bonusLeft = 0;
+    const x0 = p.state.xp;
+    const paid = p.recordWipeout(10, 20);
+    assert.equal(paid, 5 + 15 + 10);
+    assert.equal(p.recordWipeout(500, 50), core.XP_SOURCES.wipeout.max);
+    assert.ok(of('achievement').some((a) => a.id === 'yard-sale'));
+    for (let i = 0; i < 8; i++) p.recordWipeout(1, 1);
+    assert.ok(of('achievement').some((a) => a.id === 'meat-10'));
+    assert.ok(p.state.xp > x0);
+    p.endRide();
+    assert.equal(p.recordWipeout(5, 5), 0, 'nothing outside a ride');
+  });
+
   // ---------------------------------------------------------------- juice: combo chain + time warp
   await test('juice combo: own chain grows per different move, banks a bonus, loses on crash', () => {
     const pl = { state: 1, flow: null };
