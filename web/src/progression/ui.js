@@ -7,6 +7,7 @@ import { progression } from './index.js';
 const CSS = /* css */`
 #lvlUp { position: fixed; inset: 0; z-index: 40; pointer-events: none; display: grid; place-items: center; opacity: 0; }
 #lvlUp.show { animation: luIn 3.2s ease-out forwards; }
+#lvlUp.yield .box, #lvlUp.yield .ring { opacity: .18; transition: opacity .15s; }   /* a trick announcement takes the stage */
 #lvlUp .ring { position: absolute; left: 50%; top: 42%; width: 140px; height: 140px; margin: -70px 0 0 -70px; border-radius: 50%; border: 6px solid var(--rc, #ffe14d); opacity: 0; }
 #lvlUp.show .ring { animation: luRing 1.1s cubic-bezier(.1,.8,.3,1) forwards; }
 #lvlUp.show .ring.r2 { animation-delay: .14s; }
@@ -87,7 +88,7 @@ export function mountProgressionUi({ juice }) {
     lv.querySelector('.n').textContent = e.level;
     lv.querySelector('.rk').textContent = e.rankUp ? `NEW RANK · ${e.rank.name.toUpperCase()}` : e.rank.name.toUpperCase();
     lv.querySelector('.sub').textContent = nextUnlockText(e.level);
-    lv.classList.remove('show'); void lv.offsetWidth; lv.classList.add('show');
+    lv.classList.remove('show', 'yield'); void lv.offsetWidth; lv.classList.add('show');
     document.body.classList.add('lvlup');
     clearTimeout(play.t); play.t = setTimeout(() => document.body.classList.remove('lvlup'), 2900);
     sfx('medal', 0.8, e.rankUp ? 0.9 : 1.05);
@@ -95,6 +96,9 @@ export function mountProgressionUi({ juice }) {
     setTimeout(play, 2400);
   };
   on('juiceLevelUp', (e) => { queue.push(e); if (!playing) play(); });
+  const yieldTo = () => { if (lv.classList.contains('show') && document.body.classList.contains('lvlup')) lv.classList.add('yield'); };
+  on('landed', (e) => { if (e.result !== 'crash' && e.air > 0.5) yieldTo(); });
+  on('grindScore', yieldTo);
 
   mountRecap();
   const toast = (o) => juice?.toast(o);

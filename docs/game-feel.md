@@ -143,6 +143,12 @@ These are separate from the existing trauma shake, which is unchanged.
 
 With the system's *reduced motion* preference on and no shake setting saved, shake and punches default to 0.4 and the white landing flashes are off.
 
+## 3a. Hot trail (juice/trail.js)
+
+This is the SSX "on fire" look. A ribbon streams from the rider's feet while the combo is ×2 or more (intensity 0.6, rising to 1 at ×4) or SEND IT is on. It is coloured by tier: teal, then blue, gold, orange and pink (gold in SEND IT).
+
+It is one alpha-blended draw call: additive blending vanished on white snow, and bright HDR colours tone-map to white. It has 48 points 0.45 m apart and is 0.55 m wide, tapering and fading. It is off on the low quality tier, in the helmet cam and when the speed rush setting is off, and it resets on a respawn. Tunables: `JUICE_TRAIL`.
+
 ## 3b. Challenge splits (juice/splits.js)
 
 These are Trackmania-style split times. At every Challenge gate (passed or missed), the run's clock including penalties is compared with the same gate on your best run. A delta flashes beside the timer: −0.42 in cyan when ahead, +0.31 in pink when behind, labelled GATE n. A FINISH delta shows at the end.
@@ -204,7 +210,7 @@ Bus events: `musicEnergy {level}` at 5 Hz, and `musicDrop {kind, strength}`.
 - **Challenge results.** An extra row reads "XP this ride +N · level L", with ▲ when the ride levelled up.
 - **First rides.** One hint 15 s into each of the first two rides explains that tricks, combos, close shaves and dailies earn XP.
 - **Ranks (`RANKS`).** Rookie from level 1, Shredder from 5, Ripper from 10, Pro from 20, Legend from 35, Mountain God from 60. Each rank has a colour, used for the badge, the celebration and the Progress tab.
-- **Level-up.** It waits (up to 4 s) while the rider is in the air or a trick is being announced, then plays a full-screen celebration (rings, the level number slamming in, the rank and XP to the next level) plays over the ride and the lobby. Level-ups queue, rumble, give a music drop and flash.
+- **Level-up.** If a trick is announced while it plays, it fades back to let the trick read. It waits (up to 4 s) while the rider is in the air or a trick is being announced, then plays a full-screen celebration (rings, the level number slamming in, the rank and XP to the next level) plays over the ride and the lobby. Level-ups queue, rumble, give a music drop and flash.
 - **XP bar.** A small bar under the speedometer fills in ride and fades out after 2.5 s.
 - **Ride recap.** Back in the lobby after a ride, a card slides in on the right. It counts up "+1,240 XP", animates the level bar from where the ride started, and lists the ride's best trick, plus the dailies, achievements and personal bests from that ride, and the distance and score. It ends with "ONE MORE RUN? PRESS ENTER", hides after 9 s or on click, and comes from `progressRideSummary`.
 

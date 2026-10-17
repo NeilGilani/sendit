@@ -13,9 +13,10 @@ import { installSpeedFx } from './speedfx.js';
 import { MusicEnergy } from './music.js';
 import { mountJuiceSettings } from './settings.js';
 import { SplitTracker } from './splits.js';
+import { HotTrail } from './trail.js';
 import { game, Mode, on } from '../state.js';
 
-export function installJuice({ player, cam, sound, input, post, camera, fx, activities }) {
+export function installJuice({ player, cam, sound, input, post, camera, fx, activities, scene }) {
   const combo = new ComboTracker(player);
   const warp = new TimeWarp();
   const hud = typeof document !== 'undefined' ? mountJuiceHud({ player, combo, input, camera }) : null;
@@ -25,8 +26,10 @@ export function installJuice({ player, cam, sound, input, post, camera, fx, acti
   const music = new MusicEnergy({ sound, player, combo });
   mountJuiceSettings();
   const splits = activities ? new SplitTracker(activities) : null;
+  let trail = null;
+  try { if (scene) trail = new HotTrail(scene, player); } catch (e) { console.warn('[juice] trail off', e); }
   const juice = {
-    combo, warp, hud, speedfx, music, splits,
+    combo, warp, hud, speedfx, music, splits, trail,
     /** Physics time scale for this frame (hit-stop / micro slow-mo); 1 = real time. */
     timeScale(dt) {
       if (game.mode === Mode.RIDING) return warp.scale(dt);
@@ -39,6 +42,7 @@ export function installJuice({ player, cam, sound, input, post, camera, fx, acti
       // A hot chain opens the lens a little (+0.75° per ×1 above ×1, at most +3°, scaled by the shake setting).
       const c = riding ? combo.state() : null;
       if (cam) cam.juiceFov = c ? Math.min(3, (c.mult - 1) * 0.75) * shakeAmount() : 0;
+      trail?.update(dt, c?.mult ?? 1, !!player.flow?.inState, riding);
       hud?.update(dt);
       music.update(dt);
       speedfx?.update(dt, time, player.speedRatio ?? 0, riding, !!player.flow?.inState);
