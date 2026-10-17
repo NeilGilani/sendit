@@ -17,12 +17,14 @@ the numbers and the comparisons with real recordings are in `docs/audio-research
 | `web/src/audio/grind.js` | Rail and box grind: a modal metal scrape plus the `grind_loop` sample, lock-on clang, kink ticks and pop-off. |
 | `web/src/audio/ambience.js` | Per-map beds: forest soughing and creaks, park crowd babble, cheers and a distant PA announcer. The distant wind lives in the wind worklet. |
 | `web/src/audio/lift.js` | Chairlift: rope hum and cable sing, chair creaks, and the grip rattling over each tower's sheaves. |
+| `web/src/audio/others.js` | The other skiers on the run (`life.js`): the nearest three each get a positional (HRTF) snow voice that follows their speed and edge. |
 | `web/src/audio/breath.js` | The rider's breathing: an exertion meter, catching breath after hard runs, and huffs on crashes. |
 | `web/src/audio/tuning.js` | Every parameter, in one place. |
 | `web/src/audio/harness.{html,js}` | Offline render and analysis harness for the tests. Dev only; nothing imports it. |
 | `web/scripts/audio-test.mjs` | Headless test that renders ~25 scripted rides and checks levels, clipping, NaNs and sound-design relations, optionally writing WAVs. |
 | `web/scripts/audio-trace.mjs` | Records real-physics rides (skis and board) as rider-frame traces for the test. |
 | `web/scripts/audio-compare.mjs` | Octave-band, centroid and modulation comparison of recordings and renders. |
+| `web/scripts/audio-spectrogram.mjs` | Log-frequency spectrogram PNGs of recordings and renders, for comparing time structure. |
 
 ## Signal flow
 
@@ -83,7 +85,7 @@ mountain drops in pitch with time.
 | Slash | Edge angle crosses 0.6 rad quickly while skidding, above 6 m/s: an exaggerated fan of spray, as Steep does |
 | Take-off | `takeoff` event: tail or tip tock, plus the snow flicked off. The old `jump_pop` sample sits underneath. |
 | Grab rustle | `player.grab` rises past 0.5 in the air (on release, a shorter rustle) |
-| Landing | `landed` (rawImpact): a 62–78 Hz thud, then a flat-base slap (board) or double clack (skis), then a snow burst (short and bright on hardpack, long and fluffy in powder) |
+| Landing | `landed` (rawImpact), shaped on CC0 snow-impact recordings: a broadband crack, a body thud at 120–200 Hz, a flat-base slap (board) or double clack (skis), crunchy debris grains thinning out over ~0.5 s, and the snow burst (short and bright on hardpack, long and fluffy in powder) |
 | Crash tumble | `crashed`: 4–6 decaying impacts, cloth and a long slide |
 | Near miss | `nearMiss`: pink band sweeping 2.6 kHz → 650 Hz (Doppler) with a 4 → 9 → 4 ms comb sweep, panned to the obstacle's side from the travel direction; trees add needle rustle |
 | Hard brake | `hardBrake`: spray fan and rough scrape onset (the worklet carries the sustained stop) |

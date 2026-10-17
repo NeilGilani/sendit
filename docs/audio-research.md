@@ -77,6 +77,13 @@ levels in dB relative to the loudest band, for the loudest 15 % of seconds.
 | Alpine gusts (kyles #454092) | −7 | −8 | −6 | −4 | 0 | −1 | −9 | −20 | −31 | 1.1 kHz |
 | Squeaky snow under a board (facemusic #39082) | 0 | −9 | −4 | 0 | −8 | −15 | −22 | −27 | −34 | 0.16 kHz |
 | Ski pass-by (cribbler #592379) | −48 | −25 | −14 | −5 | −1 | 0 | −2 | −2 | −10 | 3.4 kHz |
+| Skateboard rail grind (21100495 #655371) | −6 | 0 | −2 | −6 | −4 | −3 | −6 | −17 | −28 | 0.8 kHz |
+| Our rail grind, board (first build) | −13 | −8 | −32 | 0 | −19 | −2 | −4 | −7 | −5 | 5.5 kHz, pure static mode lines + hiss |
+| Our rail grind (tuned) | −25 | −18 | −11 | −2 | −7 | −1 | 0 | −13 | −37 | 1.8 kHz |
+| Chairlift tower pass (andriiperevodchyk #519459) | −13 | −10 | −8 | −3 | −1 | 0 | −3 | −12 | −38 | 1.8 kHz |
+| Body fall in hard snow (craigsmith #675895) | −17 | 0 | 0 | −7 | −9 | −11 | −13 | −19 | −53 | 0.46 kHz |
+| Our landings (first build) | 0 | −8 | −20 | −23 | −24 | −23 | −26 | −33 | −41 | 0.1 kHz, a sub boom |
+| Our landings (tuned) | −3 | 0 | −3 | −5 | −6 | −13 | −16 | −23 | −34 | 0.3 kHz |
 
 **What changed because of the comparison:**
 - The glide hiss became pink noise between a rising high-pass and low-pass. Pink noise is flat in octave bands,
@@ -84,6 +91,16 @@ levels in dB relative to the loudest band, for the loudest 15 % of seconds.
 - The crystal-grain layer dropped by 9 dB. It had been masking everything with a 4 kHz fizz.
 - The board's body moved to a 230 Hz band.
 - The ambient wind moved up to ~650 Hz with more hiss.
+- **Spectrograms** (`web/scripts/audio-spectrogram.mjs`) compared the time structure too:
+  - **Groomed run:** the real run dips ~10 dB above 3 kHz at each edge change, so the hiss now drops when the
+    skis go flat.
+  - **Board:** the real board is choppy (1–2 % envelope modulation), so its grains became fewer and coarser.
+  - **Rail grind:** the real grind shows fuzzy resonances gliding with speed and deep stick-slip, so the rail
+    modes were broadened and made to follow speed.
+  - **Lift tower:** the real pass is a 2–3 s rattle of rapid clicks over a rope whirr at 300 Hz–3 kHz, so the
+    tower sound was rebuilt that way.
+  - **Snow impacts:** the real ones are a broadband crack followed by scattered crunchy debris, so landings now
+    have crack, thud, debris and spray instead of a sine boom.
 
 Envelope modulation in the references is low (0.2–0.6 % for the groomed run, 1–2 % on the icy board), so the
 continuous layers stay smooth and the "events" (edges, plants, slashes) carry the rhythm.
