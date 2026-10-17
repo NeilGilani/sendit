@@ -273,16 +273,16 @@ map2-bot --verify, map3-unit 32/32, map3-fuzz, map4-unit 15/15 all pass; GPU lob
 ### Performance
 
 GPU ms per frame at 1600×900, quality 1, dev server on :5196 (`map3-perf.mjs`, the rider riding at six spots down
-the hero line; each spot is the quietest of three windows), Intel Arc 130V shared with ~10 other sessions. The GPU
-was heavily contended all night (in the worst window Ravenspire itself read 65 ms average), so per the overnight
-rule the table keeps the **minimum per spot over all runs**, with Ravenspire measured back to back:
+the hero line; each spot is the quietest of three windows), Intel Arc 130V shared with ~10 other sessions. Most of
+the night the GPU was heavily contended (in the worst window Ravenspire itself read 65 ms average); at 04:35 the
+machine was quiet and this back-to-back pair is the clean measurement:
 
-| map | 2 % | 20 % | 38 % | 55 % | 62 % | 80 % | draws | triangles |
-|---|---|---|---|---|---|---|---|---|
-| fjordline | 14.2 | 12.1 | 12.4 | 14.6 | 12.5 | 14.0 | 206–445 | 1.46–1.64 M |
-| ravenspire | 11.0 | 11.3 | 10.8 | 13.0 | 13.2 | 15.7 | 187–492 | 1.58–1.86 M |
+| map | avg / worst | 2 % | 20 % | 38 % | 55 % | 62 % | 80 % | draws | triangles | boot |
+|---|---|---|---|---|---|---|---|---|---|---|
+| fjordline | **11.3 / 14.5** | 14.5 | 12.6 | 9.7 | 10.5 | 10.0 | 10.1 | 202–446 | 1.49–1.63 M | 48 s |
+| ravenspire | 12.3 / 15.5 | 15.5 | 11.4 | 11.8 | 11.2 | 11.0 | 12.9 | 188–491 | 1.57–1.86 M | 47 s |
 
-So Fjordline sits at **~12–15 ms**, inside the 14–16 ms target and level with Ravenspire. Where the time goes
+So Fjordline sits at **~10–15 ms** (11.3 ms average), inside the 14–16 ms target and a little under Ravenspire. Where the time goes
 (`web/scripts/map7-gpudiag.mjs`: hide one group at a time, min of three windows): nothing in Fjordline's own
 props stands out — the water plane, the sea ice, the village and the trees are each inside the noise (±3 ms); the
 terrain is the bulk, as on every map. The water is drawn after the terrain (`renderOrder`), so early depth rejects
@@ -291,9 +291,9 @@ it wherever the land covers it. Draws peak at the col (~445, the whole fjord in 
 **Pop-in** (`gfxpopin.mjs http://localhost:5196 fjordline 1 25`): **0** tree, shadow, scatter and terrain-LOD pops
 per second, 0 shader compiles and 0 texture uploads during the ride.
 
-**Boot**: 27–40 s to the first riding frame on a quiet-ish machine, 100–140 s while the other sessions' bots and
-perf runs held the CPU (Ravenspire booted in 127–132 s in the same windows). The height function costs ~3 µs a
-sample (the headland, the outcrops and the relief), about 1.5× Ravenspire's.
+**Boot**: 48 s to the first riding frame on the quiet machine (Ravenspire 47 s in the same window), 100–140 s while the
+other sessions' bots and perf runs held the CPU. The height function costs ~3 µs a sample (the headland, the
+outcrops and the relief), about 1.5× Ravenspire's.
 
 ---
 
