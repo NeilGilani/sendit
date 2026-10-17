@@ -32,6 +32,7 @@ export const VOLTAGE_PHYSICS = {
   },
   snowboard: {
     maxVelocity: 20,
+    dragUpright: 0.0128, dragTuck: 0.0072,   // a low, compact park crouch: boards carry speed into the big take-offs like skis do
     popMin: 2.4, popMax: 4.3,
     landClean: 17, landStumble: 46,
   },

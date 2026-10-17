@@ -148,7 +148,7 @@ export const PIPE = { name: 'The Conduit', u0: 355, u1: 575, v: -95, F: 3.2, R: 
 // Big air: a scaffold in-run (top deck `top` m over the snow at u0), 34° in-run, a 32° lip, a 22 m table to
 // the knuckle and an EFH landing for take-offs up to vMax (research §2: Shougang 30° in-run, 5 m kicker, 20 m
 // to the knoll, 38° landing; a 30 m jump needs ~16 m/s at the lip).
-export const BIG_AIR = { name: 'The Tower', u: 330, v: -172, top: 26, deckLen: 8, inDeg: 34, R: 22, lipDeg: 32, kickH: 5, table: 24, vMax: 26, hw: 4, deckHw: 9, landHw: 12 };
+export const BIG_AIR = { name: 'The Tower', u: 322, v: -172, top: 31, deckLen: 8, inDeg: 34, R: 22, lipDeg: 32, kickH: 5, table: 24, vMax: 26, hw: 4, deckHw: 9, landHw: 12 };
 
 // ------------------------------------------------------------------ practice: drop zones (keys 1–9)
 // [name, u, v, heading offset deg from the fall line]

@@ -19,7 +19,7 @@ const { course, T } = await L.loadPark({ quiet: true });
 // ------------------------------------------------------------------ lines: features in order
 const jib = (name) => ({ kind: 'jib', name });
 const jump = (name, trick) => ({ kind: 'jump', name, trick });
-const slope = (a, b, c) => [jib(a), jib(b), jib(c), jump('Lightning', 'grab'), jump('Thunder', 'spin360'), jump('Voltage', 'flip')];
+const slope = (a, b, c) => [jib(a), jib(b), jib(c), jump('Lightning', 'spin360'), jump('Thunder', 'spin540'), jump('Voltage', 'flip')];
 export const LINES = {
   slopeA: { start: [2, 0], feats: slope('Circuit Flat-Down', 'Surge DFD', 'Overload C-Rail') },
   slopeB: { start: [2, 0], feats: slope('Circuit Box', 'Surge Rainbow', 'Overload Handrail') },
@@ -33,7 +33,7 @@ export const LINES = {
   gridM: { start: [40, 247], feats: ['Grid Rail A', 'Grid Down Rail', 'Grid Long Rail', 'Grid S-Rail', 'Grid Down Box', 'Grid Cannon'].map(jib) },
   gridR: { start: [40, 257], feats: ['Grid Tube A', 'Grid Wide Tube', 'Grid Ledge'].map(jib) },
   hips: { start: [360, -232], feats: [jump('Hip Left'), jump('Hip Right')] },
-  bigair: { zone: 4, feats: [jump('The Tower', 'spin360')] },
+  bigair: { zone: 4, feats: [jump('The Tower', 'spin720')] },
   pipe: { zone: 5, feats: [{ kind: 'pipe', name: 'The Conduit' }] },
 };
 
@@ -84,7 +84,7 @@ function ride(type, key, sty) {
     on('takeoff', () => { const nm = course.featureAt(p.position.x, p.position.z); if (nm) ev.speeds[nm] = +p.speed.toFixed(1); }),
   ];
   const hist = [];
-  let key0 = 0, pipeSide = 1, pipeT = 0;
+  let key0 = 0, pipeSide = 1, pipeT = 0, airTrick = null, lastState = 1;
   p.script = (c, pl) => {
     Object.assign(c, { steer: 0, brake: 0, up: 0, jump: false, tuck: 0 });
     const g = pl.grind.g;
@@ -161,16 +161,27 @@ function ride(type, key, sty) {
       if (a !== null && a > 0.04 && !(dRail < 6 || (nextRail && wi >= way.indexOf(nextRail) - 1 && dRail < 10))) c.jump = true;
       // Trick set-up on the in-run (the wind-up / flip preload while loading).
       const fj = nextJump?.f;
-      if (c.jump && fj?.trick && dJump < 12) {
-        if (fj.trick === 'spin360' || (sty === 'trick' && fj.trick !== 'flip')) c.steer = 1;
-        if (fj.trick === 'flip' && sty !== 'clean') c.brake = 1;
+      // The jump whose lip is right here (the waypoint may already point past it).
+      let here = null, dHere = 1e9;
+      for (const q of way) if (q[2] === 'lip') { const d = Math.hypot(q[0] - pl.position.x, q[1] - pl.position.z); if (d < dHere) { dHere = d; here = q.f; } }
+      const trick = sty === 'clean' || dHere > 14 ? null : here?.trick;
+      if (c.jump && trick) {
+        if (/^spin/.test(trick)) c.steer = -1;            // wind up (the spin goes the other way of the load: a frontside spin here)
+        if (trick === 'flip') c.brake = 1;                // preload a backflip off the tail
       }
-      if (sty === 'clean' && fj?.trick === 'flip' && c.jump) c.brake = 0;
+      if (trick) airTrick = trick;
     }
-    if (pl.state === 2) {
-      const fj = way.slice(Math.max(0, wi - 2), wi + 1).find((q) => q.f?.kind === 'jump')?.f;
-      if (fj?.trick === 'grab' && pl.airTime > 0.25 && pl.dyn.timeToLand() > 0.5) c.tuck = 1;
+    if (pl.state === 2 && airTrick) {
+      // Spins: keep the stick in until what's turned + what the open-arms spin still turns reaches the target,
+      // then let go and spot. Flips: S through the throw window, then let go (the rider spots the landing).
+      const tl = pl.dyn.timeToLand();
+      const target = { spin360: 2, spin540: 3, spin720: 4 }[airTrick];
+      if (target && Math.abs(pl._spinTotal) + Math.abs(pl.spinRate) * 0.15 + Math.abs(pl.dyn.spinH || 0) * pl.dyn.C.spinOpen * Math.max(0, tl - 0.15) < Math.PI * target) c.steer = -1;
+      if (airTrick === 'flip' && pl.airTime < 0.45) c.brake = 1;
+      if (pl.airTime > 0.25 && tl > 0.6 && !target) c.tuck = 1;   // grab (not while spinning: the stick spins)
     }
+    if (pl.state === 1 && lastState === 2) airTrick = null;   // landed: the trick is done
+    lastState = pl.state;
   };
   const DT = 1 / 60;
   const dbgR = process.env.DBG ? course.rails.find((q) => q.name === process.env.DBG) : null;
@@ -194,6 +205,7 @@ function ride(type, key, sty) {
   const rails = line.feats.filter((f) => f.kind === 'jib').map((f) => f.name);
   const missed = rails.filter((n) => !ev.locks.has(n));
   const j = course.judgeRun.judge();
+  if (process.env.V) console.log('     judge:', j.sections.map((q) => `${q.name} ${q.score.toFixed(1)}`).join(', '), `variety ${j.variety.toFixed(1)} amplitude ${j.amplitude.toFixed(1)} flow ${j.flow.toFixed(1)} crashes ${j.crashes} avg ${j.avg.toFixed(1)}`);
   return { type, key, sty, t: +t.toFixed(1), crashes, stumbles, missed, ev, judged: j.total, u: Math.round(p.position.x - START_X) };
 }
 

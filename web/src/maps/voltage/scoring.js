@@ -23,7 +23,7 @@ export class SlopeJudge {
     on('resetTop', () => this.reset());
     on('grindScore', (g) => this.onGrind(g));
     on('landed', (e) => this.onLanded(e));
-    on('parkLanding', (e) => { if (this.lastJump && e.jump === this.lastJump.name) this.lastJump.zone = e.zone; });
+    on('parkLanding', (e) => this.onZone(e));
     on('crashed', () => this.onCrash());
     on('grindEnd', (e) => { if (e.reason === 'stall') this.run.stalls++; });
   }
@@ -71,15 +71,21 @@ export class SlopeJudge {
     const exec = !e.clean ? 0.5 : e.grade === 'stomped' || e.perfect ? 1.08 : 1;
     this.lastJump = { name, zone: null, score: diff * exec * (0.6 + 0.4 * decay), clean: e.clean };
     this.run.jumps++;
-    // Amplitude arrives with parkLanding (same frame); fold it in on the next tick.
-    queueMicrotask(() => {
-      const J = this.lastJump;
-      if (!J || J.name !== name) return;
-      const amp = { sweet: 1.5, deep: 1.0, short: 0, knuckle: -1, cased: -2, overshot: -1.5 }[J.zone] ?? 0;
-      if (J.zone === 'sweet') this.run.sweet++;
-      if (J.zone === 'deep') this.run.deep++;
-      this.sectionScore(name, Math.max(0, Math.min(10, J.score + amp)));
-    });
+    this.sectionScore(name, Math.max(0, Math.min(10, this.lastJump.score)));
+  }
+
+  /** Where the jump landed (park.js 'parkLanding', right after 'landed'): amplitude for the section. */
+  onZone(e) {
+    const J = this.lastJump;
+    if (!J || J.name !== e.jump || J.zone) return;
+    J.zone = e.zone;
+    const amp = { sweet: 1.5, deep: 1.0, short: 0, knuckle: -1, cased: -2, overshot: -1.5 }[e.zone] ?? 0;
+    if (e.zone === 'sweet') this.run.sweet++;
+    if (e.zone === 'deep') this.run.deep++;
+    // The section keeps its best attempt; a worse landing on the same jump replaces the provisional score.
+    const s = Math.max(0, Math.min(10, J.score + amp));
+    const cur = this.run.sec[J.name];
+    if (cur === undefined || s > cur || cur === Math.max(0, Math.min(10, J.score))) this.run.sec[J.name] = s;
   }
 
   onCrash() {

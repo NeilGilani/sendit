@@ -422,9 +422,9 @@ export class VoltageCourse {
     const lip = { a: B.a, y: B.y, ang: s.lipDeg };
     B.width(s.deckHw);
     B.lineBy(-1.2, -58);
-    B.line(s.table - (B.a - lip.a), -2);
+    B.line(s.table - (B.a - lip.a), 4);                    // the table rises a little: a taller knuckle, a longer landing
     B.width(s.landHw);
-    const land = B.efhLanding(lip, { vMax: s.vMax, vn: 3.6, Rk: 6, minDeg: 24, maxDeg: 35, extra: 14, outR: 36 });
+    const land = B.efhLanding(lip, { vMax: s.vMax, vn: 3.6, Rk: 6, minDeg: 24, maxDeg: 38, extra: 14, outR: 36 });
     B.toBase(36, 4);
     const f = B.build({ name: s.name, kind: 'bigair', lane: 'bigair', rake: 1.1 });
     // The scaffold in-run is a narrow ramp: thin edges until the kicker meets the snow.
