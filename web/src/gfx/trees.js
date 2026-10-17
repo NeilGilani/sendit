@@ -365,7 +365,7 @@ const FRAG = /* glsl */`
       snow = smoothstep(0.42, 0.62, sv);
       // Snow is a solid pillow on the twig, not needle-shaped: it keeps its own soft outline.
       diffuseColor.a = max(diffuseColor.a, smoothstep(0.6, 0.66, sv));
-      #ifdef USE_ALPHATEST
+      #if defined(USE_ALPHATEST) && !defined(ALPHA_TO_COVERAGE)
       if (diffuseColor.a < alphaTest) discard;   // perf: the alpha test would discard it anyway
       #endif
       // Pillow normal: domed across the branch, lumpy (lit tops, shaded flanks).
@@ -378,7 +378,7 @@ const FRAG = /* glsl */`
       }
     }
   }
-  #ifdef USE_ALPHATEST
+  #if defined(USE_ALPHATEST) && !defined(ALPHA_TO_COVERAGE)
   if (diffuseColor.a < alphaTest) discard;
   #endif
   tNeedle = (!bark && !shell) ? (1.0 - snow) : 0.0;
@@ -561,6 +561,10 @@ export class TreeSystem {
    */
   setQuality(q, hint = null) {
     const Q = perfQ(q), P = PERF.trees[Q];   // perf tiers: gfx/perf.js
+    // MSAA tiers: frond cut-outs become alpha-to-coverage (soft, stable needle edges instead of a
+    // shimmering 1-bit alpha test).
+    const a2c = PERF.msaa[Q] > 0;
+    for (const m of [this.mats?.lod0, this.mats?.lod1]) if (m && m.alphaToCoverage !== a2c) { m.alphaToCoverage = a2c; m.needsUpdate = true; }
     // The light-space shadow box (±box) reaches box / sin(elevation) along the sun's azimuth on the
     // ground; + a crown and the camera's offset behind the rider.
     this.shadowR = PERF.shadow[Q].box / Math.max(0.2, SUN_DIR.y) + 18;

@@ -225,6 +225,9 @@ export class PostStack {
     if (ao) { this.ao.setQualityMode(ao.mode); this.ao.configuration.halfRes = !!ao.halfRes; }
     this.bloom.intensity = POST.bloom.intensity * PERF.bloomScale[q];
     this.smaaEffect.applyPreset(SMAAPreset[PERF.smaa[q]]);
+    // MSAA on the scene pass (WebGL2 multisampled render target): geometry edges + alpha-to-coverage
+    // foliage. SMAA still runs after it for shader / specular aliasing.
+    if (this.composer.multisampling !== PERF.msaa[q]) this.composer.multisampling = PERF.msaa[q];
     this.grade.uniforms.get('glare').value = PERF.glare[q] ? POST.glare : 0;
     this.grade.uniforms.get('flare').value = PERF.flare[q] ? POST.flare : 0;
   }

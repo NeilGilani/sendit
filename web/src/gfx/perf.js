@@ -14,6 +14,7 @@ export const PERF = {
   // settings, so medium relies on the baked terrain sky-visibility and per-tree AO instead.
   ao: [null, null, { mode: 'Medium', halfRes: true }],
   smaa: ['LOW', 'LOW', 'HIGH'],                // SMAA preset
+  msaa: [0, 0, 4],                             // scene-pass MSAA samples (trees use alpha-to-coverage when > 0)
   bloomScale: [0.7, 1, 1],                     // × POST.bloom.intensity
   glare: [false, true, true],                  // occlusion-aware veiling glare toward the sun
   flare: [false, false, true],                 // faint lens ghosts
