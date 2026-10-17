@@ -12,10 +12,12 @@
 //   tags: ['handmade'], experimental?: true,
 //   mountain: { id, name, region, blurb, accent },   which mountain card this map sits under
 //                                         (default: a mountain of its own named after the map)
-//   trails: [{ id, name, difficulty, description, length?, vertical?, featured?, group?, variant? }],
+//   trails: [{ id, name, difficulty, description, length?, vertical?, featured?, group?, variant?, dropZone?, at? }],
 //                                         STATIC data (the lobby lists trails without loading the map).
 //                                         difficulty: 'green' | 'blue' | 'black' | 'double-black' | 'park'.
-//                                         The first trail is the map's default start.
+//                                         The first trail is the map's default start. dropZone: the name of
+//                                         one of course.dropZones to start at (when trailSpawn has no answer);
+//                                         at: { x, z, heading } static world start (last resort before the spawn).
 //   variants?: async () => [{ id, name, meta, value }],   optional sub-choices (e.g. runs)
 //   describe?: (variantValue) => 'one line for the lobby',
 //   load: async ({ variant, trail, onProgress }) => course,   a Course-compatible object (course.js API)
@@ -76,6 +78,7 @@ function normTrails(def) {
 export function registerMap(def) {
   if (!def?.id || !def.name || typeof def.load !== 'function') throw new Error('registerMap: id, name and load() are required');
   const entry = { description: '', thumbnail: null, order: 100, tags: [], experimental: false, variants: null, describe: null, ...def };
+  entry.declared = { mountain: !!def.mountain, trails: Array.isArray(def.trails) && def.trails.length > 0 };
   entry.mountain = normMountain(def);
   entry.trails = normTrails(def);
   maps.set(entry.id, entry);
@@ -86,7 +89,22 @@ export function registerMap(def) {
 export function extendMap(id, extra) {
   const m = maps.get(id);
   if (!m) return null;
-  return registerMap({ ...m, mountain: m.mountain, trails: m.trails, ...extra });
+  return registerMap({ ...m, mountain: m.declared.mountain ? m.mountain : null, trails: m.declared.trails ? m.trails : null, ...extra });
+}
+
+/**
+ * Adapter for a map whose registerMap call lives elsewhere: gives it `mountain` / `trails` (and any
+ * `extra` fields) only where its own registration did not declare them, so the owner's data wins.
+ */
+export function adaptMap(id, { mountain, trails, ...extra } = {}) {
+  const m = maps.get(id);
+  if (!m) return null;
+  return registerMap({
+    ...m,
+    ...Object.fromEntries(Object.entries(extra).filter(([k]) => m[k] == null)),
+    mountain: m.declared.mountain ? m.mountain : mountain,
+    trails: m.declared.trails ? m.trails : trails,
+  });
 }
 
 export const getMap = (id) => maps.get(id) ?? null;
@@ -177,19 +195,32 @@ export function selectionQuery(mapId, trailId, base = '') {
 }
 
 /**
- * Where a trail starts on a loaded course: { x, z, heading, trail }. Asks course.trailSpawn(trailId);
- * anything missing or invalid falls back to `fallback` (the terrain's default spawn).
+ * Where a trail starts on a loaded course: { x, z, heading, fallback }. Asks course.trailSpawn(trailId),
+ * then (if the trail names one) the course's drop zone `trail.dropZone` (exact name, else the first
+ * name starting with it, case-insensitive), then `trail.at`; anything missing or invalid falls back to `fallback`
+ * (the terrain's default spawn, { position, heading }).
  */
-export function trailSpawnFor(course, trailId, fallback) {
+export function trailSpawnFor(course, trailId, fallback, trail = null) {
   const base = { x: fallback.position.x, z: fallback.position.z, heading: fallback.heading ?? 0, fallback: true };
-  if (!trailId || typeof course?.trailSpawn !== 'function') return base;
-  try {
-    const s = course.trailSpawn(trailId);
-    if (s && Number.isFinite(s.x) && Number.isFinite(s.z)) {
-      return { x: s.x, z: s.z, heading: Number.isFinite(s.heading) ? s.heading : base.heading, fallback: false };
-    }
-  } catch (e) { console.warn(`[maps] trailSpawn("${trailId}") failed; using the default spawn`, e); }
-  return base;
+  if (!trailId) return base;
+  const ok = (s) => s && Number.isFinite(s.x) && Number.isFinite(s.z);
+  const out = (s) => ({ x: s.x, z: s.z, heading: Number.isFinite(s.heading) ? s.heading : base.heading, fallback: false });
+  if (typeof course?.trailSpawn === 'function') {
+    try {
+      const s = course.trailSpawn(trailId);
+      if (ok(s)) return out(s);
+    } catch (e) { console.warn(`[maps] trailSpawn("${trailId}") failed; using the default spawn`, e); }
+  }
+  const dz = trail?.dropZone && findDropZone(course, trail.dropZone);
+  if (ok(dz)) return out(dz);
+  return ok(trail?.at) ? out(trail.at) : base;
+}
+
+/** A course drop zone by name: exact (case-insensitive), else the first whose name starts with it. */
+export function findDropZone(course, name) {
+  const zones = Array.isArray(course?.dropZones) ? course.dropZones : [];
+  const n = String(name).toLowerCase();
+  return zones.find((z) => String(z.name).toLowerCase() === n) ?? zones.find((z) => String(z.name).toLowerCase().startsWith(n)) ?? null;
 }
 
 /** A trail's custom finish from course.trailFinish(trailId), or null (use the course's own finish). */

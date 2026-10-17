@@ -49,6 +49,8 @@ registerMap({
 | `trails[].featured` | bool (optional) | gets a star and sorts first in "Featured". |
 | `trails[].group` | string (optional) | groups the list (Lake Tahoe: the resort). |
 | `trails[].variant` | any (optional) | the map variant this trail needs (Lake Tahoe: `{ resort, run }`). Picking a trail with a different variant reloads. |
+| `trails[].dropZone` | string (optional) | name of one of `course.dropZones` to start at when `trailSpawn` has no answer (exact name, else the first name starting with it). Maps with drop zones can skip `trailSpawn` entirely. |
+| `trails[].at` | `{ x, z, heading }` (optional) | a static world start, used after `trailSpawn` and `dropZone`. |
 
 **The first trail is the map's default start** (the one a plain `?map=<id>` rides). Make it the trail that
 starts at the course's normal spawn. Without `trails`, a map gets one trail `{ id: 'main', name: map.name, difficulty: 'blue' }`.
@@ -59,14 +61,15 @@ Without `mountain`, a map is its own mountain.
 ```js
 class DragonbackCourse {
   trailSpawn(trailId) {
-    const z = this.dropZones.find((d) => d.id === trailId);
-    return z ? { x: z.x, z: z.z, heading: z.heading } : null;   // null → the default spawn
+    const t = SPINE_STARTS[trailId];                           // your own table of starts
+    return t ? { x: t.x, z: t.z, heading: t.heading } : null;   // null → dropZone / the default spawn
   }
   // optional:
   trailFinish(trailId) { return trailId === 'south-gully' ? { x: 120, z: 900, radius: 40 } : null; }
 }
 ```
 
+- Order: `course.trailSpawn(trailId)`, then the trail's `dropZone`, then its `at`, then the default spawn.
 - `trailSpawn(trailId) → { x, z, heading } | null`. World metres; `heading` is the rider's yaw
   (`0` = facing −Z, the convention of `terrain.meta.spawn` and `player.place`). Return `null` (or omit the
   method) for the default start; any throw or non-finite value also falls back to the default spawn.
@@ -101,7 +104,9 @@ class DragonbackCourse {
 | `trailSpawnFor(course, trailId, terrain.getSpawn())` | `{ x, z, heading, fallback }` |
 | `trailFinishFor(course, trailId)` | `{ x, z, radius }`, `{ progress }` or `null` |
 | `trailBoardId(mapId, trailId)` | leaderboard id |
-| `extendMap(id, extra)` | re-register a map with extra fields (adapter for maps owned elsewhere) |
+| `extendMap(id, extra)` | re-register a map with extra fields |
+| `adaptMap(id, { mountain, trails })` | adapter for a map owned elsewhere: fills `mountain` / `trails` only where its own registration has none |
+| `findDropZone(course, name)` | |
 
 ## Mountains and trails today
 
