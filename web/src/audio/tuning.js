@@ -32,8 +32,8 @@ export const AUDIO = {
   },
   // First person (helmet cam) vs chase cam. fp: the rider's own ears inside the helmet.
   perspective: {
-    fp: { snow: 1.0, snowLow: 1.0, wind: 1.15, buffet: 1.0, whistle: 1.0, flap: 1.0, fx: 1.0 },
-    chase: { snow: 0.85, snowLow: 0.6, wind: 0.75, buffet: 0.3, whistle: 0.35, flap: 0.6, fx: 0.9 },
+    fp: { snow: 1.0, snowLow: 1.0, wind: 1.15, buffet: 1.0, whistle: 1.0, flap: 1.0, fx: 1.0, breath: 1.0, face: 1.0 },
+    chase: { snow: 0.85, snowLow: 0.6, wind: 0.75, buffet: 0.3, whistle: 0.35, flap: 0.6, fx: 0.9, breath: 0.35, face: 0.4 },
   },
 
   // ---------------------------------------------------------------- snow engine (worklet 'sendit-snow')
@@ -61,7 +61,8 @@ export const AUDIO = {
     // a snowboard's wide flat base: low rumble on hardpack
     base: { gain: 0.75, f: 230 },   // the board reference (snowboard on ice) peaks at 250 Hz
     // ice: thin harsh scrape on top of everything else
-    ice: { gain: 0.38, hp: 2200, bp: 3800, q: 1.0 },
+    ice: { gain: 0.38, hp: 2200, bp: 3800, q: 1.0,
+      scrape: { gain: 3.0, q: 8, fMin: 2000, fMax: 6000, walk: 0.06 } },   // narrow edge-scrape peaks wandering 2–6 kHz
     width: { ski: 0.75, board: 0.25 },   // stereo spread (two skis vs one board)
     out: 0.9,
   },
@@ -72,10 +73,10 @@ export const AUDIO = {
     exp: 1.6,             // level ∝ (v / vMax)^exp: ~10 dB / doubling (helmets measure ~15.5; loudness grows ~U^1.7)
     floor: 0.03,          // a breath of air even when slow
     // helmet buffeting: < 150 Hz, fluttering
-    buffet: { gain: 0.55, f: 110, flutterF: 7, flutterDepth: 0.7 },
+    buffet: { gain: 0.7, f: 110, flutterF: 7, flutterDepth: 0.7 },
     // the rush: two noise bands sweeping up with speed
     // the rush: 2-pole low-pass at 250 + 45·U Hz with a +5 dB bump at 150–400 Hz, a little pinna hiss on top
-    rush: { gain: 0.42, f0: 250, fPerV: 45, q: 0.7, bump: 0.8, bumpF: 280, bumpQ: 1.1, hiGain: 0.14, hiF0: 1100, hiExp: 0.7, hiQ: 0.7 },
+    rush: { gain: 0.8, f0: 250, fPerV: 45, q: 0.7, bump: 0.8, bumpF: 280, bumpQ: 1.1, hiGain: 0.14, hiF0: 1100, hiExp: 0.7, hiQ: 0.7 },
     // vortex-shedding whistles off helmet vents / goggle frame: f = St · v / d
     whistle: { gain: 0.05, st: 0.2, d1: 0.0042, d2: 0.0071, q: 40, from: 11 },
     // gusts: slow random level / airspeed swells
@@ -107,6 +108,11 @@ export const AUDIO = {
     nearMiss: { gain: 0.55 },
     hardBrake: { gain: 0.5 },
     grind: { gain: 0.5, sample: 0.55, scrape: 0.5, clank: 0.5 },
+    faceShot: { gain: 0.4, powder: 0.55, sink: 0.08, minSpeed: 7, minGap: 1.2 },   // powder thrown into the face at a turn
+    gate: { gain: 0.45 },               // a slalom pole whacked aside: hollow plastic clack + flex
+    lift: { gain: 0.16, creak: 0.12, tower: 0.45 },   // rope hum, chair creak, grip over the sheaves
+    // breathing: exertion fills with speed / turn load / stops, drains at rest; heard when slowing down after
+    breath: { gain: 0.3, fill: 0.09, drain: 0.035, from: 0.35, slowBelow: 3.5 },
   },
 
   // ---------------------------------------------------------------- per-map ambience (by map id)

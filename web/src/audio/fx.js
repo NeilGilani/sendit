@@ -107,6 +107,22 @@ export class FX {
     for (let i = 0; i < 5; i++) this.noise(when + 0.03 + i * rnd(0.03, 0.07), { f: rnd(2500, 5000) * (1 - 0.4 * powder), q: 1.2, gain: G * 0.25, decay: 0.04, pan: -0.3 * side });
   }
 
+  /** Face shot: deep powder flying up over the goggles and jacket — a soft whump and a fizz of flakes. */
+  faceShot(when, k = 1) {
+    const G = this.T.faceShot.gain * k;
+    this.noise(when, { buf: 'brown', type: 'lowpass', f: 700, q: 0.6, gain: G, attack: 0.05, decay: 0.35 });
+    this.noise(when + 0.03, { buf: 'pink', f: 3200, q: 0.7, gain: G * 0.45, attack: 0.08, hold: 0.1, decay: 0.5, type2: 'highpass', ff2: 1500 });
+    for (let i = 0; i < 6; i++) this.noise(when + 0.05 + Math.random() * 0.4, { f: rnd(4000, 7000), q: 2, gain: G * 0.12, decay: 0.02 });
+  }
+
+  /** Slalom gate: a hollow plastic pole knocked aside (two short modes) with a soft flex thud. */
+  gateClack(when, pan = 0) {
+    const G = this.T.gate.gain;
+    this.modal(when, [[rnd(780, 860), 1, 0.07], [rnd(2050, 2300), 0.6, 0.05], [rnd(3900, 4300), 0.3, 0.03]], G * 0.5, pan);
+    this.noise(when, { f: 2500, q: 1, gain: G * 0.4, decay: 0.015, pan });
+    this.thump(when + 0.01, { f: 140, f2: 80, gain: G * 0.3, decay: 0.08, pan });
+  }
+
   /** Take-off: the tail / skis unloading (a woody tock) and the snow they flick off. */
   takeoff(when, k = 1, board = 0, powder = 0) {
     const G = this.T.takeoff.gain * clamp(k, 0.3, 1.4);
@@ -172,7 +188,7 @@ export class FX {
     const c = this.ctx, d = c.createDelay(0.02), dg = c.createGain();
     d.delayTime.setValueAtTime(0.004, when); d.delayTime.linearRampToValueAtTime(0.009, when + 0.2); d.delayTime.linearRampToValueAtTime(0.004, when + 0.55);
     dg.gain.value = 0.5; g.connect(d); d.connect(dg); dg.connect(this.dest(pan));
-    this.noise(when + 0.1, { buf: 'brown', type: 'lowpass', f: 420, q: 0.6, gain: G * 0.8, attack: 0.08, decay: 0.25, pan: pan * 0.6 });
+    this.noise(when + 0.1, { buf: 'pink', f: 700, q: 0.8, gain: G * 0.6, attack: 0.08, decay: 0.25, pan: pan * 0.6 });   // body of the pass (the pass-by reference sits 500 Hz–8 kHz)
     if (tree) for (let i = 0; i < 4; i++) this.noise(when + 0.08 + i * rnd(0.03, 0.06), { f: rnd(4000, 6500), q: 1.2, gain: G * 0.25, decay: 0.05, pan });
   }
 

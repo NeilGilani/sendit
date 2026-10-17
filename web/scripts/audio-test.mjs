@@ -99,11 +99,16 @@ add('extreme-inputs', { seconds: 4, frames: frames(4, (t) => ({ speed: 80 * (t %
 add('extreme-full-volume', { seconds: 4, volumes: { master: 1, sfx: 1, music: 1 }, view: 'fp', map: 'ravenspire', musicTone: true,
   frames: frames(4, (t) => ({ speed: 45, edge: 1.2, load: 3, skid: 1.4, stop: 1, rock: 1, groomed: 0, st: t % 1 < 0.6 ? 1 : 2, air: 1, spin: 20, board: 1 })),
   events: [0.3, 0.9, 1.5, 2.1, 2.7, 3.3].map((t, i) => ({ t, name: i % 2 ? 'crashed' : 'landed', d: { impact: 25 } })) });
-if (traceDir) for (const type of ['ski', 'snowboard']) {
+add('lift-ride', { seconds: 10, frames: frames(10, () => ({ st: 4, speed: 0 })), events: [{ t: 2, name: 'liftTower' }, { t: 7, name: 'liftTower' }] });
+add('breath-after-run', { seconds: 26, view: 'fp',
+  frames: frames(26, (t) => (t < 16 ? { speed: 16, ...carve(t, 2.4, 1.0, 16), load: 1.9 } : { speed: Math.max(0, 16 - (t - 16) * 8), stop: t < 18 ? 1 : 0, skid: t < 18 ? 1.3 : 0 })) });
+add('powder-faceshot-fp', { seconds: 8, view: 'fp', frames: frames(8, (t) => ({ groomed: 0, powder: 1, deep: 1, sink: 0.22, speed: 11, ...carve(t, 2.2, 0.7, 11) })) });
+add('slalom-gates', { seconds: 6, frames: frames(6, (t) => ({ speed: 14, ...carve(t, 1.6, 0.9, 14) })), events: [0.8, 1.6, 2.4, 3.2, 4.0, 4.8].map((t) => ({ t, name: 'gate', d: { pass: true } })) });
+if (traceDir) for (const type of ['ski', 'snowboard', 'bigmountain']) {
   const f = join(traceDir, `trace-${type}.json`);
   if (!existsSync(f)) continue;
   const tr = JSON.parse(readFileSync(f, 'utf8'));
-  add(`trace-${type}`, { seconds: Math.min(40, tr.frames.length * tr.dt), frames: tr.frames, events: tr.events.map((e) => ({ t: e.t, name: e.name, d: e.d })), musicTone: true });
+  add(`trace-${type}`, { seconds: Math.min(40, tr.frames.length * tr.dt), map: type === 'bigmountain' ? 'ravenspire' : 'valcrest-gully', frames: tr.frames, events: tr.events.map((e) => ({ t: e.t, name: e.name, d: e.d })), musicTone: true });
 }
 
 // ---------------------------------------------------------------- run
@@ -149,6 +154,9 @@ if (has('wind-sweep')) {
 if (has('bigmountain-70mph-fp', 'bigmountain-70mph-chase')) expect(lvl('bigmountain-70mph-fp', 8) > lvl('bigmountain-70mph-chase', 8), 'first person is windier than the chase cam');
 if (has('jump-spin-grab-ski')) expect(Math.max(...R['jump-spin-grab-ski'].pk.slice(41, 46)) > Math.max(...R['jump-spin-grab-ski'].pk.slice(30, 38)) * 1.2, 'the landing stands out of the air');
 if (has('forest-ambience', 'idle-alpine')) expect(lvl('forest-ambience') > lvl('idle-alpine') * 0.8, 'the forest has its own bed');
+if (has('lift-ride')) expect(Math.max(...R['lift-ride'].pk.slice(20, 30)) > Math.max(...R['lift-ride'].pk.slice(40, 60)) * 1.5, 'a lift tower rattles over the rope hum');
+if (has('breath-after-run')) expect((R['breath-after-run'].events.breath || 0) >= 3 && !R['groomed-carve-ski']?.events.breath, 'the rider catches their breath after a hard run');
+if (has('powder-faceshot-fp')) expect((R['powder-faceshot-fp'].events.faceShot || 0) >= 2, 'deep powder turns throw face shots');
 if (has('park-crowd')) expect(lvl('park-crowd', 3.2, 5) > lvl('park-crowd', 0.5, 2.5) * 1.5, 'a clean park landing gets a cheer');
 await browser.close();
 if (errors.length) { console.log('page errors:', errors.slice(0, 5)); fails++; }

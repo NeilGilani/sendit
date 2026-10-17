@@ -12,6 +12,7 @@ const { Player, State } = await import('../src/player.js');
 const { Course } = await import('../src/course.js');
 const { game, Mode, on } = await import('../src/state.js');
 const { readRider } = await import('../src/audio/rider.js');
+const { RAVENSPIRE_PHYSICS } = await import('../src/maps/ravenspire/tuning.js');
 game.mode = Mode.RIDING;
 
 const outDir = process.argv[2] || '.';
@@ -67,6 +68,37 @@ function plain(d) {
   const o = {};
   for (const [k, v] of Object.entries(d)) if (v === null || ['number', 'string', 'boolean'].includes(typeof v)) o[k] = v;
   return o;
+}
+
+// Big-mountain speed: a 32° plane with Ravenspire's physics, mixed snow, long tucked arcs (≈ 25–30 m/s).
+function bigMountain(type) {
+  const g = Math.tan(38 * Math.PI / 180);
+  const T = {
+    half: 1e6, spacing: 1, course: { physics: RAVENSPIRE_PHYSICS },
+    getHeight: (x) => -g * x, baseHeight: (x) => -g * x,
+    getNormal: (x, z, r, out = new THREE.Vector3()) => out.set(g, 1, 0).normalize(),
+    getSurface: (x, z, out = new THREE.Vector4()) => { const k = 0.5 + 0.5 * Math.sin(x * 0.01); return out.set(0.5 * k, 0.5 * (1 - k) + 0.2, 0.3 * k, 0); },
+    isInside: () => true,
+    getSpawn: () => ({ position: new THREE.Vector3(), heading: -Math.PI / 2 }),
+  };
+  const p = new Player(T, null, null, { strength: () => 0, justPressed: () => false });
+  p.setEquipment(type); p.fadeThen = () => {}; p.flow?.dispose(); p.flow = null;
+  p.place(new THREE.Vector3(0, 0, 0), -Math.PI / 2);
+  const frames = [], events = [];
+  let t = 0;
+  const offs = EVENTS.map((name) => on(name, (d) => events.push({ t, name, d: plain(d) })));
+  p.script = (c) => { c.steer = Math.sin((t * 2 * Math.PI) / 6) * 0.12; c.tuck = t % 25 < 20 ? 1 : 0; c.brake = t % 25 > 24 ? 1 : 0; };
+  for (let i = 0; i < secs * 60; i++) { p.step(1 / 60); t += 1 / 60; frames.push(readRider(p, {})); }
+  offs.forEach((f) => f());
+  return { type, dt: 1 / 60, frames, events };
+}
+
+for (const type of ['bigmountain']) {
+  const tr = bigMountain('ski');
+  writeFileSync(join(outDir, `trace-${type}.json`), JSON.stringify(tr));
+  const v = tr.frames.map((f) => f.speed).sort((a, b) => a - b);
+  console.log(`
+${type}: speed p50 ${v[v.length >> 1].toFixed(1)} max ${v[v.length - 1].toFixed(1)} m/s`);
 }
 
 for (const type of ['ski', 'snowboard']) {

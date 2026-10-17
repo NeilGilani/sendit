@@ -121,6 +121,9 @@ The audio reads these events (read-only): `takeoff`, `jumped`, `landed`, `crashe
   AudioContext. Its `ensure()` now returns early when `window.__senditAudio.engine` exists, so grinds play once,
   through the main mix and settings.
 
+`PHYSICS.windRoar` (used by the old audio for Ravenspire) is no longer read. The wind worklet covers big-mountain
+speed on every map, and Ravenspire's gustier, louder map wind comes from `AUDIO.maps.ravenspire`.
+
 ## Fallback
 
 If AudioWorklet is unavailable, the engine falls back to the old sample loops (`snow_*`, `wind_*`), blended by the

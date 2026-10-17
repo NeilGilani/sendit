@@ -13,6 +13,8 @@ import { ST } from './rider.js';
 import { FX } from './fx.js';
 import { Grind } from './grind.js';
 import { Ambience } from './ambience.js';
+import { LiftVoice } from './lift.js';
+import { BreathVoice } from './breath.js';
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
@@ -91,12 +93,17 @@ export class AudioEngine {
     }
     this.grind = new Grind(c, this.fxBus, this.fx, this.T.fx.grind, this.buffers.grind_loop);
     this.amb = new Ambience(c, this.ambBus, this.fx, this.T.ambience, this.T.maps);
+    this.lift = new LiftVoice(c, this.ambBus, this.fx, this.T.fx.lift);
+    this.breath = new BreathVoice(c, this.fxBus, this.fx, this.T.fx.breath);
     this.amb.setMap(this.mapId);
     return this;
   }
 
   setMap(id) { this.mapId = id || 'default'; this.map = { ...this.T.maps.default, ...(this.T.maps[this.mapId] || {}) }; this.amb?.setMap(this.mapId); }
-  setView(v) { this.view = v === 'fp' ? 'fp' : 'chase'; }
+  setView(v) {
+    this.view = v === 'fp' ? 'fp' : 'chase';
+    this.fxBus?.gain.setTargetAtTime(this.T.mix.fx * this.T.perspective[this.view].fx, this.ctx.currentTime, 0.2);
+  }
 
   /** Settings volumes (0..1). */
   setVolumes({ master = 0.8, sfx = 0.8, music = 0.6 } = {}, when = this.ctx.currentTime) {
@@ -145,6 +152,9 @@ export class AudioEngine {
     this.grind.update(when, r.st === ST.GRIND && !quiet ? r.grindV : 0, r.grindKind, r.grindHop, r.board);
     // ---- ambience
     this.amb.update(when, dt, { riding: !o.menu, speed: r.speed });
+    this.lift.update(when, dt, r.st === ST.LIFT && !o.menu);
+    if (!quiet) this.breath.update(when, dt, r, persp.breath);
+    if (this.breath.n) this.stats.events.breath = this.breath.n;
     // ---- music duck
     this.crashT -= dt;
     const D = T.duck;
@@ -177,6 +187,13 @@ export class AudioEngine {
       if (this.edgeSide && r.edgeSign !== this.edgeSide && r.speed > F.edgeChange.minSpeed && when - this.lastEdgeT > F.edgeChange.minGap) {
         this.lastEdgeT = when;
         this.fx.edgeChange(when, clamp(r.speed / 14, 0.4, 1.2) * (0.6 + edge * 0.6), r.board, powder);
+        // deep powder: snow flies up into the face / goggles at the turn
+        const FS = F.faceShot;
+        if (powder > FS.powder && r.sink > FS.sink && r.speed > FS.minSpeed && when - (this.lastFace ?? -9) > FS.minGap) {
+          this.lastFace = when;
+          this.fx.faceShot(when + 0.08, clamp(r.speed / 12, 0.6, 1.3) * this.T.perspective[this.view].face);
+          this.count('faceShot');
+        }
         // skis: plant the pole on the inside of the new turn just as it starts
         const P = F.poleplant;
         if (!r.board && r.speed > P.minSpeed && r.speed < P.maxSpeed && r.tuck < 0.4 && when - this.lastPole > P.minGap && Math.random() < P.chance) {
@@ -211,12 +228,15 @@ export class AudioEngine {
       case 'landed': {
         const imp = d.rawImpact ?? d.impact ?? 3;
         if (imp > 4) this.landDuckT = 0.35;
+        if (imp > 9) { this.breath.jolt(0.2); this.breath.huff(when + 0.05, this.T.fx.breath.gain * 0.8 * this.T.perspective[this.view].breath); }
         this.fx.landing(when, imp, { powder, board });
         if (d.perfect || d.grade === 'stomped') this.amb.cheer(when + 0.25, 1);
         break;
       }
       case 'parkLanding': if (d.clean) this.amb.cheer(when + 0.2, clamp((d.dist ?? 15) / 20, 0.6, 1.3)); break;
-      case 'crashed': this.fx.crash(when, 1, powder); this.crashT = this.T.duck.crashHold; break;
+      case 'crashed': this.fx.crash(when, 1, powder); this.crashT = this.T.duck.crashHold; this.breath.jolt(0.35); this.breath.huff(when + 0.03, this.T.fx.breath.gain * this.T.perspective[this.view].breath); break;
+      case 'liftTower': this.lift.tower(when, d.k ?? 1); break;
+      case 'gate': if (d.pass && !board) this.fx.gateClack(when, d.side ?? 0); break;
       case 'nearMiss': this.fx.nearMiss(when, { pan: d.pan ?? 0, speed: r?.speed ?? 12, dist: d.dist, kind: d.kind }); break;
       case 'hardBrake': this.fx.hardBrake(when, typeof d === 'number' ? d : d.speed ?? 12, board, powder); break;
       case 'grindStart': this.grind.setKind(d.kind, when, true); this.grind.clank(when, d.kind, 1); break;
