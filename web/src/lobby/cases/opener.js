@@ -165,9 +165,9 @@ class Opener {
       if (k > 0.55 && !this.tense) { this.tense = true; this.el.classList.add('tense'); }
       if (k > 0.3 && k < 0.9 && !this.stopRiser && !this.frozen && !this.skipped) this.stopRiser = caseSfx.riser(T.spinDur * 0.7);
       this.trace.push({ t: +t.toFixed(4), x: +x.toFixed(2), v: +v.toFixed(1), card: cell });
-      if (k >= 1 && this.phase === 'spin') { this.phase = 'hold'; this.holdAt = t; this.land(); }
+      if (k >= 1 && this.phase === 'spin') { this.phase = 'hold'; this.land(); }
     }
-    if (this.phase === 'hold' && t - this.holdAt >= T.hold) { this.phase = 'reveal'; this.reveal(); }
+    if (this.phase === 'hold' && t >= T.spin + T.spinDur + T.hold) { this.phase = 'reveal'; this.reveal(); }
     if (this.particles) this.drawFx(now);
   }
 

@@ -7,7 +7,7 @@
 .cr-overlay.on { opacity: 1; }
 .cr-overlay.out { opacity: 0; transition: opacity .25s; }
 .cr-dim { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 50%, rgba(10, 12, 30, 0.72), rgba(4, 5, 14, 0.95) 75%); }
-.cr-overlay.revealed .cr-dim { animation: crFlash .9s ease-out; }
+.cr-overlay.revealed .cr-dim { animation: crFlash .9s ease-out; background: radial-gradient(ellipse at 50% 50%, rgba(10, 12, 30, 0.86), rgba(4, 5, 14, 0.97) 75%); }
 @keyframes crFlash { 0% { background-color: var(--rc); } 100% { background-color: transparent; } }
 .cr-head { position: absolute; top: 9%; left: 0; right: 0; text-align: center; transition: opacity .4s, transform .4s; }
 .cr-head small { display: block; font-size: .8em; letter-spacing: .3em; text-transform: uppercase; color: rgba(255,255,255,.6); font-weight: 800; }
