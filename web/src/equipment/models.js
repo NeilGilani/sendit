@@ -16,7 +16,9 @@ import { toonMaterial, outlineMaterial } from '../world.js';
 import { getEquipmentSpec, normalizeType } from './registry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-const PATTERNS = { solid: 0, stripe: 1, fade: 2, chevron: 3, split: 4 };
+// 5+ are the legendary topsheets of the reward cases (specs.js, profile/items.js GOLD_ITEMS): metal,
+// mirror chrome, holographic foil, and animated flames, galaxy and aurora.
+const PATTERNS = { solid: 0, stripe: 1, fade: 2, chevron: 3, split: 4, gold: 5, chrome: 6, holo: 7, inferno: 8, galaxy: 9, aurora: 10 };
 /** Topsheet patterns a graphic can use (spec.graphic.pattern) — for paint menus. */
 export const GRAPHIC_PATTERNS = Object.keys(PATTERNS);
 const SKI_SPACING = 0.13;   // boot centre → ski centre line (m)
@@ -169,7 +171,10 @@ function plankMaterial(spec) {
   return toonMaterial({
     name: 'plank', rim: 0.6,
     vertPars: 'attribute vec3 aPlank; varying vec3 vP;', vert: 'vP = aPlank;',
-    fragPars: 'varying vec3 vP; uniform vec3 uBase, uTop, uTop2, uAccent, uEdgeCol; uniform float uPattern;',
+    fragPars: `varying vec3 vP; uniform vec3 uBase, uTop, uTop2, uAccent, uEdgeCol; uniform float uPattern;
+float plHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float plNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(plHash(i), plHash(i + vec2(1, 0)), f.x), mix(plHash(i + vec2(0, 1)), plHash(i + vec2(1, 1)), f.x), f.y); }`,
     frag: /* glsl */`
       {
         float along = vP.x, across = vP.y, top = step(0.5, vP.z);
@@ -184,15 +189,60 @@ function plankMaterial(spec) {
           float ch = fract(along * 7.0 + abs(across) * 0.6);
           t = mix(uTop, uTop2, step(0.5, ch));
           t = mix(t, uAccent, smoothstep(0.05, 0.0, abs(along - 0.5)));
-        } else if (uPattern > 3.5) {                       // split colourway with accent seam
+        } else if (uPattern > 3.5 && uPattern < 4.5) {     // split colourway with accent seam
           t = mix(uTop, uTop2, step(0.0, across + 0.15 * sin(along * 12.0)));
           t = mix(t, uAccent, smoothstep(0.08, 0.0, abs(across + 0.15 * sin(along * 12.0))));
+        }
+        vec3 legendGlow = vec3(0.0);
+        if (uPattern > 4.5) {
+          vec3 V = normalize(cameraPosition - vW);
+          vec3 N = normalize(vWN);
+          float ndv = abs(dot(N, V));
+          vec3 R = reflect(-V, N);
+          if (uPattern < 5.5) {                            // gold leaf: brushed metal, engraved scrolls, light sweeps
+            float brush = 0.5 + 0.5 * sin(across * 60.0 + plNoise(vec2(along * 80.0, across * 4.0)) * 3.0);
+            t = mix(uTop2, uTop, 0.55 + 0.45 * brush);
+            float scroll = abs(fract(along * 14.0 + sin(across * 5.0 + along * 30.0) * 0.12) - 0.5);
+            t = mix(t, uTop2 * 0.55, (1.0 - smoothstep(0.02, 0.05, scroll)) * 0.7);
+            float sweep = pow(max(0.0, sin(along * 9.0 + dot(V, vec3(4.0, 2.0, 3.0)) * 3.0 + uTime * 0.6)), 12.0);
+            legendGlow = uAccent * (sweep * 0.9 + pow(1.0 - ndv, 3.0) * 0.4);
+          } else if (uPattern < 6.5) {                     // mirror chrome: sky above, dark horizon, snow below
+            float h = R.y + plNoise(vec2(along * 3.0, across)) * 0.05;
+            t = h > 0.02 ? mix(vec3(0.75, 0.82, 0.92), vec3(0.98), smoothstep(0.02, 0.6, h)) : mix(uTop2 * 0.25, vec3(0.86, 0.88, 0.9), smoothstep(-0.02, -0.4, h));
+            t = mix(t, vec3(0.05), (1.0 - smoothstep(0.0, 0.03, abs(h - 0.02))) * 0.8);
+            legendGlow = t * 0.35 + vec3(1.0) * pow(max(0.0, dot(R, normalize(vec3(0.3, 0.8, 0.2)))), 80.0) * 2.0;
+          } else if (uPattern < 7.5) {                     // holographic foil: rainbow by angle and position, glints
+            float hue = along * 2.5 + ndv * 2.2 + across * 0.4 + uTime * 0.04;
+            t = 0.5 + 0.5 * cos(6.2831 * (vec3(0.0, 0.33, 0.67) + hue));
+            float grate = step(0.92, fract(across * 18.0 + along * 60.0 + ndv * 6.0));
+            legendGlow = t * 0.45 + grate * 0.6;
+          } else if (uPattern < 8.5) {                     // inferno: flames racing from the tail to the tip
+            float y = 1.0 - along;
+            float n = plNoise(vec2(across * 3.0, along * 9.0 + uTime * 2.4)) * 0.6 + plNoise(vec2(across * 7.0, along * 20.0 + uTime * 4.0)) * 0.4;
+            float f = smoothstep(0.15, 0.85, y + n * 0.55 - 0.25);
+            vec3 fire = mix(uTop2, uAccent, smoothstep(0.55, 0.95, f));
+            t = mix(uTop, fire, smoothstep(0.25, 0.5, f));
+            legendGlow = fire * smoothstep(0.3, 0.9, f) * 1.4;
+          } else if (uPattern < 9.5) {                     // galaxy: nebula clouds and twinkling stars
+            float neb = plNoise(vec2(along * 6.0, across * 2.0)) * 0.6 + plNoise(vec2(along * 14.0 + 3.0, across * 5.0)) * 0.4;
+            t = mix(uTop, uTop2, smoothstep(0.45, 0.85, neb));
+            vec2 g = vec2(along * 70.0, across * 6.0);
+            float st = step(0.93, plHash(floor(g))) * (1.0 - smoothstep(0.08, 0.3, length(fract(g) - 0.5)));
+            st *= 0.6 + 0.4 * sin(uTime * 3.0 + plHash(floor(g) + 3.1) * 30.0);
+            legendGlow = uTop2 * smoothstep(0.55, 0.9, neb) * 0.5 + uAccent * st * 2.0;
+            t += uAccent * st;
+          } else {                                         // aurora: slow green / violet ribbons
+            float w = sin(across * 2.5 + along * 11.0 + uTime * 0.9 + plNoise(vec2(along * 4.0, uTime * 0.2)) * 3.0);
+            float rib = smoothstep(0.4, 1.0, w), rib2 = smoothstep(0.6, 1.0, sin(across * 3.0 - along * 7.0 + uTime * 0.6));
+            t = uTop + uTop2 * rib * 0.9 + uAccent * rib2 * 0.7;
+            legendGlow = uTop2 * rib * 0.9 + uAccent * rib2 * 0.6;
+          }
         }
         vec3 col = mix(uBase, t, top);
         float side = smoothstep(0.86, 0.97, abs(across));
         col = mix(col, uEdgeCol * 0.6 + 0.3, side * top * 0.5);
         diffuseColor.rgb = col;
-        toonEmissive = uEdgeCol * side * 1.1 + uAccent * top * smoothstep(0.03, 0.0, abs(abs(across) - 0.92)) * 0.4;
+        toonEmissive = uEdgeCol * side * 1.1 + uAccent * top * smoothstep(0.03, 0.0, abs(abs(across) - 0.92)) * 0.4 + legendGlow * top;
       }`,
     uniforms: {
       uBase: { value: c(gr.base) }, uTop: { value: c(gr.top) }, uTop2: { value: c(gr.top2) },

@@ -2,12 +2,17 @@
 // Add a tab: create lobby/tabs/<name>.js calling registerLobbyTab({...}) and import it below
 // (or import it from anywhere before the lobby is shown — the tab bar updates live).
 import './tabs/equipment.js';
-import './tabs/character.js';
+import './tabs/cases.js';
+import './tabs/locker.js';      // replaces the free colourway picker (tabs/character.js) now that skins are earned
 import './tabs/maps.js';
 import './tabs/multiplayer.js';
 import './tabs/leaderboards.js';
 import './tabs/profile.js';
 import './tabs/settings.js';
+
+import { installCaseNotifications } from './cases/notify.js';
+
+installCaseNotifications();
 
 export { Lobby } from './Lobby.js';
 export { LobbyStage } from './stage.js';

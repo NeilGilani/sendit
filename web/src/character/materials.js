@@ -4,6 +4,7 @@
 // + grazing sky sheen). The colours are uniforms, so a colourway change is free.
 import * as THREE from 'three';
 import { toonMaterial } from '../world.js';
+import { PATTERNS, FINISHES, DECALS } from './outfits.js';
 
 const col = (c) => new THREE.Color(c);
 
@@ -50,6 +51,156 @@ vec3 chBump(vec3 pos, vec3 n, float h, float fd) {
 }
 `;
 
+// Reward prints (character/outfits.js PATTERNS): q = (u around the piece 0..1, v height / length in
+// metres), K = repeats around the piece, bandY = where a chest / knee band, a fade or the skull's mouth
+// sits. `ink` returns the print's ink mask (neon finishes light it up).
+const PRINTS = /* glsl */`
+vec3 chPrint(float pat, vec2 q, float K, vec3 base, vec3 A, vec3 B, float bandY, out float ink) {
+  ink = 0.0;
+  if (pat < 0.5) return base;
+  float uc = q.x - floor(q.x + 0.5);
+  if (pat < 1.5) {                                  // 1 camo: three-colour woodland blobs
+    float n1 = chPerlin(vec2(q.x * K, q.y * 6.5), K) + 0.35 * chPerlin(vec2(q.x * K * 2.0, q.y * 13.0), K * 2.0);
+    float n2 = chPerlin(vec2(q.x * K + 7.0, q.y * 6.5 + 3.7), K) + 0.35 * chPerlin(vec2(q.x * K * 2.0 + 3.0, q.y * 13.0 + 1.3), K * 2.0);
+    float a = smoothstep(0.16, 0.2, n1), b = smoothstep(0.2, 0.24, n2) * (1.0 - a);
+    ink = a;
+    return mix(mix(base, A, a), B, b);
+  }
+  if (pat < 2.5) {                                  // 2 digital camo: blocky pixels
+    vec2 cell = floor(vec2(q.x * K * 5.0, q.y * 30.0));
+    float n = chNoise(cell * 0.32) + 0.5 * (chHash(cell) - 0.5);
+    float a = step(0.22, n), b = step(n, -0.3);
+    ink = a;
+    return mix(mix(base, A, a), B, b);
+  }
+  if (pat < 3.5) {                                  // 3 stripes around the piece
+    float st = step(0.62, fract(q.x * K * 2.0));
+    ink = st;
+    return mix(base, A, st);
+  }
+  if (pat < 4.5) {                                  // 4 retro band: wide band + pinstripe
+    float d = q.y - bandY;
+    float b1 = step(0.0, d) * step(d, 0.075), b2 = step(0.09, d) * step(d, 0.115);
+    ink = b1 + b2;
+    return mix(mix(base, A, b1), B, b2);
+  }
+  if (pat < 5.5) {                                  // 5 two-tone diagonal split
+    float s = uc * 1.3 + (q.y - bandY) * 0.9;
+    float a = step(0.0, s);
+    ink = a;
+    return mix(B, A, a);
+  }
+  if (pat < 6.5) {                                  // 6 90s zigzag bands
+    float zz = abs(fract(q.x * K * 2.5) - 0.5) * 0.09;
+    float t = fract((q.y + zz) * 5.0);
+    float a = step(0.5, t) * step(t, 0.72), b = step(0.78, t) * step(t, 0.9);
+    ink = a + b;
+    return mix(mix(base, A, a), B, b);
+  }
+  if (pat < 7.5) {                                  // 7 checkerboard
+    float c = mod(floor(q.x * K * 3.0) + floor(q.y * 22.0), 2.0);
+    ink = c;
+    return mix(base, A, c);
+  }
+  if (pat < 8.5) {                                  // 8 fade: B at the bottom to A at the top
+    float f = smoothstep(bandY - 0.35, bandY + 0.3, q.y);
+    return mix(B, A, f);
+  }
+  if (pat < 9.5) {                                  // 9 flames licking up from the bottom (they flicker)
+    float h = q.y - (bandY - 0.42);
+    float n = chPerlin(vec2(q.x * K * 2.0, q.y * 7.0 - uTime * 1.3), K * 2.0) * 0.09 + chPerlin(vec2(q.x * K * 4.0, q.y * 12.0 - uTime * 2.1), K * 4.0) * 0.04;
+    float f = h - 0.2 - n;
+    float flame = 1.0 - smoothstep(-0.01, 0.01, f);
+    float core = 1.0 - smoothstep(-0.16, -0.04, f);
+    ink = flame;
+    return mix(base, mix(A, B, core), flame);
+  }
+  if (pat < 10.5) {                                 // 10 tie-dye swirl
+    vec2 d = vec2(uc * 1.4, q.y - bandY);
+    float r = length(d), a = atan(d.y, d.x);
+    float t = sin(r * 26.0 + a * 2.0 + chPerlin(vec2(q.x * K, q.y * 4.0), K) * 2.5);
+    return mix(mix(base, A, smoothstep(0.2, 0.6, t)), B, smoothstep(-0.2, -0.65, t));
+  }
+  if (pat < 11.5) {                                 // 11 topographic contours
+    float topo = chPerlin(vec2(q.x * K * 1.5, q.y * 22.0), K * 1.5) * 0.8 + chPerlin(vec2(q.x * K * 3.0 + 3.0, q.y * 44.0), K * 3.0) * 0.25;
+    float tl = topo * 7.0;
+    float contour = 1.0 - smoothstep(0.0, fwidth(tl) * 1.2 + 0.04, 0.5 - abs(fract(tl) - 0.5));
+    ink = contour;
+    return mix(base, mix(base, vec3(0.85, 0.82, 0.74), 0.4), contour * 0.75);
+  }
+  if (pat < 12.5) {                                 // 12 skull jaw (gaiter): teeth, jaw and cheekbones on the front
+    float x = uc * 0.5;                             // ~arc metres around the face, 0 = front
+    float teeth = step(abs(q.y - bandY), 0.016) * step(abs(x), 0.06) * step(0.16, fract(x * 95.0 + 0.5));
+    float jaw = chLine(q.y - (bandY - 0.045 + x * x * 7.0), 0.0035) * step(abs(x), 0.085);
+    float cheek = chLine(q.y - (bandY + 0.04 - x * x * 5.0), 0.003) * step(0.02, abs(x)) * step(abs(x), 0.08);
+    float chin = chLine(abs(x) - 0.02 - (bandY - q.y) * 0.25, 0.0025) * step(q.y, bandY - 0.02) * step(bandY - 0.07, q.y);
+    float a = clamp(teeth + jaw + cheek + chin, 0.0, 1.0);
+    ink = a;
+    return mix(base, A, a);
+  }
+  if (pat < 13.5) {                                 // 13 stars
+    vec2 g = vec2(q.x * K * 3.0, q.y * 18.0);
+    vec2 cell = floor(g), f = fract(g) - 0.5;
+    float h = chHash(cell);
+    float r = length(f), a = atan(f.y, f.x);
+    float star = step(r, 0.2 * (0.62 + 0.38 * cos(a * 5.0 + h * 6.28))) * step(0.45, h);
+    ink = star;
+    return mix(base, A, star);
+  }
+  if (pat < 14.5) {                                 // 14 tiger stripes
+    float s = sin(q.x * K * 6.2831 * 1.5 + chPerlin(vec2(q.x * K, q.y * 5.0), K) * 3.0 + q.y * 9.0);
+    float st = smoothstep(0.55, 0.62, s) * (0.6 + 0.4 * step(0.0, chPerlin(vec2(q.x * K * 2.0, q.y * 3.0), K * 2.0)));
+    ink = st;
+    return mix(base, A, st);
+  }
+  {                                                 // 15 paint splatter
+    vec2 g = vec2(q.x * K * 1.5, q.y * 7.0);
+    vec2 cell = floor(g), f = fract(g);
+    float h = chHash(cell), h2 = chHash(cell + 7.3);
+    vec2 c0 = vec2(0.3 + 0.4 * h, 0.3 + 0.4 * h2);
+    float d = length(f - c0) + 0.06 * chNoise(f * 18.0 + cell);
+    float blob = step(d, 0.12 + 0.18 * h2) * step(0.25, h);
+    float drop = step(length(f - c0 - vec2(0.22, -0.18)), 0.04) * step(0.25, h);
+    float a = max(blob, drop);
+    ink = a;
+    return mix(base, mix(A, B, step(0.6, h)), a);
+  }
+}
+// Finish ids (outfits.js FINISHES): 1 metallic, 2 reflective, 3 iridescent, 4 neon, 5 gloss.
+void chFinish(float f, inout vec3 c) {
+  if (f < 0.5) return;
+  if (f < 1.5) { fabMetal = 1.0; fabRough = 0.3; fabSpec = 0.6; fabSheen = 0.05; c *= 0.75; }
+  else if (f < 2.5) { fabRefl = 1.0; fabRough = 0.45; fabSpec = 0.9; fabSheen = 0.5; }
+  else if (f < 3.5) { fabIri = 1.0; fabRough = 0.35; fabSpec = 0.9; fabSheen = 0.6; c *= 0.7; }
+  else if (f < 4.5) { fabRough = 0.5; fabSpec = 0.6; }
+  else { fabRough = 0.32; fabSpec = 1.1; }
+}
+`;
+
+// Finishes on top of the fabric light (fabric only): metal, retro-reflective tape, oil-slick iridescence.
+const FINISH_LIGHT = /* glsl */`
+  {
+    vec3 Vv2 = normalize(vViewPosition);
+    float NoV2 = clamp(dot(normal, Vv2), 0.0, 1.0);
+    if (fabMetal > 0.0) {
+      vec3 Hm = normalize(sunV + Vv2);
+      float spec = pow(clamp(dot(normal, Hm), 0.0, 1.0), 48.0);
+      float fr = pow(1.0 - NoV2, 2.0);
+      toonAdd += fabMetal * diffuseColor.rgb * (uSunCol * shadow * spec * 6.0 + sky * (0.6 + 1.8 * fr));
+      light *= mix(1.0, 0.45, fabMetal);
+    }
+    if (fabRefl > 0.0) {
+      // Retro-reflective: bounces light straight back, so it flares when you look along the light.
+      float back = pow(clamp(dot(Vv2, sunV), 0.0, 1.0), 6.0);
+      toonAdd += fabRefl * vec3(0.92, 0.95, 1.0) * (pow(NoV2, 5.0) * (sky * 1.6 + uSunCol * 0.25) + back * uSunCol * shadow * 1.4);
+    }
+    if (fabIri > 0.0) {
+      vec3 ir = 0.5 + 0.5 * cos(6.2831 * (vec3(0.0, 0.33, 0.67) + NoV2 * 1.7 + vObj.y * 1.2));
+      toonAdd += fabIri * ir * (sky * 1.3 + uSunCol * shadow * 0.35) * (0.4 + 0.6 * (1.0 - NoV2));
+    }
+  }
+`;
+
 // Fabric light: runs inside toonMaterial's lighting block (normal, sunV, ndl, shadow, sky, light in scope).
 const FABRIC_LIGHT = /* glsl */`
   {
@@ -87,6 +238,11 @@ export function fabricMaterial() {
     uMitt: { value: col('#9c6f45') }, uGauntlet: { value: col('#1c1c1b') }, uStyle: { value: 0 },
     uHemY: { value: new THREE.Vector3(0.84, 0.15, 0.69) },    // jacket hem, pants cuff, sleeve end
     uHide: { value: 0 },
+    // Reward looks (applyLook): x = print, y = scale, z = finish; A / B = the print's colours.
+    uJPat: { value: new THREE.Vector4(0, 1, 0, 0) }, uJPatA: { value: col('#222222') }, uJPatB: { value: col('#888888') },
+    uPPat: { value: new THREE.Vector4(0, 1, 0, 0) }, uPPatA: { value: col('#222222') }, uPPatB: { value: col('#888888') },
+    uGPat: { value: new THREE.Vector4(11, 1, 0, 0) }, uGPatA: { value: col('#e9e6dc') }, uGPatB: { value: col('#888888') },
+    uMPat: { value: new THREE.Vector4(0, 1, 0, 0) }, uMPatA: { value: col('#222222') },
   };
   const m = toonMaterial({
     name: 'riderFabric', rim: 0.25, uniforms: U,
@@ -95,7 +251,10 @@ export function fabricMaterial() {
     fragPars: `${COMMON}
 varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj;
 uniform vec3 uJacket, uPanel, uAccent, uGaiter, uPants, uCuff, uMitt, uGauntlet; uniform float uStyle; uniform vec3 uHemY;
-float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fabAO = 1.0, fabH = 0.0;`,
+uniform vec4 uJPat, uPPat, uGPat, uMPat; uniform vec3 uJPatA, uJPatB, uPPatA, uPPatB, uGPatA, uGPatB, uMPatA;
+float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fabAO = 1.0, fabH = 0.0;
+float fabMetal = 0.0, fabRefl = 0.0, fabIri = 0.0;
+${PRINTS}`,
     frag: /* glsl */`
       {
         float id = floor(vG.x + 0.5);
@@ -105,6 +264,7 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
         float seam = 0.0, zip = 0.0, tape = 0.0;
         float wr = 1.0;                            // wrinkle strength
         vec2 wf = vec2(14.0, 4.0);                 // wrinkle frequency (around u, along v): long drape folds
+        float ink = 0.0;                           // the print's ink mask (neon finishes glow there)
         if (id < 0.5) {
           // ---------------- jacket body: x = arc metres from the centre front
           float x = uc * 1.42, ax = abs(x);
@@ -114,7 +274,9 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
           float sideP = 1.0 - step(0.055, abs(abs(uc) - 0.25) * 1.42);
           float panel = max(yoke, sideP * step(v, yokeY));
           if (uStyle > 0.5) panel = yoke;                    // style 1: yoke + colour-blocked sleeves, no side panels
-          c = mix(uJacket, uPanel, panel);
+          vec3 jb = chPrint(uJPat.x, vec2(u, v), floor(8.0 * uJPat.y + 0.5), uJacket, uJPatA, uJPatB, 1.18, ink);
+          if (uJPat.x > 0.5 && abs(uJPat.x - 4.0) > 0.5) panel = 0.0;   // a print covers the panels (bands keep them)
+          c = mix(jb, uPanel, panel);
           seam += chLine(v - yokeY, 0.0022);
           seam += chLine(abs(abs(uc) - 0.25) * 1.42 - 0.055, 0.0022) * step(v, yokeY);
           // accent piping along the front yoke seam
@@ -160,7 +322,10 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
           float rw = 0.06 + (0.42 - v) * 0.1;
           float raglan = (1.0 - step(rw, abs(a))) * step(v, 0.42);
           float block = uStyle > 0.5 ? 1.0 : 0.0;
-          c = mix(uJacket, uPanel, max(max(raglan, cap) * (1.0 - block), block));
+          vec3 jb = chPrint(uJPat.x, vec2(u, v), floor(4.0 * uJPat.y + 0.5), uJacket, uJPatA, uJPatB, 0.42, ink);
+          if (uJPat.x > 0.5 && abs(uJPat.x - 4.0) > 0.5) { raglan = 0.0; cap = 0.0; block = 0.0; }
+          if (abs(uJPat.x - 5.0) < 0.5) jb = side > 0.5 ? uJPatA : uJPatB;   // two-tone: one sleeve each
+          c = mix(jb, uPanel, max(max(raglan, cap) * (1.0 - block), block));
           seam += max(chLine(abs(a) - rw, 0.002) * step(capV, v) * step(v, 0.42), chLine(v - capV, 0.002) * step(rw, abs(a))) * (1.0 - block);
           // elbow articulation darts (back of the arm)
           float ea = (uc + 0.25) * 0.62;
@@ -187,7 +352,8 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
           outer -= floor(outer / 0.95 + 0.5) * 0.95; inner -= floor(inner / 0.95 + 0.5) * 0.95;
           float cuffBand = step(v, uHemY.y + 0.075);
           float kick = (1.0 - step(0.07, abs(inner))) * step(v, uHemY.y + 0.14);
-          c = mix(uPants, uCuff, max(cuffBand, kick));
+          vec3 pb = chPrint(uPPat.x, vec2(u, v), floor(6.0 * uPPat.y + 0.5), uPants, uPPatA, uPPatB, 0.6, ink);
+          c = mix(pb, uCuff, max(cuffBand, kick));
           seam += chLine(v - (uHemY.y + 0.075), 0.002);
           seam += chLine(chBox(vec2(inner, v - uHemY.y - 0.07), vec2(0.07, 0.07), 0.03), 0.0018) * (1.0 - cuffBand);
           // knee darts
@@ -218,14 +384,10 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
           wr = 1.4;
         } else if (id < 5.5) {
           // ---------------- fleece gaiter
-          // Heathered knit with fine vertical ribs and a small accent tag on the left.
+          // Heathered knit with fine vertical ribs and a small accent tag on the left; the print comes
+          // from the face slot (topographic contours by default, skull jaw, camo, flames…).
           float heather = chNoise(vec2(u * 90.0, v * 160.0)) * 0.4 + chNoise(vec2(u * 23.0, v * 50.0)) * 0.6;
-          c = uGaiter * (0.93 + 0.08 * heather);
-          // Topographic contour print (periodic around the tube), lighter than the base.
-          float topo = chPerlin(vec2(u * 6.0, v * 22.0), 6.0) * 0.8 + chPerlin(vec2(u * 12.0 + 3.0, v * 44.0), 12.0) * 0.25;
-          float tl = topo * 7.0;
-          float contour = 1.0 - smoothstep(0.0, fwidth(tl) * 1.2 + 0.04, 0.5 - abs(fract(tl) - 0.5));   // near integer levels
-          c = mix(c, mix(c, vec3(0.85, 0.82, 0.74), 0.4), contour * 0.75);
+          c = chPrint(uGPat.x, vec2(u, v), floor(4.0 * uGPat.y + 0.5), uGaiter, uGPatA, uGPatB, 1.632, ink) * (0.93 + 0.08 * heather);
           float rib = u * 6.2831853 * 110.0;
           fabH += sin(rib) * 0.00009 * (1.0 - smoothstep(0.3, 0.8, fwidth(rib)));
           c = mix(c, uAccent, 1.0 - step(0.0, chBox(vec2((uc - 0.2) * 0.5, v - 1.6), vec2(0.008, 0.005), 0.002)));
@@ -233,14 +395,14 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
           wr = 0.7;
         } else if (id < 6.5) {
           // ---------------- leather mitt: knuckle seam, thumb crease, worn highlights
-          c = uMitt * (0.85 + 0.15 * chNoise(vec2(u * 20.0, v * 80.0)));
+          c = chPrint(uMPat.x, vec2(u, v), 4.0, uMitt, uMPatA, uMPatA, 0.78, ink) * (0.85 + 0.15 * chNoise(vec2(u * 20.0, v * 80.0)));
           seam += chLine(v - 0.8, 0.0022);
           seam += chLine(uc * 0.3 - 0.0, 0.0018) * step(0.8, v);
           fabRough = 0.5; fabSheen = 0.18; fabSpec = 0.6;
           wr = 0.35; wf = vec2(9.0, 30.0);        // supple leather: a few soft creases, no crumple
         } else if (id > 7.5) {
-          // ---------------- hood worn up: yoke colour, a centre seam over the crown, accent lining
-          c = uPanel;
+          // ---------------- hood worn up: yoke colour (or the jacket's print), a centre seam over the crown
+          c = uJPat.x > 0.5 && abs(uJPat.x - 4.0) > 0.5 ? chPrint(uJPat.x, vec2(u, v + 1.0), 4.0, uJacket, uJPatA, uJPatB, 1.9, ink) : uPanel;
           seam += chLine(uc * 0.75, 0.002) + chLine((abs(uc) - 0.5) * 0.75, 0.002);
           seam += chLine(v - 0.93, 0.002);
           wr = 0.6; wf = vec2(12.0, 6.0);
@@ -254,6 +416,15 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
           c = mix(c, uAccent, (1.0 - step(0.0, chBox(tp - vec2(0.03, 0.0), vec2(0.008, 0.012), 0.003))));
           fabRough = 0.75;
           wr = 0.8;
+        }
+        // Finish of the piece's garment (jacket pieces, pants, mitts): metal, reflective, iridescent, neon.
+        float fin = (id < 1.5 || (id > 2.5 && id < 4.5) || id > 7.5) ? uJPat.z : (id < 2.5 ? uPPat.z : (id > 5.5 && id < 7.5 ? uMPat.z : 0.0));
+        chFinish(fin, c);
+        if (fin > 3.5 && fin < 4.5) {
+          // Neon: the print's ink glows, and so do the gauntlet straps.
+          vec3 glowCol = (id > 5.5 && id < 7.5) ? uMPatA : (id > 1.5 && id < 2.5 ? uPPatA : uJPatA);
+          toonEmissive += glowCol * ink * 0.9;
+          if (abs(id - 7.0) < 0.5) toonEmissive += uGauntlet * 0.5;
         }
         // Rolled edges / linings
         if (vLin > 0.5) { c = (id > 2.5 && id < 3.5) ? uAccent : c * 0.5; seam = 0.0; zip = 0.0; }
@@ -277,7 +448,7 @@ float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fa
         fabAO = (1.0 - seam * 0.25) * clamp(1.0 + vCrease * 22.0, 0.72, 1.1);
         diffuseColor.rgb = c;
       }`,
-    band: FABRIC_LIGHT,
+    band: FABRIC_LIGHT + FINISH_LIGHT,
   });
   extend(m, { normal: 'normal = chBump(-vViewPosition, normal, fabH, faceDirection);', key: 'fabric' });
   return m;
@@ -343,6 +514,29 @@ export function bodyMaterial(src) {
   return m;
 }
 
+// Helmet finishes on top of the fabric light: a chrome mirror of sky, horizon and snow, tinted metal,
+// and a soft pearl sheen that shifts hue with the angle.
+const HELMET_LIGHT = /* glsl */`
+  if (hChrome + hMetal + hPearl > 0.0) {
+    vec3 Vv3 = normalize(vViewPosition);
+    float NoV3 = clamp(dot(normal, Vv3), 0.0, 1.0);
+    vec3 nWd = inverseTransformDirection(normal, viewMatrix);
+    vec3 rd = reflect(normalize(vW - cameraPosition), nWd);
+    float h = clamp(rd.y, -1.0, 1.0);
+    vec3 env = h > 0.0 ? mix(uSkyAmb * 1.9 + uSunCol * 0.1, uSkyAmb * vec3(0.4, 0.6, 1.1), pow(h, 0.6)) : mix(uSkyAmb * 1.5, uGroundAmb * 1.3 + uSunCol * 0.45, smoothstep(0.0, -0.15, h));
+    float az = atan(rd.x, rd.z);
+    env = mix(env, uGroundAmb * 0.3, smoothstep(0.02, -0.01, h - 0.03 * sin(az * 6.0)) * smoothstep(-0.12, -0.04, h) * 0.8);
+    float sd = max(dot(rd, uSunDir), 0.0);
+    vec3 glint = uSunCol * (pow(sd, 600.0) * 60.0 + pow(sd, 24.0) * 0.8);
+    float F = 0.6 + 0.4 * pow(1.0 - NoV3, 3.0);
+    toonAdd += hChrome * (env * mix(vec3(1.0), diffuseColor.rgb * 1.4, 0.55) * 1.3 + glint) * F;
+    toonAdd += hMetal * diffuseColor.rgb * (env * 0.9 + glint * 0.6);
+    vec3 ir = 0.5 + 0.5 * cos(6.2831 * (vec3(0.0, 0.33, 0.67) + NoV3 * 1.4));
+    toonAdd += hPearl * mix(vec3(1.0), ir, 0.5) * (uSkyAmb * 0.9 + uSunCol * 0.12) * (0.4 + 0.6 * (1.0 - NoV3));
+    light *= 1.0 - hChrome * 0.85 - hMetal * 0.5;
+  }
+`;
+
 /**
  * Helmet shell, liner, strap, gasket. Attribute aR = region (0 shell, 1 liner, 2 strap, 3 clip,
  * 4 gasket), aUV = strap coordinates. Vents and ear pads are drawn from the bind-space position.
@@ -353,6 +547,8 @@ export function helmetMaterial(hs) {
     uStrap: { value: col('#1d1d1b') }, uStrapLogo: { value: col('#ff5b14') },
     uHelm: { value: new THREE.Vector4(hs.top, hs.cz, hs.halfW, hs.yEq) },   // crown y, centre z, half width, equator y
     uHide: { value: 0 },
+    // Reward looks (applyLook): x = shell finish (FINISHES), y = decal (DECALS); decal colour; goggle frame.
+    uHFin: { value: new THREE.Vector4(0, 0, 0, 0) }, uHDecal: { value: col('#ffffff') }, uFrame: { value: col('#252525') },
   };
   const m = toonMaterial({
     name: 'riderHelmet', rim: 0.35, uniforms: U,
@@ -361,7 +557,9 @@ export function helmetMaterial(hs) {
     fragPars: `${COMMON}
 varying float vR; varying vec2 vUV; varying vec3 vObj;
 uniform vec3 uShell, uLiner, uHAccent, uStrap, uStrapLogo; uniform vec4 uHelm;
-float fabRough = 0.62, fabSheen = 0.08, fabSheenRough = 0.5, fabSpec = 0.32, fabAO = 1.0, fabH = 0.0;`,
+uniform vec4 uHFin; uniform vec3 uHDecal, uFrame;
+float fabRough = 0.62, fabSheen = 0.08, fabSheenRough = 0.5, fabSpec = 0.32, fabAO = 1.0, fabH = 0.0;
+float hMetal = 0.0, hChrome = 0.0, hPearl = 0.0;`,
     frag: /* glsl */`
       {
         float r = floor(vR + 0.5);
@@ -369,6 +567,25 @@ float fabRough = 0.62, fabSheen = 0.08, fabSheenRough = 0.5, fabSpec = 0.32, fab
         vec3 p = vObj;
         float cz = uHelm.y, hw = uHelm.z;
         if (r < 0.5) {
+          // Decals (reward helmets): a racing stripe over the crown, hot-rod flames from the brim, stars.
+          {
+            float dec = 0.0;
+            float dy = p.y - uHelm.w;
+            if (abs(uHFin.y - 1.0) < 0.5) dec = (1.0 - step(0.024, abs(p.x))) + chLine(abs(p.x) - 0.034, 0.0022);
+            else if (abs(uHFin.y - 2.0) < 0.5) {
+              float front = smoothstep(cz - 0.15, cz + 0.12, p.z);
+              float tongue = 0.012 + front * (0.035 + 0.03 * (0.5 + 0.5 * sin(p.z * 140.0 + abs(p.x) * 40.0)));
+              dec = 1.0 - smoothstep(-0.002, 0.002, dy + 0.03 - tongue);
+              c = mix(c, mix(uHDecal, vec3(1.0, 0.85, 0.25), smoothstep(0.0, -0.03, dy + 0.03 - tongue * 0.6)), dec);
+              dec = 0.0;
+            } else if (abs(uHFin.y - 3.0) < 0.5) {
+              vec2 g = vec2(atan(p.x, p.z - cz) * 4.0, dy * 70.0);
+              vec2 cell = floor(g), f = fract(g) - 0.5;
+              float h = chHash(cell), rr = length(f), aa = atan(f.y, f.x);
+              dec = step(rr, 0.22 * (0.62 + 0.38 * cos(aa * 5.0 + h * 6.28))) * step(0.5, h) * step(-0.01, dy);
+            } else if (abs(uHFin.y - 4.0) < 0.5) dec = mod(floor(p.x * 60.0) + floor(p.z * 60.0), 2.0) * step(0.03, dy);
+            c = mix(c, uHDecal, clamp(dec, 0.0, 1.0));
+          }
           // Crown slots: two rows each side, running front to back, rounded ends.
           float crown = smoothstep(uHelm.w + 0.035, uHelm.w + 0.06, p.y);
           float slot = 1e3;
@@ -413,6 +630,18 @@ float fabRough = 0.62, fabSheen = 0.08, fabSheenRough = 0.5, fabSpec = 0.32, fab
           // A small accent mark low on the back, a thin parting line over the crown.
           c = mix(c, uHAccent, (1.0 - step(0.0, chBox(vec2(p.x, p.y - uHelm.w + 0.005), vec2(0.014, 0.004), 0.002))) * step(p.z, cz - 0.1));
           fabH -= chLine(abs(p.x) - 0.0, 0.0012) * step(cz + 0.02, p.z) * crown * 0.0004;
+          // Shell finish: 5 gloss, 1 metallic, 6 chrome, 7 carbon weave, 8 pearl.
+          float shell = (1.0 - pad) * (1.0 - vent);
+          float hf = uHFin.x;
+          if (abs(hf - 5.0) < 0.5) { fabRough = mix(fabRough, 0.18, shell); fabSpec = mix(fabSpec, 1.6, shell); }
+          else if (abs(hf - 1.0) < 0.5) { hMetal = shell; fabRough = mix(fabRough, 0.28, shell); }
+          else if (abs(hf - 6.0) < 0.5) { hChrome = shell; fabRough = mix(fabRough, 0.08, shell); fabSpec = mix(fabSpec, 2.5, shell); }
+          else if (abs(hf - 7.0) < 0.5) {
+            vec2 w = vec2(p.x + p.z, p.x - p.z) * 260.0;
+            float weave = step(0.5, fract(w.x)) == step(0.5, fract(w.y + floor(w.x) * 0.5)) ? 1.0 : 0.0;
+            c = mix(c, c * (0.55 + 0.9 * weave) + 0.02, shell);
+            fabRough = mix(fabRough, 0.22, shell); fabSpec = mix(fabSpec, 1.4, shell);
+          } else if (abs(hf - 8.0) < 0.5) { hPearl = shell; fabRough = mix(fabRough, 0.25, shell); fabSpec = mix(fabSpec, 1.2, shell); }
         } else if (r < 1.5) {
           c = uLiner; fabRough = 0.9; fabSpec = 0.08; fabSheen = 0.25;
         } else if (r < 2.5) {
@@ -432,11 +661,11 @@ float fabRough = 0.62, fabSheen = 0.08, fabSheenRough = 0.5, fabSpec = 0.32, fab
         } else if (r < 3.5) {
           c = vec3(0.03); fabRough = 0.8; fabSpec = 0.1;
         } else {
-          c = vec3(0.018); fabRough = 0.55; fabSpec = 0.3;
+          c = uFrame; fabRough = 0.55; fabSpec = 0.3;   // goggle frame / gasket
         }
         diffuseColor.rgb = c;
       }`,
-    band: FABRIC_LIGHT,
+    band: FABRIC_LIGHT + HELMET_LIGHT,
   });
   extend(m, { normal: 'normal = chBump(-vViewPosition, normal, fabH, faceDirection);', key: 'helmet' });
   return m;
@@ -445,13 +674,13 @@ float fabRough = 0.62, fabSheen = 0.08, fabSheenRough = 0.5, fabSpec = 0.32, fab
 /** Mirrored goggle lens: reflects a sky / snow environment in its tint, with a sun glint that blooms. */
 export function lensMaterial() {
   const U = {
-    uLens: { value: col('#f2a23a') }, uLensBase: { value: col('#b9471e') },
+    uLens: { value: col('#f2a23a') }, uLensBase: { value: col('#b9471e') }, uLensIri: { value: 0 },
   };
   const m = toonMaterial({
     name: 'riderLens', rim: 0.0, uniforms: U,
     vertPars: 'varying vec3 vObj;',
     vertPre: 'vObj = position;',
-    fragPars: 'uniform vec3 uLens, uLensBase; varying vec3 vObj;',
+    fragPars: 'uniform vec3 uLens, uLensBase; uniform float uLensIri; varying vec3 vObj;',
     frag: 'diffuseColor.rgb = uLensBase * 0.035;',
     band: /* glsl */`
       {
@@ -476,9 +705,31 @@ export function lensMaterial() {
         float sun = pow(sd, 900.0) * 260.0 + pow(sd, 30.0) * 1.5;
         float F = 0.5 + 0.5 * pow(1.0 - NoV, 4.0);
         vec3 tint = mix(uLens, mix(uLens, uLensBase, 0.5) * 1.3, smoothstep(0.8, 0.2, NoV));   // iridescent shift at grazing angles
+        vec3 rainbow = 0.5 + 0.5 * cos(6.2831 * (vec3(0.0, 0.33, 0.67) + NoV * 2.2 + vObj.x * 9.0));
+        tint = mix(tint, rainbow * (0.6 + 0.6 * uLens), uLensIri * smoothstep(1.0, 0.35, NoV) * 0.85);   // reward lenses: oil-slick rainbow
         toonAdd += (env * tint * 1.3 + uSunCol * sun * mix(tint, vec3(1.0), 0.6)) * F * mix(0.6, 1.0, occl);
         light *= 0.4;
       }`,
   });
   return m;
+}
+
+/**
+ * Push a resolved outfit's reward looks (prints, finishes, decals, frames; outfits.js) into the
+ * materials' uniforms. Missing fields fall back to plain (print 0, matte), the gaiter to its topo print.
+ */
+export function applyLook({ fabric, helmet, lens }, C) {
+  const F = fabric.userData.uniforms, H = helmet.userData.uniforms, L = lens.userData.uniforms;
+  const pat = (c, dflt = 0) => PATTERNS[c?.pat] ?? dflt;
+  const fin = (c) => FINISHES[c?.finish] ?? 0;
+  const set = (u, c, dflt) => { if (c) u.value.set(c); else if (dflt) u.value.set(dflt); };
+  const J = C.jacket || {}, P = C.pants || {}, G = C.face || {}, M = C.gloves || {}, Hm = C.helmet || {}, Gg = C.goggles || {};
+  F.uJPat.value.set(pat(J), J.patScale || 1, fin(J), 0); set(F.uJPatA, J.patA, J.accent); set(F.uJPatB, J.patB, J.panel);
+  F.uPPat.value.set(pat(P), P.patScale || 1, fin(P), 0); set(F.uPPatA, P.patA, P.cuff); set(F.uPPatB, P.patB, P.cuff);
+  F.uGPat.value.set(pat(G, PATTERNS.topo), G.patScale || 1, 0, 0); set(F.uGPatA, G.patA, '#e9e6dc'); set(F.uGPatB, G.patB, '#888888');
+  F.uMPat.value.set(pat(M), 1, fin(M), 0); set(F.uMPatA, M.patA, M.cuff);
+  if (G.base) F.uGaiter.value.set(G.base);
+  H.uHFin.value.set(FINISHES[Hm.finish] ?? 0, DECALS[Hm.decal] ?? 0, 0, 0); set(H.uHDecal, Hm.decalCol, Hm.accent);
+  set(H.uFrame, Gg.frame, '#252525');
+  L.uLensIri.value = Gg.iri || 0;
 }

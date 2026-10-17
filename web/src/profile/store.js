@@ -160,10 +160,10 @@ class ProfileStore {
     return res;
   }
 
-  /** Clear the "new" marker of a skin (or all of them). */
-  markSeen(key = null) {
+  /** Clear the "new" marker of a skin, of every skin in a slot, or of all of them. */
+  markSeen(key = null, slot = null) {
     const inv = this.profile.inventory.items;
-    const keys = key ? [key] : Object.keys(inv);
+    const keys = key ? [key] : Object.keys(inv).filter((k) => !slot || getItem(k.split(':')[0])?.slot === slot);
     if (!keys.some((k) => inv[k] && !inv[k].seen)) return;
     this.update((p) => { for (const k of keys) if (p.inventory.items[k]) p.inventory.items[k].seen = true; }, 'seen');
   }
