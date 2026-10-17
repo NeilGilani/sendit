@@ -369,7 +369,7 @@ await test('bad-luck protection: red or gold at least every PITY cases', () => {
     worst = Math.max(worst, since);
   }
   assert.ok(worst < rewards.PITY, `longest dry streak ${worst} < ${rewards.PITY}`);
-  assert.ok(pities > 0 && pities < 60, `${pities} pity pulls in 3000`);
+  assert.ok(pities > 0 && pities < 50, `${pities} pity pulls in 3000`);
 });
 
 await test('store: openCase persists the pull and emits rewards / caseEarned', () => {

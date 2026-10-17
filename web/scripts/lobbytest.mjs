@@ -276,7 +276,7 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await page.waitForSelector('.cr-overlay .cr-case', { timeout: 10000 });
   ok(true, 'the case box appears');
   await page.waitForFunction(() => document.querySelector('.cr-overlay.reel'), null, { timeout: 15000 });
-  const reel = await page.evaluate(() => ({ cards: document.querySelectorAll('.cr-strip .cr-card').length, gold: document.querySelectorAll('.cr-strip .cr-card.r-gold').length, tiers: new Set([...document.querySelectorAll('.cr-strip .cr-card')].map((c) => c.className.match(/r-(\w+)/)[1])).size }));
+  const reel = await page.evaluate(() => ({ cards: document.querySelectorAll('.cr-strip .cr-card').length, gold: document.querySelectorAll('.cr-strip .cr-card.r-gold').length, tiers: new Set([...document.querySelectorAll('.cr-strip .cr-card')].map((c) => c.className.match(/\br-(\w+)/)[1])).size }));
   ok(reel.cards === 60 && reel.tiers >= 4, `reel of ${reel.cards} cards in ${reel.tiers} grades`);
   // Let it spin a moment: the reel moves and slows down (CS2 curve).
   await page.waitForTimeout(2500);

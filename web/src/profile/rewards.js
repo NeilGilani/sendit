@@ -32,10 +32,11 @@ export const DISTANCE_MILESTONES = [
 ];
 export const MILESTONE_EVERY = 100000;
 /**
- * Bad-luck protection (disclosed in the Cases tab, like Apex's legendary pity): if this many cases in a
- * row open without a Covert (red) or gold item, the next one is red or gold (gold keeps its share).
+ * Bad-luck protection (disclosed in the Cases tab, like Apex's legendary pity): if PITY − 1 cases in a
+ * row open without a Covert (red) or gold item, the next one is Covert. It never forces gold, so gold
+ * stays at its 0.3 %; red goes from 1.3 % to about 2.1 % overall.
  */
-export const PITY = 40;
+export const PITY = 60;
 const HISTORY = 40;
 
 export function defaultRewards() {
@@ -117,11 +118,11 @@ function rollTier(odds, rng) {
   return RARITIES.find((r) => odds[r.id] > 0).id;
 }
 
-/** Roll one case: { key, item, variant, rarity }. `pity` = only red or gold can drop (same relative odds). */
+/** Roll one case: { key, item, variant, rarity }. `pity` = a Covert (red) item for sure. */
 export function rollCase(series, rng = Math.random, pity = false) {
   const pool = casePool(series);
   const odds = caseOdds(series);
-  if (pity) for (const r of RARITIES) if (RARITY[r.id].rank < RARITY.legendary.rank) odds[r.id] = 0;
+  if (pity) for (const r of RARITIES) if (r.id !== 'legendary') odds[r.id] = 0;
   const tier = rollTier(odds, rng);
   const e = pick(pool[tier], rng);
   return { ...e, rarity: tier };
