@@ -6,10 +6,7 @@
 //   4. mocked gamepad: RB switches tabs, Y swaps gear, d-pad + A activate, Start rides
 //   5. Ride → pause (Esc) → Back to lobby; checks the ride was recorded
 //   6. ?ride skips the lobby; pause → lobby still works (stage built lazily)
-//   7. legacy migration: old 'sendit.best' + settings.resort become a profile; a v1 profile keeps its
-//      look and gets a welcome case
-//   8. cases: a new rider owns only the plain kit; a finished run earns case XP (runCompleted);
-//      a case opens (box, reel, reveal), Equip now dresses the rider, the Locker lists the pull
+//   7. legacy migration: old 'sendit.best' + settings.resort become a v1 profile
 // Fails on any console error / page error.
 // GPU=1 renders on the real GPU (ANGLE D3D11): the lobby shows the full world behind the rider, which
 // is very slow on SwiftShader (minutes per run), so prefer GPU=1 where a GPU is available.
@@ -178,26 +175,10 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await ctx.close();
 }
 
-// ---------------------------------------------------------------- 7: migration from pre-lobby storage
-{
-  const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
-  await ctx.addInitScript(() => {
-    if (sessionStorage.getItem('seeded')) return;
-    sessionStorage.setItem('seeded', '1');
-    localStorage.clear();
-    localStorage.setItem('sendit.best', '4321');
-  });
-  const page = await newPage(ctx);
-  await page.goto(base);
-  await lobbyReady(page);
-  const p = await page.evaluate(() => JSON.parse(localStorage.getItem('sendit.profile')));
-  ok(p.version === 2 && p.stats.bestScore === 4321, 'legacy best score migrated into the profile');
-  ok(p.rewards.cases.length === 0 && Object.keys(p.inventory.items).length === 0, 'a first visit starts with no cases and no skins');
-  ok(p.loadout.equipment === 'skis' && p.loadout.slots.board?.item === 'board-northwake-twin', 'migrated profile has a full default loadout');
-  await ctx.close();
-}
-
-// ---------------------------------------------------------------- 7b: a v1 profile (before cases)
+// ---------------------------------------------------------------- cases (docs/rewards.md)
+// 6b. a v1 profile (before cases) keeps the skins it wore and gets a welcome case
+// 6c. a new rider owns only the plain kit; a finished run earns case XP (runCompleted); a case opens
+//     (box, reel, reveal), Equip now dresses the rider, the Locker lists the pull
 {
   const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
   await ctx.addInitScript(() => {
@@ -220,7 +201,7 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await ctx.close();
 }
 
-// ---------------------------------------------------------------- 8: cases, the reel, the locker
+// ---------------------------------------------------------------- 6c: cases, the reel, the locker
 {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   const page = await newPage(ctx);
@@ -303,6 +284,26 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await shot(page, 't5_locker');
   await ctx.close();
 }
+
+// ---------------------------------------------------------------- 7: migration from pre-lobby storage
+{
+  const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
+  await ctx.addInitScript(() => {
+    if (sessionStorage.getItem('seeded')) return;
+    sessionStorage.setItem('seeded', '1');
+    localStorage.clear();
+    localStorage.setItem('sendit.best', '4321');
+  });
+  const page = await newPage(ctx);
+  await page.goto(base);
+  await lobbyReady(page);
+  const p = await page.evaluate(() => JSON.parse(localStorage.getItem('sendit.profile')));
+  ok(p.version === 2 && p.stats.bestScore === 4321, 'legacy best score migrated into the profile');
+  ok(p.rewards.cases.length === 0 && Object.keys(p.inventory.items).length === 0, 'a first visit starts with no cases and no skins');
+  ok(p.loadout.equipment === 'skis' && p.loadout.slots.board?.item === 'board-northwake-twin', 'migrated profile has a full default loadout');
+  await ctx.close();
+}
+
 
 await browser.close();
 ok(errors.length === 0, `no console errors${errors.length ? `:\n  ${errors.slice(0, 8).join('\n  ')}` : ''}`);
