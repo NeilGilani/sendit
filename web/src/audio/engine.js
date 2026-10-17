@@ -248,7 +248,7 @@ export class AudioEngine {
     }
     // music low-pass: muffled in big air, dark on a bail, opens on landing
     // music energy (setMusicEnergy): mellow (low-passed) when calm, fully open as the ride heats up
-    let lp = this.energy === undefined ? 20000 : Math.min(20000, D.calmLp * Math.pow(20000 / D.calmLp, sstep(D.calmFrom, D.calmFull, this.energy)));
+    let lp = this.energy === undefined || o.menu ? 20000 : Math.min(20000, D.calmLp * Math.pow(20000 / D.calmLp, sstep(D.calmFrom, D.calmFull, this.energy)));
     if (r.st === ST.AIR && r.air > D.airLpAfter) lp = D.airLp;
     if (this.crashT > 0) lp = D.crashLp;
     lp = Math.round(lp / 50) * 50;
