@@ -198,6 +198,10 @@ export const CLOTHING_ITEMS = [
       { id: 'basic', name: 'Rental', starter: true, colors: cw('basic', 'face') },
       { id: 'tuff', name: 'Topo', rarity: 'common', series: 'first-chair', colors: { base: '#4a473f', pat: 'topo', patA: '#a8a291' } },
       { id: 'black', name: 'Blackout', rarity: 'common', series: 'night-park', colors: { base: '#18191b', pat: 'none' } },
+      // The gaiters the old colourways came with (a v1 rider keeps the one matching their jacket).
+      { id: 'nightshift', name: 'Nightshift', rarity: 'common', series: 'first-chair', colors: { ...cw('nightshift', 'face'), patA: '#a8a291' } },
+      { id: 'arcade', name: 'Arcade', rarity: 'common', series: 'night-park', colors: { ...cw('arcade', 'face'), patA: '#ffd23f' } },
+      { id: 'summit', name: 'Summit Crew', rarity: 'uncommon', series: 'first-chair', colors: { ...cw('summit', 'face'), patA: '#a8a291' } },
       { id: 'checker', name: 'Checkerboard', rarity: 'uncommon', series: 'night-park', colors: { base: '#f1f1ee', pat: 'checker', patA: '#141414' } },
       { id: 'woodland', name: 'Woodland', rarity: 'uncommon', series: 'first-chair', colors: { base: '#4d5a36', pat: 'camo', patA: '#2b2a1f', patB: '#8a7650' } },
       { id: 'skull', name: 'Skull Jaw', rarity: 'epic', series: 'first-chair', colors: { base: '#151517', pat: 'skull', patA: '#e9e6dc' } },

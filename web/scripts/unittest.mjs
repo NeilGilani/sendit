@@ -231,7 +231,8 @@ await test('migration v1 → v2: keeps the worn colourway, adds a welcome case a
   assert.equal(from, 1); assert.equal(profile.version, 2);
   assert.equal(profile.loadout.slots.jacket.variant, 'arcade', 'still wearing Arcade');
   assert.equal(profile.loadout.slots.helmet.variant, 'summit');
-  assert.equal(profile.loadout.slots.face.variant, 'basic', 'new face slot gets the starter');
+  assert.equal(profile.loadout.slots.face.variant, 'arcade', 'the gaiter of the old Arcade colourway becomes a face skin');
+  assert.ok(profile.inventory.items['face-gaiter:arcade']);
   for (const k of ['jacket-tuff-shell:arcade', 'pants-tuff-bib:arcade', 'helmet-tuff:summit', 'goggles-tuff:tuff', 'gloves-tuff-mitt:nightshift']) assert.ok(profile.inventory.items[k], k);
   assert.equal(profile.rewards.cases.length, 4, '1 welcome + 3 veteran cases (capped)');
   assert.equal(profile.rewards.cases[0].source, 'welcome');
@@ -452,6 +453,33 @@ await test('tracker: finished runs emit runCompleted and earn case XP; leaving c
   st.emit('juiceLevelUp', { level: 5, rankUp: true });
   assert.equal(profileStore.unopened.length, before + 1);
   assert.equal(profileStore.unopened.at(-1).source, 'rank');
+});
+
+await test('hardening: garbled saves do not back-pay milestones, lose cases or share case ids', () => {
+  const r = rewards.sanitizeRewards({ distance: 5e6, milestone: 0, cases: [{ series: 'first-chair' }, { series: 'first-chair' }, { id: 'x', series: 'nope' }] });
+  assert.equal(r.milestone, 5e6, 'passed milestones count as paid');
+  assert.equal(r.cases.length, 2);
+  assert.notEqual(r.cases[0].id, r.cases[1].id);
+  const p = schema.defaultProfile();
+  p.rewards = r;
+  const c = rewards.creditRun(p, { mapId: 'm', distance: 100, finished: false });
+  assert.ok(c.cases.length === 0 && c.xp < 10, 'no flood of milestone cases');
+  const many = rewards.sanitizeRewards({ cases: Array.from({ length: 700 }, (_, i) => ({ id: `k${i}`, series: 'night-park' })) });
+  assert.equal(many.cases.length, 500);
+  assert.equal(many.cases.at(-1).id, 'k699', 'the newest cases are kept');
+});
+
+await test('store: a deferred openCase saves at once but announces only at the reveal', () => {
+  profileStore.reset();
+  profileStore.grantCase('test');
+  const seen = [];
+  const offs = [on('rewards', (e) => seen.push(e.reason)), on('profile', (e) => seen.push(`p:${e.reason}`))];
+  const res = profileStore.openCase(null, rewards.seeded(9), { defer: true });
+  assert.deepEqual(seen, [], 'nothing announced while the reel spins');
+  assert.equal(JSON.parse(mem.get(schema.PROFILE_KEY)).rewards.opened, 1, 'but already saved');
+  res.announce(); res.announce();
+  offs.forEach((f) => f());
+  assert.deepEqual(seen, ['p:case', 'open'], 'announced once');
 });
 
 await test('store: openCase persists the pull and emits rewards / caseEarned', () => {

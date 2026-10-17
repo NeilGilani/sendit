@@ -66,8 +66,12 @@ export function sanitizeRewards(r) {
   for (const k of ['xp', 'xpTotal', 'earned', 'opened', 'seq', 'distance', 'milestone', 'dupeXp', 'sinceRed']) out[k] = Math.max(0, num(r[k]));
   out.xp = Math.min(out.xp, CASE_XP - 1e-6);
   out.distanceBy = { skis: Math.max(0, num(r.distanceBy?.skis)), snowboard: Math.max(0, num(r.distanceBy?.snowboard)) };
-  out.cases = (Array.isArray(r.cases) ? r.cases : []).filter((c) => c && SERIES[c.series]).slice(0, 200)
-    .map((c) => ({ id: String(c.id), series: c.series, at: num(c.at), source: String(c.source || '') }));
+  // Keep the newest 500 cases; give id-less ones a fresh id so two cases never share one.
+  out.distance = Math.min(out.distance, 1e9);
+  out.cases = (Array.isArray(r.cases) ? r.cases : []).filter((c) => c && SERIES[c.series]).slice(-500)
+    .map((c, i) => ({ id: c.id ? String(c.id) : `c${out.seq + i + 1}-fix`, series: c.series, at: num(c.at), source: String(c.source || '') }));
+  // Milestones already passed count as paid (a garbled save must not back-pay hundreds of cases).
+  while (nextMilestone(out).m <= out.distance) out.milestone = nextMilestone(out).m;
   out.maps = (Array.isArray(r.maps) ? r.maps : []).filter((x) => typeof x === 'string');
   out.trails = (Array.isArray(r.trails) ? r.trails : []).filter((x) => typeof x === 'string');
   out.history = (Array.isArray(r.history) ? r.history : []).filter((h) => h && typeof h.key === 'string').slice(-HISTORY);
@@ -223,7 +227,8 @@ export function creditRun(p, run, now = Date.now()) {
   // Finish bonuses need a real run: at least EARN.minRun metres since the last credit.
   if (run.finished && dist >= EARN.minRun) {
     gains.push({ xp: EARN.finish, label: 'Run complete' });
-    const day = new Date(now).toISOString().slice(0, 10);
+    const dd = new Date(now);   // the rider's own calendar day
+    const day = `${dd.getFullYear()}-${String(dd.getMonth() + 1).padStart(2, '0')}-${String(dd.getDate()).padStart(2, '0')}`;
     if (r.lastDay !== day) { r.lastDay = day; gains.push({ xp: EARN.firstToday, label: 'First run today', milestone: true }); }
     if (run.medal && EARN.medal[run.medal]) gains.push({ xp: EARN.medal[run.medal], label: `${run.medal[0].toUpperCase()}${run.medal.slice(1)} medal` });
     if (run.mapId && !r.maps.includes(run.mapId)) { r.maps.push(run.mapId); gains.push({ xp: EARN.firstMap, label: `First run on ${run.mapName || run.mapId}`, milestone: true }); }
@@ -314,6 +319,13 @@ export function grandfather(p, old, now = Date.now()) {
     const item = getItem(e?.item);
     const v = item?.variants.find((x) => x.id === e.variant);
     if (v?.rarity && !v.starter) p.inventory.items[ownKey(item.id, v.id)] = { at: now, n: 1, seen: true };
+  }
+  // Before v2 the gaiter came with the jacket's colourway: keep it as a face skin.
+  const jacket = old.loadout?.slots?.jacket;
+  const face = jacket && getItem('face-gaiter')?.variants.find((x) => x.id === jacket.variant);
+  if (face && !face.starter && !old.loadout?.slots?.face) {
+    p.inventory.items[ownKey('face-gaiter', face.id)] = { at: now, n: 1, seen: true };
+    p.loadout = { ...p.loadout, slots: { ...p.loadout?.slots, face: { item: 'face-gaiter', variant: face.id } } };
   }
   const s = old.stats || {};
   const r = p.rewards;

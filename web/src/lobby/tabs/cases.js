@@ -81,7 +81,7 @@ registerLobbyTab({
           <span>First run on each map · new trail</span><b>+${EARN.firstMap} · +${EARN.firstTrail}</b>
           <span>Next milestone: ${esc(ms.label)} (${fmtKm(Math.max(0, ms.m - r.distance))} to go)</span><b>+${ms.xp} XP</b>
           <span>Duplicates turn into progress</span><b>+10 % to a whole case</b>
-          <span>Every new rank (level 5, 10, 20, 35, 60)</span><b>a case</b>
+          ${globalThis.__progression ? '<span>Every new rank (level 5, 10, 20, 35, 60)</span><b>a case</b>' : ''}
         </div>
 
         <h3 class="lp-h3">Collection</h3>

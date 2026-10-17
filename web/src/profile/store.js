@@ -46,12 +46,12 @@ class ProfileStore {
     this.storage.set(PROFILE_KEY, this.profile);
   }
 
-  /** Apply `fn(profile)`, sanitize, persist and emit 'profile'. */
-  update(fn, reason = 'update') {
+  /** Apply `fn(profile)`, sanitize, persist and emit 'profile' (unless `silent`: the caller announces later). */
+  update(fn, reason = 'update', { silent = false } = {}) {
     fn(this.profile);
     this.data = sanitize(this.profile);
     this.save();
-    emit('profile', { profile: this.data, reason });
+    if (!silent) emit('profile', { profile: this.data, reason });
     return this.data;
   }
 
@@ -150,13 +150,24 @@ class ProfileStore {
     return c;
   }
 
-  /** Open an unopened case (the first one when no id). The result carries the reel to animate. */
-  openCase(caseId, rng = Math.random) {
+  /**
+   * Open an unopened case (the first one when no id). The pull is saved at once; the result carries the
+   * reel to animate. With `{ defer: true }` nothing is announced yet (no badges, toasts or tab updates
+   * that would spoil the reel): call `result.announce()` at the reveal.
+   */
+  openCase(caseId, rng = Math.random, { defer = false } = {}) {
     let res = null;
-    this.update((p) => { res = R.openCase(p, caseId, rng); }, 'case');
+    this.update((p) => { res = R.openCase(p, caseId, rng); }, 'case', { silent: true });
     if (!res) return null;
-    emit('rewards', { reason: 'open', result: res, cases: res.cases });
-    if (res.cases.length) emit('caseEarned', { cases: res.cases, source: 'duplicate' });
+    let told = false;
+    res.announce = () => {
+      if (told) return;
+      told = true;
+      emit('profile', { profile: this.data, reason: 'case' });
+      emit('rewards', { reason: 'open', result: res, cases: res.cases });
+      if (res.cases.length) emit('caseEarned', { cases: res.cases, source: 'duplicate' });
+    };
+    if (!defer) res.announce();
     return res;
   }
 

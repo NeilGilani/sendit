@@ -6,7 +6,7 @@
 //
 // To change the schema: bump PROFILE_VERSION, add MIGRATIONS[oldVersion] that returns the upgraded
 // object, update defaultProfile(), and extend sanitize() for the new fields.
-import { SLOTS, EQUIPMENT_TYPES, DEFAULT_EQUIPMENT, getItem, defaultItemFor, defaultVariantFor, ownsVariant } from './catalog.js';
+import { SLOTS, EQUIPMENT_TYPES, DEFAULT_EQUIPMENT, getItem, defaultItemFor, defaultVariantFor, unlockState } from './catalog.js';
 import { defaultRewards, sanitizeRewards, grandfather } from './rewards.js';
 import { SETTINGS_KEY } from '../state.js';
 
@@ -113,7 +113,8 @@ export function sanitize(p) {
     const item = want && getItem(want.item);
     // Reward skins must be owned; anything else falls back to the slot's starter.
     const variant = item && (item.variants.find((v) => v.id === want.variant) ?? defaultVariantFor(item));
-    const usable = item && item.slot === slot && (!variant.rarity && !variant.starter ? true : ownsVariant(out, item, variant));
+    // Same rule as profileStore.equip(): owned skins, explicit unlocks, or items whose stat rule is met.
+    const usable = item && item.slot === slot && (!variant.rarity && !variant.starter ? true : unlockState(item, out, variant.id).unlocked);
     if (usable) slots[slot] = { item: item.id, variant: variant.id };
     else if (d.loadout.slots[slot]) slots[slot] = d.loadout.slots[slot];
   }

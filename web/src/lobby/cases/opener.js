@@ -55,7 +55,7 @@ export function openCaseShow(caseId, { onClose, rng } = {}) {
   const c = caseId ? profileStore.unopened.find((x) => x.id === caseId) : profileStore.unopened[0];
   if (!c) return Promise.resolve(null);
   caseSfx.unlock();
-  const result = profileStore.openCase(c.id, rng);
+  const result = profileStore.openCase(c.id, rng, { defer: true });   // announced at the reveal (no spoilers)
   if (!result) return Promise.resolve(null);
   let resolve;
   const promise = new Promise((r) => { resolve = r; });
@@ -81,6 +81,9 @@ class Opener {
     this.raf = requestAnimationFrame((n) => this.frame(n));
     this.onKey = (e) => this.key(e);
     addEventListener('keydown', this.onKey, true);
+    // A resize mid-spin re-measures the strip (cards are em-sized), so it still stops on the winner.
+    this.onResize = () => { if (this.el && this.phase !== 'reveal') this.measure(); };
+    addEventListener('resize', this.onResize);
     this.lobby = globalThis.__sendit?.lobby;
     if (this.lobby) this.lobby.overlay = this;
     caseSfx.open();
@@ -207,6 +210,7 @@ class Opener {
 
   reveal() {
     const res = this.result;
+    res.announce?.();
     const r = rarityOf(res.rarity);
     const slot = SLOTS[res.item.slot]?.label || '';
     const pct = Math.round((res.dupeXp / CASE_XP) * 100);
@@ -259,11 +263,19 @@ class Opener {
 
   key(e) {
     if (!this.el) return;
-    if (e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); if (this.phase === 'reveal') this.close(); else this.skip(); return; }
-    if (e.code === 'Space' && this.phase !== 'reveal') { e.preventDefault(); e.stopPropagation(); this.skip(); return; }
-    // Keep the lobby's own keys (Q/E tabs, Enter = ride) from firing under the overlay.
-    if (['KeyQ', 'KeyE', 'KeyA', 'KeyD', 'KeyR'].includes(e.code)) { e.stopPropagation(); e.preventDefault(); }
-    if (e.code === 'Enter' && this.phase !== 'reveal') { e.stopPropagation(); e.preventDefault(); }
+    // No key reaches the lobby (Q/E tabs, A/D spin, Enter = ride) while the overlay is up.
+    e.stopPropagation();
+    const btns = [...this.el.querySelectorAll('.cr-btn')];
+    const onBtn = btns.includes(document.activeElement);
+    if (e.code === 'Escape') { e.preventDefault(); if (this.phase === 'reveal') this.close(); else this.skip(); return; }
+    if (this.phase !== 'reveal') { if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); this.skip(); } return; }
+    // Reveal: Tab and arrows cycle the buttons; Enter / Space press the focused one (or the first).
+    if (e.code === 'Tab' || e.code.startsWith('Arrow')) {
+      e.preventDefault();
+      const back = e.shiftKey || e.code === 'ArrowLeft' || e.code === 'ArrowUp';
+      const i = btns.indexOf(document.activeElement);
+      btns[(i + (back ? -1 : 1) + btns.length) % btns.length]?.focus();
+    } else if ((e.code === 'Enter' || e.code === 'Space') && !onBtn) { e.preventDefault(); btns[0]?.click(); }
   }
 
   /** Gamepad (via Lobby.onAction): A skips / presses, d-pad moves between buttons, B closes. Eats the rest. */
@@ -282,6 +294,8 @@ class Opener {
   close(then) {
     if (this.phase === 'closing') return;
     this.phase = 'closing';
+    this.result.announce?.();
+    removeEventListener('resize', this.onResize);
     if (this.lobby?.overlay === this) this.lobby.overlay = null;
     removeEventListener('keydown', this.onKey, true);
     this.stopRiser?.();
