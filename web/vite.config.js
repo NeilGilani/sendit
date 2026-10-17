@@ -7,6 +7,7 @@ export default defineConfig({
   publicDir: resolve(__dirname, '../assets'),
   server: { port: 5173, open: false, host: true },
   build: { target: 'es2022', chunkSizeWarningLimit: 2000 },
+  worker: { format: 'es' },   // module workers (src/loading/worker.js) may code-split / import()
   plugins: [{
     name: 'credits',
     configureServer(server) {
