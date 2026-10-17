@@ -132,7 +132,7 @@ centimetre-scale drone sway, and pitch is clamped (−13°, −24° for the orbi
 
 URL flags (all optional): `?loadseed=<n>` `?loadtod=golden|alpenglow|bluebird|dawn|storm|aurora`
 `?loadmtn=spires|ranges|inversion` `?loadgear=ski|snowboard` `?loadtrick=<id>` `?loadcam=<id>`
-`?loadscene=0` (static screen only) `?loadhold` (never hand off; for captures) `?loadq=low|high`
+`?loadscene=0` (static screen only) `?loadhold` (never hand off; for captures) `?loadq=low|high|idle` (idle = build but never render, for cost measurements)
 `?loaddebug=cam:px,py,pz,tx,ty,tz,fov` (pinned camera).
 
 ### Resolution and frame rate
@@ -163,16 +163,23 @@ dev server, **with ~10 other sessions running builds and browsers (CPU at 100 %)
 by ±5 s. Every comparison is interleaved run by run (`node scripts/loadtime.mjs <url> 6 "loadscene=0;"`):
 `loadscene=0` = the painted static screen only (no worker), i.e. the old loading cost.
 
-**Boot to lobby, final version (6 interleaved pairs):**
+**Boot to lobby, final version (6 interleaved pairs, 01:45, machine a little quieter):**
 
 | | median | min | worker fps while booting |
 |---|---|---|---|
-| static screen only | 8.58 s | 6.47 s | – |
-| live scene (default) | 9.34 s | 7.55 s | 50–55 (26 on the cold-shader run) |
+| static screen only (old cost) | 5.85 s | 5.57 s | – |
+| live scene (default) | 6.81 s | 6.33 s | 45–53 (35 on the cold-shader run) |
 
-Paired deltas (warm pairs): −2.1, −0.7, +0.6, −0.1, +3.8 s, inside this machine's noise; call it
-**+0–0.8 s (≈ +5–9 %)**. Earlier in the night, with the old bar-only screen, boot measured 10.4–11.8 s
-(warm) under similar load.
+Paired deltas (warm pairs): +0.1, +1.2, +0.7, +2.4, +1.1 s → **about +1 s (≈ +15 %)** on this saturated
+laptop. An earlier round (00:45, busier machine) gave 9.34 s vs 8.58 s (+0.8 s). With the old
+bar-only screen at the start of the night, boot measured 10.4–11.8 s (warm) under heavier load.
+
+Where that second goes: a round with `?loadq=idle` (the worker builds everything but never renders)
+was no faster than the live scene (8.41 s vs 7.96 s live vs 6.82 s static, medians of 4), so it is the
+worker's startup work, not its frames: module evaluation, terrain build, the rider's glTF + texture decode
++ outfit geometry, and its shader compiles in the GPU process, all competing for a CPU that the other
+sessions keep at 100 %. On an unloaded machine a worker core is mostly idle capacity, so the cost should be
+lower there; it could not be measured tonight.
 
 **What cost what (earlier A/B rounds):**
 

@@ -377,7 +377,7 @@ export class LoadingScene {
     this.grade.uniforms.get('sunScreen').value.set(sp.x * 0.5 + 0.5, sp.y * 0.5 + 0.5, sp.z < 1 ? facing * facing : 0);
     globals.uTime.value = this.screenT;
     globals.uResolution.value.set(this.size.width, this.size.height);
-    if (setupOnly) return;
+    if (setupOnly || this.opts.q === 'idle') return;   // ?loadq=idle: measure the scene's startup cost alone
     this.composer.render(dt);
     this.frames++;
   }
