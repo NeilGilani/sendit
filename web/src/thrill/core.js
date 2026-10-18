@@ -39,7 +39,8 @@ export const THRILL = {
     near: 45,              // … ahead of you, or any direction within this
     max: 3,                // markers at once
     lift: 5,               // m above the snow
-    size: 2.2,             // sprite size (m) up close; grows with distance to stay readable
+    size: 2.2,             // sprite size (m) up close …
+    angular: 0.055,        // … and m per m of distance beyond that (≈ 3° on screen)
   },
   exposure: {
     look: [6, 10, 15, 22, 30],   // m ahead sampled along the travel direction

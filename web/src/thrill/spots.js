@@ -52,12 +52,12 @@ class SpotMarkers {
     for (const [i, it] of this.items.entries()) {
       const d = it.target ? Math.hypot(it.sp.position.x - pos.x, it.sp.position.z - pos.z) : Infinity;
       // Fade in from range to range·0.7, out again inside `near`/2 (you are on it).
-      const want = show && it.target ? Math.min(1, (M.range - d) / (M.range * 0.3)) * Math.min(1, d / (M.near * 0.5)) : 0;
+      const want = show && it.target ? Math.min(1, (M.range - d) / (M.range * 0.15)) * Math.min(1, d / (M.near * 0.5)) : 0;
       it.a += (Math.max(0, want) - it.a) * Math.min(1, dt * 4);
       it.sp.visible = it.a > 0.02;
       if (!it.sp.visible) continue;
       it.sp.material.opacity = it.a * 0.9;
-      const s = M.size * (0.8 + Math.min(1.6, d / 60));   // stays readable far away
+      const s = Math.max(M.size, d * M.angular);   // about the same size on screen far away
       it.sp.scale.set(s, s, 1);
       if (it.target) it.sp.position.y = this.terrain.getHeight(it.target.x, it.target.z) + M.lift + Math.sin(this.t * 2 + i) * 0.4;
     }
