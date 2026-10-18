@@ -166,6 +166,8 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
 
   return {
     get active() { return !!active; },
+    /** For tests: the recorder's state. */
+    debug: () => ({ t0: ring?.t0, t1: ring?.t1, count: ring?.count, cuts: [...cuts], moment, recClock, busy: !!player._busy, state: player.state }),
     start, stop,
     /** Per frame, after the rider rig and camera have updated (main.js). */
     record(dt) { if (!active && game.mode === Mode.RIDING) record(dt); },

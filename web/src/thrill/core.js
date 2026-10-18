@@ -20,6 +20,7 @@ export const THRILL = {
     lead: 2.6,             // s before the last take-off to put you back (on the approach, with its speed) …
     leadMin: 12, leadMax: 45,   // … measured as distance at the take-off speed, m
     minAir: 0.4,           // s: shorter airs (bumps, rollers) don't move the retry point
+    bounceM: 40,           // m after a landing in which a much smaller air (< 60 %) is a bounce, not a new target
     sampleM: 1.5,          // m between ground samples
     keep: 600,             // m of trail kept
   },

@@ -71,15 +71,20 @@ export function installRetry({ player, input, activities, ui, cam }) {
 
   // A take-off counts once it proves to be a real air (≥ minAir s, or a crash), not a bump on the way out.
   let pending = null;
-  const mark = () => { trail.markTakeoff(pending); lead = pendingLead; };
+  let marked = null;   // { air, landAt } of the take-off the retry points at
+  const mark = (air = 9) => {
+    // A bounce off the landing right after a bigger air (a knuckle, a roller) keeps the bigger air as the target.
+    if (marked && clock - marked.landAt < C.bounceM && air < marked.air * 0.6) return;
+    trail.markTakeoff(pending); lead = pendingLead; marked = { air, landAt: clock };
+  };
   on('takeoff', () => {
     if (game.mode !== Mode.RIDING) return;
     pending = clock;
     pendingLead = Math.min(C.leadMax, Math.max(C.leadMin, Math.hypot(player.velocity.x, player.velocity.z) * C.lead));   // C.lead s at the take-off speed, in m
   });
-  on('landed', (e) => { if (pending !== null && (e.air >= C.minAir || e.result === 'crash')) mark(); pending = null; });
+  on('landed', (e) => { if (pending !== null && (e.air >= C.minAir || e.result === 'crash')) mark(e.air); pending = null; });
   on('crashed', () => { if (pending !== null) mark(); pending = null; });
-  on('rideStarted', () => { trail.clear(); clock = 0; pending = null; last.ok = false; });
+  on('rideStarted', () => { trail.clear(); clock = 0; pending = null; marked = null; last.ok = false; });
   on('dropZone', () => { trail.clear(); last.ok = false; });
   on('resetTop', () => { last.ok = false; });
   on('respawned', () => { last.ok = false; });

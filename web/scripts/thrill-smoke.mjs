@@ -73,7 +73,8 @@ await page.keyboard.press('Backspace');
 await wait(700);
 const retry = (await ev('thrillRetry')).at(-1)?.[2];
 const k = await page.evaluate(() => { const k = window.__sendit.features.kickers[2], p = window.__sendit.player.position; return { a: (p.x - k.o.x) * k.f.x + (p.z - k.o.y) * k.f.y }; });
-check('Backspace retries on the approach with speed', !!retry && retry.speed > 5 && k.a < 0 && k.a > -60, JSON.stringify({ retry, a: k.a }));
+const airs = (await ev('landed')).map((e) => +e[2].air.toFixed(2));
+check('Backspace retries on the approach with speed', !!retry && retry.speed > 5 && k.a < 0 && k.a > -60, JSON.stringify({ retry, a: k.a, airs }));
 await shot('5-retry-on-approach');
 // Quick restart.
 const t0 = await page.evaluate(() => performance.now());
@@ -82,7 +83,7 @@ await page.waitForFunction(() => window.__ev.some((e) => e[0] === 'resetTop'), n
 const rt = (await ev('resetTop')).at(-1);
 check('R restarts in well under half a second', !!rt && rt[1] - t0 < 400, rt ? `${(rt[1] - t0).toFixed(0)} ms` : 'no resetTop');
 // A wipeout: the respawn offers its replay.
-await scenario('crash');
+await scenario('crash', (src) => src.replace('p.crash("test")', '(window.__crashed ? 0 : (window.__crashed = 1, p.crash("test")))'));   // one crash (the table's script keeps crashing on every respawn)
 await page.waitForFunction(() => { const e = document.getElementById('thrill-rp'); return e?.classList.contains('on') && /WIPEOUT/.test(e.textContent); }, null, { timeout: 15000 }).catch(() => {});
 const wp = await page.evaluate(() => document.getElementById('thrill-rp')?.textContent || '');
 check('a wipeout offers REPLAY WIPEOUT after the respawn', /WIPEOUT/.test(wp) && (await page.evaluate(() => document.getElementById('thrill-rp').classList.contains('on'))), wp);
