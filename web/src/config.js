@@ -150,6 +150,8 @@ export const PHYSICS = {
     flipThrowAir: 0.15,       // s of extra throw window per s of expected air beyond 1 s (0.7 s on a 3 s air)
     flipLateMax: 1.8, flipLateRate: 4, flipLateAir: 1.7,   // after the window W / S still start a flip: up to 1.8 rad/s at 4 rad/s², with ≥ 1.7 s of air left
     flipOpen: 0.75,           // a stretched layout (key against the flip, or spotting an over-set flip) slows it to this share
+    flipSpotBleed: 2.0,       // rad/s² of flip momentum a spotting rider sheds stretching out of an over-set flip (down to what the landing needs)
+    flipCounter: 4.0, flipCounterAngle: 50,   // key against the flip within this many ° of upright: sheds momentum at this rate (rad/s²) — evens out a near miss
     flipMinH: 0.35, flipMinAir: 0.45, flipCheck: 1.2,       // not flipping below flipMinH; no new flip with < flipMinAir s left
     flipSpot: 0.35,           // s: let go and the rider plans to come round early and open up (layout) for the last flipSpot s
     flipLandClean: 22, flipLandStumble: 42,
@@ -193,6 +195,7 @@ export const PHYSICS = {
     flipTuckHold: 1.6, flipTuckFade: 1.0, flipTuckFloor: 0.2,
     flipThrow: 0.4, flipThrowAir: 0.15, flipThrowRate: 11, flipThrowMax: 2.0, flipMinH: 0.35,
     flipLateMax: 1.8, flipLateRate: 4, flipLateAir: 1.7, flipOpen: 0.75, flipMinAir: 0.45, flipCheck: 1.2,
+    flipSpotBleed: 2.0, flipCounter: 4.0, flipCounterAngle: 50,
     flipSpot: 0.35,
     flipLandClean: 22, flipLandStumble: 42,
     grabRate: 7, grabRelease: 9, grabLetGo: 0.22,
