@@ -541,6 +541,12 @@ export class FjordlineCourse {
     return pts;
   }
 
+  /** The trail's own line in world [x, z] points (spawn → finish), for measuring length / vertical (scripts/trails-check.mjs). */
+  rideLine(trailId) {
+    const L = Object.values(RIDE_LINES).find((r) => r.trail === trailId);
+    return L ? this.linePoints(L).map(([u, v]) => [START_X + u, v]) : null;
+  }
+
   /** lineDist() from a precomputed 8 m grid (bilinear; capped at 200 m): cheap enough for the height function. */
   lineDistFast(u, v) {
     const G = 8, U0 = -240, V0 = -1560, NU = 400, NV = 392;

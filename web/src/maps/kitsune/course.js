@@ -236,6 +236,15 @@ export class KitsuneCourse {
     return pts;
   }
 
+  /** The trail's own line in world [x, z] points (spawn → finish), for measuring length / vertical (scripts/trails-check.mjs). */
+  rideLine(trailId) {
+    if (!RIDE_LINES[trailId]) return null;
+    const t = this.trails.find((x) => x.id === trailId);
+    const pts = this.linePoints(trailId), u0 = t?.start?.[0] ?? 0, out = [[START_X + u0, t?.start?.[1] ?? sampleLine(pts, u0)]];
+    for (let u = u0 + 5; u <= FINISH_U; u += 5) out.push([START_X + u, sampleLine(pts, u)]);   // 5 m steps, like measureTrails()
+    return out;
+  }
+
   // ---------------------------------------------------------------- the height function
   /** Macro shape only (everywhere): the cone and its crater, the face, ridges and the ranges around. */
   macro(x, z) {
