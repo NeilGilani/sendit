@@ -492,3 +492,20 @@ strong at 144 Hz, half at 30 Hz). Both now use the physics clock (`player.simTim
 | body reactions at 144 Hz (steady carve) | 14 % ripple | 0 % |
 | keyboard spin / flip thrown at the lip | 0.90 · 0.83 / 0.92 s | unchanged |
 | physics-tricks (most flips per air), physics-rotation `--check`, jumps-bench max flips / spins | — | unchanged (jumps-bench: 0 crashes; the send bot's line differs a little where its spins now land) |
+
+### Ground and landing windows (measured, left as they are)
+
+- **Steering curve** (steady path turn rate °/s at a pinned speed, flat, steer input 0.1 · 0.3 · 0.5 · 0.7 · 0.9 · 1):
+  skis at 12 m/s 6 · 32 · 38 · 50 · 69 · 82; at 20 m/s 5 · 34 · 38 · 44 · 51 · 52; Ravenspire at 28 m/s
+  3 · 14 · 22 · 30 · 40 · 40; board at 16 m/s 5 · 37 · 49 · 53 · 57 · 57. Monotonic everywhere, no dead zone
+  and no step; between 16 and 24 m/s the middle of the range is flatter (the grip-limited carve, before
+  `carveInput` phases in) and the last 10 % of input at 16–22 m/s on default maps adds skid (4° → 11–14°) rather
+  than turn — full lock at top speed scrubs a little speed, a real cost of over-steering. Keys start at 65 % lock,
+  so they live in the steep part. Response 0.10–0.22 s, edge-to-edge links 0.09–0.16 s (physics-steer).
+- **Speeds and brakes** (physics-sim, map3-speeds): top speeds, carve radii, stops and the tuck match their
+  research targets; terminal speed rises smoothly with the slope (no hard cap: the soft cap is quadratic drag).
+- **Physics step:** fixed 60 Hz in main.js, so ground handling can't depend on the display rate.
+- **Landing windows:** yaw clean / stumble / slide-or-crash 15 / 30 / 38° (skis), 15 / 45 / 82° (board), tighter
+  ×0.75 at 32 m/s on the big maps; pitch 22 / 42° of the drawn tilt (corks read their own, smaller tilt, the same
+  as a plain flip within 16° of upright). Near misses were fair but unreadable — a random wipeout word — which is
+  what change 5 addresses.
