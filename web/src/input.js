@@ -88,13 +88,22 @@ export class Input {
         return [x * k, y * k];
       };
       [this.pad.lx, this.pad.ly] = stick(gp.axes[0] || 0, gp.axes[1] || 0);
+      // The same stick for in-air rotation (airStrength): linear past the dead zone (the carving curve above made
+      // half a push a 0.27 input, under the 0.2–0.4 rotation thresholds for most of the travel) and mapped from
+      // its round gate onto a square, so a full diagonal (a cork: spin + flip) is full on both axes, not 0.71 each.
+      {
+        const x = gp.axes[0] || 0, y = gp.axes[1] || 0, r0 = Math.hypot(x, y);
+        const r = r0 < 0.16 ? 0 : Math.min(1, (r0 - 0.16) / 0.84), m = Math.max(Math.abs(x), Math.abs(y));
+        const k = r0 > 1e-6 && m > 1e-6 ? r / m : 0;
+        this.pad.sx = Math.max(-1, Math.min(1, x * k)); this.pad.sy = Math.max(-1, Math.min(1, y * k));
+      }
       [this.pad.rx, this.pad.ry] = stick(gp.axes[2] || 0, gp.axes[3] || 0);
       this.pad.lt = gp.buttons[PAD.LT]?.value || 0; this.pad.rt = gp.buttons[PAD.RT]?.value || 0;
       this.pad.buttons = gp.buttons.map((b) => b.pressed);
       if (this.pad.buttons.some(Boolean) || Math.abs(this.pad.lx) + Math.abs(this.pad.ly) + Math.abs(this.pad.rx) + Math.abs(this.pad.ry) > 0.3) this.setDevice('gamepad');
     } else {
       this.pad.buttons = [];
-      this.pad.lx = this.pad.ly = this.pad.rx = this.pad.ry = this.pad.lt = this.pad.rt = 0;
+      this.pad.lx = this.pad.ly = this.pad.rx = this.pad.ry = this.pad.lt = this.pad.rt = this.pad.sx = this.pad.sy = 0;
     }
   }
 
@@ -116,6 +125,21 @@ export class Input {
       case 'tuck': return this.key('tuck') || this.btn(PAD.RB) || this.btn(PAD.X) ? 1 : 0;
       default: return 0;
     }
+  }
+
+  /**
+   * Rotation inputs in the air, 0..1 (steer −1..1): keys as strength(), the left stick square-mapped and
+   * straight (no ground tuck scale on up, no extra brake dead zone on down), so a full stick push — straight
+   * or diagonal — throws as hard as the keys. The ground controls keep strength().
+   */
+  airStrength() {
+    const p = this.pad, sx = p.sx || 0, sy = p.sy || 0;
+    const kx = (this.key('right') ? 1 : 0) - (this.key('left') ? 1 : 0);
+    return {
+      steer: Math.abs(sx) > Math.abs(kx) ? sx : kx,
+      up: Math.max(this.key('speedUp') ? 1 : 0, Math.max(0, -sy), p.rt),
+      brake: Math.max(this.key('brake') ? 1 : 0, Math.max(0, sy), p.lt, this.btn(PAD.B) ? 1 : 0),
+    };
   }
 
   justPressed(action) {

@@ -9,7 +9,7 @@ const [base = 'http://localhost:5198/', outDir = '.', equip = 'ski', kick = '2']
 fs.mkdirSync(outDir, { recursive: true });
 const browser = await chromium.launch({
   args: process.env.GPU
-    ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required']
+    ? [...(process.platform === 'darwin' ? ['--use-gl=angle', '--use-angle=metal'] : ['--use-angle=d3d11', '--enable-gpu']), '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required']
     : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
