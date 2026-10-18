@@ -169,7 +169,7 @@ async function warmShadowVariants(renderer, scene, post, camera) {
   scene.add(group);
   await compileForTarget(renderer, scene, camera, post);   // the stand-ins' main-pass programs, in parallel
   const kids = [...group.children];
-  const PER = 2;   // one dummy + clone pair per frame (the depth programs still link synchronously)
+  const PER = 4;   // two dummy + clone pairs per frame (the depth programs still link synchronously)
   for (let i = 0; i < kids.length; i += PER) {
     for (let k = 0; k < kids.length; k++) kids[k].visible = k >= i && k < i + PER;
     post.composer.render(1 / 60);

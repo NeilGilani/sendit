@@ -13,7 +13,7 @@
     // A lobby → mountain load (localStorage sendit.loadhint, src/loading/hint.js) prefers a still in that
     // mountain's light. ?loadstill=<name> pins one, ?nostill skips it (the painted CSS screen only).
     (function () {
-      var S = /*STILLS*/[{"f":"golden-method.webp","seed":7101,"tod":"golden","mtn":"spires","gear":"snowboard"},{"f":"golden-backflip.webp","seed":7101,"tod":"golden","mtn":"spires","gear":"ski"},{"f":"bluebird-japan.webp","seed":7412,"tod":"bluebird","mtn":"ranges","gear":"ski"},{"f":"bluebird-cork.webp","seed":7533,"tod":"bluebird","mtn":"spires","gear":"snowboard"},{"f":"alpenglow-method.webp","seed":7377,"tod":"alpenglow","mtn":"spires","gear":"snowboard"},{"f":"dawn-japan.webp","seed":7690,"tod":"dawn","mtn":"inversion","gear":"ski"},{"f":"storm-japan.webp","seed":7801,"tod":"storm","mtn":"ranges","gear":"ski"},{"f":"aurora-backflip.webp","seed":7955,"tod":"aurora","mtn":"spires","gear":"ski"}]/*END*/;
+      var S = /*STILLS*/[{"f":"golden-method.webp","seed":7101,"tod":"golden","mtn":"spires","gear":"snowboard"},{"f":"golden-backflip.webp","seed":7101,"tod":"golden","mtn":"spires","gear":"ski"},{"f":"bluebird-japan.webp","seed":7412,"tod":"bluebird","mtn":"ranges","gear":"ski"},{"f":"bluebird-cork.webp","seed":7533,"tod":"bluebird","mtn":"spires","gear":"snowboard"},{"f":"alpenglow-method.webp","seed":7377,"tod":"alpenglow","mtn":"spires","gear":"snowboard"},{"f":"dawn-japan.webp","seed":7690,"tod":"dawn","mtn":"inversion","gear":"ski"},{"f":"storm-japan.webp","seed":7801,"tod":"storm","mtn":"ranges","gear":"ski"},{"f":"aurora-backflip.webp","seed":7955,"tod":"aurora","mtn":"spires","gear":"ski"},{"f":"aurora-method.webp","seed":7955,"tod":"aurora","mtn":"spires","gear":"snowboard"},{"f":"dawn-method.webp","seed":7690,"tod":"dawn","mtn":"inversion","gear":"snowboard"},{"f":"bluebird-method.webp","seed":7412,"tod":"bluebird","mtn":"ranges","gear":"snowboard"},{"f":"alpenglow-backflip.webp","seed":7377,"tod":"alpenglow","mtn":"spires","gear":"ski"}]/*END*/;
       var LOOK = { 'valcrest-gully': 'golden bluebird', 'lake-tahoe': 'bluebird golden', blackspruce: 'bluebird storm golden', ravenspire: 'golden alpenglow storm',
         'voltage-park': 'aurora bluebird', dragonback: 'bluebird golden dawn', 'kitsune-peak': 'alpenglow dawn', fjordline: 'golden dawn' };
       var q = location.search, pool = S, s = null, h = null, last = null;
@@ -125,7 +125,7 @@
       #loading .ld-ui::after { bottom: 0; background: linear-gradient(transparent, rgba(5,6,10,.7)); }
       #loading .ld-brand, #loading .ld-foot { z-index: 1; } #loading .ld-brand { top: 18px; } #loading .ld-foot { bottom: 22px; } }
     @media (max-width: 640px) { #loading .ld-foot { flex-direction: column; align-items: stretch; gap: 12px; } #loading .ld-progress { width: 100%; } #loading .ld-msg { text-align: left; } #loading .ld-cap { display: none; } }
-    @media (prefers-reduced-motion: reduce) { #loading .ld-flakes, #loading .bar::after { animation: none; } }
+    @media (prefers-reduced-motion: reduce) { #loading .ld-flakes, #loading .bar::after, #loading .ld-still { animation: none; } }
   </style>
 </head>
 <body>

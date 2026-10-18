@@ -3,7 +3,7 @@
 // adaptive scaling, ?loadfreeze=<fraction of the air time>), captured from loading.html with the
 // overlay hidden, then encoded to WebP in the browser (canvas.toBlob) — no native image tools needed.
 // Usage: node scripts/loadingstills.mjs <loading.html url> <outDir> [WxH@dpr=1600x900@1.8 → 2880×1620] [only=<name,…>]
-// Writes <outDir>/<name>.webp (+ .png with KEEP_PNG=1) and prints the manifest JSON for index.html.
+// Writes <outDir>/<name>.webp (+ .png with KEEP_PNG=1); a full run also writes the manifest into index.html.
 import { chromium } from '@playwright/test';
 import fs from 'fs';
 
@@ -11,7 +11,7 @@ const url = process.argv[2] || 'http://localhost:5184/loading.html';
 const out = process.argv[3] || '../assets/loading';
 const [W, H, DPR] = (process.argv[4] || '1600x900@1.8').split(/[x@]/).map(Number);
 const only = (process.argv[5] || '').replace(/^only=/, '').split(',').filter(Boolean);
-const Q = Number(process.env.Q || 0.8);
+const Q = Number(process.env.Q || 0.86);
 
 // name, seed (place, light, rider), trick, camera move, freeze point (fraction of the air), tod, mtn.
 // Chosen from contact sheets (docs/loading-screen.md): the 'hero' 3/4 move from below the apex reads
@@ -25,6 +25,10 @@ export const STILLS = [
   { name: 'dawn-japan', seed: 7690, trick: 'japan', cam: 'hero', freeze: 0.45, tod: 'dawn', mtn: 'inversion', gear: 'ski' },
   { name: 'storm-japan', seed: 7801, trick: 'japan', cam: 'close', freeze: 0.45, tod: 'storm', mtn: 'ranges', gear: 'ski' },
   { name: 'aurora-backflip', seed: 7955, trick: 'backflip', cam: 'hero', freeze: 0.5, tod: 'aurora', mtn: 'spires', gear: 'ski' },
+  { name: 'aurora-method', seed: 7955, trick: 'method', cam: 'hero', freeze: 0.45, tod: 'aurora', mtn: 'spires', gear: 'snowboard' },
+  { name: 'dawn-method', seed: 7690, trick: 'method', cam: 'hero', freeze: 0.45, tod: 'dawn', mtn: 'inversion', gear: 'snowboard' },
+  { name: 'bluebird-method', seed: 7412, trick: 'method', cam: 'hero', freeze: 0.45, tod: 'bluebird', mtn: 'ranges', gear: 'snowboard' },
+  { name: 'alpenglow-backflip', seed: 7377, trick: 'backflip', cam: 'hero', freeze: 0.5, tod: 'alpenglow', mtn: 'spires', gear: 'ski' },
 ];
 
 // SPECS='[{...}]' replaces the list (contact sheets while choosing shots).
@@ -75,4 +79,11 @@ try {
   await browser.close();
 }
 console.log(JSON.stringify(manifest));
+// The full set: write the manifest into index.html's still picker (/*STILLS*/…/*END*/).
+if (!only.length && !process.env.SPECS && !bad) {
+  const idx = new URL('../index.html', import.meta.url);
+  const man = JSON.stringify(LIST.map((x) => ({ f: `${x.name}.webp`, seed: x.seed, tod: x.tod, mtn: x.mtn, gear: x.gear })));
+  fs.writeFileSync(idx, fs.readFileSync(idx, 'utf8').replace(/\/\*STILLS\*\/.*?\/\*END\*\//, `/*STILLS*/${man}/*END*/`));
+  console.log('index.html still manifest updated');
+}
 process.exit(bad ? 1 : 0);
