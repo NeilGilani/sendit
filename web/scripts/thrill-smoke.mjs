@@ -43,7 +43,7 @@ const ev = (n) => page.evaluate((n) => window.__ev.filter((e) => e[0] === n), n)
 
 // ---------------------------------------------------------------- Valcrest: spot, replay, retry, restart
 await boot('map=valcrest-gully&kicker=2&ride');
-await scenario('spin360', (src) => src.replace('SPIN = 2', 'SPIN = 0').replace('GRAB = false', 'GRAB = true'));   // a straight grab: lands clean
+await scenario('spin360', (src) => src.replace('SPIN = 2', 'SPIN = 0').replace('multiplyScalar(13)', 'multiplyScalar(11)').replaceAll('*= 13 / sp', '*= 11 / sp'));   // a straight air at 11 m/s: ~1.9 s, lands clean
 await wait(300);
 const landed = (await ev('landed')).at(-1)?.[2];
 const spot = (await ev('thrillSpot')).at(-1)?.[2];
@@ -107,11 +107,12 @@ await page.evaluate(() => { window.__maxExp = 0; window.__expT = setInterval(() 
 await page.evaluate((src) => { window.__done = false; const s = window.__sendit, pl = s.player, snap = () => {}; new Function('s', 'pl', 'snap', src)(s, pl, snap); }, SCENARIOS.cliff.setup);
 let shotDone = false;
 for (let i = 0; i < 200 && !(await page.evaluate(() => window.__done)); i++) {
-  if (!shotDone && (await page.evaluate(() => window.__thrill.adrenaline.level)) > 0.45) { await shot('7-adrenaline-cliff'); shotDone = true; }
+  if (!shotDone && (await page.evaluate(() => window.__thrill.adrenaline.level)) > 0.45) { await shot('7-adrenaline-cliff'); shotDone = true; globalThis.__vig = await page.evaluate(() => Number(document.getElementById('thrill-vignette')?.style.opacity || 0)); }
   await wait(60);
 }
 const maxExp = await page.evaluate(() => window.__maxExp);
 check('adrenaline rises over the cliff', maxExp > 0.4, `max level ${maxExp.toFixed(2)}`);
+check('the edges close in when exposed', (globalThis.__vig || 0) > 0.2, `vignette opacity ${globalThis.__vig}`);
 const rs = (await ev('thrillSpot')).map((e) => e[2].name);
 check('cliff send names a Ravenspire spot', rs.length > 0, rs.join(', ') || 'none (crashed?)');
 if (!shotDone) await shot('7-adrenaline-cliff');

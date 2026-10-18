@@ -102,7 +102,7 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
   }
 
   function start(rec = false) {
-    if (!canReplay() && !(rec && active)) return false;
+    if (active || !canReplay()) return false;
     const r = clipRange({ t0: ring.t0, t1: ring.t1 }, cuts, moment, recClock, C);
     if (!r) { emit('hint', 'Nothing to replay yet'); return false; }
     const t0 = r.a, t1 = r.b, m = moment && moment.t >= t0 && moment.t <= t1 ? moment : null;
@@ -179,7 +179,8 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
       if (!active) return;
       if (game.mode !== Mode.RIDING) { stop(); return; }
       if (input.codePressed('Enter') && !active.rec) { const keep = active.fov; active = null; start(true); if (active) active.fov = keep; return; }
-      if (skipPressed()) { stop(); return; }
+      active.age = (active.age || 0) + 1;
+      if (active.age > 1 && skipPressed()) { stop(); return; }   // not the key press that started it
       const airborne = apply(active.t);
       const rate = active.wipe !== null ? (active.t > active.wipe - 0.6 && active.t < active.wipe + 1.6 ? C.wipeSlow : 1) : airborne ? C.slow : 1;
       active.rate = (active.rate ?? rate) + (rate - (active.rate ?? rate)) * Math.min(1, dt * 6);
