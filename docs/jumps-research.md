@@ -487,6 +487,7 @@ strong at 144 Hz, half at 30 Hz). Both now use the physics clock (`player.simTim
 | pre-wind the other way + grab, stick against it at 0.5 / 0.9 s | ski 1.52 s, board never | 1.37 / 1.30 s |
 | throw reversed 0.25 s in (vy 15) | never (wrong way all air) | 180° the asked way in 2.1 s |
 | board, full set let go at 45° (2.4 s air) | crash at 266° | clean 180 |
+| release sweep: 10 922 spins (ski / board, all-mountain / park, default / Ravenspire, wind-up 0–1, pop 0.6–1) let go with ≥ 0.6 s left | clean 9 559, stumble 1 230, slide 35, crash 98 | clean 9 633, stumble 1 247, slide 12, crash 30 |
 | gamepad diagonal stick: flip to 180° | 1.18–1.30 s | 0.92 s (keys 0.92 s) |
 | gamepad 40 / 50 / 60 % stick push: spin to 180° | never / 1.32 s at 60 % | 1.45 / 1.32 / 1.17 s |
 | body reactions at 144 Hz (steady carve) | 14 % ripple | 0 % |
