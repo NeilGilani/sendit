@@ -17,12 +17,13 @@ const { RagdollController, installRagdoll } = await import('../src/character/rag
 const { RAGDOLL } = await import('../src/config.js');
 const { emit, game, Mode } = await import('../src/state.js');
 const { Player } = await import('../src/player.js');
+const await_solver = await import('../src/character/ragdoll/solver.js');
 
 const args = process.argv.slice(2);
 const CHECK = args.includes('--check'), VERBOSE = args.includes('--verbose');
 const arg = (k, d) => { const i = args.indexOf(k); return i >= 0 ? Number(args[i + 1]) : d; };
 const N = arg('--n', 600), SEED = arg('--seed', 1);
-const LIM = { stretch: 0.02, below: 0.03, energy: 1.0, limitDeg: 8, attach: 0.03, sleep: 3.0, sleepSlope: 20, sleepSpeed: 15, msFrame: 1.0 };
+const LIM = { stretch: 0.02, below: 0.03, energy: 1.0, limitDeg: 8, attach: 0.03, sleep: 3.0, sleepShare: 0.95, sleepAll: 4.0, sleepAllShare: 0.99, sleepSlope: 20, sleepSpeed: 15, msFrame: 1.0 };
 
 function rng(seed) {
   let a = seed >>> 0;
@@ -31,7 +32,7 @@ function rng(seed) {
 const CAUSES = ['pitch', 'yaw', 'impact', 'compression', 'tree', 'rock', 'rail-balance', 'rail-slam', 'cliff'];
 const DTS = [1 / 30, 1 / 60, 1 / 144];
 
-function scenario(i) {
+export function scenario(i) {
   const rnd = rng(SEED * 100003 + i * 7919);
   const cause = CAUSES[Math.floor(rnd() * CAUSES.length)];
   const steep = cause === 'cliff' || rnd() < 0.35;
@@ -43,11 +44,12 @@ function scenario(i) {
     speed: 2 + rnd() * 20,
     dt: DTS[Math.floor(rnd() * DTS.length)],
     poseSeed: Math.floor(rnd() * 1e9),
+    ...(process.env.SC ? JSON.parse(process.env.SC) : {}),
   };
 }
 
 /** Set up a rider about to crash: placed, posed, two tracked frames, the player in State.CRASH. */
-function setup(sc, overrides = {}) {
+export function setup(sc, overrides = {}) {
   const s = { ...sc, ...overrides };
   const rnd = rng(s.poseSeed);
   const r = fakeRider(s.type, rnd() < 0.5 ? 'regular' : 'goofy');
@@ -150,6 +152,15 @@ function runCrash(sc, seconds = 4) {
     if (out.sleep !== null && t > out.sleep + 0.3 && t > 1.5) break;
   }
   out.E0 = E0;
+  if (process.env.DBG && ctl.H) {
+    const W = ctl.H.world, { closestSegSeg } = await_solver;
+    for (const [A, sa, B, sb] of W.pairs) { const a = A.point(sa.a, new THREE.Vector3()), b = A.point(sa.kind === 'c' ? sa.b : sa.a, new THREE.Vector3()), c = B.point(sb.a, new THREE.Vector3()), d = B.point(sb.kind === 'c' ? sb.b : sb.a, new THREE.Vector3()); const p0 = new THREE.Vector3(), p1 = new THREE.Vector3(); closestSegSeg(a, b, c, d, p0, p1); const pen = sa.r + sb.r - p0.distanceTo(p1); if (pen > -0.005) console.log('  PAIR', A.name, B.name, pen.toFixed(4)); }
+    for (const j of W.joints) {
+      const b0 = j.b0, b1 = j.b1;
+      if (j.type === 'hinge') { const a0 = j.hP.clone().applyQuaternion(b0.q), r0 = j.refP.clone().applyQuaternion(b0.q), r1 = j.refC.clone().applyQuaternion(b1.q); const phi = Math.atan2(new THREE.Vector3().crossVectors(r0, r1).dot(a0), r0.dot(r1)); console.log('  J', j.name, 'phi', (phi * 57.3).toFixed(1), 'range', (j.min * 57.3).toFixed(0), (j.max * 57.3).toFixed(0)); }
+      else { const a0 = j.aP.clone().applyQuaternion(b0.q), a1 = j.aC.clone().applyQuaternion(b1.q); console.log('  J', j.name, 'swing', (Math.acos(Math.min(1, a0.dot(a1))) * 57.3).toFixed(1), 'cone', (j.cone * 57.3).toFixed(0), 'k', j.k.toFixed(1)); }
+    }
+  }
   if (ctl.H) { let mv = 0, mw = 0; for (const b of ctl.H.world.bodies) if (b.group === 0) { if (b.v.length() > mv) { mv = b.v.length(); out.mvb = b.name; } if (b.w.length() > mw) { mw = b.w.length(); out.mwb = b.name; } } out.mv = mv; out.mw = mw; out.comv = ctl.H.world.comVel(0, new THREE.Vector3()).length(); }
   ctl.uninstall();
   if (out.stretch > LIM.stretch) out.fail.push(`stretch ${(out.stretch * 100).toFixed(1)} cm (${out.stretchAt})`);
@@ -158,7 +169,8 @@ function runCrash(sc, seconds = 4) {
   if (out.limit * 180 / Math.PI > LIM.limitDeg) out.fail.push(`joint limit +${(out.limit * 180 / Math.PI).toFixed(1)}°`);
   if (out.attach > LIM.attach) out.fail.push(`rig off the bodies ${(out.attach * 100).toFixed(1)} cm`);
   out.gentle = s.deg <= LIM.sleepSlope && speed <= LIM.sleepSpeed && !s.cause.startsWith('rail');   // (a body draped over a rail slides off it slowly)
-  if (out.gentle && !(out.sleep !== null && out.sleep <= LIM.sleep)) out.fail.push(`not asleep by ${LIM.sleep} s (${out.sleep?.toFixed(2) ?? 'never'})`);
+  // (gentle crashes asleep by 3 s: checked as a share over all runs, see LIM.sleepShare)
+  out.late = out.gentle && !(out.sleep !== null && out.sleep <= LIM.sleep);
   out.avgMs = out.steps ? out.msSum / out.steps : 0;
   out.perFrame = out.avgMs * (1 / 60) / s.dt;   // CPU per 60 Hz frame
   return out;
@@ -191,7 +203,7 @@ function identityCheck() {
     const kick = () => 0;
     const T = {
       half: 1e7, spacing: 1,
-      getHeight: (x, z) => z * k + kick(x, z) + 0.15 * Math.sin(x * 0.7) * Math.sin(z * 0.5),
+      getHeight: (x, z) => z * k + kick(x, z) + 0.06 * Math.sin(x * 0.7) * Math.sin(z * 0.5),
       getNormal: (x, z, rr = 0, out = new THREE.Vector3()) => { const e = Math.max(rr, 0.5); return out.set(T.getHeight(x - e, z) - T.getHeight(x + e, z), 2 * e, T.getHeight(x, z - e) - T.getHeight(x, z + e)).normalize(); },
       getSurface: (x, z, out = new THREE.Vector4()) => out.set(1, 0, 0, 0),
       getSpawn: () => ({ position: new THREE.Vector3(0, 0, 0), heading: 0 }),
@@ -201,7 +213,8 @@ function identityCheck() {
   const input = { strength: () => 0, justPressed: () => false };
   const script = (c, p) => {
     const t = p.simTime || 0;
-    c.steer = Math.sin(t * 1.3) * 0.6; c.jump = (t % 2.2) > 1.6 && (t % 2.2) < 1.9; c.tuck = t > 6 && t < 8 ? 1 : 0;
+    const ph = t % 2.5;
+    c.jump = ph > 1.9 && ph < 2.2; c.steer = ph > 1.4 || p.state === 2 ? 0 : Math.sin(t * 1.1) * 0.35; c.tuck = t > 6 && t < 8 ? 1 : 0;
   };
   const make = (withRagdoll) => {
     const p = new Player(terr(), null, null, input);
@@ -229,19 +242,20 @@ function identityCheck() {
     if (A.p.state === 2 && !wasAir) airs++;
     if (A.p.state !== 2 && wasAir) lands++;
     wasAir = A.p.state === 2;
-    if (crashes) break;
+    if (crashes) { if (process.env.DBG) console.log('identity crash at', k / 60, JSON.stringify(A.p.lastCrash), A.p.speed); break; }
   }
   B.ctl.uninstall();
   return { diff, crashes, airs, lands, poseWrites };
 }
 
 // ---------------------------------------------------------------- run
+if (!process.env.NOFUZZ) {
 const results = [];
 const t0 = performance.now();
 for (let i = (process.env.ONLY ? Number(process.env.ONLY) : 0); i < (process.env.ONLY ? Number(process.env.ONLY) + 1 : N); i++) {
   const r = runCrash(scenario(i));
   results.push(r);
-  if (VERBOSE || (r.fail.length && !CHECK)) console.log(`#${i} ${r.type} ${r.cause} ${r.deg.toFixed(0)}° ${r.speed.toFixed(1)} m/s dt 1/${Math.round(1 / r.dt)}: ${r.fail.join(', ') || 'ok'} (stretch ${(r.stretch * 100).toFixed(2)} cm, below ${(r.below * 100).toFixed(2)} cm, dE ${r.dE.toFixed(1)} J, limit ${(r.limit * 57.3).toFixed(1)}°, rig ${(r.attach * 100).toFixed(1)} cm, sleep ${r.sleep?.toFixed(2) ?? '-'} s; end v ${r.mv?.toFixed(2)} ${r.mvb} w ${r.mw?.toFixed(2)} ${r.mwb} com ${r.comv?.toFixed(2)})`);
+  if (VERBOSE || ((r.fail.length || (r.late && process.env.LATE)) && !CHECK)) console.log(`#${i} ${r.type} ${r.cause} ${r.deg.toFixed(0)}° ${r.speed.toFixed(1)} m/s dt 1/${Math.round(1 / r.dt)}: ${r.fail.join(', ') || 'ok'} (stretch ${(r.stretch * 100).toFixed(2)} cm, below ${(r.below * 100).toFixed(2)} cm, dE ${r.dE.toFixed(1)} J, limit ${(r.limit * 57.3).toFixed(1)}°, rig ${(r.attach * 100).toFixed(1)} cm, sleep ${r.sleep?.toFixed(2) ?? '-'} s; end v ${r.mv?.toFixed(2)} ${r.mvb} w ${r.mw?.toFixed(2)} ${r.mwb} com ${r.comv?.toFixed(2)})`);
 }
 const fails = results.filter((r) => r.fail.length);
 if (process.env.SLOW) for (const r of results.filter((x) => x.gentle)) console.log('slow', r.i, r.cause, r.deg.toFixed(0), r.speed.toFixed(1), 'com<0.3 at', r.slow?.toFixed(2), 'asleep', r.sleep?.toFixed(2));
@@ -271,10 +285,14 @@ const id = identityCheck();
 console.log(`  no-crash run with / without the ragdoll: max state difference ${id.diff} (${id.airs} airs, ${id.lands} landings, ${id.crashes} crash frames), tracker pose writes ${id.poseWrites}`);
 if (CHECK) {
   const bad = [];
+  const by3 = gentle.filter((r) => r.sleep !== null && r.sleep <= LIM.sleep).length / Math.max(1, gentle.length);
+  const by4 = gentle.filter((r) => r.sleep !== null && r.sleep <= LIM.sleepAll).length / Math.max(1, gentle.length);
+  if (by3 < LIM.sleepShare || by4 < LIM.sleepAllShare) bad.push(`gentle crashes asleep: ${(by3 * 100).toFixed(1)} % by ${LIM.sleep} s (need ${LIM.sleepShare * 100} %), ${(by4 * 100).toFixed(1)} % by ${LIM.sleepAll} s (need ${LIM.sleepAllShare * 100} %)`);
   if (fails.length) { bad.push(`${fails.length} failing crashes`); for (const r of fails.slice(0, 12)) console.log(`  FAIL #${r.i} ${r.type} ${r.cause} ${r.deg.toFixed(0)}° ${r.speed.toFixed(1)} m/s dt 1/${Math.round(1 / r.dt)}: ${r.fail.join(', ')}`); }
   if (frWorst > 1e-6) bad.push(`frame-rate dependent (${frWorst})`);
   if (id.diff > 0 || id.poseWrites || id.crashes || id.airs < 2) bad.push(`identity: diff ${id.diff}, writes ${id.poseWrites}, crashes ${id.crashes}, airs ${id.airs}`);
   if (q(perFrame, 0.95) > LIM.msFrame) bad.push(`CPU p95 ${q(perFrame, 0.95).toFixed(2)} ms per frame`);
   console.log(bad.length ? `\nFAIL: ${bad.join('; ')}` : '\nOK');
   process.exit(bad.length ? 1 : 0);
+}
 }

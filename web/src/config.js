@@ -472,7 +472,7 @@ export const RAGDOLL = {
   ejectSpeed: 5,               // m/s: skis release above this (poles always drop)
   blendTime: 0.1,              // s from the animated pose to the ragdoll
   // Rest / respawn
-  sleepSpeed: 0.2, sleepSpin: 1.5, sleepTime: 0.25,
+  sleepSpeed: 0.3, sleepSpin: 1.5, sleepTime: 0.25,
   settleSpeed: 0.5, settleRate: 10,  // centre of mass slower than this (touching): what's left dies at this rate (1/s)
   restHold: 0.45,              // s asleep before the respawn fade (never before PHYSICS.tumbleTime)
   maxTumble: 3.0,              // s: respawn fade starts at the latest here

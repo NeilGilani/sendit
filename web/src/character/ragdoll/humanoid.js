@@ -320,6 +320,7 @@ export function depenetrate(H, env, maxLift = 0.45, maxPush = 1.2) {
         for (const s of b.samples) {
           b.point(s.p, p);
           if (p.y > o.y1 + s.r || p.y < o.y0 - 1) continue;
+          if (o.cap && p.distanceTo(n.set(o.x, o.y1 - o.r, o.z)) >= o.r + s.r) continue;   // (rocks are domes)
           const R = o.r + s.r + 0.005, qx = p.x - o.x, qz = p.z - o.z;
           const qu = qx * ux + qz * uz, c = qx * qx + qz * qz - R * R;
           if (c >= 0) continue;

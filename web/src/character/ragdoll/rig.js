@@ -91,7 +91,7 @@ export function applyPose(rider, H, seed, alpha, blend, renderPos) {
   }
   // World → armature space → parent-relative locals.
   rider.armature.matrixWorld.decompose(_p, _q, _s);
-  const qArmInv = conj(_q, new THREE.Quaternion());
+  const qArmInv = conj(_q, H._qai || (H._qai = new THREE.Quaternion()));
   const A = H._A || (H._A = {});
   const rootRest = rider.restGlobal.get(B.root);
   if (!H._rootQ) { H._rootQ = new THREE.Quaternion(); rootRest.decompose(_p, H._rootQ, _s); H._rootInv = rootRest.clone().invert(); }
@@ -122,7 +122,7 @@ export function applyPose(rider, H, seed, alpha, blend, renderPos) {
 
   // Gear: loose pieces and the ones still on (attached skis, the board).
   const mesh = (L) => (L.kind === 'ski' ? rider.skis?.[L.index] : L.kind === 'pole' ? rider.poles?.[seed.gear.poles[L.index]?.mesh ?? L.index] : rider.board);
-  for (const L of [...H.loose, ...H.attach]) {
+  for (const L of H.gearAll || (H.gearAll = [...H.loose, ...H.attach])) {
     const m = mesh(L);
     if (!m) continue;
     const e = D.get(L.body);

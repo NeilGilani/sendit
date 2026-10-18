@@ -262,8 +262,11 @@ export class World {
       for (const b of this.bodies) if (b.group === gid) { _a.addScaledVector(b.v, b.m); m += b.m; if (b.touch) touch = true; }
       if (!touch || _a.length() / m > C.settleSpeed) continue;
       if (gid === 0) this.settling = true;
+      // (only the wobble: spins and motion relative to the centre of mass; a body sliding off something keeps
+      // sliding at gravity's pace instead of creeping through treacle)
       const k = Math.max(0, 1 - C.settleRate * h);
-      for (const b of this.bodies) if (b.group === gid) { b.v.multiplyScalar(k); b.w.multiplyScalar(k); }
+      _a.divideScalar(m);
+      for (const b of this.bodies) if (b.group === gid) { b.v.sub(_a).multiplyScalar(k).add(_a); b.w.multiplyScalar(k); }
     }
     // Energy budget (group 0): muscle tone may move limbs but never adds energy beyond the crash's own
     // (World.budget is set from the seeded state); anything above it is taken out of the motion.
@@ -285,8 +288,18 @@ export class World {
     }
     for (const [gid, G] of this.groups) {
       if (G.asleep) continue;
-      let still = true;
-      for (const b of this.bodies) if (b.group === gid && (b.v.length() > C.sleepSpeed || b.w.length() > C.sleepSpin)) { still = false; break; }
+      // Still: every piece slow — or the whole body at rest (centre of mass crawling) with only a limb
+      // finishing a small swing (it would take seconds to die out against the joint and self-contacts).
+      let still = true, loose = true, m = 0;
+      _a.set(0, 0, 0);
+      for (const b of this.bodies) {
+        if (b.group !== gid) continue;
+        const vl = b.v.length(), wl = b.w.length();
+        if (vl > C.sleepSpeed || wl > C.sleepSpin) still = false;
+        if (vl > 2 * C.sleepSpeed || wl > 2.5 * C.sleepSpin) loose = false;
+        _a.addScaledVector(b.v, b.m); m += b.m;
+      }
+      if (!still && loose && _a.length() / m < C.sleepSpeed * 0.3) still = true;
       G.still = still ? G.still + h : 0;
       if (G.still > C.sleepTime) {
         G.asleep = true;
@@ -467,19 +480,23 @@ export class World {
         }
         this.contact(b, _p0, _n.set(s.nx, s.ny, s.nz), r, pen, b.mu, b.muS, b.e, h, s);
       }
-      // Obstacles: vertical cylinders from the snow to their top (trees, rocks, posts).
+      // Obstacles: trunks / posts are vertical cylinders from the snow to their top; rocks are domes (a sphere of
+      // the rock's radius whose top is the rock's top: smooth, no corner for a limb to rattle on).
       for (const o of env.obstacles) {
         const dx = _p0.x - o.x, dz = _p0.z - o.z, R = o.r + r;
         if (dx * dx + dz * dz >= R * R || _p0.y > o.y1 + r || _p0.y < o.y0 - 1) continue;
+        if (o.cap) {
+          const dy = _p0.y - (o.y1 - o.r), d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          if (d >= R || d < 1e-6) continue;
+          this.contact(b, _p0, _g.set(dx / d, dy / d, dz / d), r, R - d, C.muBark, C.muBark, 0.1, h);
+          continue;
+        }
         // Push out the side the sample came from (no tunnelling through a trunk in one sub-step).
         _p1.copy(s.p).applyQuaternion(b.qp).add(b.xp);
         let nx = _p1.x - o.x, nz = _p1.z - o.z;
-        const dp = Math.hypot(nx, nz);
-        if (dp > 1e-6) { nx /= dp; nz /= dp; } else { const d = Math.hypot(dx, dz) || 1; nx = dx / d; nz = dz / d; }
-        const penSide = R - (nx * dx + nz * dz);
-        const penTop = o.y1 + r - _p0.y;
-        if (o.cap && penTop < penSide && penTop < 0.15) this.contact(b, _p0, _g.set(0, 1, 0), r, penTop, C.muBark, C.muBark, 0.1, h);
-        else this.contact(b, _p0, _g.set(nx, 0, nz), r, penSide, C.muBark, C.muBark, 0.15, h);
+        const dp = Math.sqrt(nx * nx + nz * nz);
+        if (dp > 1e-6) { nx /= dp; nz /= dp; } else { const d = Math.sqrt(dx * dx + dz * dz) || 1; nx = dx / d; nz = dz / d; }
+        this.contact(b, _p0, _g.set(nx, 0, nz), r, R - (nx * dx + nz * dz), C.muBark, C.muBark, 0.15, h);
       }
       // Rails / boxes: capsules along their top line.
       for (const rl of env.rails) {

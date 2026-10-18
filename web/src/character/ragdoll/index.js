@@ -31,15 +31,20 @@ export function makeEnv(terrain, scatter, course) {
     obstacles: [],
     rails: [],
     _railsAll: null,
+    _cache: new Map(),
     /** Gather obstacles and rails within `r` m of p (call every frame step; cheap). */
     refresh(p, r = 4) {
       env.obstacles.length = 0;
       if (scatter?.obstaclesNear) {
         for (const o of scatter.obstaclesNear(p, r)) {
-          const kind = o[3];
-          const top = kind === 'tree' ? o[2] * 26 : kind === 'rock' ? o[2] * 1.1 + 0.3 : kind === 'tower' ? 15 : 2;
-          const y0 = terrain.getHeight(o[0], o[1]);
-          env.obstacles.push({ x: o[0], z: o[1], r: o[2], y0, y1: y0 + top, cap: kind !== 'tree' && kind !== 'tower' });
+          let e = env._cache.get(o);   // (one entry per scatter obstacle: no garbage per refresh)
+          if (!e) {
+            const kind = o[3];
+            const top = kind === 'tree' ? o[2] * 26 : kind === 'rock' ? o[2] * 1.1 + 0.3 : kind === 'tower' ? 15 : 2;
+            const y0 = terrain.getHeight(o[0], o[1]);
+            env._cache.set(o, e = { x: o[0], z: o[1], r: o[2], y0, y1: y0 + top, cap: kind !== 'tree' && kind !== 'tower' });
+          }
+          env.obstacles.push(e);
         }
       }
       if (env._railsAll === null) {
