@@ -298,3 +298,115 @@ spotted (checked back) from 0.1 s — pressing steer 0.2 s later on a small air 
 
 Side effect: physics-fuzz (random inputs) sees a few more yaw crashes (28 → 33 in 4 × 120 s), since random
 steering in the air now builds a late spin.
+
+## 8. Spin and flip together: corks, rodeos, misties, double corks
+
+Players found combined spins and flips messy: "the air time and trajectory get messed with and the animation
+isn't clean". Code: `web/src/physics/offaxis.js` (new), `player.js`, `physics/edge.js`, `rider.js`. Benches:
+`node web/scripts/physics-combo.mjs [ski|snowboard|both] [--check]` (headless) and
+`node web/scripts/combo-shots.mjs <url> <outDir> [ski|snowboard] [tricks]` (frame sequences in the game).
+
+### Research
+
+**The flight.** In the air the centre of mass flies a parabola set at the lip; twisting, tucking and arm throws
+cannot change it, only drag does [S: Yeadon, aerial movement (lboro.ac.uk/microsites/ssehs/biomechanics);
+Open University MST209 "rotating bodies"]. Hang time comes from take-off speed, lip angle and the landing
+[S/C, §1]. Tuck vs open changes the drag area by up to ≈ 0.35 → 0.55 m² (wind-tunnel postures vary by up to 64 %,
+mostly the arms) [S: Elfmark et al. 2022, Sports Engineering; arXiv 2410.02767] — worth ≈ 1–5 % of a 20–25 m
+flight [C] and best left out of a game (the user's ask: rotation must not change the arc).
+
+**What a cork is.**
+- Corks are off-axis spins (the lead shoulder dropped into the spin); a rodeo is an off-axis backflip with spin,
+  a misty the forward (frontflip) one; a double / triple counts the off-axis passes, the number the whole spin
+  [S: SkiTalk freestyle glossary; snowboardingdays.com; NBC Olympics glossary; FIS park & pipe tricks list].
+- **Axis tilt:** "a cork tilts that axis 45°–60° from vertical" (Google Cloud / US Ski & Snowboard sensor tool,
+  which measures the angle between the instantaneous rotation axis and vertical, the "cork ribbon") [S:
+  cloud.google.com/blog "measure physics of freestyle snowboarding and skiing"].
+- **Geometry [C]:** a body that starts upright and turns about an axis tilted α from vertical has its long axis
+  ride a cone round that axis, deepest at 2α half a revolution in: α = 45° lays it flat on its side, 60° leaves
+  the feet a little above the head (120°), 90° is a plain flip (180°). So corks ≈ 90–120° at the deepest, rodeos
+  / misties ≈ 130–160° (α ≈ 65–80°), a flip 180°.
+- **It is not one rigid rotation for the whole trick.** Measured corks come out a median 25° short of their name
+  and flatspins 21° long [S: Merz et al. 2025, Sports Biomechanics 24(7), 149 tricks]; Shaun White's cab double
+  cork 1440 measured ≈ 1122° [S: Google Cloud]. A cork 720 has "two distinct off-axis spins" with the invert in
+  one of them [S: Skiing mag "how to corkscrew 720"]. The physics is a twisting somersault [S: Yeadon 1993; Hiley
+  & Yeadon; Mikl & Rye arXiv 1510.08046]: the angular momentum is fixed, the body turns about it with its long
+  axis tilted off it and twists about that long axis (faster the more it tilts); equipment raises the long-axis
+  inertia, so skiers need much more tilt than gymnasts [S: Yeadon 2013, aerials]. The tilt is set on the lip
+  (shoulder drop, pop direction) and changed a little in the air [S: Snowboard Addiction BS cork 540; Yeadon].
+- **Rates:** rotation amount is driven 3–5× more by the angular velocity than by the air time [S: Merz et al.
+  2025 J Sports Sci 43(3); Beijing 2022 halfpipe IMU study]. A double cork 1440 averages ≈ 400–550°/s [C].
+- **Technique:** "lead with your head and let the rest of your body follow as one unit" [S: Fall-Line]; spot the
+  landing at ≈ 540° of a 720 [S: Fall-Line, Skiing mag] — the last 25–35 % of the rotation; tuck to spin faster,
+  open to stall [S: Skiing mag; Scientific American]; grabs taken after the set and held through the middle,
+  let go to spot [E]; open up (let go, extend, reach for the landing) ≈ 0.3–0.5 s before touchdown [E, no source].
+
+**Games.** Steep: left stick spins (longer hold = more) and flips, the right stick shifts the body 90° mid-trick;
+corks are undocumented ("rodeos and corks are yours to master"); reviewers found its tricks clumsy to aim [S:
+Twinfinite, Steam discussions, Game Informer]. Riders Republic encodes the order: flip first then spin = rodeo /
+misty, spin first then tip = cork [S: Attack of the Fanboy trick list]. Shredders pre-loads flips and spins
+before the lip [S: TheGamer]. Infinite Air: hard to control, narrow landing window [S: Push Square].
+
+### What was wrong
+
+1. **The flight did change a little** — the flip tuck lowered the air drag (compact × 0.7): +0.75 % air time,
+   +0.9–1.7 % distance for every flip or cork vs a straight air (physics-combo, flat and 32° landing). Nothing
+   else in the physics depended on rotation (gravity, landing detection and the ground probes use the point
+   mass; rotation is drawn on top).
+2. **The rotation path was two independent rotations** — `renderOrient = base(heading) · Rx(flip)`: the flip
+   turned about the gear's own sideways axis while the heading spun, so the flip axis turned with the rider.
+   Every combo went fully upside down (179–180° at the deepest, even a cork 720), and the body's up axis drew a
+   spiral instead of a clean loop (16–26° off the best cone fit).
+3. **The body orbited the path**: flips pivoted 0.85 m above the feet and spins about the feet, not about the
+   posed body's own centre of mass — the drawn body strayed 0.21–0.24 m round the flight path in a cork.
+4. **Poses fought each other**: a flip's stretched layout (arms flung up above the head, legs long) came on in
+   the middle of corks while the spin wanted the arms in.
+5. **The spot parked the spin mid-flip**: letting go of the stick while the spin passed an alignment checked it
+   there even with half a flip to go — the cork turned into a plain flip half-way (a double cork with the stick
+   let go at 540° landed as a "Double Cork 720" with the spin frozen for ≈ 0.9 s upside down).
+
+### What changed
+
+1. Drag no longer depends on the flip tuck (a grab still compacts the body).
+2. `physics/offaxis.js`: the flip axis is fixed in the world when the flip starts; each flip is one revolution
+   about an axis tilted α from vertical toward it, and the spin beyond that revolution's 360° is a twist about
+   the long axis (cork 720 = one off-axis revolution + 360° of twist; double cork 1080 = two + 360°). α from the
+   spin : flip rate ratio r (`alphaTable`): 72° at r ≈ 1 (backflip 360 / rodeo 360), 64° at 1.5 (rodeo 540,
+   double cork), 58° at 2 (cork 720), 52° at 3, 50° floor; +6° for frontflips (misties invert early, like
+   rodeos). Little spin per flip (r under 0.45–0.75) keeps a plain flip about the fixed axis with an aerials-style
+   twist. The shape changes only within 16° of upright, where both forms coincide; whole flips are exactly the
+   plain heading, so take-offs, landings, the trick names, the scoring and every rate are unchanged. The landing
+   pitch check reads the drawn attitude (the body's tilt off upright: the flip angle for a plain flip, a little
+   less in a cork — the window is the same 22° / 42° of real tilt).
+3. rider.js: the body pivots about its own posed centre of mass (measured from the bones each frame) for the
+   spin and the flip, held on the flight path; the head leads (into the spin, back for a backflip, chin in for a
+   frontflip) then spots the landing over the last 0.8 → 0.35 s; a spin + flip holds a compact shape (knees up,
+   arms wrapped in) and opens over the last 0.55 → 0.3 s; arms "out wide" sit at shoulder height.
+4. physics/edge.js: with more than 120° of a flip to come (`flipBusy`), the spot keeps the spin going (open if the
+   next alignment is out of reach) and checks only as the flip comes out.
+
+### Before and after (physics-combo.mjs, take-off 11 m/s forward + 11 m/s up, 13 up for the double cork; ski · board)
+
+| | before | after |
+|---|---|---|
+| air time / landing point vs straight air, flat | +0.75 % / +0.8–1.0 % (every flip) | 0.00 % / 0.00 % |
+| same, 32° landing (double cork) | +0.4–0.9 % / +1.2–1.7 % | 0.00 % / 0.00 % |
+| deepest body tilt: backflip | 180° | 180° |
+| backflip 360 / rodeo 360 | 180° · 180° | 144° · 143° |
+| cork 720 (board: FS rodeo 720) | 179° · 179° | 104° · 111° |
+| misty 720 | 179° · 179° | 117° · 124° |
+| rodeo 540 (board) | 179° | 130° |
+| double cork 1080 (two passes) | 180° · 179° | 140° · 135° |
+| up-axis path off a clean cone (corks) | 16–26° | 0.3–5° |
+| double cork, stick let go at 540° of spin | spin parked upside down, "Double Cork 720" · "720" | spins on: "Double Cork 1080" · "900" |
+| drawn body's centre of mass round the flight path (combo-shots, ski cork 720 · double cork) | 0.24 · 0.21 m | ≈ 0.03–0.06 m |
+| landings (flat): cork 720, misty, rodeo 540, bf 360 | clean | clean (pitch ≤ 2°) |
+
+Unchanged: physics-tricks (the most flips per air time 0.92 / 1.41 / 1.85 / 2.25 / 2.61 / 2.91 at 1.1–3.0 s on
+skis; double cork 1080 lands at 2.6 s, triple at 3.2 s), physics-rotation `--check`, the names and points.
+
+Frame sequences (combo-shots, side camera tracking the centre of mass, every 0.12 s): a cork 720 now drops the
+head to the side and rolls through with the skis passing above at ≈ 105–125°, body balled up, arms in, then
+opens and reaches for the landing; before it went straight upside down with the skis vertical overhead, the body
+stretched long and an arm flung above the head. The double cork shows two clean off-axis loops with a near-upright
+moment between them; the snowboard rodeo 540 goes over the heel side with the board overhead at ≈ 130°.
