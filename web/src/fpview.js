@@ -3,7 +3,8 @@
 // pitch through flips, yaw through spins, roll through corks — so the horizon and the slope swing
 // through the view the way they do in helmet-cam footage. The head leads the rotation a little (riders
 // spot ahead), the lens opens and the goggle frame darkens with the rotation rate, and the view settles
-// back onto the run on landing. See docs/first-person.md (tunables: FP below).
+// back onto the run on landing. Also here: the goggle lens state (tint / fog / snow, drawn by gfx/post.js),
+// breath puffs, terrain chatter and the crash cam. See docs/first-person.md (tunables: FP* below).
 //
 // Used by camera.js (CameraController.firstPerson → FPView.update) and rider.js (first-person arm,
 // pole and shadow helpers below).
@@ -539,7 +540,7 @@ export function fpSkiArm(rider, side, pl, u, l) {
 // on the heel side once the shoulders open, the rear one behind on the toe side, so the arms never
 // cross the lens), y = up, z = forward along the view, metres from the eye.
 export const FP_BOARD = {
-  ride: { x: 0.33, y: -0.26, z: 0.46 },    // balance hands just inside the lower frame edges
+  ride: { x: 0.36, y: -0.26, z: 0.46 },    // balance hands just inside the lower frame edges
   rearReach: 0.1,                           // the rear (behind-the-eye) glove sits a little closer
   rearProtract: 0.45,                       // extra shoulder-blade reach (rad) for the rear arm
   frontDrop: 0.35,                          // nose-side shoulder lowered (rad) so it never fills the lower view

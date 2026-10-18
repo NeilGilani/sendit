@@ -152,7 +152,7 @@ body { --fp-rush: 0; --fp-lens: 1; }
   opacity: calc(0.45 + 0.55 * var(--fp-lens));
   background:
     linear-gradient(115deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.045) 38%, rgba(255,255,255,0) 46%),
-    radial-gradient(ellipse 13% 11% at 50% 102%, rgba(6,8,18,0.85) 35%, rgba(6,8,18,0) 100%),
+    radial-gradient(ellipse 12% 7% at 50% 101%, rgba(6,8,18,0.6) 30%, rgba(6,8,18,0) 100%),
     radial-gradient(ellipse calc(80% - var(--fp-rush) * 7%) calc(77% - var(--fp-rush) * 6%) at 50% 46%,
       rgba(0,0,0,0) 63%, rgba(14,20,44,calc(0.32 + var(--fp-rush) * 0.3)) 84%, rgba(8,10,24,calc(0.8 + var(--fp-rush) * 0.15)) 100%);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04); }

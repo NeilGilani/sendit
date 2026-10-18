@@ -245,5 +245,6 @@ No new asset files: everything is generated in code, so CREDITS.md is unchanged.
 - Poles and skis / board keep their equipment-catalog colours (pink poles), which can clash with
   earth-tone colourways; equipment colours are the equipment code's business.
 - Logos are abstract marks (no text rendering); the strap wordmark is blocky glyphs.
-- Helmet cam: sleeves and gauntlets are slimmed 25 % in first person, but the pole shafts still run
-  along the forearms (`placePoles()`, animation code untouched here), so they are mostly hidden.
+- Helmet cam: sleeves and gauntlets are slimmed 25 % in first person; the poles, gloves and goggle lens
+  in the helmet cam are described in `docs/first-person.md`. The hidden face pieces (`uHide`) are also
+  discarded in the fragment shader, since the collapsed vertices still skinned into thin strands.
