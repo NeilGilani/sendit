@@ -312,8 +312,8 @@ export const CAMERA = {
   // yawRateTurn at a turn rate of 1 rad/s, and leads it by turnLead s of the turn rate (low-passed at turnRateSmooth
   // 1/s). Steady-carve lag ≈ turnRate · (1 / rate − turnLead): ~20° before, a few degrees now.
   yawRate: 3.2,
-  yawRateTurn: 1.5,
-  turnLead: 0.1,
+  yawRateTurn: 2,
+  turnLead: 0.14,
   turnRateSmooth: 6,
   // Air framing. The camera follows the flight line, never the rotating body; the horizon stays level.
   airYawRate: 1.0,            // 1/s yaw chase in the air (the flight direction barely changes)
