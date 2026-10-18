@@ -58,7 +58,10 @@ export function scoreSnapshot() {
 // ---------------------------------------------------------------- settings
 // Stored under SETTINGS_KEY; the player profile links to this key (profile.links.settings).
 export const SETTINGS_KEY = 'sendit.settings';
-const DEFAULTS = { quality: 1, master: 0.8, music: 0.6, sfx: 0.8, mouseSens: 1.0, camSens: 1.0, snowfall: false };
+const DEFAULTS = { quality: 1, master: 0.8, music: 0.6, sfx: 0.8, mouseSens: 1.0, camSens: 1.0, snowfall: false,
+  // First person: fpStable = steadier helmet cam in flips (keeps the spin, damps flip / cork tilt);
+  // fpLens = goggle lens effects strength (tint, fringe, fog / snow on the lens), 0 = clear view.
+  fpStable: false, fpLens: 1 };
 export const settings = { ...DEFAULTS, ...safeParse(safeGet(SETTINGS_KEY)) };
 
 export function setSetting(k, v) {

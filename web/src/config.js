@@ -269,8 +269,11 @@ export const ANIM = {
 // ------------------------------------------------------------------ CameraController
 export const CAMERA = {
   baseFov: 66,
-  fpFov: 80,                  // first person: wide helmet-cam lens
-  fpFovBonus: 14,
+  // First person (helmet cam, fpview.js): vertical FoV (deg) of the wide helmet-cam lens, the extra at
+  // top speed, and the extra while rotating fast (deg at 2π rad/s). The only source for these values.
+  fpFov: 74,
+  fpFovBonus: 10,
+  fpSpinFov: 5,
   maxFovBonus: 8,             // currentFoV = baseFoV + velocityRatio * maxFovBonus
   fovRiseRate: 2.2,           // 1/s easing up
   fovSnapRate: 14,            // 1/s snapping back on crash / hard brake

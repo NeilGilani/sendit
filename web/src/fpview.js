@@ -17,8 +17,7 @@ export const FP = {
   // Eye: from the head bone (base of the skull), in the view frame: up / forward, metres.
   eyeUp: 0.1, eyeFwd: 0.11,
   near: 0.04,
-  // Lens: vertical FoV (deg) + bonus at top speed; rotation opens it a little more (deg at 2π rad/s).
-  fov: 74, fovBonus: 10, spinFov: 5,
+  // Lens: CAMERA.fpFov / fpFovBonus / fpSpinFov in config.js.
   // Ground look: pitch (deg, − = down), extra per degree of slope, per unit speed ratio, in a tuck.
   pitch: -19, slopePitch: 0.55, speedPitch: 4, tuckPitch: 5, lookIntoTurn: 0.2,
   travelWeight: 0.8,          // yaw toward the velocity (vs the gear's travel axis) once moving
@@ -69,7 +68,7 @@ export class FPView {
     this.wAir = 0; this.wasAir = false; this.active = false;
     this.yaw = 0; this.pitch = FP.pitch; this.roll = 0; this.airAdj = 0;
     this.lookYaw = 0; this.lookPitch = 0; this.lookIdle = 10;
-    this.dip = 0; this.dipV = 0; this.fov = FP.fov; this.rot = 0;
+    this.dip = 0; this.dipV = 0; this.fov = C.fpFov; this.rot = 0;
   }
 
   /** Landing compression kick (camera.js forwards the 'landed' event). */
@@ -184,8 +183,8 @@ export class FPView {
     cam.quaternion.copy(this.q);
     if (ground) cam.rotateZ(noise1(t * 31, 9.3) * chat * 0.6);
 
-    // Trauma shake, gentler than the chase camera's.
-    const tr2 = ctl.trauma * ctl.trauma;
+    // Trauma shake, gentler than the chase camera's; scaled by the screen-shake setting like the chase cam.
+    const tr2 = ctl.trauma * ctl.trauma * (settings.juiceShake ?? (ctl.reducedMotion ? 0.4 : 1));
     if (tr2 > 1e-4) {
       const f = t * C.shakeFreq;
       cam.rotateX(deg(noise1(f, 11.2) * C.shakeAngle * 0.7 * tr2));
@@ -194,8 +193,8 @@ export class FPView {
     }
 
     // Lens: wide, opening with speed and with the rotation rate; snaps in on hard stops.
-    let wantFov = FP.fov + r * FP.fovBonus + Math.min(1, this.rot / (Math.PI * 2)) * FP.spinFov;
-    if (ctl.snapT > 0) wantFov = FP.fov - 5;
+    let wantFov = C.fpFov + r * C.fpFovBonus + Math.min(1, this.rot / (Math.PI * 2)) * C.fpSpinFov;
+    if (ctl.snapT > 0) wantFov = C.fpFov - 5;
     ctl.fov += (wantFov - ctl.fov) * k(ctl.snapT > 0 || wantFov < ctl.fov ? C.fovSnapRate : C.fovRiseRate * (this.rot > 1 ? 3 : 1));
     cam.fov = clamp(ctl.fov, 50, 115);
     cam.updateProjectionMatrix();
