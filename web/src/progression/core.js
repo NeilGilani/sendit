@@ -166,6 +166,11 @@ export const ACHIEVEMENTS = [
   { id: 'master-1', title: 'Mountain Master', desc: 'Three stars on a map: ridden, a clean run and a ×4 combo', xp: 400, icon: '⛰', test: (s) => Object.entries(s.life.mapStats || {}).some(([id, m]) => s.life.maps?.[id] && m.clean > 0 && m.mult >= 4) },
   { id: 'meat-10', title: 'Hall of Meat', desc: 'Wipe out 10 times', xp: 150, icon: '✚', test: (s) => s.life.wipeouts >= 10 },
   { id: 'yard-sale', title: 'Yard Sale', desc: 'Tumble 15 m in one wipeout', xp: 200, icon: '☄', test: (s) => s.life.maxTumble >= 15 },
+  // Thrill (thrill/): spots and gaps discovered, friends beaten through a versus link.
+  { id: 'spots-10', title: 'Scout', desc: 'Discover 10 spots (send named features)', xp: 250, icon: '⌖', test: (s) => s.life.spots >= 10 },
+  { id: 'gap-1', title: 'Mind the Gap', desc: 'Land a transfer gap from one named spot to another', xp: 200, icon: '⤳', test: (s) => s.life.gaps >= 1 },
+  { id: 'gap-10', title: 'Gap Master', desc: 'Find 10 different gaps', xp: 500, icon: '⤳', test: (s) => s.life.gaps >= 10 },
+  { id: 'versus-win', title: 'Bragging Rights', desc: "Beat a friend's time from a challenge link", xp: 300, icon: '⚔', test: (s) => s.life.versusWins >= 1 },
   { id: 'level-10', title: 'Double Digits', desc: 'Reach level 10', xp: 0, icon: '⬆', test: (s, p) => p.level >= 10 },
 ];
 
@@ -181,7 +186,7 @@ export const PB_STATS = {
 export function defaultState() {
   return {
     version: PROGRESSION_VERSION, xp: 0,
-    life: { rides: 0, tricks: 0, flips: 0, stomps: 0, near: 0, meters: 0, air: 0, grindM: 0, maxSpin: 0, bestMult: 0, topKmh: 0, golds: 0, dailySweeps: 0, wipeouts: 0, maxTumble: 0, runs: 0, cleanRuns: 0, maps: {}, mapStats: {}, trickBook: {} },
+    life: { rides: 0, tricks: 0, flips: 0, stomps: 0, near: 0, meters: 0, air: 0, grindM: 0, maxSpin: 0, bestMult: 0, topKmh: 0, golds: 0, dailySweeps: 0, wipeouts: 0, maxTumble: 0, runs: 0, cleanRuns: 0, spots: 0, gaps: 0, versusWins: 0, maps: {}, mapStats: {}, trickBook: {} },
     daily: null,           // { day, list: [3 challenges], rerolls: {slot: n}, rerollsLeft, progress: {stat: n}, done: {id: true}, swept }
     weekly: null,          // { week, progress: {stat: n}, done }
     achievements: {},      // id → unlock time (ms)
@@ -467,6 +472,15 @@ export class Progression {
     this.state.life.near++;
     this.bump('near');
     this.bump(`near@${this.ride.mapId}`);
+    this.checkAchievements();
+  }
+
+  /** Thrill discoveries: 'spot' (a new spot), 'gap' (a new gap), 'versusWin'. Counted for life, any ride. */
+  recordThrill(kind) {
+    const k = { spot: 'spots', gap: 'gaps', versusWin: 'versusWins' }[kind];
+    if (!k) return;
+    this.state.life[k] = (this.state.life[k] || 0) + 1;
+    this.save();
     this.checkAchievements();
   }
 
