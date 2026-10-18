@@ -40,7 +40,8 @@ export function installAdrenaline({ player, terrain, sound }) {
 
   return {
     get level() { return level; },
-    update(dt) {
+    /** extra: another 0..1 exposure (a neck-and-neck versus race), counted at THRILL.exposure.raceShare. */
+    update(dt, extra = 0) {
       const on = settings.thrillAdrenaline !== false && game.mode === Mode.RIDING;
       let want = 0;
       if (on && (player.state === 1 || player.state === 2 || player.state === 5)) {
@@ -52,7 +53,7 @@ export function installAdrenaline({ player, terrain, sound }) {
           drop = player.state === 1 && hs > 6 ? dropAhead((x, z) => terrain.getHeight(x, z), p.x, p.y, p.z, vx / hs, vz / hs, C.look) : 0;
         }
         const above = player.state === 2 ? p.y - terrain.getHeight(p.x, p.z) : 0;
-        want = exposureLevel({ drop, above, speedRatio: player.speedRatio || 0 }, C);
+        want = Math.max(exposureLevel({ drop, above, speedRatio: player.speedRatio || 0 }, C), extra * C.raceShare);
       }
       level += (want - level) * Math.min(1, dt * (want > level ? C.rise : C.fall));
       if (level < 0.004) level = 0;

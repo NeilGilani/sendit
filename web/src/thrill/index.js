@@ -48,7 +48,7 @@ export function installThrill(o) {
     update(dt) {
       retry.update(dt);
       spots.update(dt);
-      adrenaline.update(dt);
+      adrenaline.update(dt, versus.closeness());
       versus.update(dt);
       replay.record(dt);
     },

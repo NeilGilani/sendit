@@ -50,6 +50,7 @@ export const THRILL = {
     rise: 2.5, fall: 0.9,        // 1/s easing of the level
     bpm: [76, 148],              // heartbeat tempo from level 0.15 to 1
     vignette: 0.7,               // vignette opacity at level 1
+    raceGap: 15, raceShare: 0.5, // a versus race within 15 m of the friend's ghost raises the level to 0.5 (neck and neck)
   },
   medal: {
     closeS: 1.5,           // s: within this (or closeShare of the target time) the results card says SO CLOSE

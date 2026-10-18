@@ -7,7 +7,7 @@
 // The target stays for every retry of that run until the page is reloaded without ?vs.
 import * as THREE from 'three';
 import { on, emit, game, Mode } from '../state.js';
-import { encodeVersus, decodeVersus, marginText } from './core.js';
+import { THRILL, encodeVersus, decodeVersus, marginText } from './core.js';
 import { skierGeometry } from '../life.js';
 import { fmtTime } from '../activities.js';
 import { progression } from '../progression/index.js';
@@ -54,7 +54,7 @@ export function installVersus({ scene, course, player, activities, hud, getMap, 
     line.style.cssText = 'margin-top:6px;font-size:13px;font-weight:700;letter-spacing:.12em;color:#ffb3ea;text-shadow:0 1px 6px rgba(0,0,0,.45)';
     document.getElementById('chal')?.appendChild(line);
   }
-  let hudT = 0;
+  let hudT = 0, gap = null;   // metres ahead (+) / behind (−) of the friend's ghost, while racing
 
   // ---- results: verdict row + the share button
   let last = null;
@@ -113,8 +113,14 @@ export function installVersus({ scene, course, player, activities, hud, getMap, 
   return {
     target,
     link,
+    /** 1 when neck and neck with the friend's ghost, 0 from THRILL.exposure.raceGap m apart (adrenaline). */
+    closeness() {
+      if (!target || gap === null || activities?.state !== 'running' || game.mode !== Mode.RIDING) return 0;
+      return Math.max(0, 1 - Math.abs(gap) / THRILL.exposure.raceGap);
+    },
     update(dt) {
       if (!target) return;
+      if (activities?.state !== 'running') gap = null;
       const A = activities;
       const running = game.mode === Mode.RIDING && A?.mode === 'challenge' && A.state === 'running';
       if (ghost) { if (running) playGhost(A.time); else ghost.visible = false; }
@@ -126,7 +132,8 @@ export function installVersus({ scene, course, player, activities, hud, getMap, 
       if (running && ghost?.visible !== undefined && course?.progress && target.ghost) {
         const me = course.progress(player.position.x, player.position.z), them = course.progress(ghost.position.x, ghost.position.z);
         if (me >= 0 && them >= 0 && A.time > 1) {
-          const d = Math.round(me - them);
+          gap = me - them;
+          const d = Math.round(gap);
           txt += d >= 0 ? `  ▲ ${d} m` : `  ▼ ${-d} m`;
           line.style.color = d >= 0 ? '#7ef9ff' : '#ffb3ea';
         }

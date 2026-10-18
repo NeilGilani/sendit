@@ -601,6 +601,8 @@ An exposure level from 0 to 1 is the largest of three measures:
   calm and a cliff band reads high. It runs from 6 m (level 0) to 24 m (level 1).
 - **Height above the snow in the air.** From 6 m (level 0) to 24 m (level 1).
 - **Speed ratio.** From 0.93 to 1.05, worth at most 0.35.
+- **A close race.** In a versus race (8e), being within 15 m of the friend's ghost along the course is
+  worth up to 0.5 when neck and neck (`raceGap`, `raceShare`).
 
 The level eases up at 2.5/s and down at 0.9/s. From 0.15, a synthesized heartbeat plays on the sfx bus: a
 "lub-dub" of two low sine thumps, from 76 to 148 bpm, louder as the level rises. The screen edges also
@@ -636,6 +638,8 @@ position, rotation, scale and visibility, which covers bones, gear, garments and
   beside the take-off (or the crash) and 4 m ahead, 1.4 m up. A long lens pans with the rider and zooms to
   keep about 3.2 m of scene in frame (14–55°). Tunables: `filmerDist`, `filmerAhead`, `filmerHeight`,
   `filmerFrame`.
+- **Helmet cam.** A clip recorded in first person still shows the whole rider: the head is full size and
+  the garments are shown.
 - **The screen.** Letterbox bars, a blinking REPLAY tag, the rate (0.4×) and a progress line. The HUD, the
   adrenaline vignette, the level-up overlay and the case cards are hidden.
 - **Frozen world.** The ride is frozen while it plays: no physics, no timers. Afterwards the rig is put
