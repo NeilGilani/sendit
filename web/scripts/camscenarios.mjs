@@ -13,8 +13,8 @@ const jump = (where, { v = 13, flip = 0, spin = 0, grab = false, pop = true, bac
   pl.place({ x: ox - fx * ${back}, z: oz - fz * ${back} }, Math.atan2(-fx, -fz));
   pl.velocity.copy(pl.forward()).multiplyScalar(${v});
   const FLIP = ${flip}, SPIN = ${spin}, GRAB = ${grab}, POP = ${pop}, TAU = Math.PI * 2;
-  let land = -1, wasAir = false, tg = 0, pre = false, apex = false, crashT = -1;
-  const tls = [1.0, 0.6, 0.3, 0.12], ats = [0.3];
+  let land = -1, wasAir = false, tg = 0, pre = false, apex = false, crashT = -1, lastAir = 0;
+  let tls = [1.0, 0.6, 0.3, 0.12], ats = [0.3];
   window.__phase = 'in';
   pl.script = (c, p) => {
     tg += 1 / 60;
@@ -33,7 +33,7 @@ const jump = (where, { v = 13, flip = 0, spin = 0, grab = false, pop = true, bac
       if (SPIN && POP) c.steer = a > L - 3 && aNext < L ? Math.sign(SPIN) : 0;
     } else if (p.state === 2) {
       if (!wasAir) { snap('lip'); window.__phase = 'air'; }
-      wasAir = true;
+      wasAir = true; lastAir = p.airTime;
       const tl = p.dyn.timeToLand();
       const fl = Math.abs(FLIP) * TAU, sp = Math.abs(SPIN) * Math.PI;
       const go = POP || p.airTime > 0.1;
@@ -42,7 +42,9 @@ const jump = (where, { v = 13, flip = 0, spin = 0, grab = false, pop = true, bac
       if (GRAB && p.airTime > 0.15) c.tuck = 1;
       if (ats.length && p.airTime >= ats[0]) { ats.shift(); snap('a' + p.airTime.toFixed(1)); }
       if (!apex && p.velocity.y <= 0 && p.airTime > 0.2) { apex = true; if (tl > 0.75) snap('apex'); }
-      while (tls.length && tl <= tls[0]) { const x = tls.shift(); if (p.airTime > 0.25) { snap('tl' + x); break; } }
+      if (p.airTime > 0.25) while (tls.length && tl <= tls[0]) { const x = tls.shift(); if (tl > x - 0.08) { snap('tl' + x); break; } }
+    } else if (wasAir && lastAir < 0.35 && land < 0) {
+      wasAir = false; apex = false; tls = [1.0, 0.6, 0.3, 0.12]; ats = [0.3];   // a hop on the way in (a roll-over): not the jump yet
     } else if (wasAir) {
       if (land < 0) { land = tg; snap('touch'); window.__phase = 'land'; }
       else if (tg - land > 0.3 && tg - land < 0.32) snap('l30');

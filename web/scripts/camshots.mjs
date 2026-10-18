@@ -52,6 +52,7 @@ for (const [query, list] of byMap) {
   await page.waitForFunction(() => window.__sendit.game.mode === 1 && window.__sendit.player.state !== 4, null, { timeout: 120000 });
   await page.waitForFunction(() => window.__cam?.intro >= 1, null, { timeout: 120000 });
   await page.waitForTimeout(300);
+  await page.evaluate((hud) => { window.__keepHud = hud; }, !!process.env.HUD);
   await page.evaluate(() => {
     const s = window.__sendit, V = s.camera.position.constructor;
     const f = new V(), r = new V(), pv = new V(), lp = new V(), tmp = new V();
@@ -96,9 +97,12 @@ for (const [query, list] of byMap) {
       }
       return o;
     };
-    window.__vt.hook = () => { if (window.__rec && s.game.mode === 1) window.__camlog.push(window.__camInfo()); };
+    // A snapshot pauses the game for a few real frames: flag the first frame after it (its turn rate is off).
+    window.__vt.hook = () => { if (window.__rec && s.game.mode === 1) { const o = window.__camInfo(); if (window.__after > 0) { o.after = 1; window.__after--; } window.__camlog.push(o); } };
     window.__shots = [];
-    window.__snap = (tag) => { window.__shots.push({ tag, info: window.__camInfo() }); s.game.mode = 2; };
+    window.__snap = (tag) => { window.__shots.push({ tag, info: window.__camInfo() }); s.game.mode = 2; window.__after = 2; };
+    // HUD off in the shots (popups and the speed readout cover the landing); HUD=1 keeps it.
+    if (!window.__keepHud) { const st = document.createElement('style'); st.textContent = 'body *:not(canvas) { visibility: hidden !important; } canvas { visibility: visible !important; }'; document.head.appendChild(st); }
   });
   for (const name of list) {
     const sc = SCENARIOS[name];
@@ -154,7 +158,7 @@ await browser.close();
 function summarize(log) {
   log = log.slice(20);   // the first frames settle the camera after the teleport (cam.snap)
   const air = log.filter((o) => o.st === 2), gnd = log.filter((o) => o.st === 1);
-  const max = (a, k) => a.reduce((m, o) => Math.max(m, Math.abs(o[k] ?? 0)), 0);
+  const max = (a, k) => a.reduce((m, o) => (o.after && (k === 'w' || k === 'acc') ? m : Math.max(m, Math.abs(o[k] ?? 0))), 0);
   const out = (o) => Math.abs(o.rx) > 0.85 || Math.abs(o.ry) > 0.85;
   const m = { n: log.length, airN: air.length };
   m.rollMax = +max(log, 'roll').toFixed(1);
