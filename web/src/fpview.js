@@ -3,22 +3,26 @@
 // pitch through flips, yaw through spins, roll through corks — so the horizon and the slope swing
 // through the view the way they do in helmet-cam footage. The head leads the rotation a little (riders
 // spot ahead), the lens opens and the goggle frame darkens with the rotation rate, and the view settles
-// back onto the run on landing. See docs/first-person.md (tunables: FP below).
+// back onto the run on landing. Also here: the goggle lens state (tint / fog / snow, drawn by gfx/post.js),
+// breath puffs, terrain chatter and the crash cam. See docs/first-person.md (tunables: FP* below).
 //
 // Used by camera.js (CameraController.firstPerson → FPView.update) and rider.js (first-person arm,
 // pole and shadow helpers below).
 import * as THREE from 'three';
 import { CAMERA as C } from './config.js';
 import { State } from './player.js';
-import { settings } from './state.js';
+import { settings, on } from './state.js';
 import { lerpAngle, clamp } from './world.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export const FP = {
   // Eye: from the head bone (base of the skull), in the view frame: up / forward, metres.
   eyeUp: 0.1, eyeFwd: 0.11,
-  near: 0.04,
-  // Lens: vertical FoV (deg) + bonus at top speed; rotation opens it a little more (deg at 2π rad/s).
-  fov: 74, fovBonus: 10, spinFov: 5,
+  eyeFwdBoard: 0.17,          // snowboard: the view runs past the front shoulder, so the eye sits further out
+  near: 0.05,
+  shoulderClear: 0.27,        // m the eye keeps from each shoulder joint (it rises over them)
+  headScale: 0.45,            // the head + helmet shrink to this share in first person (rider.js trunk)
+  // Lens: CAMERA.fpFov / fpFovBonus / fpSpinFov in config.js.
   // Ground look: pitch (deg, − = down), extra per degree of slope, per unit speed ratio, in a tuck.
   pitch: -19, slopePitch: 0.55, speedPitch: 4, tuckPitch: 5, lookIntoTurn: 0.2,
   travelWeight: 0.8,          // yaw toward the velocity (vs the gear's travel axis) once moving
@@ -31,9 +35,37 @@ export const FP = {
   lookMin: -60, lookMax: 45, pitchMin: -54,   // look limits (deg): input, and the total on the snow
 };
 
+// Goggle lens (drawn by the grade pass, gfx/post.js; strength × settings.fpLens): the worn goggle's
+// tint, a colour fringe at the frame, fog creeping in when you stop after working hard, snow flecks from
+// powder face shots, deep landings and crashes that melt / blow off over a few seconds.
+export const FP_LENS = {
+  tint: 0.3,               // share of the tinted image mixed into the view
+  sat: 0.5,                // how much of the lens colour's saturation the tint keeps
+  fringe: 1,               // edge warp + colour fringe (shader units)
+  snowFace: 0.6, snowLand: 0.3, snowCrash: 0.95, snowFall: 0.025,   // fleck amount added (snowFall: per s, riding fast in snowfall)
+  snowClear: 0.06, snowClearSpeed: 0.16,   // per s melting / blown off (more at speed)
+  fogRise: 0.035, fogClear: 0.4, fogMax: 0.5,   // per s while stopped after effort / at speed, cap
+};
+
+// Breath: a soft puff of vapour drifting out below the view on each exhale, quicker after hard riding,
+// visible standing / riding slowly (at speed the cold air takes it away instantly).
+export const FP_BREATH = {
+  rest: 3.4, hard: 1.7,       // s per breath at rest / right after effort
+  exhale: 1.1,                // s a puff lives
+  opacity: 0.32, size: 0.18,  // at its fullest, metres across at birth (grows ×2.4)
+  fadeSpeed: 6,               // m/s above which it is gone
+};
+// Crash (ragdoll, character/ragdoll.js): the helmet cam is knocked out of the head and settles a few
+// metres back / up the way you came, watching the body tumble, so the crash stays readable and nobody
+// gets a ragdoll's-eye spin. First person resumes on the respawn.
+export const FP_CRASH = { back: 2.6, up: 1.4, settle: 0.9, follow: 5, lookRate: 7, floor: 0.45 };
+// Terrain chatter: bumps (how fast the ground normal under the rider changes) kick the helmet cam.
+export const FP_BOB = { gain: 0.0035, max: 0.05, spring: 260, damp: 22 };
+
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
-const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _e = new THREE.Euler(0, 0, 0, 'YXZ');
-const _m = new THREE.Matrix4(), _s = new THREE.Vector3();
+const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _e = new THREE.Euler(0, 0, 0, 'YXZ');
+const _cv1 = new THREE.Vector3(), _cv2 = new THREE.Vector3();
+const _m = new THREE.Matrix4(), _s = new THREE.Vector3(), _col = new THREE.Color(), _col2 = new THREE.Color();
 const Y = new THREE.Vector3(0, 1, 0), X = new THREE.Vector3(1, 0, 0), Z = new THREE.Vector3(0, 0, 1);
 const RY_PI = new THREE.Quaternion().setFromAxisAngle(Y, Math.PI);
 const deg = THREE.MathUtils.degToRad;
@@ -69,16 +101,141 @@ export class FPView {
     this.wAir = 0; this.wasAir = false; this.active = false;
     this.yaw = 0; this.pitch = FP.pitch; this.roll = 0; this.airAdj = 0;
     this.lookYaw = 0; this.lookPitch = 0; this.lookIdle = 10;
-    this.dip = 0; this.dipV = 0; this.fov = FP.fov; this.rot = 0;
+    this.dip = 0; this.dipV = 0; this.fov = C.fpFov; this.rot = 0;
+    this.lens = { tint: new THREE.Color(1, 1, 1), amount: 0, fringe: 0, fog: 0, snow: 0 };
+    this.snow = 0; this.fog = 0; this.effort = 0; this._edge = 0;
+    this.bob = 0; this.bobV = 0; this.prevN = new THREE.Vector3(0, 1, 0);
+    this.breathT = 0; this.puff = null;
+    on('crashed', () => { this.snow = Math.max(this.snow, FP_LENS.snowCrash); });
+    on('landed', ({ impact }) => {
+      const pl = this.c.player;
+      if ((pl.powder ?? 0) > 0.5 && impact > 5) this.snow = Math.min(1, this.snow + FP_LENS.snowLand * Math.min(1.5, impact / 10));
+    });
+  }
+
+  /** Breath puffs in front of the face (a single soft sprite in the scene, placed from the camera). */
+  updateBreath(dt) {
+    const B = FP_BREATH, cam = this.c.camera, rider = this.c.rider, pl = this.c.player;
+    let scene = rider.root; while (scene.parent) scene = scene.parent;
+    if (!this.puff) {
+      if (scene === rider.root || typeof document === 'undefined') return;
+      const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+      const g = cv.getContext('2d');
+      for (let i = 0; i < 14; i++) {   // a few overlapping soft blobs: a cloud, not a disc
+        const x = 32 + (Math.random() - 0.5) * 22, y = 32 + (Math.random() - 0.5) * 22, r = 10 + Math.random() * 14;
+        const gr = g.createRadialGradient(x, y, 0, x, y, r);
+        gr.addColorStop(0, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+      }
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, fog: false, color: new THREE.Color(1.5, 1.55, 1.65), opacity: 0 });
+      this.puff = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+      this.puff.name = 'fpBreath'; this.puff.renderOrder = 5; this.puff.frustumCulled = false;
+      this.puffPos = new THREE.Vector3(); this.puffVel = new THREE.Vector3(); this.puffAge = 9;
+      scene.add(this.puff);
+    }
+    const moving = clamp(pl.speed / B.fadeSpeed, 0, 1);
+    this.breathT += dt;
+    const period = B.rest + (B.hard - B.rest) * this.effort;
+    if (this.breathT > period) {
+      this.breathT = 0; this.puffAge = 0;
+      // Out of the mouth: below and a little ahead of the eye, drifting forward / down with the rider's velocity.
+      this.puffPos.copy(this.eye).add(_v.set(0, -0.13, -0.16).applyQuaternion(this.q));
+      this.puffVel.copy(_v.set(0, -0.05, -0.35).applyQuaternion(this.q)).addScaledVector(pl.velocity, 0.7);
+    }
+    this.puffAge += dt;
+    const a = this.puffAge / B.exhale;
+    const vis = a < 1 ? Math.sin(Math.min(1, a * 3) * Math.PI * 0.5) * (1 - a) * (1 - a) : 0;
+    this.puffPos.addScaledVector(this.puffVel, dt);
+    this.puffVel.multiplyScalar(Math.exp(-1.5 * dt));
+    const m = this.puff;
+    m.visible = vis * (1 - moving) > 0.003 && pl.state !== State.LIFT;
+    if (!m.visible) return;
+    m.position.copy(this.puffPos);
+    m.quaternion.copy(cam.quaternion);
+    m.scale.setScalar(B.size * (1 + 1.4 * Math.min(1, a)));
+    m.material.opacity = B.opacity * vis * (1 - moving);
+  }
+
+  /** Lens state for the grade pass (this.lens): tint from the worn goggles, fog, snow flecks. */
+  updateLens(dt) {
+    const L = FP_LENS, pl = this.c.player, rider = this.c.rider, k = settings.fpLens ?? 1;
+    const U = rider.look?.lens?.userData?.uniforms;
+    if (U) {
+      // Through-the-lens colour: mostly the dark base tint behind the mirror, normalised to full brightness.
+      const c = _col.copy(U.uLensBase.value).multiplyScalar(0.65).add(_col2.copy(U.uLens.value).multiplyScalar(0.35));
+      const m = Math.max(c.r, c.g, c.b, 1e-3);
+      // Desaturated: a real lens shifts the colour balance, it doesn't paint the world (FP_LENS.sat).
+      this.lens.tint.setRGB(1 + (c.r / m - 1) * L.sat, 1 + (c.g / m - 1) * L.sat, 1 + (c.b / m - 1) * L.sat);
+    }
+    // Face shots: an edge change in deep powder at speed throws snow over the goggles.
+    const es = Math.sign(pl.edgeAngle || 0);
+    if (es && this._edge && es !== this._edge && (pl.powder ?? 0) > 0.55 && (pl.sink || 0) > 0.08 && pl.speed > 7) this.snow = Math.min(1, this.snow + L.snowFace * Math.min(1.3, pl.speed / 12));
+    if (es) this._edge = es;
+    const r = pl.speedRatio || 0;
+    if (settings.snowfall && r > 0.4) this.snow = Math.min(0.5, this.snow + L.snowFall * r * dt);
+    this.snow = Math.max(0, this.snow - (L.snowClear + L.snowClearSpeed * r) * dt);
+    // Fog: builds while standing after effort (exertion fills at speed / in turns), clears once moving.
+    this.effort = clamp(this.effort + (r > 0.5 ? 0.05 : -0.02) * dt, 0, 1);
+    if (pl.speed < 2 && pl.state === State.GROUNDED) this.fog = Math.min(L.fogMax * (0.4 + 0.6 * this.effort), this.fog + L.fogRise * dt);
+    else this.fog = Math.max(0, this.fog - L.fogClear * (0.3 + r) * dt);
+    this.lens.amount = L.tint * k;
+    this.lens.fringe = L.fringe * k;
+    this.lens.fog = this.fog * k;
+    this.lens.snow = this.snow * k;
   }
 
   /** Landing compression kick (camera.js forwards the 'landed' event). */
   kick(impact) { this.dipV += Math.min(FP.dipMax, impact * FP.dipKick); }
 
   /** Next update starts fresh (after the chase camera, a respawn or a menu). */
-  reset() { this.active = false; }
+  reset() {
+    this.active = false;
+    if (this.c.rider?.fpCam) this.c.rider.fpCam.ok = false;
+    if (this.puff) this.puff.visible = false;
+  }
+
+  /** Crashed in first person: an out-of-body follow of the ragdoll (camera.js calls this in State.CRASH). */
+  crash(dt) {
+    const ctl = this.c, cam = ctl.camera, rider = ctl.rider, F = FP_CRASH;
+    const k = (r) => 1 - Math.exp(-r * dt);
+    const chest = rider.bones.spine_03.getWorldPosition(_cv1);
+    if (!this.crashing) {
+      this.crashing = true; this.crashT = 0; this.active = false;
+      if (rider.fpCam) rider.fpCam.ok = false;
+      if (this.puff) this.puff.visible = false;
+      this.crashPos = cam.position.clone();
+      this.crashQ = cam.quaternion.clone();
+      // Back along where the camera was looking (level), i.e. up the track.
+      this.crashBack = _v.set(0, 0, 1).applyQuaternion(cam.quaternion).setY(0);
+      if (this.crashBack.lengthSq() < 1e-3) this.crashBack.set(0, 0, 1);
+      this.crashBack = this.crashBack.clone().normalize();
+    }
+    this.crashT += dt;
+    const e = THREE.MathUtils.smoothstep(this.crashT, 0, F.settle);
+    const want = _cv2.copy(chest).addScaledVector(this.crashBack, F.back * e).add(_v.set(0, 0.2 + F.up * e, 0));
+    this.crashPos.lerp(want, k(F.follow * (0.4 + e)));
+    const floor = ctl.terrain.getHeight(this.crashPos.x, this.crashPos.z) + F.floor;
+    if (this.crashPos.y < floor) this.crashPos.y = floor;
+    cam.position.copy(this.crashPos);
+    _m.lookAt(this.crashPos, chest, Y);
+    _q.setFromRotationMatrix(_m);
+    this.crashQ.slerp(_q, k(F.lookRate));
+    cam.quaternion.copy(this.crashQ);
+    const tr2 = ctl.trauma * ctl.trauma * (settings.juiceShake ?? (ctl.reducedMotion ? 0.4 : 1));
+    if (tr2 > 1e-4) {
+      const f = ctl.t * C.shakeFreq;
+      cam.rotateX(deg(noise1(f, 11.2) * C.shakeAngle * 0.6 * tr2));
+      cam.rotateZ(deg(noise1(f, 3.7) * C.shakeAngle * 0.6 * tr2));
+    }
+    ctl.fov += (C.fpFov - 6 - ctl.fov) * k(4);
+    cam.fov = ctl.fov;
+    if (cam.near !== FP.near) cam.near = FP.near;
+    cam.updateProjectionMatrix();
+  }
 
   update(dt) {
+    this.crashing = false;
     const ctl = this.c, cam = ctl.camera, s = ctl.player, rider = ctl.rider, rp = rider.p;
     const k = (r) => 1 - Math.exp(-r * dt);
     const st = s.state, air = st === State.AIR, lift = st === State.LIFT;
@@ -175,17 +332,35 @@ export class FPView {
     // --- eye: in front of the head bone along the view (the head turns about the neck with the look,
     // so looking down puts the eyes out over the chest, looking aside never puts them in a shoulder)
     rider.bones.Head.getWorldPosition(this.eye);
-    this.eye.add(_v.set(0, FP.eyeUp, -FP.eyeFwd).applyQuaternion(this.q));
+    this.eye.add(_v.set(0, FP.eyeUp, -(rider.isBoard ? FP.eyeFwdBoard : FP.eyeFwd)).applyQuaternion(this.q));
+    // …but never inside a shoulder: looking steeply down past the nose-side shoulder (a board's landing
+    // spot at the end of a spin, looking down at the board) the eye would end up in the jacket, so it
+    // rises along the body's up axis until it clears both shoulder joints by FP.shoulderClear.
+    _v2.set(0, 1, 0).applyQuaternion(s.renderOrient);
+    for (const n of ['upperarm_l', 'upperarm_r']) {
+      const S = rider.bones[n].getWorldPosition(_v3), d = _v.subVectors(this.eye, S);
+      const h = d.dot(_v2), r2 = d.lengthSq() - h * h, R = FP.shoulderClear;
+      if (r2 < R * R) { const need = Math.sqrt(R * R - r2); if (h < need) this.eye.addScaledVector(_v2, need - h); }
+    }
     // Snow chatter: a fine vertical buzz that grows with speed on the ground.
     const chat = ground ? (0.003 + r * r * 0.012) : 0.0008;
     this.eye.y += (noise1(t * 26, 2.1) * 0.7 + noise1(t * 53, 4.4) * 0.3) * chat;
     this.eye.y -= this.dip * 0.5;
+    // Terrain chatter: a stiff spring kicked by how fast the ground normal changes (bumps, ruts, crud).
+    if (ground && dt > 1e-4) {
+      const dn = _v.copy(s.groundNormal).sub(this.prevN).length() / dt;
+      this.bobV += Math.min(FP_BOB.max, dn * FP_BOB.gain * (0.4 + r)) * (noise1(t * 40, 6.6) > 0 ? 1 : -1);
+    }
+    this.prevN.copy(s.groundNormal);
+    this.bobV -= (this.bob * FP_BOB.spring + this.bobV * FP_BOB.damp) * dt;
+    this.bob += this.bobV * dt;
+    this.eye.y += this.bob;
     cam.position.copy(this.eye);
     cam.quaternion.copy(this.q);
     if (ground) cam.rotateZ(noise1(t * 31, 9.3) * chat * 0.6);
 
-    // Trauma shake, gentler than the chase camera's.
-    const tr2 = ctl.trauma * ctl.trauma;
+    // Trauma shake, gentler than the chase camera's; scaled by the screen-shake setting like the chase cam.
+    const tr2 = ctl.trauma * ctl.trauma * (settings.juiceShake ?? (ctl.reducedMotion ? 0.4 : 1));
     if (tr2 > 1e-4) {
       const f = t * C.shakeFreq;
       cam.rotateX(deg(noise1(f, 11.2) * C.shakeAngle * 0.7 * tr2));
@@ -194,8 +369,8 @@ export class FPView {
     }
 
     // Lens: wide, opening with speed and with the rotation rate; snaps in on hard stops.
-    let wantFov = FP.fov + r * FP.fovBonus + Math.min(1, this.rot / (Math.PI * 2)) * FP.spinFov;
-    if (ctl.snapT > 0) wantFov = FP.fov - 5;
+    let wantFov = C.fpFov + r * C.fpFovBonus + Math.min(1, this.rot / (Math.PI * 2)) * C.fpSpinFov;
+    if (ctl.snapT > 0) wantFov = C.fpFov - 5;
     ctl.fov += (wantFov - ctl.fov) * k(ctl.snapT > 0 || wantFov < ctl.fov ? C.fovSnapRate : C.fovRiseRate * (this.rot > 1 ? 3 : 1));
     cam.fov = clamp(ctl.fov, 50, 115);
     cam.updateProjectionMatrix();
@@ -204,7 +379,13 @@ export class FPView {
       const g = Math.min(1, this.rot / 9) * 0.5 + THREE.MathUtils.smoothstep(r, 0.6, 1) * 0.2;
       if (Math.abs(g - (this._g ?? -1)) > 0.01) { this._g = g; document.body.style.setProperty('--fp-rush', g.toFixed(2)); }
     }
+    this.updateLens(dt);
+    this.updateBreath(dt);
+    if (typeof document !== 'undefined' && this._lensCss !== settings.fpLens) { this._lensCss = settings.fpLens; document.body.style.setProperty('--fp-lens', String(settings.fpLens ?? 1)); }
     rider.fpLookPitch = THREE.MathUtils.radToDeg(_e.setFromQuaternion(this.q, 'YXZ').x);
+    // The arms (rider.js → fpBoardArm) frame the gloves in this view next frame.
+    const fc = rider.fpCam ||= { q: new THREE.Quaternion(), eye: new THREE.Vector3(), ok: false };
+    fc.q.copy(this.q); fc.eye.copy(this.eye); fc.ok = true;
     this.active = true;
   }
 }
@@ -214,10 +395,13 @@ export class FPView {
 // they frame the same way whatever the crouch: gloves in the bottom corners at arm's length (never a
 // giant mitt in the lens), pole shafts angled out past the gloves so they never hide behind the forearms.
 export const FP_ARMS = {
-  ski: { x: 0.27, y: -0.37, z: 0.33 },    // glove relative to the eye (x outward)
+  ski: { x: 0.3, y: -0.32, z: 0.38 },     // glove relative to the eye (x outward, y up, z along the view's heading)
   skiSpeed: { x: -0.02, y: 0.03, z: 0.08 },
-  skiTuck: { x: 0.12, y: -0.4, z: 0.3 },
-  plantReach: 0.14, turnReach: 0.06,
+  skiTuck: { x: 0.13, y: -0.35, z: 0.34 },
+  plantReach: 0.14, turnReach: 0.06, plantDrop: 0.05,
+  air: { x: 0.06, y: 0.05, z: -0.02 },     // in the air: gloves a little wider and higher (balance), poles out
+  flipTuck: { x: -0.08, y: -0.14, z: 0.02 },// flip tuck: hands in toward the shins
+  grind: { x: 0.1, y: 0.04 },
   minEye: 0.46,                             // gloves never closer to the eye than this (m)
   protract: 0.42, shrug: 0.0,               // shoulder blades forward (rad about Y) / up
   handScale: 0.86,                          // viewmodel glove scale
@@ -237,7 +421,10 @@ export function eyeArmature(rider, out = new THREE.Vector3()) {
 /** First person: shoulder blades drawn forward (protraction) so the gloves reach into view. */
 export function fpProtract(rider, side) {
   const c = rider.bones['clavicle' + (side > 0 ? '_l' : '_r')];
-  rider.rotateGlobal(c, _hq.setFromAxisAngle(Y, -side * FP_ARMS.protract).multiply(_hq2.setFromAxisAngle(X, -FP_ARMS.shrug)));
+  const amt = rider.fpProt?.[side > 0 ? 0 : 1] ?? FP_ARMS.protract;   // per-arm override (fpBoardArm)
+  const drop = rider.fpDrop?.[side > 0 ? 0 : 1] ?? 0;                  // shoulder lowered (rad, fpBoardArm)
+  if (drop) rider.rotateGlobal(c, _hq.setFromAxisAngle(Z, -side * drop));
+  rider.rotateGlobal(c, _hq.setFromAxisAngle(Y, -side * amt).multiply(_hq2.setFromAxisAngle(X, -FP_ARMS.shrug)));
 }
 
 /** First person: smaller gloves (viewmodel scale) turned into a pole grip / board-balance hand. */
@@ -293,6 +480,7 @@ function keepOffEye(hand, eye, min) {
  */
 export function fpSkiArm(rider, side, pl, u, l) {
   const p = rider.p, A = FP_ARMS;
+  rider.fpProt = null; rider.fpDrop = null;
   const eye = eyeArmature(rider, new THREE.Vector3());
   const tp = handFrom(rider, side, u, l);
   const r = pl.speedRatio || 0;
@@ -303,7 +491,7 @@ export function fpSkiArm(rider, side, pl, u, l) {
   const sway = Math.sin(p.t * 1.3 + side) * 0.012;
   const fp = new THREE.Vector3(
     side * (A.ski.x + A.skiSpeed.x * r),
-    A.ski.y + A.skiSpeed.y * r + env * 0.06 + sway,
+    A.ski.y + A.skiSpeed.y * r - env * A.plantDrop + sway,
     A.ski.z + A.skiSpeed.z * r + env * A.plantReach + reach,
   );
   // Tuck: gloves together in front of the chin, poles under the arms.
@@ -312,30 +500,210 @@ export function fpSkiArm(rider, side, pl, u, l) {
   const pu = p.push || 0;
   if (pu > 0.01) {
     const q = p.pushPhase || 0, f = q < 0.4 ? q / 0.4 : 1 - (q - 0.4) / 0.6;
-    fp.lerp(_b.set(side * 0.27, -0.85 + f * 0.33, 0.05 + f * 0.47), pu);
+    fp.lerp(_b.set(side * 0.27, -0.62 + f * 0.3, 0.12 + f * 0.36), pu);
   }
   // Looking down: the gloves part so the knees and skis show between them.
   const ld = THREE.MathUtils.smoothstep(-(rider.fpLookPitch ?? -20), 30, 55);
   fp.x += side * 0.16 * ld; fp.y -= 0.05 * ld;
   // Hockey stop / plough: hands forward and a little wider for balance.
   fp.x += side * 0.06 * Math.max(p.stop || 0, p.plow || 0); fp.z += 0.05 * (p.stop || 0);
+  // Air: balance hands stay framed (wider, higher, a slow sway); flip tuck pulls them in toward the
+  // shins; a spin wrap brings them in, flung wide lets them out; on a rail they go wide.
+  const air = p.air || 0, ft = clamp(p.flipTuck || 0, 0, 1), si = clamp(p.spinTuck || 0, -1, 1);
+  fp.x += side * (A.air.x * air + A.flipTuck.x * ft - 0.08 * si + A.grind.x * (p.grind || 0));
+  fp.y += A.air.y * air + Math.sin(p.t * 3.1 + side) * 0.02 * air + A.flipTuck.y * ft - 0.05 * Math.max(0, si) + A.grind.y * (p.grind || 0);
+  fp.z += A.air.z * air + A.flipTuck.z * ft;
+  // Into armature space along the helmet cam's heading (level, body-relative): in a hockey stop or a
+  // counter-rotated carve the skis and hips point away from where you look, the gloves stay framed.
+  const fpEye = _be2, fw = _bz2, lf = _bx2;
+  if (viewArmature(rider, lf, _by, fw, fpEye)) {
+    fw.y = 0;
+    if (fw.lengthSq() < 0.05) fw.set(0, 0, 1); else fw.normalize();
+    lf.crossVectors(Y, fw);                      // armature +X is the rider's left
+    eye.copy(fpEye);
+    fp.set(lf.x * fp.x + fw.x * fp.z, fp.y, lf.z * fp.x + fw.z * fp.z);
+  }
   fp.add(eye);
-  const w = (1 - (p.air || 0)) * (1 - (p.stumble || 0)) * (1 - (p.crash || 0)) * (1 - (p.grind || 0)) * (1 - (p.sit || 0)) * (1 - (p.grab || 0));
+  // The grabbing hand reaches for real (third-person arm); stumbles flail half of it; the chair sits.
+  const name = pl.grabName || 'Safety', grabHand = name === 'Mute' ? -1 : 1;
+  const grab = side === grabHand || name === 'Truck driver' ? (p.grab || 0) : 0;
+  const w = (1 - 0.6 * (p.stumble || 0)) * (1 - (p.crash || 0)) * (1 - (p.sit || 0)) * (1 - grab);
   const hand = tp.lerp(fp, w);
   if ((p.sit || 0) < 0.5 && (p.crash || 0) < 0.5) keepOffEye(hand, eye, A.minEye);
   return armIK(rider, side, hand, _c.set(side * A.elbow[0], A.elbow[1], A.elbow[2]).normalize().clone());
 }
 
+// Snowboard: the camera looks down the nose (sideways to the chest), so view-frame targets are turned
+// into armature space through the helmet cam's orientation relative to the armature (last frame's
+// camera and armature; their relative turn changes slowly, even mid-flip, so the lag doesn't show).
+// Glove targets: x = toward the arm's own shoulder side of the view (the nose-side shoulder sits ahead
+// on the heel side once the shoulders open, the rear one behind on the toe side, so the arms never
+// cross the lens), y = up, z = forward along the view, metres from the eye.
+export const FP_BOARD = {
+  ride: { x: 0.36, y: -0.26, z: 0.46 },    // balance hands just inside the lower frame edges
+  rearReach: 0.1,                           // the rear (behind-the-eye) glove sits a little closer
+  rearProtract: 0.45,                       // extra shoulder-blade reach (rad) for the rear arm
+  frontDrop: 0.35,                          // nose-side shoulder lowered (rad) so it never fills the lower view
+  twist: 0.28,                              // extra shoulder opening toward the nose (rad, rider.js poseBoard)
+  speed: { x: 0.02, y: 0.02, z: 0.05 },     // at top speed: a touch wider and further forward
+  crouch: -0.07,                            // lower with the crouch / tuck
+  toe: { x: 0.05, y: -0.08 },               // toe-side carve: the toe-side hand drops toward the snow
+  heel: { y: 0.04, z: 0.06 },               // heel-side carve: both hands reach forward against the sit
+  air: { x: 0.07, y: 0.07 },                // in the air: a little wider and higher (balance)
+  spinIn: { x: -0.09, y: -0.06 },           // spin wrap (arms in across the chest) / flung wide (−)
+  flipTuck: { x: -0.08, y: -0.16, z: 0.04 },// flip tuck: hands down toward the shins
+  grind: { x: 0.08, y: 0.05 },
+  minEye: 0.44,
+};
+
+const _bq = new THREE.Quaternion(), _bq2 = new THREE.Quaternion(), _bm = new THREE.Matrix4();
+const _bx2 = new THREE.Vector3(), _bz2 = new THREE.Vector3(), _be2 = new THREE.Vector3();
+const _bx = new THREE.Vector3(), _by = new THREE.Vector3(), _bz = new THREE.Vector3(), _be = new THREE.Vector3();
+
 /**
- * First-person pole shaft direction (rider.visual frame: +X right, −Z forward; `sx` −1 left / +1 right):
- * angled out past the glove and trailing a little while gliding, swung forward to the snow on a plant,
- * tucked back under the arms in a tuck. Air / push / grind blends are applied by the caller.
+ * Helmet-cam frame in armature space (from last frame's camera, FPView sets rider.fpCam): fills
+ * right / up / forward unit vectors and the eye position. Returns false before the first FP frame.
  */
-export function fpPoleDir(rider, i, sx, out) {
-  const p = rider.p, plant = p.plant[i];
+function viewArmature(rider, right, up, fwd, eye) {
+  const fc = rider.fpCam, arm = rider.armature;
+  if (!fc?.ok || !arm) return false;
+  arm.matrixWorld.decompose(_be, _bq, _bx);
+  _bq2.copy(_bq).invert().multiply(fc.q);
+  right.set(1, 0, 0).applyQuaternion(_bq2);
+  up.set(0, 1, 0).applyQuaternion(_bq2);
+  fwd.set(0, 0, -1).applyQuaternion(_bq2);
+  eye.copy(fc.eye).applyMatrix4(_bm.copy(arm.matrixWorld).invert());
+  return true;
+}
+
+/**
+ * First-person snowboard arm: gloves balance at the lower frame edges (the nose-side glove on its side
+ * of the view, the rear one on the other), dropping on toe-side carves, reaching forward on heel side,
+ * wider in the air, in toward the shins in a flip tuck; grabs and hand drags reach for real (the
+ * third-person arm), held off the lens. `front` = the nose-side arm. Returns new [u, l] for armAim.
+ */
+export function fpBoardArm(rider, side, front, pl, u, l) {
+  const p = rider.p, A = FP_BOARD;
+  const right = _bx, up = _by, fwd = _bz;
+  const eye = new THREE.Vector3();
+  if (!viewArmature(rider, right, up, fwd, eye)) return [u, l];
+  const tp = handFrom(rider, side, u, l);
+  // Which side of the view this arm's shoulder is on (handles goofy, switch and the head turning).
+  const B = rider.bones, sh = posOf(rider.g(B['upperarm' + (side > 0 ? '_l' : '_r')]), new THREE.Vector3()).sub(eye);
+  // Compared with the other shoulder, so the front shoulder sitting right on the view axis can't flip it.
+  const other = posOf(rider.g(B['upperarm' + (side > 0 ? '_r' : '_l')]), new THREE.Vector3()).sub(eye);
+  const sx = sh.dot(right) >= other.dot(right) ? 1 : -1;
+  const behind = THREE.MathUtils.smoothstep(-sh.dot(fwd), -0.05, 0.12);   // shoulder behind the eye
+  (rider.fpProt ||= [FP_ARMS.protract, FP_ARMS.protract])[side > 0 ? 0 : 1] = FP_ARMS.protract + behind * A.rearProtract;
+  (rider.fpDrop ||= [0, 0])[side > 0 ? 0 : 1] = (1 - behind) * A.frontDrop;   // the shoulder ahead of the eye drops out of the view
+  const r = pl.speedRatio || 0, crouch = clamp(((p.crouch || 0) - 0.45) / 0.5, 0, 1);
+  // Toe side of the view: + when the chest (+Z armature) faces view-right.
+  const toeSide = Math.sign(_a.set(0, 0, 1).dot(right)) || 1;
+  const sway = Math.sin(p.t * 1.1 + side * 1.7) * 0.01;
+  let x = A.ride.x + A.speed.x * r - behind * A.rearReach * 0.5;
+  let y = A.ride.y + A.speed.y * r + A.crouch * crouch + sway;
+  let z = A.ride.z + A.speed.z * r - behind * A.rearReach;
+  const ground = 1 - (p.air || 0);
+  const toe = (p.toe || 0) * ground, heel = (p.heel || 0) * ground;
+  if (sx === toeSide) { x += A.toe.x * toe; y += A.toe.y * toe; }
+  y += A.heel.y * heel; z += A.heel.z * heel;
+  x += A.air.x * (p.air || 0); y += A.air.y * (p.air || 0) + Math.sin(p.t * 3.1 + side) * 0.025 * (p.air || 0);
+  const si = clamp(p.spinTuck || 0, -1, 1);
+  x += A.spinIn.x * si; y += A.spinIn.y * Math.max(0, si);
+  const ft = clamp(p.flipTuck || 0, 0, 1);
+  x += A.flipTuck.x * ft; y += A.flipTuck.y * ft; z += A.flipTuck.z * ft;
+  x += A.grind.x * (p.grind || 0); y += A.grind.y * (p.grind || 0);
+  x += 0.05 * (p.stop || 0);
+  const fp = eye.clone().addScaledVector(right, sx * x).addScaledVector(up, y).addScaledVector(fwd, z);
+  // The grab hand and a dragging hand reach for real; stumbling flails half of it; the lift chair sits.
+  const name = pl.grabName || 'Indy';
+  const grabbing = front === (name === 'Melon' || name === 'Nose grab') ? (p.grab || 0) : 0;
+  const dragging = front === ((p.toe || 0) >= (p.heel || 0)) ? (p.drag || 0) : 0;
+  const w = (1 - grabbing) * (1 - dragging) * (1 - 0.6 * (p.stumble || 0)) * (1 - (p.sit || 0)) * (1 - (p.crash || 0));
+  const hand = tp.lerp(fp, w);
+  if ((p.sit || 0) < 0.5 && (p.crash || 0) < 0.5) keepOffEye(hand, eye, A.minEye);
+  // Elbow out to the arm's side of the view and down.
+  const pole = _c.copy(right).multiplyScalar(sx * 0.8).addScaledVector(up, -0.6).addScaledVector(fwd, -0.2).normalize().clone();
+  return armIK(rider, side, hand, pole);
+}
+
+// Poles in first person: a detailed pole (grip with knob and finger ridges, wrist strap, tapered shaft,
+// basket with spokes, carbide tip) at a real length for the rider, placed from the fist.
+export const FP_POLE = {
+  length: 1.24,                  // m, fist to tip (about 0.7 x rider height; the grip sits in the fist)
+  glide: [0.52, -1, -0.2],        // shaft direction gliding (visual frame: x out, y up, +z back)
+  plant: [0.2, -1, -0.42],       // swung forward to the snow on a plant
+  air: [0.5, -0.85, -0.12],      // in the air: out and a touch forward, in view below the gloves
+  tuck: [0.1, -0.35, 1],         // under the arms
+  shaft: [1.0, 0.24, 0.5],       // vertex colours (the catalog's pink shaft)
+  grip: [0.035, 0.035, 0.045], ring: [0.55, 0.55, 0.6], strap: [0.06, 0.06, 0.08], basket: [0.03, 0.03, 0.04], tip: [0.7, 0.72, 0.75],
+};
+
+let _fpPoleGeo = null;
+/** The first-person pole (origin at the fist, pointing down -Y). Built once. */
+export function fpPoleGeometry() {
+  if (_fpPoleGeo) return _fpPoleGeo;
+  const P = FP_POLE, L = P.length;
+  const paint = (g, c) => {
+    g = g.index ? g.toNonIndexed() : g;
+    const n = g.attributes.position.count, a = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) a.set(c, i * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(a, 3));
+    if (g.attributes.uv) g.deleteAttribute('uv');
+    return g;
+  };
+  const parts = [];
+  // Grip: a slightly waisted moulded handle with a knob on top and three finger ridges.
+  const grip = new THREE.LatheGeometry([[0, 0.07], [0.019, 0.07], [0.022, 0.06], [0.018, 0.05], [0.0165, 0.03], [0.0185, 0.015], [0.0165, 0], [0.0185, -0.015], [0.0165, -0.03], [0.0185, -0.045], [0.016, -0.075], [0.012, -0.095], [0.0095, -0.1]].map(([r, y]) => new THREE.Vector2(r, y)), 14);
+  parts.push(paint(grip, P.grip));
+  const ring = new THREE.CylinderGeometry(0.0172, 0.0172, 0.008, 14); ring.translate(0, -0.062, 0); parts.push(paint(ring, P.ring));
+  // Wrist strap: a flat loop hanging from the top of the grip around the back of the glove.
+  const strap = new THREE.TorusGeometry(0.05, 0.0045, 4, 18, Math.PI * 1.55);
+  strap.scale(1, 1.35, 0.35); strap.rotateY(Math.PI / 2); strap.rotateX(Math.PI * 0.05); strap.translate(0, 0.02, 0.012);
+  parts.push(paint(strap, P.strap));
+  // Shaft: tapered, from the grip to the ferrule.
+  const sh = new THREE.CylinderGeometry(0.0092, 0.0062, L - 0.16, 10, 1, true); sh.translate(0, -0.1 - (L - 0.16) / 2, 0); parts.push(paint(sh, P.shaft));
+  // Basket: hub cone, a flat spoked disc and an outer ring.
+  const yb = -L + 0.075;
+  const hub = new THREE.CylinderGeometry(0.009, 0.014, 0.025, 10); hub.translate(0, yb, 0); parts.push(paint(hub, P.basket));
+  const disc = new THREE.CylinderGeometry(0.043, 0.043, 0.003, 18, 1); disc.translate(0, yb - 0.004, 0); parts.push(paint(disc, P.basket));
+  const rim = new THREE.TorusGeometry(0.043, 0.0045, 5, 20); rim.rotateX(Math.PI / 2); rim.translate(0, yb - 0.004, 0); parts.push(paint(rim, P.basket));
+  for (let k = 0; k < 4; k++) {
+    const sp = new THREE.BoxGeometry(0.084, 0.004, 0.006); sp.rotateY((k * Math.PI) / 4); sp.translate(0, yb - 0.001, 0); parts.push(paint(sp, P.ring));
+  }
+  // Tip: ferrule and carbide point.
+  const fer = new THREE.CylinderGeometry(0.0062, 0.0058, 0.05, 8); fer.translate(0, -L + 0.03, 0); parts.push(paint(fer, P.tip));
+  const tip = new THREE.ConeGeometry(0.0058, 0.02, 8); tip.rotateX(Math.PI); tip.translate(0, -L, 0); parts.push(paint(tip, P.tip));
+  _fpPoleGeo = mergeGeometries(parts);
+  _fpPoleGeo.computeBoundingSphere();
+  return _fpPoleGeo;
+}
+
+const V3 = (a) => _d.set(a[0], a[1], a[2]);
+/**
+ * First-person pole shaft direction (rider.visual frame: +X right, -Z forward; `sx` -1 left / +1 right):
+ * angled out past the glove while gliding, swung forward to the snow on a plant (the basket touches down
+ * at the envelope's peak), forward then back through a double-pole push, under the arms in a tuck, out
+ * and back in the air. With `hand` given (visual frame), the tip is kept on / above the snow.
+ */
+export function fpPoleDir(rider, i, sx, out, hand) {
+  const p = rider.p, P = FP_POLE, plant = p.plant[i];
   const ph = 1 - plant, env = plant > 0 ? (ph < 0.25 ? ph / 0.25 : 1 - (ph - 0.25) / 0.75) : 0;
-  out.set(sx * 0.4, -1, -0.12).normalize();
-  out.lerp(_a.set(sx * 0.2, -1, -0.62).normalize(), env).normalize();
+  const g = V3(P.glide); out.set(sx * g.x, g.y, g.z).normalize();
+  const w = V3(P.plant); out.lerp(_a.set(sx * w.x, w.y, w.z).normalize(), env).normalize();
+  out.x += sx * 0.12 * Math.max(p.stop || 0, p.plow || 0);
+  if ((p.push || 0) > 0.01) { const q = p.pushPhase || 0; out.lerp(_a.set(sx * 0.14, -1, q < 0.4 ? -0.3 + q : 0.3 + (q - 0.4) * 1.4).normalize(), p.push).normalize(); }
+  const t = V3(P.tuck); out.lerp(_a.set(sx * t.x, t.y, t.z).normalize(), p.tuck || 0).normalize();
+  const a = V3(P.air); out.lerp(_a.set(sx * a.x, a.y, a.z).normalize(), (p.air || 0) * (1 - (p.grab || 0) * 0.5)).normalize();
+  if (hand && (p.air || 0) < 0.5) {
+    // Tip on the snow, not through it (snow in this lean-rolled frame: y = x * tan(lean)).
+    const L = P.length, snowY = (hand.x + out.x * L) * Math.tan(p.lean || 0) - 0.02;
+    const maxDown = (hand.y - snowY) / L;
+    if (-out.y > maxDown && maxDown > 0.15) {
+      const h = Math.hypot(out.x, out.z), c = Math.sqrt(1 - maxDown * maxDown);
+      out.set(out.x / h * c, -maxDown, out.z / h * c);
+    }
+  }
   return out;
 }
 
