@@ -477,13 +477,21 @@ export class EdgePhysics {
     // The late throw: after the window, steering with no spin going (or a slow one the same way) still
     // builds one — slowly, up to spinLateMax (a late 180 / 360 on a big air, never a set), and only with
     // spinLateAir s of air left to start. A carve held off a lip (_spinLock) stays locked until re-pressed.
+    // A slow drift the other way (a carve's pre-wind, ≤ spinDrift × spinMinH) turns round the same way: with the
+    // stick held against it the spin used to open up and keep drifting the wrong way for the rest of the air.
+    const against = Math.sign(-steer) !== Math.sign(h);
+    const drift = against && Math.abs(h) <= (C.spinDrift ?? 0) * C.spinMinH && tLand > C.spinLateAir;
     const late = !throwing && steer && C.spinLateMax && Math.abs(h) < C.spinLateMax * this.H.spin
-      && (Math.sign(-steer) === Math.sign(h) || Math.abs(h) < C.spinMinH) && (Math.abs(h) > C.spinMinH || tLand > C.spinLateAir);
+      && (!against || Math.abs(h) < C.spinMinH || drift) && (Math.abs(h) > C.spinMinH || tLand > C.spinLateAir);
     if (late) h = approach(h, Math.sign(-steer) * C.spinLateMax * this.H.spin, C.spinLateRate * Math.abs(steer) * dt);
     // Shape: tucked (stick with the spin), open (against), grabbing = compact, released = spotting.
     let pose = 0, rate = null;
     const dir = Math.sign(h), spinning = Math.abs(h) > C.spinMinH;
-    if (grabbing) pose = 0.6;
+    // A grab is compact (pose 0.6, it can't open up); a late spin (building, or one no bigger than the late
+    // throw makes) with the stick into it tucks fully while grabbing, as it does without the grab — it used to
+    // hold 0.6 there, so a grabbed late 180 took ~20 % longer (1.42–1.5 s). Thrown / wound-up sets are unchanged.
+    const lateSized = Math.abs(h) <= (C.spinLateMax || 0) * this.H.spin + 1e-6;
+    if (grabbing) pose = late || (lateSized && steer && spinning && Math.sign(-steer) === dir) ? 1 : 0.6;
     else if (throwing) pose = 0.5;
     else if (late) pose = 1;
     else if (steer && spinning) pose = Math.sign(-steer) === dir ? 1 : -1;

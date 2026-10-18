@@ -140,6 +140,7 @@ export const PHYSICS = {
     spinThrowMax: 3.4,        // … up to this without a wind-up (rad/s)
     spinLateMax: 2.2, spinLateRate: 6, spinLateAir: 0.8,   // after the window steering still builds a spin: up to 2.2 rad/s (neutral) at 6 rad/s², with ≥ 0.8 s of air left
     spinMinH: 0.5, spinCheck: 3.2, airTwist: 1.0,   // below spinMinH not spinning; check-back / hip-twist rates (rad/s)
+    spinDrift: 2,             // a spin slower than this × spinMinH (a carve's pre-wind) turns round with the stick held against it (late spin rules)
     poseTime: 0.22,           // s to tuck in / open up fully (the rotation speeds up and slows gradually)
     rollSet: 0.6,             // set share rolling off without a pop
     // Flips (W = front, S = back): rad/s in the open (layout) pose, × flipTuckGain tucked.
@@ -190,6 +191,7 @@ export const PHYSICS = {
     // Rotation (see ski): a board spins a little faster (one platform, arms free): 390°/s neutral, 565°/s tucked.
     spinSet: 6.8, spinTuckGain: 1.45, spinOpen: 0.6, spinResponse: 9, prewind: 0.55, windupSpin: 3.2,
     spinThrow: 0.3, spinThrowAir: 0.1, spinThrowRate: 20, spinThrowMax: 3.8, spinMinH: 0.5, spinCheck: 3.2, airTwist: 1.0,
+    spinDrift: 2,
     spinLateMax: 2.4, spinLateRate: 6.5, spinLateAir: 0.8,
     poseTime: 0.22, rollSet: 0.6,
     // Flips (W = tamedog / front, S = wildcat / back, over the toe-heel axis): 185°/s open, 425°/s tucked.

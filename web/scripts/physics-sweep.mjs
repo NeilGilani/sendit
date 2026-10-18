@@ -122,6 +122,9 @@ function* grid() {
 }
 
 // ------------------------------------------------------------------ run + report
+if (import.meta.url === (await import('node:url')).pathToFileURL(process.argv[1]).href) await main();
+
+async function main() {
 const rows = [];
 const t0 = Date.now();
 for (const s of grid()) rows.push({ ...s, ...run(s) });
@@ -162,4 +165,5 @@ if (CSV) {
   const cols = ['slice', 'type', 'variant', 'map', 'sw', 'stance', 'axis', 'vy', 'set', 'held', 'tp', 'grab', 'dt', 't90', 't180', 'left', 'air', 'result'];
   fs.writeFileSync(CSV, [cols.join(','), ...rows.map((r) => cols.map((c) => (typeof r[c] === 'number' ? +r[c].toFixed(3) : r[c] ?? '')).join(','))].join('\n'));
   console.log(`\nwrote ${CSV}`);
+}
 }
