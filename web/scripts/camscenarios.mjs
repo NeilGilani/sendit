@@ -17,6 +17,7 @@ const jump = (where, { v = 13, flip = 0, spin = 0, grab = false, pop = true, bac
   let tls = [1.0, 0.6, 0.3, 0.12], ats = [0.3];
   window.__phase = 'in';
   pl.script = (c, p) => {
+    if (window.__done) return;
     tg += 1 / 60;
     if (p.state === 3) {
       if (crashT < 0) { crashT = tg; snap('crash'); window.__phase = 'crash'; }
