@@ -67,6 +67,22 @@ try {
     await page.waitForTimeout(800);
   };
   if (process.env.PERF) await fpsRun();
+  if (process.env.CHAIN) {
+    // "Open all" in real time: screenshots every 1.5 s through the chain (auto-advance, summary).
+    await page.evaluate(() => { const P = window.__sendit.profile; while (P.unopened.length) P.unopened.splice(0, 1); for (let i = 0; i < 3; i++) P.grantCase('test', ['first-chair', 'night-park', 'backcountry'][i]); window.__sendit.lobby.select('locker'); });
+    await page.waitForTimeout(300);
+    await page.evaluate(() => window.__sendit.lobby.select('cases'));
+    await page.waitForTimeout(600);
+    await page.click('.cs-all');
+    for (let i = 1; i <= 16; i++) {
+      await page.waitForTimeout(1500);
+      await page.screenshot({ path: `${outDir}/chain-${String(i).padStart(2, '0')}.png` });
+      // A Classified+ pull pauses the chain: press Open another like a player would.
+      await page.evaluate(() => { if (!document.querySelector('.cr-auto')) document.querySelector('.cr-btn[data-act="next"]')?.click(); });
+    }
+    console.log('chain pulls', await page.evaluate(() => window.__senditCases?.opener?.chain?.pulls.map((p) => p.rarity).join(',')));
+    console.log(`errors: ${errors.length}`, errors.slice(0, 6).join('\n')); await browser.close(); process.exit(errors.length ? 1 : 0);
+  }
   if (process.env.MATRIX) {
     // Every case × every grade in one session: a few key frames each, one contact sheet per case.
     const R = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'gold'];
@@ -112,6 +128,12 @@ try {
     const f = `${outDir}/${series}-${want || 'any'}-${t.toFixed(2)}.png`;
     await page.screenshot({ path: f });
   }
+  if (process.env.INSPECT) console.log('visible', await page.evaluate(() => {
+    const out = [];
+    const walk = (o, d) => { if (!o.visible) return; if (d > 0 && (o.isMesh || o.isPoints || o.isSprite || o.isLine)) out.push(`${'  '.repeat(d)}${o.type}:${o.name || o.material?.name || o.material?.type}`); if (d < 4) for (const c of o.children) walk(c, d + 1); };
+    walk(window.__sendit.scene, 0);
+    return out.slice(0, 120).join('\n');
+  }));
   const res = await page.evaluate(() => { const r = window.__senditCases.result; return { key: r.key, rarity: r.rarity, near: r.reel.nearMiss, gear: !!r.item.equipment }; });
   // Contact sheet of the sequence (one image to look at).
   const files = times.map((t) => `${outDir}/${series}-${want || 'any'}-${t.toFixed(2)}.png`);

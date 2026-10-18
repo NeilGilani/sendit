@@ -48,8 +48,8 @@ vec3 studioEnv(vec3 d, float rough) {
   float az = atan(d.x, d.z);
   float sw = 0.07 + w * 0.45;
   float strips = exp(-pow((az - 0.95) / sw, 2.0)) + 0.6 * exp(-pow((az + 1.05) / sw, 2.0));
-  c += vec3(1.25, 1.2, 1.12) * strips * smoothstep(-0.35, 0.1, d.y) * smoothstep(0.9, 0.45, d.y) * (1.0 - rough * 0.6);
-  c += uStudioTint * smoothstep(0.1, -0.5, d.y) * 0.6;
+  c += vec3(1.25, 1.2, 1.12) * strips * smoothstep(-0.35, 0.1, d.y) * (1.0 - smoothstep(0.45, 0.9, d.y)) * (1.0 - rough * 0.6);
+  c += uStudioTint * (1.0 - smoothstep(-0.5, 0.1, d.y)) * 0.6;
   return c;
 }`;
 function studio(m, k) {
@@ -101,7 +101,7 @@ void main() {
     v = exp(-r * r * 5.0) * 0.9 + exp(-r * 14.0) * 1.2;
   } else if (uMode < 1.5) {
     float rays = pow(0.5 + 0.5 * sin(a * 9.0 + uTime * uSpin), 6.0) + 0.6 * pow(0.5 + 0.5 * sin(a * 14.0 - uTime * uSpin * 0.7 + 1.3), 10.0);
-    v = rays * smoothstep(1.0, 0.15, r) * smoothstep(0.0, 0.18, r) + exp(-r * 5.0) * 0.5;
+    v = rays * (1.0 - smoothstep(0.15, 1.0, r)) * smoothstep(0.0, 0.18, r) + exp(-r * 5.0) * 0.5;
   } else if (uMode < 2.5) {
     float w = 0.03 + 0.08 * uRing;
     v = exp(-pow((r - uRing) / w, 2.0)) * (1.0 - uRing * 0.7) + exp(-r * r * 9.0) * 0.25;
@@ -155,9 +155,12 @@ void main() {
     float haze = 0.5 + 0.5 * n2(d.xz * 3.0 + d.y * 2.0);
     col += uTint * (0.05 + 0.05 * haze) * exp(-abs(h - 0.05) * 5.0);
     // Faint specks (a few far 'stars' of light in the studio air).
-    vec2 g = floor(vec2(atan(d.z, d.x) * 90.0, h * 60.0));
+    // (A tiny soft dot in a few random cells; the cell itself is ~10 cm across at the dome.)
+    vec2 gc = vec2(atan(d.z, d.x) * 90.0, h * 60.0);
+    vec2 g = floor(gc);
     float s = fract(sin(dot(g, vec2(12.9898, 78.233))) * 43758.5453);
-    col += step(0.997, s) * 0.18 * (0.6 + 0.4 * sin(uTime * 2.0 + s * 40.0));
+    float dotk = 1.0 - smoothstep(0.05, 0.16, length(fract(gc) - 0.5));
+    col += step(0.993, s) * dotk * 0.35 * (0.6 + 0.4 * sin(uTime * 2.0 + s * 40.0));
   } else {
     float r = length(vP.xy);
     col = vec3(0.012, 0.013, 0.02) + uTint * 0.22 * exp(-r * 0.55) + vec3(0.05) * exp(-r * r * 0.35);
@@ -203,11 +206,11 @@ void main() {
   else if (vKind < 2.5) {                                                       // spinning star
     float an = atan(p.y, p.x) + vSpin;
     float star = 0.45 + 0.55 * pow(abs(cos(an * 2.5)), 3.0);
-    a = smoothstep(star, star - 0.2, r);
+    a = 1.0 - smoothstep(star - 0.2, star, r);
   } else if (vKind < 3.5) {                                                     // confetti flake (tumbling)
     vec2 q = vec2(p.x, p.y / max(0.15, abs(sin(vSpin))));
     a = step(max(abs(q.x), abs(q.y)), 0.7);
-  } else a = smoothstep(1.0, 0.5, r);                                          // snow chunk
+  } else a = 1.0 - smoothstep(0.5, 1.0, r);                                         // snow chunk
   if (a < 0.01) discard;
   gl_FragColor = uAdd > 0.5 ? vec4(vC.rgb * a * vA, 1.0) : vec4(vC.rgb, a * vA);
 }`;
@@ -223,7 +226,7 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   gl_Position = projectionMatrix * mv;
   gl_PointSize = (0.012 + aS.w * 0.014) * uPx / max(0.1, -mv.z);
-  vA = uOp * smoothstep(3.2, 2.6, y) * smoothstep(-0.3, 0.2, y) * (0.35 + 0.65 * aS.w);
+  vA = uOp * (1.0 - smoothstep(2.6, 3.2, y)) * smoothstep(-0.3, 0.2, y) * (0.35 + 0.65 * aS.w);
 }`;
 const SNOW_FRAG = /* glsl */`
 uniform vec3 uCol;
