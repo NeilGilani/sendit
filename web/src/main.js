@@ -285,6 +285,7 @@ function saveLoadHint(mapId = currentMap?.map.id, trail = null, transition = fal
       transition, mapId, mountain: m.name || map?.name, region: m.region, accent: m.accent,
       trail: trail?.name, difficulty: trail?.difficulty,
       gear: profileStore.equipment, gearModel: profileStore.gearModel(), outfit: outfitSlotsFromProfile(),
+      rider: profileStore.profile.displayName || null,
     });
   } catch (e) { console.warn('[loading] hint not saved', e); }
 }

@@ -383,7 +383,7 @@ export class LoadingScene {
     this.mode = 'shot';
     this.dip = this.stillFadeT && this.stillFadeT < 0.1 ? 0 : 0.6;   // fade up from the cut (not under the still)
     const T = TRICKS[trick];
-    this.lastInfo = { trick: T.name, trickId: trick, cam, camera: CAMERAS[cam].name, place: v.place, time: TIMES[v.tod].name, tod: v.tod, mtn: v.mtn, gear: v.gear, seed: v.seed, own: !!v.own };
+    this.lastInfo = { trick: T.name, trickId: trick, cam, camera: CAMERAS[cam].name, place: v.place, time: TIMES[v.tod].name, tod: v.tod, mtn: v.mtn, gear: v.gear, seed: v.seed, own: !!v.own, rider: v.riderName };
     this.post('shot', { info: this.lastInfo });
   }
 

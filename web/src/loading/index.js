@@ -175,7 +175,8 @@ class LoadingScreen {
     this.caption.classList.remove('on');
     clearTimeout(this._capT);
     this._capT = setTimeout(() => {
-      this.caption.innerHTML = `<b>${info.trick}</b><span>${info.place} · ${info.time}</span>`;
+      const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      this.caption.innerHTML = `<b>${esc(info.trick)}</b><span>${info.rider ? `${esc(info.rider)} · ` : ''}${esc(info.place)} · ${esc(info.time)}</span>`;
       this.caption.classList.add('on');
     }, 600);
   }

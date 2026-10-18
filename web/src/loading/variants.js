@@ -171,7 +171,7 @@ export function pickVariant(opts = {}) {
   const place0 = r.pick(M.places);
   const place = own && hint.mountain ? [hint.mountain, hint.trail].filter(Boolean).join(' · ') : place0;
   return {
-    seed, r, tod, time: T, mtn, mountain: M, place, own,
+    seed, r, tod, time: T, mtn, mountain: M, place, own, riderName: own ? (hint.rider && hint.rider !== 'Rider' ? String(hint.rider).slice(0, 24) : 'You') : null,
     sunAz, sunElev: T.sunElev * D,
     gear, gearModel, stance: r() < 0.3 ? 'goofy' : 'regular', outfit,
     terrainSeed: Math.floor(r() * 1e6),
