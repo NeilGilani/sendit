@@ -59,6 +59,10 @@ export function rankFor(level) { let r = RANKS[0]; for (const k of RANKS) if (le
 // A template makes a challenge from a seeded random number. `stat` is the counter it reads (see
 // Progression.record*), `scope` 'ride' resets every ride (one-ride goals), 'day' accumulates all day.
 const MAPS = { 'valcrest-gully': 'Valcrest', blackspruce: 'Blackspruce', ravenspire: 'Ravenspire', 'voltage-park': 'Voltage Park' };
+// Explorer ("ride every map") reads the map registry: progression/index.js hands in the built-in, non-experimental
+// map ids (Lake Tahoe's real-data resorts are experimental and don't count). Until then the original four.
+let exploreIds = () => Object.keys(MAPS);
+export function setExplorerMaps(fn) { exploreIds = typeof fn === 'function' ? fn : () => Object.keys(MAPS); }
 export const CHALLENGE_POOL = [
   { cat: 'spin', make: (r) => { const g = pick(r, [540, 720, 900]); return { stat: `spin${g}`, goal: 1, title: `Land a ${g}`, desc: `Any spin of ${g}° or more, landed clean`, xp: g >= 900 ? 450 : g >= 720 ? 320 : 220 }; } },
   { cat: 'flip', make: (r) => { const g = pick(r, [1, 3, 5]); return { stat: 'flips', goal: g, title: g === 1 ? 'Land a flip' : `Land ${g} flips`, desc: 'Backflips, frontflips, corks, rodeos…', xp: 180 + g * 50 }; } },
@@ -152,7 +156,7 @@ export const ACHIEVEMENTS = [
   { id: 'km-100', title: 'Mountain Miles', desc: 'Ride 100 km in total', xp: 800, icon: '⛰', test: (s) => s.life.meters >= 100000 },
   { id: 'air-60', title: 'Frequent Flyer', desc: '60 s of air in one ride', xp: 300, icon: '☁', test: (s) => s.ride.air >= 60 },
   { id: 'grind-100', title: 'Rail Rat', desc: 'Grind 100 m of rails in total', xp: 300, icon: '═', test: (s) => s.life.grindM >= 100 },
-  { id: 'all-maps', title: 'Explorer', desc: 'Ride Valcrest, Blackspruce, Ravenspire and Voltage Park', xp: 400, icon: '⌖', test: (s) => Object.keys(MAPS).every((m) => s.life.maps?.[m]) },
+  { id: 'all-maps', title: 'Explorer', desc: 'Ride every map', xp: 400, icon: '⌖', test: (s) => { const ids = exploreIds() || Object.keys(MAPS); return ids.length > 0 && ids.every((m) => s.life.maps?.[m]); } },
   { id: 'dailies-3', title: 'Daily Grind', desc: 'Finish all three dailies in a day', xp: 250, icon: '✓', test: (s) => s.life.dailySweeps >= 1 },
   { id: 'gold', title: 'Golden', desc: 'Earn a gold medal', xp: 350, icon: '🥇', test: (s) => s.life.golds >= 1 },
   { id: 'book-10', title: 'Bag of Tricks', desc: 'Land 10 different tricks', xp: 250, icon: '📖', test: (s) => Object.keys(s.life.trickBook || {}).length >= 10 },
@@ -314,6 +318,10 @@ export class Progression {
     const d = this.ensureDay();
     for (const c of this.challenges()) {
       if (c.done || d.done[c.id]) continue;
+      // Progress tick for the HUD / lobby (only when the value moved, and not on the finishing step).
+      this._seen ||= {};
+      const key = `${d.day}:${c.id}`;
+      if (c.value < c.goal && (this._seen[key] ?? 0) !== c.value) { if (this._seen[key] !== undefined || c.value > 0) this.emit('challengeProgress', { challenge: c, value: c.value }); this._seen[key] = c.value; }
       if (c.value >= c.goal) {
         d.done[c.id] = true;
         this.ride?.dailies.push(c.title);
