@@ -3,8 +3,8 @@
 //
 //   top centre    combo chain: ×mult, points, the last moves, a timer bar; "LAND IT" while the chain
 //                 rides on an air or a rail (a crash loses it)
-//   upper third   announcer: grade badge (STOMPED / PERFECT / CLEAN / SKETCHY), the trick name, +points
-//   centre        live air: rotation degrees ticking up per 180, flips, the grab being held
+//   upper third   announcer (30 %, above the landing the camera frames near the middle): grade badge (STOMPED / PERFECT / CLEAN / SKETCHY), the trick name, +points
+//   upper third   live air (24 %, gone for the last 0.5 s before touchdown): rotation degrees ticking up per 180, flips, the grab being held
 //   below centre  small call-outs (CLOSE SHAVE ×n, rail names), banners (COMBO ×3 +1,200 / COMBO LOST)
 //   right         toasts (achievements, challenges, personal bests, level-ups: juice/toasts via toast())
 // Tunables: JUICE_HUD.
@@ -19,6 +19,7 @@ export const JUICE_HUD = {
   minAirToAnnounce: 0.5,     // s — shorter airs don't get a grade unless they were a named trick
   announceHold: 1.35,        // s the trick name stays up
   liveAirFrom: 0.45,         // s of air before the live rotation read-out appears
+  liveAirClear: 0.5,         // s before touchdown it fades, so the landing the camera frames is clear to spot
   hangFrom: 1.0,             // s of air before a straight air shows its hang time
   riskVignetteFrom: 3,       // combo multiplier from which an airborne chain pulses a pink edge
   nearStreakWindow: 2.6,     // s between close shaves that still count as a streak
@@ -63,7 +64,7 @@ const CSS = /* css */`
 #juiceHud .sp small { display: block; font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 800; font-size: 10px; letter-spacing: .28em; color: rgba(250,248,243,.75); -webkit-text-stroke: 0; }
 @keyframes jhSplit { 0% { opacity: 0; transform: translateX(-12px); } 10% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
 /* announcer */
-#juiceHud .an { position: absolute; left: 50%; top: 37%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; opacity: 0; }
+#juiceHud .an { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; opacity: 0; }
 #juiceHud .an.show { animation: jhSlam var(--hold, 1.6s) cubic-bezier(.2,.9,.3,1) forwards; }
 #juiceHud .an .g { display: inline-block; font-size: 22px; letter-spacing: .28em; padding: 3px 14px 3px 18px; border-radius: 3px; transform: skewX(-12deg); color: #1b1446; margin-bottom: 6px; }
 #juiceHud .an .g span { display: inline-block; transform: skewX(12deg); }
@@ -82,7 +83,7 @@ const CSS = /* css */`
   100% { opacity: 0; transform: translate(-50%, -70%) scale(.92) rotate(-3deg); }
 }
 /* live air */
-#juiceHud .air { position: absolute; left: 50%; top: 33%; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity .18s; white-space: nowrap; }
+#juiceHud .air { position: absolute; left: 50%; top: 24%; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity .18s; white-space: nowrap; }
 #juiceHud .air.on { opacity: 1; }
 #juiceHud .air .d { font-size: 46px; line-height: 1; display: inline-block; -webkit-text-stroke: 2px #1b1446; paint-order: stroke fill; text-shadow: 0 0 20px rgba(47,245,214,.5); }
 #juiceHud .air .d.tick { animation: jhBump .26s cubic-bezier(.2,1.8,.4,1); }
@@ -395,7 +396,9 @@ export function mountJuiceHud({ player, combo, input, camera }) {
     const grab = player.grabName && player.grab > 0.6 ? player.grabName : '';
     // Big straight airs show the hang time instead (from 1 s), so drops build anticipation too.
     const hang = inAir && player.airTime > JUICE_HUD.hangFrom;
-    const show = inAir && (halves > 0 || flips > 0 || grab || hang);
+    // (Off for the last liveAirClear s: the camera frames the landing near the middle of the screen.)
+    const clear = inAir && player.dyn?.timeToLand && player.dyn.timeToLand() < JUICE_HUD.liveAirClear;
+    const show = inAir && !clear && (halves > 0 || flips > 0 || grab || hang);
     if (show !== airOn) { air.classList.toggle('on', show); airOn = show; }
     if (show) {
       const deg = halves * 180;
