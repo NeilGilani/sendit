@@ -30,7 +30,7 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
     nodes = [];
     rider.root.traverse((o) => nodes.push(o));
     const stride = nodes.length * STRIDE_NODE + 4;
-    ring = new FrameRing(Math.ceil(C.seconds * 75), stride);
+    ring = new FrameRing(Math.ceil(C.seconds * 62), stride);   // frames are kept at ≤ 60 Hz (fast displays skip some)
     moment = null; cuts = [];
   }
   on('equipmentChanged', () => { ring = null; });
@@ -56,6 +56,7 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
       if (!ring || n !== nodes.length) rebuild();
     }
     recClock += dt;
+    if (ring.count && recClock - ring.t1 < 1 / 60 - 1e-4) return;
     const o0 = ring.push(recClock), D = ring.data;
     let o = o0;
     for (const nd of nodes) {

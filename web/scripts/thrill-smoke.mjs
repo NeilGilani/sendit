@@ -87,6 +87,7 @@ await page.waitForFunction(() => { const e = document.getElementById('thrill-rp'
 const wp = await page.evaluate(() => document.getElementById('thrill-rp')?.textContent || '');
 check('a wipeout offers REPLAY WIPEOUT after the respawn', /WIPEOUT/.test(wp) && (await page.evaluate(() => document.getElementById('thrill-rp').classList.contains('on'))), wp);
 await page.evaluate(() => { window.__sendit.player.script = null; });
+await page.waitForFunction(() => !window.__sendit.player._busy, null, { timeout: 5000 }).catch(() => {});   // the respawn fade
 await page.keyboard.press('Tab');
 await wait(1500);
 check('Tab replays the wipeout', await page.evaluate(() => window.__thrill.replay.active));
