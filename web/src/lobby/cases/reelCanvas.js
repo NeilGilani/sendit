@@ -140,7 +140,7 @@ export class CanvasReel {
   }
 
   /**
-   * Before the reel shows: draw the next few distinct cards once (tiny, then cleared) so their
+   * Before the reel shows: draw the next few distinct cards once (full size, then cleared; the band is still invisible) so their
    * bitmaps are uploaded to the GPU during the crate's first second, not on the reel's first frames.
    * Returns true while there is more to warm.
    */
@@ -152,10 +152,11 @@ export class CanvasReel {
     while (this.warmAt < this.warmIds.length && done < n) {
       const bm = cache.get(`${this.size}|${this.warmIds[this.warmAt]}`);
       if (!bm) break;   // not rasterised yet: try again next frame
-      g.drawImage(bm, 0, 0, 2, 2);
+      g.drawImage(bm, 0, this.top, this.cw, this.ch);   // full size: the real texture upload
       this.warmAt++; done++;
     }
-    g.clearRect(0, 0, 4, 4);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, this.cv.width, this.cv.height);
     return this.warmAt < this.warmIds.length;
   }
 
