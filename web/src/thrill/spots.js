@@ -28,7 +28,7 @@ class SpotMarkers {
     tex.colorSpace = THREE.SRGBColorSpace;
     this.items = [];
     for (let i = 0; i < THRILL.markers.max; i++) {
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false, opacity: 0 }));
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false, fog: false, opacity: 0 }));
       sp.visible = false; sp.renderOrder = 5;
       scene.add(sp);
       this.items.push({ sp, target: null, a: 0 });
@@ -106,17 +106,24 @@ function buildCatalog(course, features, terrain, namer, done) {
     done([...names], pts); return () => {};
   }
   const half = terrain?.half || 2000, step = 8;
-  let i = -half, stop = false;
-  const slice = () => {
+  let i = -half, j = -half, stop = false;
+  // Idle time only (between frames), so the scan never stretches a frame; 3 ms slices where there is no
+  // requestIdleCallback.
+  const idle = typeof requestIdleCallback === 'function' ? (f) => requestIdleCallback(f, { timeout: 2000 }) : (f) => setTimeout(() => f(null), 40);
+  const slice = (deadline) => {
     if (stop) return;
     const t0 = performance.now();
-    while (i <= half && performance.now() - t0 < 6) {
-      for (let z = -half; z <= half; z += step) { const n = namer(i, z); if (n) add(n, i, z); }
-      i += step;
+    const more = () => (deadline && !deadline.didTimeout ? deadline.timeRemaining() > 2 : performance.now() - t0 < 3);
+    while (i <= half && more()) {
+      for (let k = 0; k < 64 && i <= half; k++) {
+        const n = namer(i, j); if (n) add(n, i, j);
+        j += step;
+        if (j > half) { j = -half; i += step; }
+      }
     }
-    if (i > half) done([...names], pts); else setTimeout(slice, 30);
+    if (i > half) done([...names], pts); else idle(slice);
   };
-  setTimeout(slice, 2500);   // after the loading screen and first frames
+  setTimeout(() => idle(slice), 2500);   // after the loading screen and first frames
   return () => { stop = true; };
 }
 
