@@ -585,7 +585,7 @@ function frame(now) {
   const riding = game.mode === Mode.RIDING;
   // In the helmet cam the corner streaks start a little earlier and stay fainter (wind past the goggles).
   const fpWind = rider.fp ? HUD.fpWindEarly : 0;
-  const wantWind = riding ? THREE.MathUtils.smoothstep(player.speedRatio, HUD.windStreakFrom - fpWind, HUD.windStreakFull) * (rider.fp ? 0.8 : 1) : 0;
+  const wantWind = riding && !replaying ? THREE.MathUtils.smoothstep(player.speedRatio, HUD.windStreakFrom - fpWind, HUD.windStreakFull) * (rider.fp ? 0.8 : 1) : 0;
   post.update(dt, time, wantWind);
   post.setLens(!replaying && rider.fp && cam.fpView?.active && (game.mode === Mode.RIDING || game.mode === Mode.LIFT || game.mode === Mode.PAUSED) ? cam.fpView.lens : null);   // goggle lens (fpview.js)
   juice?.update(paused || replaying ? 0 : dt, time);
