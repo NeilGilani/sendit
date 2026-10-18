@@ -61,6 +61,8 @@ export const THRILL = {
     slow: 0.4,             // playback rate while airborne
     orbitDeg: 120,         // drone orbit over the replay
     dist: 6.2, rise: 2.4,  // drone arm (m); it flies on the side with fewer trees in the way
+    filmerDist: 10, filmerAhead: 4, filmerHeight: 1.4,   // every other replay: a tripod this far beside / ahead of the take-off (m)
+    filmerFrame: 3.2,      // m of scene the long lens keeps in frame around the rider
     prompt: 4,             // s the REPLAY prompt stays after a big landing
     bigAir: 1.4,           // s of air (or a huge trick) for the prompt
     window: 14,            // s after a moment that Tab still replays it (else the last `fallback` s)

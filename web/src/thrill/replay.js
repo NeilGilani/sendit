@@ -24,6 +24,7 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
   let moment = null;          // the last replayable moment { t, before, after, kind: 'trick' | 'wipeout' }
   let cuts = [];              // rec-clock times of teleports (respawn, retry, drop zone): a replay never spans one
   let crash = null;           // the crash waiting for its respawn (wipeout replays)
+  let lastShot = 'filmer';    // alternates 'drone' / 'filmer'
   const ui = typeof document !== 'undefined' ? mountUi() : null;
 
   function rebuild() {
@@ -129,6 +130,14 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
     const travel = Math.atan2(pb.z - pa.z, pb.x - pa.x);
     const side = clearSide(t0, t1, travel);
     active = { t: t0, t0, t1, ang: travel + side * Math.PI / 2, fov: camera.fov, rec: null, center: posAt(t0, new THREE.Vector3()), camPos: null, wipe: m?.kind === 'wipeout' ? m.t : null };
+    // Every other replay is the filmer's shot: a tripod beside the take-off, a long lens panning with you.
+    active.shot = rec ? lastShot : (lastShot = lastShot === 'drone' ? 'filmer' : 'drone');
+    if (active.shot === 'filmer') {
+      const at = posAt(Math.max(t0, Math.min(t1, m ? m.t - (m.kind === 'wipeout' ? 0.2 : 0.7) : (t0 + t1) / 2)), new THREE.Vector3());
+      const px = Math.cos(active.ang), pz = Math.sin(active.ang), fx = Math.cos(travel), fz = Math.sin(travel);
+      const x = at.x + px * C.filmerDist + fx * C.filmerAhead, z = at.z + pz * C.filmerDist + fz * C.filmerAhead;
+      active.tripod = new THREE.Vector3(x, Math.max(terrain.getHeight(x, z), at.y - 6) + C.filmerHeight, z);
+    }
     if (rec) active.rec = startClip();
     ui?.show(true, !!active.rec);
     ui?.prompt(false);
@@ -206,9 +215,21 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
       const rate = active.wipe !== null ? (active.t > active.wipe - 0.6 && active.t < active.wipe + 1.6 ? C.wipeSlow : 1) : airborne ? C.slow : 1;
       active.rate = (active.rate ?? rate) + (rate - (active.rate ?? rate)) * Math.min(1, dt * 6);
       active.t += dt * active.rate;
-      // Drone: orbit the (smoothed) rider, above the snow.
       active.center.lerp(_c, Math.min(1, dt * 10));
       const u = (active.t - active.t0) / (active.t1 - active.t0);
+      if (active.tripod) {
+        // Filmer: fixed tripod, long lens that keeps the rider about the same size in frame.
+        camera.position.copy(active.tripod);
+        camera.lookAt(_look.copy(active.center).add({ x: 0, y: 0.9, z: 0 }));
+        const d = camera.position.distanceTo(_look);
+        const fov = Math.max(14, Math.min(55, (2 * Math.atan(C.filmerFrame / Math.max(d, 1)) * 180) / Math.PI));
+        active.lens = active.lens === undefined ? fov : active.lens + (fov - active.lens) * Math.min(1, dt * 3);
+        if (Math.abs(camera.fov - active.lens) > 0.01) { camera.fov = active.lens; camera.updateProjectionMatrix(); }
+        ui?.tick(active.rate, u);
+        if (active.t >= active.t1) stop();
+        return;
+      }
+      // Drone: orbit the (smoothed) rider, above the snow.
       const th = active.ang + (C.orbitDeg * Math.PI / 180) * (u - 0.5);
       _cam.set(active.center.x + Math.cos(th) * C.dist, active.center.y + C.rise, active.center.z + Math.sin(th) * C.dist);
       _cam.y = Math.max(_cam.y, terrain.getHeight(_cam.x, _cam.z) + 1.2);

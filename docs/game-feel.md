@@ -631,6 +631,10 @@ position, rotation, scale and visibility, which covers bones, gear, garments and
 - **The camera.** A drone orbits the rider: 6.2 m out, 2.4 m up, 120° over the clip, starting side-on to
   the travel and kept 1.2 m above the snow. It flies on whichever side of the line has fewer trees between
   it and the rider (sampled against the scatter's obstacle hash). The lens is 50°.
+- **The filmer's shot.** Every other replay uses a tripod instead, like a snowboard-video filmer: 10 m
+  beside the take-off (or the crash) and 4 m ahead, 1.4 m up. A long lens pans with the rider and zooms to
+  keep about 3.2 m of scene in frame (14–55°). Tunables: `filmerDist`, `filmerAhead`, `filmerHeight`,
+  `filmerFrame`.
 - **The screen.** Letterbox bars, a blinking REPLAY tag, the rate (0.4×) and a progress line. The HUD, the
   adrenaline vignette, the level-up overlay and the case cards are hidden.
 - **Frozen world.** The ride is frozen while it plays: no physics, no timers. Afterwards the rig is put
