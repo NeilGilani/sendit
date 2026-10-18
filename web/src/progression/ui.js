@@ -103,7 +103,8 @@ export function mountProgressionUi({ juice }) {
   on('juiceLevelUp', (e) => { queue.push(e); if (!playing) play(); });
   const yieldTo = () => { if (lv.classList.contains('show') && document.body.classList.contains('lvlup')) lv.classList.add('yield'); };
   on('landed', (e) => { if (e.result !== 'crash' && e.air > 0.5) yieldTo(); });
-  on('takeoff', yieldTo);   // the next air needs the landing in view: the card fades back
+  // A real next air (still airborne 0.35 s after the take-off, not a bump) needs the landing in view: the card fades back.
+  on('takeoff', () => setTimeout(() => { if (juice?.hud?.busy?.()) yieldTo(); }, 350));
   on('grindScore', yieldTo);
 
   mountRecap();
