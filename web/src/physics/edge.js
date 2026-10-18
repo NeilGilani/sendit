@@ -423,8 +423,15 @@ export class EdgePhysics {
   /** Largest flip momentum (open-pose rad/s). */
   flipCap() { return this.C.flipSet * Math.sqrt(this.H.spin) * (1 + flowK(this.pl, 'spinBoost')); }
 
-  air(dt, ctrl) {
+  air(dt, ctrl0) {
     const pl = this.pl, C = this.C;
+    // Rotation inputs: the stronger of the plain controls and the square-mapped stick (input.js airStrength):
+    // a gamepad's diagonal or pushed-up stick throws as hard as the keys. Keyboards read the same either way.
+    const ctrl = this._airCtrl || (this._airCtrl = {});
+    Object.assign(ctrl, ctrl0);
+    if (Math.abs(ctrl0.airSteer || 0) > Math.abs(ctrl0.steer)) ctrl.steer = ctrl0.airSteer;
+    ctrl.up = Math.max(ctrl0.up, ctrl0.airUp || 0);
+    ctrl.brake = Math.max(ctrl0.brake, ctrl0.airBrake || 0);
     const tLand = this.timeToLand();
     // Grabs: reached for after the take-off, let go of just before touchdown (the legs land, not the hand).
     const grabbing = ctrl.active && ctrl.tuck > 0.5 && pl.airTime > 0.12 && tLand > C.grabLetGo;

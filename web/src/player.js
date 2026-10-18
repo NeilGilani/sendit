@@ -84,7 +84,7 @@ export class Player {
     this.visFlip = 0; this.flipSettle = 0; this.prevFlip = 0; this.renderFlip = 0;
     this.offAxis = new OffAxis();
     this.renderBase = new THREE.Quaternion(); this.renderTrick = new THREE.Quaternion();
-    this._ctrl = { steer: 0, brake: 0, up: 0, jump: false, tuck: 0, active: false };
+    this._ctrl = { steer: 0, brake: 0, up: 0, jump: false, tuck: 0, active: false, airSteer: 0, airUp: 0, airBrake: 0 };
     this.setEquipment('ski');
   }
 
@@ -232,11 +232,13 @@ export class Player {
   readInput(dt) {
     const I = this.input, c = this._ctrl;
     c.active = this.controllable() && this.state !== State.LIFT;
-    c.steer = 0; c.brake = 0; c.up = 0; c.jump = false; c.tuck = 0;
+    c.steer = 0; c.brake = 0; c.up = 0; c.jump = false; c.tuck = 0; c.airSteer = 0; c.airUp = 0; c.airBrake = 0;
     if (c.active) {
       c.steer = I.strength('right') - I.strength('left');
       c.brake = I.strength('brake');
       c.up = I.strength('speedUp');
+      // In-air rotation reads the stick square-mapped (input.js airStrength; edge.js air() takes the stronger).
+      if (I.airStrength) { const a = I.airStrength(); c.airSteer = a.steer; c.airUp = a.up; c.airBrake = a.brake; }
       c.tuck = I.strength('tuck');
       c.jump = I.strength('jump') > 0.5;
       if (I.justPressed('reset')) this.resetToTop();
