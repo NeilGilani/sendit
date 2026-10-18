@@ -286,7 +286,7 @@ export function mountJuiceHud({ player, combo, input, camera }) {
     const grade = gradeOf(e);
     if (grade === 'clean' && !named && e.air < 0.9) return;   // a plain hop: no announcement
     const title = (e.trick || (e.air >= 0.9 ? `${e.air.toFixed(1)}s AIR` : '')).toUpperCase();
-    const extra = [e.drop >= 4 ? `${Math.round(e.drop)} M DROP` : null, e.switch ? 'SWITCH' : null].filter(Boolean).join(' · ');
+    const extra = [!e.clean && e.why ? e.why : null, e.drop >= 4 ? `${Math.round(e.drop)} M DROP` : null, e.switch ? 'SWITCH' : null].filter(Boolean).join(' · ');
     const sub = e.points > 0 ? `+${fmt(e.points)}${extra ? `<small>${extra}</small>` : ''}` : extra ? `<small>${extra}</small>` : '';
     announce(grade, title, sub);
     if (grade === 'stomped' || grade === 'perfect') { flash(grade === 'stomped' ? 0.26 : 0.18); input?.rumble?.(0.35, 0.8, 120); }
@@ -302,6 +302,8 @@ export function mountJuiceHud({ player, combo, input, camera }) {
     else if (cleanRun >= 5 && cleanRun % 5 === 0) setTimeout(() => callout(`${cleanRun} CLEAN IN A ROW`, '#2ff5d6'), 450);
   });
   on('crashed', () => { stompRun = 0; cleanRun = 0; });
+  // A landing crash says how far off it was (player.landingWhy): a near miss reads as a near miss.
+  on('crashed', (kind) => { if (kind === 'landing' && player.lastCrash?.why) setTimeout(() => callout(player.lastCrash.why, '#ff6bb0'), 250); });
   on('grindScore', ({ label, points }) => announce(/^Sketchy/.test(label) ? 'sketchy' : null, shortLabel(label).toUpperCase(), `+${fmt(points)}`));
   on('grindLost', () => callout('RAIL LOST', '#ff6bb0'));
   // Wipeouts pay a little XP (progression): say so once the rider is back up.
