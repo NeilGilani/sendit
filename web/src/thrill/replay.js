@@ -98,6 +98,23 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
     return out.set(D[a] + (D[b] - D[a]) * f.k, D[a + 1] + (D[b + 1] - D[a + 1]) * f.k, D[a + 2] + (D[b + 2] - D[a + 2]) * f.k);
   }
 
+  /** Which side of the line the drone flies (+1 / -1): the one with fewer trees between it and the rider. */
+  function clearSide(t0, t1, travel) {
+    const sc = player.scatter;
+    if (!sc?.nearest) return 1;
+    const c = new THREE.Vector3(), q = { x: 0, z: 0 };
+    const hits = (side) => {
+      let n = 0;
+      for (let i = 0; i <= 6; i++) {
+        posAt(t0 + (t1 - t0) * i / 6, c);
+        const th = travel + side * Math.PI / 2 + (C.orbitDeg * Math.PI / 180) * (i / 6 - 0.5);
+        for (let k = 1; k <= 4; k++) { q.x = c.x + Math.cos(th) * C.dist * k / 4; q.z = c.z + Math.sin(th) * C.dist * k / 4; if (sc.nearest(q, 0.8)) n++; }
+      }
+      return n;
+    };
+    return hits(1) <= hits(-1) ? 1 : -1;
+  }
+
   function canReplay() {
     return game.mode === Mode.RIDING && !!ring && ring.count > 10 && activities?.mode !== 'challenge' && !player._busy && player.state !== 3;
   }
@@ -110,7 +127,8 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
     // Drone side: perpendicular to the travel over the clip.
     const pa = posAt(t0, new THREE.Vector3()), pb = posAt(t1, new THREE.Vector3());
     const travel = Math.atan2(pb.z - pa.z, pb.x - pa.x);
-    active = { t: t0, t0, t1, ang: travel + Math.PI / 2, fov: camera.fov, rec: null, center: posAt(t0, new THREE.Vector3()), camPos: null, wipe: m?.kind === 'wipeout' ? m.t : null };
+    const side = clearSide(t0, t1, travel);
+    active = { t: t0, t0, t1, ang: travel + side * Math.PI / 2, fov: camera.fov, rec: null, center: posAt(t0, new THREE.Vector3()), camPos: null, wipe: m?.kind === 'wipeout' ? m.t : null };
     if (rec) active.rec = startClip();
     ui?.show(true, !!active.rec);
     ui?.prompt(false);
@@ -220,7 +238,7 @@ function mountUi() {
     background:rgba(8,14,28,.72);border:1px solid rgba(47,245,214,.55);border-radius:999px;padding:7px 16px;font-size:13px;font-weight:700;letter-spacing:.16em;color:#dffcf7}
   #thrill-rp.on{opacity:1;transform:translateX(-50%)}
   #thrill-rp kbd{font:inherit;background:#2ff5d6;color:#06121a;border-radius:5px;padding:1px 7px;margin-left:8px}
-  body.thrill-replay #hud,body.thrill-replay #thrill-vignette{visibility:hidden}
+  body.thrill-replay #hud,body.thrill-replay #thrill-vignette,body.thrill-replay #lvlUp,body.thrill-replay .cn-stack{visibility:hidden}
   body.pad #thrill-rp .k{display:none}body:not(.pad) #thrill-rp .p{display:none}
   @keyframes thrillRec{50%{opacity:.2}}`;
   document.head.appendChild(st);

@@ -41,7 +41,11 @@ export const THRILL = {
     speedFrom: 0.93, speedFull: 1.05, speedShare: 0.35,   // speed ratio adds at most this much
     rise: 2.5, fall: 0.9,        // 1/s easing of the level
     bpm: [76, 148],              // heartbeat tempo from level 0.15 to 1
-    vignette: 0.55,              // darkest edge (level 1)
+    vignette: 0.7,               // vignette opacity at level 1
+  },
+  medal: {
+    closeS: 1.5,           // s: within this (or closeShare of the target time) the results card says SO CLOSE
+    closeShare: 0.04,
   },
   replay: {
     seconds: 8,            // s kept in the recorder
@@ -49,7 +53,7 @@ export const THRILL = {
     after: 1.5,            // s after touchdown it ends
     slow: 0.4,             // playback rate while airborne
     orbitDeg: 120,         // drone orbit over the replay
-    dist: 6.2, rise: 2.0,  // drone arm (m)
+    dist: 6.2, rise: 2.4,  // drone arm (m); it flies on the side with fewer trees in the way
     prompt: 4,             // s the REPLAY prompt stays after a big landing
     bigAir: 1.4,           // s of air (or a huge trick) for the prompt
     window: 14,            // s after a moment that Tab still replays it (else the last `fallback` s)
@@ -318,6 +322,20 @@ export function decodeVersus(code) {
     }
     return { map: head.m, trail: head.tr ?? null, name: String(head.n || 'Rider').slice(0, VERSUS.maxName), time: head.t / 1000, score: Number(head.s) || 0, medal: ['gold', 'silver', 'bronze'].includes(head.md) ? head.md : null, ghost };
   } catch { return null; }
+}
+
+/**
+ * The next medal up from a Challenge time: { medal, gap (s), close } or null for gold. targets: { gold, silver,
+ * bronze } times (s). close = within C.closeS s or C.closeShare of the target (the near miss worth shouting).
+ */
+export function nextMedalGap(time, targets, C = THRILL.medal) {
+  if (!targets || !Number.isFinite(time)) return null;
+  const order = ['bronze', 'silver', 'gold'];
+  let next = null;
+  for (const m of order) if (Number.isFinite(targets[m]) && time > targets[m]) { next = m; break; }
+  if (!next) return null;
+  const gap = time - targets[next];
+  return { medal: next, gap, close: gap <= Math.max(C.closeS, targets[next] * C.closeShare) };
 }
 
 /** "1.23 s" style margin between two times. */

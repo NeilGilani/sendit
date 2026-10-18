@@ -125,6 +125,16 @@ export async function run(test, assert) {
     assert.deepEqual(T.clipRange({ t0: 0, t1: 3 }, [], null, 3), { a: 0, b: 3 });
   });
 
+  await test('thrill nextMedalGap: the next medal up, and SO CLOSE within 1.5 s or 4 %', () => {
+    const tg = { gold: 100, silver: 120, bronze: 140 };
+    assert.equal(T.nextMedalGap(95, tg), null, 'gold');
+    assert.deepEqual(T.nextMedalGap(101, tg), { medal: 'gold', gap: 1, close: true });
+    assert.deepEqual(T.nextMedalGap(110, tg), { medal: 'gold', gap: 10, close: false });
+    assert.deepEqual(T.nextMedalGap(124, tg), { medal: 'silver', gap: 4, close: true }, '4 s is within 4 % of 120 s');
+    assert.equal(T.nextMedalGap(200, tg).medal, 'bronze');
+    assert.equal(T.nextMedalGap(NaN, tg), null);
+  });
+
   await test('thrill versus: codes round-trip with a compact ghost; junk decodes to null', () => {
     const ghost = [];
     for (let i = 0; i <= 900; i++) { const t = i / 10; ghost.push(+t.toFixed(2), +(100 + t * 11.3).toFixed(2), +(2000 - t * 6.1).toFixed(2), +(-40 + Math.sin(t) * 9).toFixed(2), +((t * 0.3) % 6).toFixed(3)); }

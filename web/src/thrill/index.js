@@ -7,12 +7,14 @@
 //   adrenaline.js  heartbeat + closing edges when exposed (cliff ahead, big air, top speed)
 //   replay.js      instant replay of the last big trick from a drone, save as a clip
 //   versus.js      "beat my run" challenge links with the friend's ghost
+//   medals.js      "SO CLOSE · 0.42 s off SILVER" on the Challenge results card
 import { settings, setSetting, game, Mode } from '../state.js';
 import { installRetry } from './retry.js';
 import { installSpots } from './spots.js';
 import { installAdrenaline } from './adrenaline.js';
 import { installReplay } from './replay.js';
 import { installVersus } from './versus.js';
+import { installMedalLine } from './medals.js';
 
 export function installThrill(o) {
   const { player, rider, cam, camera, sound, input, activities, ui, juice, scene, course, features, terrain, canvas, getMap, getName, params } = o;
@@ -22,6 +24,7 @@ export function installThrill(o) {
   const adrenaline = installAdrenaline({ player, terrain, sound });
   const replay = installReplay({ player, rider, camera, terrain, input, activities, cam, canvas });
   const versus = installVersus({ scene, course, player, activities, hud, getMap, getName, params });
+  installMedalLine();
   mountThrillSettings();
   // Tab is the replay key while riding: keep the browser from moving focus.
   if (typeof addEventListener === 'function') addEventListener('keydown', (e) => { if (e.code === 'Tab' && game.mode === Mode.RIDING) e.preventDefault(); });

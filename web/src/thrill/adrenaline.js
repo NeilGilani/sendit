@@ -17,7 +17,7 @@ export function installAdrenaline({ player, terrain, sound }) {
   if (el) {
     el.id = 'thrill-vignette';
     el.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:4;opacity:0;transition:none;'
-      + 'background:radial-gradient(ellipse 72% 64% at 50% 52%, rgba(0,0,0,0) 55%, rgba(6,10,24,0.85) 100%);';
+      + 'background:radial-gradient(ellipse 70% 62% at 50% 50%, rgba(0,0,0,0) 42%, rgba(6,10,24,0.55) 72%, rgba(4,6,16,0.95) 100%);';
     document.body.appendChild(el);
   }
 
