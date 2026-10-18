@@ -411,7 +411,11 @@ class Opener {
       this.close();
     } else if (a === 'next') {
       const oc = this.userClose, chain = this.chain, quick = this.quick;
-      this.close(() => openCaseShow(null, { onClose: oc, chain, quick: chain ? true : quick }));
+      this.close(() => openCaseShow(null, { onClose: oc, chain, quick: chain ? true : quick }).then((r) => {
+        if (r) return;
+        crateShow.end();   // no case after all: leave the studio
+        document.body.classList.remove('cr-open');
+      }));
     } else this.close();
   }
 
