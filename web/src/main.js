@@ -518,6 +518,7 @@ function frame(now) {
   const riding = game.mode === Mode.RIDING;
   const wantWind = riding ? THREE.MathUtils.smoothstep(player.speedRatio, HUD.windStreakFrom, HUD.windStreakFull) : 0;
   post.update(dt, time, wantWind);
+  post.setLens(rider.fp && cam.fpView?.active && (game.mode === Mode.RIDING || game.mode === Mode.LIFT || game.mode === Mode.PAUSED) ? cam.fpView.lens : null);   // goggle lens (fpview.js)
   juice?.update(paused ? 0 : dt, time);
   progressUpdate?.(dt);
   input.endFrame();

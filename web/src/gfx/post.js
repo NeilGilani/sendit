@@ -32,6 +32,22 @@ export class GradeEffect extends Effect {
       uniform vec3 shadowTint; uniform vec3 highlightTint; uniform float goggles;
       uniform vec3 sunScreen;      // xy = sun position in uv, z = facing (0..1)
       uniform float glare; uniform float flare;
+      // First-person goggle lens (fpview.js → PostStack.setLens): tint colour; x = tint strength,
+      // y = colour fringe / edge warp, z = fog on the lens edge, w = snow flecks (0..1 amount).
+      uniform vec3 lensTint; uniform vec4 lensFx;
+      float lensHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      // Snow flecks / melt drops stuck on the lens: one soft dot per grid cell, shown while the cell's
+      // random threshold is under the amount, so they appear and melt away one at a time.
+      float lensFlecks(vec2 uv, float amt, float scale, float seed) {
+        vec2 q = uv * vec2(aspect, 1.0) * scale;
+        vec2 id = floor(q), f = fract(q) - 0.5;
+        float h = lensHash(id + seed), h2 = lensHash(id + seed + 17.3);
+        float show = smoothstep(h, h + 0.12, amt);
+        vec2 o = (vec2(h2, lensHash(id + seed + 5.1)) - 0.5) * 0.5;
+        float r = (0.12 + 0.2 * h2) * (0.55 + 0.45 * show);
+        float d = length(f - o);
+        return show * smoothstep(r, r * 0.35, d);
+      }
       // How much of the sun disk is actually visible (mountains / trees / rider can hide it).
       float sunVisible() {
         if (sunScreen.z <= 0.0 || sunScreen.x < -0.05 || sunScreen.x > 1.05 || sunScreen.y < -0.05 || sunScreen.y > 1.05) return 0.0;
@@ -75,6 +91,19 @@ export class GradeEffect extends Effect {
       }
       void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
         vec3 c = inputColor.rgb * exposure;
+        vec2 ld = uv - 0.5;
+        float le = dot(ld * vec2(aspect * 0.75, 1.0), ld * vec2(aspect * 0.75, 1.0));   // 0 centre … ~0.4 corners
+        float fl = 0.0;
+        if (lensFx.w > 0.001) fl = max(lensFlecks(uv, lensFx.w * (0.55 + 0.9 * le), 9.0, 0.0), lensFlecks(uv, lensFx.w * (0.4 + 1.1 * le), 17.0, 3.7) * 0.8);
+        // Lens edge: a little warp and a colour fringe toward the frame, and refraction through the flecks
+        // (delta samples so the bloom already in inputColor is kept).
+        if (lensFx.y > 0.001 && le > 0.04 || fl > 0.01) {
+          vec2 o = ld * smoothstep(0.04, 0.4, le) * lensFx.y * 0.006 + ld * fl * 0.025;
+          vec3 base = texture2D(inputBuffer, uv).rgb;
+          c.r += (texture2D(inputBuffer, uv - o * 1.6).r - base.r) * exposure;
+          c.g += (texture2D(inputBuffer, uv - o).g - base.g) * exposure;
+          c.b += (texture2D(inputBuffer, uv - o * 0.4).b - base.b) * exposure;
+        }
         // Veiling glare toward the sun (scattering in the eye / lens): lifts and warms the image a touch.
         vec2 sd = (uv - sunScreen.xy) * vec2(aspect, 1.0);
         float vis = sunVisible();
@@ -106,6 +135,20 @@ export class GradeEffect extends Effect {
         g *= mix(shadowTint, highlightTint, smoothstep(0.2, 0.85, l));
         // Optional goggle lens: warm amber/rose tint, slightly deeper blues.
         g = mix(g, g * vec3(1.06, 0.98, 0.84) + vec3(0.02, 0.0, -0.01), goggles);
+        // First-person lens: the worn goggle's tint (brightness kept, a touch of its darkening), fog
+        // creeping in from the frame, snow flecks catching the light.
+        if (lensFx.x > 0.001) {
+          float l0 = dot(g, vec3(0.2126, 0.7152, 0.0722));
+          vec3 t = g * lensTint;
+          float l1 = dot(t, vec3(0.2126, 0.7152, 0.0722));
+          t *= mix(1.0, l0 / max(l1, 1e-3), 0.85);
+          g = mix(g, t, lensFx.x);
+        }
+        if (lensFx.z > 0.001) {
+          float fog = lensFx.z * smoothstep(0.06, 0.38, le + 0.03 * sin(uv.x * 23.0 + uv.y * 17.0));
+          g = mix(g, vec3(0.84, 0.87, 0.91) + g * 0.14, fog * 0.8);
+        }
+        if (fl > 0.0) g = mix(g, g * 0.75 + vec3(0.26, 0.27, 0.29), fl * 0.8);
         vec2 dv = (uv - 0.5) * vec2(aspect * 0.8, 1.0);
         g *= 1.0 - vignette * smoothstep(0.25, 0.95, dot(dv, dv) * 1.6);
         c = max(g, 0.0); c *= c;
@@ -122,6 +165,7 @@ export class GradeEffect extends Effect {
         ['goggles', new THREE.Uniform(POST.goggles)],
         ['sunScreen', new THREE.Uniform(new THREE.Vector3())], ['glare', new THREE.Uniform(POST.glare)],
         ['flare', new THREE.Uniform(POST.flare)],
+        ['lensTint', new THREE.Uniform(new THREE.Color(1, 1, 1))], ['lensFx', new THREE.Uniform(new THREE.Vector4())],
       ]),
     });
   }
@@ -233,6 +277,17 @@ export class PostStack {
   }
 
   setSize(w, h) { this.composer.setSize(w, h); }
+
+  /**
+   * First-person goggle lens (fpview.js FPView.lens): { tint: Color, amount, fringe, fog, snow }, or null
+   * for a clear view (chase camera).
+   */
+  setLens(L) {
+    const fx = this.grade.uniforms.get('lensFx').value;
+    if (!L) { fx.set(0, 0, 0, 0); return; }
+    this.grade.uniforms.get('lensTint').value.copy(L.tint);
+    fx.set(L.amount, L.fringe, L.fog, L.snow);
+  }
 
   /** Per frame: wind streak intensity (0..1 target) and the sun's screen position for the glare. */
   update(dt, time, windTarget) {

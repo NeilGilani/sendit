@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { CAMERA as C } from './config.js';
 import { State } from './player.js';
-import { settings } from './state.js';
+import { settings, on } from './state.js';
 import { lerpAngle, clamp } from './world.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
@@ -34,9 +34,21 @@ export const FP = {
   lookMin: -60, lookMax: 45, pitchMin: -54,   // look limits (deg): input, and the total on the snow
 };
 
+// Goggle lens (drawn by the grade pass, gfx/post.js; strength × settings.fpLens): the worn goggle's
+// tint, a colour fringe at the frame, fog creeping in when you stop after working hard, snow flecks from
+// powder face shots, deep landings and crashes that melt / blow off over a few seconds.
+export const FP_LENS = {
+  tint: 0.3,               // share of the tinted image mixed into the view
+  sat: 0.5,                // how much of the lens colour's saturation the tint keeps
+  fringe: 1,               // edge warp + colour fringe (shader units)
+  snowFace: 0.6, snowLand: 0.3, snowCrash: 0.95, snowFall: 0.025,   // fleck amount added (snowFall: per s, riding fast in snowfall)
+  snowClear: 0.06, snowClearSpeed: 0.16,   // per s melting / blown off (more at speed)
+  fogRise: 0.035, fogClear: 0.4, fogMax: 0.5,   // per s while stopped after effort / at speed, cap
+};
+
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _e = new THREE.Euler(0, 0, 0, 'YXZ');
-const _m = new THREE.Matrix4(), _s = new THREE.Vector3();
+const _m = new THREE.Matrix4(), _s = new THREE.Vector3(), _col = new THREE.Color(), _col2 = new THREE.Color();
 const Y = new THREE.Vector3(0, 1, 0), X = new THREE.Vector3(1, 0, 0), Z = new THREE.Vector3(0, 0, 1);
 const RY_PI = new THREE.Quaternion().setFromAxisAngle(Y, Math.PI);
 const deg = THREE.MathUtils.degToRad;
@@ -73,6 +85,41 @@ export class FPView {
     this.yaw = 0; this.pitch = FP.pitch; this.roll = 0; this.airAdj = 0;
     this.lookYaw = 0; this.lookPitch = 0; this.lookIdle = 10;
     this.dip = 0; this.dipV = 0; this.fov = C.fpFov; this.rot = 0;
+    this.lens = { tint: new THREE.Color(1, 1, 1), amount: 0, fringe: 0, fog: 0, snow: 0 };
+    this.snow = 0; this.fog = 0; this.effort = 0; this._edge = 0;
+    on('crashed', () => { this.snow = Math.max(this.snow, FP_LENS.snowCrash); });
+    on('landed', ({ impact }) => {
+      const pl = this.c.player;
+      if ((pl.powder ?? 0) > 0.5 && impact > 5) this.snow = Math.min(1, this.snow + FP_LENS.snowLand * Math.min(1.5, impact / 10));
+    });
+  }
+
+  /** Lens state for the grade pass (this.lens): tint from the worn goggles, fog, snow flecks. */
+  updateLens(dt) {
+    const L = FP_LENS, pl = this.c.player, rider = this.c.rider, k = settings.fpLens ?? 1;
+    const U = rider.look?.lens?.userData?.uniforms;
+    if (U) {
+      // Through-the-lens colour: mostly the dark base tint behind the mirror, normalised to full brightness.
+      const c = _col.copy(U.uLensBase.value).multiplyScalar(0.65).add(_col2.copy(U.uLens.value).multiplyScalar(0.35));
+      const m = Math.max(c.r, c.g, c.b, 1e-3);
+      // Desaturated: a real lens shifts the colour balance, it doesn't paint the world (FP_LENS.sat).
+      this.lens.tint.setRGB(1 + (c.r / m - 1) * L.sat, 1 + (c.g / m - 1) * L.sat, 1 + (c.b / m - 1) * L.sat);
+    }
+    // Face shots: an edge change in deep powder at speed throws snow over the goggles.
+    const es = Math.sign(pl.edgeAngle || 0);
+    if (es && this._edge && es !== this._edge && (pl.powder ?? 0) > 0.55 && (pl.sink || 0) > 0.08 && pl.speed > 7) this.snow = Math.min(1, this.snow + L.snowFace * Math.min(1.3, pl.speed / 12));
+    if (es) this._edge = es;
+    const r = pl.speedRatio || 0;
+    if (settings.snowfall && r > 0.4) this.snow = Math.min(0.5, this.snow + L.snowFall * r * dt);
+    this.snow = Math.max(0, this.snow - (L.snowClear + L.snowClearSpeed * r) * dt);
+    // Fog: builds while standing after effort (exertion fills at speed / in turns), clears once moving.
+    this.effort = clamp(this.effort + (r > 0.5 ? 0.05 : -0.02) * dt, 0, 1);
+    if (pl.speed < 2 && pl.state === State.GROUNDED) this.fog = Math.min(L.fogMax * (0.4 + 0.6 * this.effort), this.fog + L.fogRise * dt);
+    else this.fog = Math.max(0, this.fog - L.fogClear * (0.3 + r) * dt);
+    this.lens.amount = L.tint * k;
+    this.lens.fringe = L.fringe * k;
+    this.lens.fog = this.fog * k;
+    this.lens.snow = this.snow * k;
   }
 
   /** Landing compression kick (camera.js forwards the 'landed' event). */
@@ -216,6 +263,8 @@ export class FPView {
       const g = Math.min(1, this.rot / 9) * 0.5 + THREE.MathUtils.smoothstep(r, 0.6, 1) * 0.2;
       if (Math.abs(g - (this._g ?? -1)) > 0.01) { this._g = g; document.body.style.setProperty('--fp-rush', g.toFixed(2)); }
     }
+    this.updateLens(dt);
+    if (typeof document !== 'undefined' && this._lensCss !== settings.fpLens) { this._lensCss = settings.fpLens; document.body.style.setProperty('--fp-lens', String(settings.fpLens ?? 1)); }
     rider.fpLookPitch = THREE.MathUtils.radToDeg(_e.setFromQuaternion(this.q, 'YXZ').x);
     // The arms (rider.js → fpBoardArm) frame the gloves in this view next frame.
     const fc = rider.fpCam ||= { q: new THREE.Quaternion(), eye: new THREE.Vector3(), ok: false };
