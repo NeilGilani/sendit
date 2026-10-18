@@ -8,7 +8,7 @@
 //   replay.js      instant replay of the last big trick from a drone, save as a clip
 //   versus.js      "beat my run" challenge links with the friend's ghost
 //   medals.js      "SO CLOSE · 0.42 s off SILVER" on the Challenge results card
-import { settings, setSetting, game, Mode } from '../state.js';
+import { settings, setSetting, game, Mode, on, emit } from '../state.js';
 import { installRetry } from './retry.js';
 import { installSpots } from './spots.js';
 import { installAdrenaline } from './adrenaline.js';
@@ -26,6 +26,20 @@ export function installThrill(o) {
   const versus = installVersus({ scene, course, player, activities, hud, getMap, getName, params });
   installMedalLine();
   mountThrillSettings();
+  // The new keys, explained on the first two rides (after the game's own early hints).
+  let hintT = 0;
+  on('rideStarted', () => {
+    clearTimeout(hintT);
+    let n = 0;
+    try { n = Number(localStorage.getItem('sendit.thrill.hints') || 0); } catch { /* private mode */ }
+    if (n >= 2) return;
+    hintT = setTimeout(() => {
+      if (game.mode !== Mode.RIDING) return;
+      emit('hint', input.usingPad ? 'Y restarts instantly · d-pad ▼ retries your last jump · d-pad ▲ replays it' : 'R restarts instantly · Backspace retries your last jump · Tab replays it');
+      try { localStorage.setItem('sendit.thrill.hints', String(n + 1)); } catch { /* private mode */ }
+    }, 24000);
+  });
+  on('rideEnded', () => clearTimeout(hintT));
   // Tab is the replay key while riding: keep the browser from moving focus.
   if (typeof addEventListener === 'function') addEventListener('keydown', (e) => { if (e.code === 'Tab' && game.mode === Mode.RIDING) e.preventDefault(); });
   const thrill = {
