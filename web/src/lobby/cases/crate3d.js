@@ -1049,9 +1049,12 @@ class CrateShow {
 
   // ---------------------------------------------------------------- camera
   /** Shot → root-local camera position: look at `tgt`, framing height `h`, pitch / yaw in degrees. */
-  shotPose(tgt, h, pitch, yaw, out = {}) {
+  shotPose(tgt, h, pitch, yaw, w = h, out = {}) {
     const fov = (this.stage.camera.fov * Math.PI) / 180;
-    const d = h / (2 * Math.tan(fov / 2));
+    // Fit the height h and the width w (portrait phones are narrow: the width wins there).
+    const { w: W, h: H } = this.stage.size;
+    const th = Math.tan(fov / 2);
+    const d = Math.max(h / (2 * th), w / (2 * th * (W / H)));
     const p = pitch * DEG, yw = yaw * DEG;
     out.look = new THREE.Vector3(...tgt);
     out.pos = out.look.clone().add(new THREE.Vector3(Math.sin(yw) * Math.cos(p) * d, Math.sin(p) * d, Math.cos(yw) * Math.cos(p) * d));
@@ -1063,10 +1066,10 @@ class CrateShow {
     const st = this.stage;
     const drift = reduced() ? 0 : Math.sin(t * 0.35) * 4;
     // Key shots (root-local), blended over the timeline.
-    const sDrop = this.shotPose([0, 0.32, 0], 1.65, 15, -10 + drift);
-    const sPush = this.shotPose([0, 0.36, 0], 1.42, 18, 4 + drift * 0.5);
-    const sBurst = this.shotPose([0, 0.55, 0], 1.8, 16, 2 + drift * 0.5);
-    const sReel = this.shotPose([0, 0.92, 0], 2.55, 12, drift);
+    const sDrop = this.shotPose([0, 0.32, 0], 1.65, 15, -10 + drift, 1.7);
+    const sPush = this.shotPose([0, 0.36, 0], 1.42, 18, 4 + drift * 0.5, 1.3);
+    const sBurst = this.shotPose([0, 0.55, 0], 1.8, 16, 2 + drift * 0.5, 1.4);
+    const sReel = this.shotPose([0, 0.92, 0], 2.55, 12, drift, 1.4);
     let pose = sDrop;
     const mix = (a, b, k) => ({ pos: a.pos.clone().lerp(b.pos, k), look: a.look.clone().lerp(b.look, k) });
     pose = mix(sDrop, sPush, smooth(T.land, T.lid, t));
@@ -1076,13 +1079,15 @@ class CrateShow {
     if (o.revealAt != null && t >= o.revealAt) {
       const k = easeOut3((t - o.revealAt) / 0.7);
       let sRev;
-      if (this.gear) sRev = this.shotPose([0, 0.62 + (this.itemLen || 1.6) / 2, 0], (this.itemLen || 1.6) + 0.9, 8, drift * 1.5);
-      else { const f = this.slotFocus(); sRev = this.shotPose([0, f.y, 0], f.h + 0.25, 6, drift * 1.5); }
+      // Tall screens: the text panel takes the lower ~45 %, so frame the subject into the top part.
+      const tall = st.size.w / st.size.h <= 1.15 ? 1.7 : 1;
+      if (this.gear) sRev = this.shotPose([0, 0.62 + (this.itemLen || 1.6) / 2, 0], ((this.itemLen || 1.6) + 0.9) * tall, 8, drift * 1.5, 0.9);
+      else { const f = this.slotFocus(); sRev = this.shotPose([0, f.y, 0], (f.h + 0.25) * tall, 6, drift * 1.5, Math.max(0.75, f.h * 0.75)); }
       pose = mix(pose, sRev, k);
       // Lens shift: the subject sits left of centre on wide screens (the text panel is on the right).
       const { w: W, h: H } = st.size;
       // (Tall screens: the panel is at the bottom, so the subject moves up instead.)
-      if (W / H > 1.15) offX = W * 0.15 * k; else offY = H * 0.17 * k;
+      if (W / H > 1.15) offX = W * 0.15 * k; else offY = H * 0.22 * k;
     }
     // Opening blend from the lobby camera.
     const root = st.root;
