@@ -29,6 +29,7 @@
       try { localStorage.setItem('sendit.laststill', s.f); } catch (e) { /* ignore */ }
       window.__ldStill = s;
       var url = '/loading/' + s.f, root = document.documentElement, img = new Image();
+      root.classList.add('ld-still-pending');   // no flash of the CSS mountains before the still decodes
       var l = document.createElement('link'); l.rel = 'preload'; l.as = 'image'; l.href = url; l.setAttribute('fetchpriority', 'high'); document.head.appendChild(l);
       // Ken Burns: a slow drift whose direction differs per load.
       root.style.setProperty('--ld-still', 'url("' + url + '")');
@@ -39,7 +40,7 @@
       (img.decode ? img.decode() : Promise.resolve()).then(function () {
         window.__ldStillAt = performance.now();
         root.classList.add('ld-has-still');
-      }, function () { window.__ldStillFailed = true; });
+      }, function () { window.__ldStillFailed = true; root.classList.remove('ld-still-pending'); });
     })();
   </script>
   <link rel="stylesheet" href="/src/style.css" />
@@ -56,6 +57,8 @@
     #loading .ld-still { position: absolute; inset: -2%; background: #0b0e16 var(--ld-still, none) center / cover no-repeat; opacity: 0;
       transition: opacity .5s ease; transform-origin: 50% 55%; animation: ld-kb 30s cubic-bezier(.25,.1,.25,1) both; will-change: transform; }
     .ld-has-still #loading .ld-still { opacity: 1; }
+    .ld-still-pending #loading .ld-sun, .ld-still-pending #loading .ld-ridges { display: none; }
+    .ld-still-pending #loading .ld-static { background: #0b0e16; }
     @keyframes ld-kb { from { transform: scale(1.03) translate3d(0, 0, 0); } to { transform: scale(1.13) translate3d(var(--kbx, -1.5%), var(--kby, -0.8%), 0); } }
     #loading .ld-flakes.c { background-image: radial-gradient(circle, rgba(255,255,255,.55) 0 3px, rgba(255,255,255,.18) 5px, transparent 7px);
       background-size: 523px 611px; background-position: 120px 40px; filter: blur(2.2px); opacity: .5; animation-duration: 6.5s; }
