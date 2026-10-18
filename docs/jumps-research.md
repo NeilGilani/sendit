@@ -410,3 +410,85 @@ head to the side and rolls through with the skis passing above at ≈ 105–125�
 opens and reaches for the landing; before it went straight upside down with the skis vertical overhead, the body
 stretched long and an arm flung above the head. The double cork shows two clean off-axis loops with a near-upright
 moment between them; the snowboard rodeo 540 goes over the heel side with the board overhead at ≈ 130°.
+
+## 9. Polish pass: rotation that takes too long "for no reason", air input, landings
+
+Players still met "weird scenarios where spinning or flipping takes way too long for seemingly no reason". The rule
+for this pass: the game stays exactly as skilful (no rate, cap or set changed; the most flips / spins a perfect set
+allows is unchanged), and every change is backed by a bot. Benches (headless, the real Player):
+
+- `node web/scripts/physics-sweep.mjs [--quick] [--csv f]` — **the scenario sweep**: 21 930 airs off flat ground ×
+  equipment (ski, board; all-mountain, GS, park) × map physics (default, Ravenspire, Dragonback, Voltage) × stance /
+  switch × take-off (air 1.2–3 s) × pop timing (at the lip, early, flat, rolled off) × what was held through the
+  take-off (nothing, a carve's pre-wind with / against the spin, the key itself, W, S, carving the other way, the
+  other axis under way) × press time (0–1.4 s) × grab × physics step (1/30, 1/60, 1/144 s). It measures the time
+  from the key press to 180° *the way it was asked for* and lists the outliers (slow or never with ≥ 1.5 s of air
+  left for a spin, ≥ 1.9 s for a flip) grouped by cause.
+- `node web/scripts/physics-polish.mjs [--check]` — the regression for everything fixed below.
+- Scratch probes (in the notes below): a release sweep (a spin set, steer held to R°, let go with ≥ 0.6 s left —
+  where does the spot land it?), a gamepad stick probe (input.js on a fake controller) and a frame-rate probe.
+
+### What was found
+
+| scenario (sweep) | cause | verdict |
+|---|---|---|
+| late spin while grabbing: 1.42 / 1.32 s to 180° (1.22 / 1.18 s without the grab) | the grab pose (0.6) replaced the tuck the late spin uses | **fixed** |
+| carve pre-wind the other way + grab, stick against it after the throw window: never (board) | against a spin the stick only opens up (× 0.6) and momentum never turns round; the grab also switched off the spot that would have bled it | **fixed** |
+| a throw reversed late in its window (vy 15, 0.25 s in) | left at 1.3 rad/s the old way, the stick against it opened up: 45°/s the wrong way for 2.4 s | **fixed** |
+| full set let go early (board, 45° on a 2.4 s air): crash at 266° | the spot's check passing 180° shed most of the momentum, overshot its 12° window (the rate lags) and let go below `spinMinH`: no plan left, a slow drift sideways into the snow | **fixed** |
+| check-backs ending 20–40° short at touchdown | the check aimed to arrive exactly at touchdown, but the spin rate follows with a 1/`spinResponse` lag | **fixed** |
+| gamepad: diagonal stick (cork) flip 1.18–1.30 s vs 0.92 s on keys; stick-up flip 0.97 s | a round stick gate gives 0.71 per axis on a diagonal, stick-up is scaled to 0.8 (the ground tuck) and the flip input has a 0.4 dead zone | **fixed** |
+| gamepad: < 45 % stick tilt never spins in the air | the carving curve (exponent 1.35) makes half a push 0.27, under the 0.2 spin threshold until ~45 % | **fixed** |
+| a key held through the take-off (W tuck, S brake, a carve off a roller) does nothing until re-pressed | deliberate: a tuck / brake / carve isn't a trick; one-time hint for the flip keys | kept |
+| a flip pressed after the throw window with < 1.7 s left: nothing | the late-throw gate. On flat ground a press 0.05 s inside the window and one 0.05 s after it land identically for every air left (1.0–1.8 s: crash below 1.7 s, stumble at 1.7, clean at 1.8) — the gate is where a flip stops coming round | kept |
+| spin pressed late in its throw window: 1.23–1.25 s vs 0.90 s at the lip | the throw fades over its window into the late spin (no cliff: 0.93 → 1.25 → 1.28 s for 0.1 / 0.25 / 0.4 s) | kept (the set is made at the lip) |
+| popped carving one way, steered the other way after the whole window | a real thrown set (up to 3.4 rad/s): the stick against it stalls | kept (by design) |
+| GS skis 10 % slower late spins | gear `spin` 0.9 | kept (equipment) |
+| maps (Ravenspire, Dragonback, Voltage), switch, goofy | no outliers of their own (same medians ± 0.02 s) | — |
+| physics step 1/30 vs 1/60 vs 1/144 s | ± 0.04 s to 180°; the game steps physics at a fixed 60 Hz anyway (main.js), so display rate never changes the rotation; slow-mo only scales the step | — |
+| Ravenspire slow-mo (huge airs) | rotation in real seconds × 1/0.7 around the apex | kept (visible, intended) |
+
+Two frame-rate dependences outside the physics turned up and were fixed: the rider's force-driven body reactions
+(character/dynamics.js) differentiated the physics velocity by the render frame time — at 144 / 165 Hz frames
+alternate between zero and one physics step, a 14 % frame-to-frame ripple in a steady carve (0 % at 30 / 60 Hz) —
+and the first-person terrain chatter (fpview.js) kicked per frame from the ground normal's change rate (2.4× as
+strong at 144 Hz, half at 30 Hz). Both now use the physics clock (`player.simTime`).
+
+### What changed (physics/edge.js unless noted)
+
+1. **Slow spins the other way turn round.** With the stick against a spin no bigger than the late throw makes
+   (`spinDrift` × `spinLateMax`, 2.2 / 2.4 rad/s) and ≥ `spinLateAir` of air left, the late spin turns it round
+   instead of opening it up. Bigger sets still only stall, and so does everything in the last 0.8 s.
+2. **Grabbed late spins tuck.** Building a late spin (or one no bigger) with the stick into it while grabbing uses
+   the full tuck, as without the grab. Thrown / wound-up sets keep the grab's 0.6 (the cork 720 + grab is unchanged).
+3. **The spot finishes the checks it starts**, even once the momentum it sheds drops below `spinMinH`, and checks
+   aim one 1/`spinResponse` before touchdown. A rider who was never spinning still settles only within
+   `spinCheckAngle` (or `airSettleAngle`).
+4. **Gamepad in the air** (input.js `airStrength`, player.js, edge.js `air()`): the rotation reads the left stick
+   linearly past its dead zone, mapped from its round gate onto a square, and takes the stronger of that and the
+   plain controls. Keyboards read exactly as before; the stick on the snow keeps its carving curve.
+5. **Landings say why** (player.js `landingWhy`, juice/hud.js): a stumble's announcement carries "OVER-ROTATED 31°",
+   "FLIP UNDER-ROTATED 35°", "40° SIDEWAYS" or "HARD LANDING"; a landing crash shows it as a call-out under the
+   rider. A crash with a grab held to the end (the spot only works once the hand is off) gives a one-time hint.
+6. **HUD keeps the landing clear** (juice/hud.js, progression/ui.js): the chase camera frames the landing near the
+   middle of the screen, where the live rotation read-out (33 %), the trick announcer (37 %) and the level-up card
+   (42 %, 3.2 s) sat. The read-out moved to 24 % and is gone for the last 0.5 s before touchdown, the announcer to
+   30 %, the level-up card to 32 % and it fades on the next take-off.
+
+### Before and after
+
+| | before | after |
+|---|---|---|
+| sweep: outliers / never (7 891 airs with enough air left, by-design locks excluded) | 486 / 120 | 221 / 48 (all left: short-air reversals, see above) |
+| sweep: spins, median · 90th percentile to 180° | 1.20 · 1.42 s | 1.20 · 1.33 s |
+| sweep: spins while grabbing, median · 90th pct · never | 1.32 · 1.52 s · 90 | 1.18 · 1.37 s · 24 |
+| sweep: flips, median · 90th pct · worst | 1.03 · 1.08 · 1.13 s | unchanged |
+| late spin pressed 0.5 s in while grabbing (vy 12), ski / board | 1.42 / 1.32 s | 1.27 / 1.18 s |
+| pre-wind the other way + grab, stick against it at 0.5 / 0.9 s | ski 1.52 s, board never | 1.37 / 1.30 s |
+| throw reversed 0.25 s in (vy 15) | never (wrong way all air) | 180° the asked way in 2.1 s |
+| board, full set let go at 45° (2.4 s air) | crash at 266° | clean 180 |
+| gamepad diagonal stick: flip to 180° | 1.18–1.30 s | 0.92 s (keys 0.92 s) |
+| gamepad 40 / 50 / 60 % stick push: spin to 180° | never / 1.32 s at 60 % | 1.45 / 1.32 / 1.17 s |
+| body reactions at 144 Hz (steady carve) | 14 % ripple | 0 % |
+| keyboard spin / flip thrown at the lip | 0.90 · 0.83 / 0.92 s | unchanged |
+| physics-tricks (most flips per air), physics-rotation `--check`, jumps-bench max flips / spins | — | unchanged (jumps-bench: 0 crashes; the send bot's line differs a little where its spins now land) |
