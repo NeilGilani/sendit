@@ -30,8 +30,10 @@ ground look (`landBlend`) with a damped compression dip. The eye never ends up i
 along the body's up axis until it clears both shoulder joints (`shoulderClear`). The head (and helmet) shrink
 to `headScale` so the eye is always outside them; shadow-only stand-ins keep the rider's shadow whole.
 
-**Comfort.** `settings.fpStable` (Settings → *Steady helmet cam (flips)*) keeps the spin but only
-`stableShare` of flip / cork pitch and roll. Screen shake follows the *Screen shake & punch* slider like
+**Comfort.** `settings.fpStable` (Settings → *Steady helmet cam (flips)*) keeps the spin (the heading
+turned since take-off) but only `stableShare` of flip / cork pitch and roll, continuously: the kept tilt is
+2 · `stableShare` · sin(flip / 2) rad, so it peaks at 34° upside down and is level again as the body comes round
+(a flip measured 45 °/s mean view rotation steadied vs 140 °/s without). Screen shake follows the *Screen shake & punch* slider like
 the chase camera (`settings.juiceShake`). The goggle frame closes in and darkens a little with the rotation
 rate and at top speed (`--fp-rush`).
 

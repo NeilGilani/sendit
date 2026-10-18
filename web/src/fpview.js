@@ -79,20 +79,13 @@ export function headFrame(rider, out = new THREE.Quaternion(), pos) {
   return out.multiply(rider._restHeadQInv).multiply(RY_PI);
 }
 
-/** Swing-twist: split q into a rotation about `axis` (twist) and the rest (swing = q · twist⁻¹). */
-function twistAbout(q, axis, out) {
-  const d = q.x * axis.x + q.y * axis.y + q.z * axis.z;
-  out.set(axis.x * d, axis.y * d, axis.z * d, q.w);
-  const l = out.length();
-  return l < 1e-6 ? out.identity() : out.multiplyScalar(1 / l);
-}
-
 export class FPView {
   constructor(ctrl) {
     this.c = ctrl;                         // the CameraController (camera, player, rider, input, trauma…)
     this.q = new THREE.Quaternion();       // camera orientation before shake
     this.qGround = new THREE.Quaternion();
     this.qAir = new THREE.Quaternion();
+    this.prevSwing = new THREE.Quaternion();   // fpStable: last frame's flip swing (keeps q ≡ −q continuous)
     this.hLook = new THREE.Quaternion();   // body → look offset captured at take-off
     this.B0 = new THREE.Quaternion();      // body orientation at take-off
     this.prevBody = new THREE.Quaternion();
@@ -303,6 +296,7 @@ export class FPView {
       const from = this.active ? this.q : _q3.setFromEuler(_e.set(deg(FP.pitch), (s.travelSign ?? 1) < 0 ? Math.PI : 0, 0, 'YXZ'));
       if (this.active) this.hLook.copy(body).invert().multiply(from); else this.hLook.copy(from);
       this.pitch0 = this.pitch; this.airAdj = 0;
+      this.prevSwing.identity(); this.heading0 = s.heading;
     }
     this.wasAir = air;
     if (air) this.wAir = 1; else this.wAir *= Math.exp(-FP.landBlend * dt);
@@ -311,9 +305,22 @@ export class FPView {
       // Comfort option: keep the spin (yaw) but only a share of the flip / cork pitch and roll.
       const rel = _q.copy(body).multiply(_q2.copy(this.B0).invert());
       if (settings.fpStable) {
-        const tw = twistAbout(rel, Y, _q2);                       // rel = swing · twist
+        // The spin (twist about the vertical) is the heading turned since take-off. (A swing-twist split of `rel`
+        // has no defined twist upside down: mid-flip it jumped up to 180° of yaw in one frame.)
+        const tw = _q2.setFromAxisAngle(Y, s.heading - this.heading0);   // rel = swing · twist
         const swing = _q3.copy(tw).invert().premultiply(rel);
-        rel.identity().slerp(swing, FP.stableShare).multiply(tw);
+        // Keep stableShare of the swing, continuously: a shortest-path slerp toward the swing flipped from +54° to
+        // −54° the moment a flip passed upside down (a one-frame 100°+ snap). The swing's vector part is
+        // axis · sin(angle / 2), continuous through any number of flips once q ≡ −q is kept continuous, so the
+        // kept tilt is 2 · stableShare · sin(angle / 2) rad: stableShare of small angles, 34° at most (upside down),
+        // back to level as the body comes round.
+        const P = this.prevSwing;
+        if (swing.x * P.x + swing.y * P.y + swing.z * P.z + swing.w * P.w < 0) swing.set(-swing.x, -swing.y, -swing.z, -swing.w);
+        P.copy(swing);
+        const sv = Math.hypot(swing.x, swing.y, swing.z);
+        if (sv > 1e-6) swing.setFromAxisAngle(_v.set(swing.x / sv, swing.y / sv, swing.z / sv), 2 * FP.stableShare * sv);
+        else swing.identity();
+        rel.copy(swing).multiply(tw);
       }
       // Straight airs (no flip): tilt the view with the flight, toward the landing as the rider drops.
       const fw = 1 - THREE.MathUtils.smoothstep(Math.abs(Math.atan2(Math.sin(s.flip || 0), Math.cos(s.flip || 0))), 0.2, 0.8);
