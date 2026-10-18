@@ -71,6 +71,7 @@ node web/scripts/ragdoll-fuzz.mjs --check            # 600 random crashes + fram
 node web/scripts/ragdoll-identity.mjs http://localhost:5196/ ski        # real game: jump runs with / without it
 node web/scripts/ragdoll-shots.mjs http://localhost:5196/ <outDir> ski overflip,sideways,cliff,steep,tree,kicker,rail,replay tp
 CLOSE=90 node web/scripts/ragdoll-shots.mjs …        # close side view of the crash frames; `fp` instead of `tp` = helmet cam
+node web/scripts/ragdoll-bench.mjs http://localhost:5196/ ski         # CPU per frame in the browser
 ```
 
 - **`ragdoll-fuzz.mjs`** (headless: the real skeleton from the glTF node tree, the real controller / solver / rig
@@ -87,7 +88,12 @@ CLOSE=90 node web/scripts/ragdoll-shots.mjs …        # close side view of the 
   frame), once after `ragdoll.uninstall()` — and every frame's player state, rider root and all bone / gear
   transforms compared (a run that ends in a crash is compared up to the crash).
 
-Numbers at the time of writing (MacBook Air): see the commit / report of this change; the fuzz prints its own.
+Numbers at the time of writing (MacBook Air M-series, 8 GB): fuzz seed 1 — stretch ≤ 0.41 cm, ≤ 1.8 cm under the
+snow, energy never above the crash's, joints ≤ 5.5° past a limit, drawn rig ≤ 0.17 cm off the bodies, 154 / 162
+gentle crashes asleep by 3 s (median 2.3 s), ~0.46 ms per 60 Hz frame in Node. In the browser
+(`node web/scripts/ragdoll-bench.mjs`, synchronous, rendering excluded) 0.5–0.9 ms per frame while the body is
+awake (Valcrest, Blackspruce, Voltage Park, skis and board), ~0.05 ms asleep, nothing outside crashes.
+`ragdoll-identity.mjs`: 0 difference over 361–365 frames × 851–860 values per run, skis and board.
 
 ### Known limits
 
