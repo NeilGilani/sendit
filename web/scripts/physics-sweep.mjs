@@ -59,7 +59,8 @@ export function run(s) {
   p.enterAir(s.set !== 'roll');
   const DT = s.dt;
   let t0 = null, t90 = null, t180 = null, base = 0;
-  const angle = () => (s.axis === 'spin' ? Math.abs(p._spinTotal - base) : Math.abs(p.flip));
+  // Rotation the way it was asked for (steer −1 = spin +, S = flip +, W = flip −): turning the wrong way doesn't count.
+  const angle = () => (s.axis === 'spin' ? p._spinTotal - base : s.axis === 'back' ? p.flip : -p.flip);
   void State;
   let air = 0;
   for (let i = 0; i < 8 / DT; i++) {
@@ -135,7 +136,10 @@ console.log(`${rows.length} airs in ${((Date.now() - t0) / 1000).toFixed(1)} s`)
 const LIMIT = { spin: 1.35, back: 1.15, front: 1.15 };
 const NEED = { spin: 1.5, back: 1.9, front: 1.9 };
 // By design: a key held through the take-off and never let go stays locked (a tuck / brake / carve isn't a trick).
-const locked = (r) => (r.held === 'key' && r.tp === 0 && (r.axis !== 'spin' || r.set === 'roll')) || (r.held === 'S' && r.axis === 'back') || (r.held === 'W' && r.axis === 'front');
+// … and a popped carve held the other way through the whole throw window threw a full spin that way (a set
+// bigger than the late throw can turn round: stick against it = a stall, by design).
+const committed = (r) => r.held === 'carve-' && r.set !== 'roll' && r.tp >= 0.3 + 0.1 * Math.min(2, Math.max(0, r.air - 1)) - 0.05;
+const locked = (r) => (r.held === 'key' && r.tp === 0 && (r.axis !== 'spin' || r.set === 'roll')) || (r.held === 'S' && r.axis === 'back') || (r.held === 'W' && r.axis === 'front') || committed(r);
 const isOut = (r) => !locked(r) && r.left >= NEED[r.axis] && (r.t180 === null || r.t180 > LIMIT[r.axis]);
 const outs = rows.filter(isOut);
 const key = (r) => `${r.axis}|${r.held}|${r.set}|${r.grab ? 'grab' : ''}`;

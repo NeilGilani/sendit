@@ -487,10 +487,12 @@ export class EdgePhysics {
     // The late throw: after the window, steering with no spin going (or a slow one the same way) still
     // builds one — slowly, up to spinLateMax (a late 180 / 360 on a big air, never a set), and only with
     // spinLateAir s of air left to start. A carve held off a lip (_spinLock) stays locked until re-pressed.
-    // A slow drift the other way (a carve's pre-wind, ≤ spinDrift × spinMinH) turns round the same way: with the
-    // stick held against it the spin used to open up and keep drifting the wrong way for the rest of the air.
+    // A slow spin the other way — no more than the late throw itself makes (spinDrift × spinLateMax): a carve's
+    // pre-wind, or a throw reversed too late in its window — turns round the same way. With the stick held against
+    // it the spin used to open up and keep drifting the wrong way for the rest of the air (45°/s for 2.4 s).
+    // Bigger sets still only open up (a stall), and so does everything in the last spinLateAir s.
     const against = Math.sign(-steer) !== Math.sign(h);
-    const drift = against && Math.abs(h) <= (C.spinDrift ?? 0) * C.spinMinH && tLand > C.spinLateAir;
+    const drift = against && Math.abs(h) <= (C.spinDrift ?? 0) * (C.spinLateMax || 0) * this.H.spin && tLand > C.spinLateAir;
     const late = !throwing && steer && C.spinLateMax && Math.abs(h) < C.spinLateMax * this.H.spin
       && (!against || Math.abs(h) < C.spinMinH || drift) && (Math.abs(h) > C.spinMinH || tLand > C.spinLateAir);
     if (late) h = approach(h, Math.sign(-steer) * C.spinLateMax * this.H.spin, C.spinLateRate * Math.abs(steer) * dt);

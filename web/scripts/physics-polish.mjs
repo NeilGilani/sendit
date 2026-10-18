@@ -1,7 +1,7 @@
 // Regression bench for the riding-feel polish pass (docs/jumps-research.md §9). Headless, no WebGL.
 //   1. Grabbed late spin: a spin started after the throw window while grabbing turns as fast as without the grab
 //      (it held the 0.6 grab pose: 1.42 / 1.32 s to 180° vs 1.22 / 1.18 s).
-//   2. Drift the other way: a carve's pre-wind spinning one way, a grab held (no spot), then the stick the other
+//   2. Drift the other way (2b: a throw reversed late in its window, left at 1.3 rad/s the old way): a carve's pre-wind spinning one way, a grab held (no spot), then the stick the other
 //      way after the throw window: turns round (it opened up and kept drifting the wrong way: never 180° on a board).
 //   3. Spot finishes its checks: a full spin set let go of early lands on an alignment (board, released at 45° on a
 //      2.4 s air: crashed sideways at 266°); a release sweep with a bounded number of crashes.
@@ -48,6 +48,13 @@ for (const type of TYPES) for (const set of ['lip', 'roll']) {
     expect(r.t180 !== null && r.t180 <= 1.45, `2 ${type} ${set} @${tp}: ${f(r.t180)}`);
   }
   console.log(`   ${type.padEnd(9)} ${set.padEnd(4)} ${cells.join('   ')}   (before: ${type === 'ski' ? '1.52 s' : 'never'})`);
+}
+
+console.log('2b. popped carving the other way, stick reversed 0.25 s in (late in the throw window, vy 15): spin the asked way');
+for (const type of TYPES) {
+  const r = run({ ...base, type, vy: 15, set: 'lip', held: 'carve-', tp: 0.25, grab: false });
+  console.log(`   ${type.padEnd(9)} 180° the asked way in ${f(r.t180)}   (before: never — it kept spinning the old way at ~45°/s for 2.4 s)`);
+  expect(r.t180 !== null, `2b ${type}: a reversed throw never turned round`);
 }
 
 // ------------------------------------------------------------------ 3. spot
