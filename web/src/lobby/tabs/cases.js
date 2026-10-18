@@ -46,8 +46,8 @@ registerLobbyTab({
     };
     debugGrant(ctx.profile);
     // Build the 3D crates and compile their shaders while the tab is open, so Open starts at once.
-    // The reel's card bitmaps (every card of every case) are drawn in idle time after that.
-    (globalThis.requestIdleCallback || ((f) => setTimeout(f, 300)))(() => crateShow.prewarm().then(() => prerasterReel(SERIES_ORDER)), { timeout: 1500 });
+    // The reel card bitmaps of the cases you hold are drawn in idle time after that (~0.3 MB each on HiDPI).
+    (globalThis.requestIdleCallback || ((f) => setTimeout(f, 300)))(() => crateShow.prewarm().then(() => prerasterReel([...new Set(ctx.profile.unopened.map((c) => c.series))])), { timeout: 1500 });
 
     const render = () => {
       const P = ctx.profile;
@@ -141,6 +141,7 @@ registerLobbyTab({
     render();
     ctx.on('rewards', render);
     ctx.on('caseEarned', render);
+    ctx.on('caseEarned', (e) => { if (crateShow.ready) prerasterReel([...new Set((e?.cases || []).map((c) => c?.series).filter(Boolean))]); });
     this._open = open;
   },
 

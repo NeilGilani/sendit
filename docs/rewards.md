@@ -208,8 +208,8 @@ reflection (`studio()` in crate3d.js) instead of a PMREM environment.
   up (20 %), and the marker stops 2–9 % from the edge facing it. The outcome is rolled before the reel is
   built, so the reel never changes what you get (and goes beyond CS2, whose filler never shows the gold card).
 - **Performance**: the Cases tab prewarms everything when it opens (crate models and textures, shaders
-  compiled in the background for the post stack's render target, three hidden warm frames, then every
-  card bitmap in idle time). The reel is one canvas (the old 60-card DOM strip made the compositor raster
+  compiled in the background for the post stack's render target, three hidden warm frames, then the
+  reel card bitmaps of the cases you hold, in idle time). The reel is one canvas (the old 60-card DOM strip made the compositor raster
   tiles mid-spin: 0.2–0.5 s stalls). While the studio is fully dark the world is hidden. Measured headless
   on the shared MacBook Air (Metal, other sessions running, `crateshot.mjs PERF=1`): 57–60 fps average
   over a whole opening (680 frames), worst frame 83 ms, prewarm 0.3–0.8 s in the background; before the
