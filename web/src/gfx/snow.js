@@ -147,8 +147,9 @@ void rockLayer(vec2 uv, float fp, out vec3 col, out vec2 g, out vec2 gh, out flo
   g = (r1.xy - 0.5) * vec2(0.8, 1.0);
   joint = (1.0 - smoothstep(0.01, 0.035 + fp / uRockScale.x * 1.5, c1.y)) * 0.55 * crackM;
   float tone = r1.z;
-  #ifdef ROCK_FAR
-  // Buttresses / slabs (tens of metres) that read from kilometres away.
+  #if defined(ROCK_FAR) || defined(ROCK_MACRO)
+  // Buttresses / slabs (tens of metres) that read from kilometres away (and break up big faces
+  // seen from close: without them a 200 m wall is one smooth plane of grain).
   vec3 c0 = rockCells(uv * vec2(1.0, 1.5) / (uRockScale.x * 3.2) + 9.1);
   vec3 r0 = hash32(vec2(c0.z, 1.3));
   g = g * 0.6 + (r0.xy - 0.5) * 0.9;
@@ -156,10 +157,14 @@ void rockLayer(vec2 uv, float fp, out vec3 col, out vec2 g, out vec2 gh, out flo
   tone = mix(tone, r0.z, 0.5);
   #endif
   gh = g;
+  #ifdef ROCK_MACRO
+  g *= 0.95;                      // tile rock: facets turn to / away from the light so blocks read as planes
+  #else
   g *= 0.7;                       // lighting: big blocks tilt less than the snow test assumes
+  #endif
   // Vertical joint columns inside the slabs.
   #ifdef ROCK_LITE
-  float wM = 0.0;
+  float wM = 0.0;                 // (medium: measured +3 % GPU on Ravenspire for the near columns alone)
   #else
   float wM = 1.0 - smoothstep(0.06, 0.2, fp / uRockScale.y);
   #endif
@@ -185,11 +190,18 @@ void rockLayer(vec2 uv, float fp, out vec3 col, out vec2 g, out vec2 gh, out flo
   vec3 p2 = texture2D(uRockTex, uv2).rgb;
   float near = 1.0 - smoothstep(0.02, 0.08, fp);
   g += ((p1.rg * 2.0 - 1.0) * 0.8 * near + (mat2(0.8, 0.6, -0.6, 0.8) * (p2.rg * 2.0 - 1.0)) * 0.6) * (1.0 - smoothstep(0.05, 0.3, fp));
+  #ifdef ROCK_MACRO
+  // Less photo blotching (it read as mud on big faces), more tone per block (separate planes).
+  float lum = mix(1.0, p1.b * 2.2, 0.5) * mix(1.0, p2.b * 2.2, 0.22);
+  float toneK = 0.42;
+  #else
   float lum = mix(1.0, p1.b * 2.2, 0.55) * mix(1.0, p2.b * 2.2, 0.45);
+  float toneK = 0.24;
+  #endif
   col = rockAlbedo(uv, smoothstep(2.0, 8.0, fp));
   // Weathering inside each block (lighter faces, darker lichen / wet patches) so no facet is flat.
   float wx = texture2D(noiseTex, uv * 0.11 + 0.23).g * 0.6 + texture2D(noiseTex, uv * 0.37 + 0.71).r * 0.4;
-  col *= (0.86 + 0.24 * tone) * (0.86 + 0.28 * wx) * lum * (1.0 - joint * 0.6);
+  col *= (1.0 - toneK * 0.58 + toneK * tone) * (0.86 + 0.28 * wx) * lum * (1.0 - joint * 0.6);
   // Big ledge systems: broken bands along the strata, only on cells that tilt up.
   float warp = texture2D(noiseTex, uv * vec2(0.006, 0.02) + 0.2).r;
   float f2 = fract(uv.y / (uRockLook.x * 4.3) + warp * 2.2);
@@ -553,6 +565,22 @@ export const FAR_SNOW_FRAG_GLSL = /* glsl */`
     float steep = smoothstep(0.03, 0.25, 1.0 - N.y) * (0.2 + 0.8 * smoothstep(2500.0, 7000.0, dist));
     N = normalize(N - vec3(g1.x, 0.0, g1.y) * 150.0 * steep - vec3(g2.x, 0.0, g2.y) * 60.0 * steep);
   }
+  // Mid ring seen from close (a few hundred metres to ~3 km, e.g. the face above a spawn near the
+  // tile edge): the 10 m grid smooths faces into blobs. Buttresses, ribs and gullies (35–110 m, the
+  // same field the playable tile uses on its steep ground) faded out by pixel footprint (no aliasing).
+  float fpW = length(fwidth(vW));
+  {
+    float on = smoothstep(0.18, 0.4, 1.0 - N.y) * (1.0 - smoothstep(3.0, 9.0, fpW)) * uFarNear.y;
+    if (on > 0.0) {
+      vec2 q = vW.xz + vW.y * 0.6;
+      vec2 qa = q * 0.009, qb = q * 0.027 + 0.41;
+      float a0 = texture2D(noiseTex, qa).r, b0 = texture2D(noiseTex, qb).r;
+      vec2 ga = vec2(texture2D(noiseTex, qa + vec2(0.027, 0.0)).r - a0, texture2D(noiseTex, qa + vec2(0.0, 0.027)).r - a0) / 3.0;
+      vec2 gb = vec2(texture2D(noiseTex, qb + vec2(0.027, 0.0)).r - b0, texture2D(noiseTex, qb + vec2(0.0, 0.027)).r - b0) / 1.0;
+      float onB = 1.0 - smoothstep(1.0, 3.0, fpW);
+      N = normalize(N - vec3(ga.x, 0.0, ga.y) * 6.0 * on - vec3(gb.x, 0.0, gb.y) * 2.2 * on * onB);
+    }
+  }
   #ifndef FAR_LITE
   N = flutes(vW, N, length(fwidth(vW)), 15.0, 0.14);
   N = flutes(vW * 0.37, N, length(fwidth(vW)) * 0.37, 15.0, 0.14);   // 40 m spines far away
@@ -569,20 +597,22 @@ export const FAR_SNOW_FRAG_GLSL = /* glsl */`
   rock *= 1.0 - smoothstep(10500.0, 12500.0, max(abs(vW.x), abs(vW.z))) * (1.0 - smoothstep(1400.0, 1900.0, vW.y));
   float forest = (1.0 - smoothstep(uFarForest.x - uFarForest.y, uFarForest.x, vW.y + (m - 0.5) * 300.0)) * (1.0 - rock) * (1.0 - smoothstep(uFarForest.z - 2500.0, uFarForest.z, max(abs(vW.x), abs(vW.z)))) * smoothstep(0.03, 0.14, slope) * smoothstep(0.35, 0.55, m2 + 0.15);
   vec3 rc = vec3(0.4);
+  // How much real rock structure (fracture blocks, joints, ledges holding snow) to draw. Full on high;
+  // on low / medium (FAR_LITE) only within uFarNear.x metres, fading to a plain rock tone beyond.
+  float rockDetail = 1.0;
   #ifdef FAR_LITE
-  rc = rockAlbedo(abs(N.x) > abs(N.z) ? vW.zy : vW.xy, 1.0);    // low quality: plain rock tone
-  if (false) {
-  #else
-  if (rock > 0.001) {
+  rc = rockAlbedo(abs(N.x) > abs(N.z) ? vW.zy : vW.xy, 1.0);    // plain rock tone (far)
+  rockDetail = 1.0 - smoothstep(uFarNear.x * 0.6, uFarNear.x, dist);
   #endif
-    vec3 Nr, Nh; float band;
-    float fp = length(fwidth(vW));
-    rockShade(vW, N, fp, rc, Nr, Nh, band);
+  if (rock > 0.001 && rockDetail > 0.0) {
+    vec3 Nr, Nh, rcD; float band;
+    rockShade(vW, N, fpW, rcD, Nr, Nh, band);
     float hold = smoothstep(0.66, 0.8, Nh.y + (m3 - 0.5) * 0.14 + uRockLook.y);
     hold = max(hold, band * 0.7);
     hold *= 1.0 - smoothstep(0.62, 0.85, slope) * 0.7;
-    rock *= 1.0 - hold * 0.85;
-    tN = normalize(mix(N, Nr, rock));
+    rock *= 1.0 - hold * 0.85 * rockDetail;
+    rc = mix(rc, rcD, rockDetail);
+    tN = normalize(mix(N, Nr, rock * rockDetail));
   }
   vec3 sc = uSnowAlbedo * (0.94 + 0.06 * m2);
   diffuseColor.rgb = mix(mix(sc, uForestCol, forest * 0.9), rc, rock);

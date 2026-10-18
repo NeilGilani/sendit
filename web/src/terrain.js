@@ -322,7 +322,9 @@ export class Terrain {
     // Far forest band: real mountains use their own treeline and keep forest to the horizon.
     const farU = snowUniforms();
     if (this.course?.treeline) farU.uFarForest.value.set(this.course.treeline, 350, 1e6);
-    this.farUniforms = { ...farU, noiseTex: { value: tex.noise } };
+    // uFarNear: x = distance (m) out to which low / medium draw real rock structure on the mid ring
+    // and backdrop, y = strength of the near ribs / gullies relief (MIDTERRAIN in scene.js).
+    this.farUniforms = { ...farU, noiseTex: { value: tex.noise }, uFarNear: { value: new THREE.Vector2(MIDTERRAIN.rockDetailDist, MIDTERRAIN.nearRelief) } };
     this.material = this.makeMaterial();
     this.material.defines = { SNOW_TRACKS: 2, SNOW_SPARKLE: 1, SNOW_TREEMASK: 1, SNOW_FLUTES: 1 };
     this.farMaterial = this.makeFarMaterial();
@@ -347,7 +349,7 @@ export class Terrain {
   makeFarMaterial() {
     const m = toonMaterial({
       name: 'terrainFarSnow', uniforms: { ...this.farUniforms, ...this.midMorph },
-      fragPars: SNOW_COMMON_PARS + 'vec3 tN;', frag: FAR_SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
+      fragPars: SNOW_COMMON_PARS + 'vec3 tN; uniform vec2 uFarNear;', frag: FAR_SNOW_FRAG_GLSL, band: SNOW_BAND_GLSL,
       vertPars: TERRAIN_MORPH_PARS, vertPre: TERRAIN_MORPH_GLSL,
     });
     const prev = m.onBeforeCompile;
@@ -368,6 +370,7 @@ export class Terrain {
     if (T.rockLite) d.ROCK_LITE = 1;
     if (T.sparkle) d.SNOW_SPARKLE = 1;
     if (q === 2) d.SNOW_FLUTES = 1;          // fall-line flutes on steep snow: high only
+    if (q >= 1 && PERF.rockMacro) d.ROCK_MACRO = 1;   // buttress facets (+ near joint columns on medium) on tile rock
     // Backdrop + mid ring cover much of the screen: full faceted rock / flutes on high only.
     const far = q === 2 ? { ROCK_FAR: 1 } : { FAR_LITE: 1, ROCK_LITE: 1 };
     return { terrain: d, far };
@@ -553,6 +556,11 @@ export class Terrain {
       const a = this.far[j * fres + i], b = this.far[j * fres + i + 1], c = this.far[(j + 1) * fres + i], d = this.far[(j + 1) * fres + i + 1];
       return (a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz;
     };
+    // The rim goes to just under the distant ranges' base (they rise in front of it). It used to sink
+    // ~900 m under the lowest backdrop point: that left a flat, haze-filled "lake" between the last
+    // backdrop ridges and the ranges on most maps.
+    const edge = m.spawn ? this.baseHeight(m.spawn.position[0], m.spawn.position[2]) : 2500;
+    const rimY = Math.max(m.far_min_height - 900, edge - RING.rimBelow);
     let k = 0;
     for (let j = 0; j <= n; j++) {
       for (let i = 0; i <= n; i++) {
@@ -562,7 +570,7 @@ export class Terrain {
         // Outer rim sinks away so the backdrop never ends in a hard box edge (the sky's ranges take over).
         const rim = smooth(fsize / 2 - 4000, fsize / 2, Math.max(Math.abs(x), Math.abs(z)));
         const y = H(x, z) - inside * (this.mid ? 160 : 90) - 2;
-        pos[k++] = x; pos[k++] = y + (m.far_min_height - 900 - y) * rim; pos[k++] = z;
+        pos[k++] = x; pos[k++] = y + (rimY - y) * rim; pos[k++] = z;
       }
     }
     const idx = new Uint32Array(n * n * 6);
@@ -594,7 +602,9 @@ export class Terrain {
     // Ranges sit around the resort's own altitude (the backdrop rim itself is sunk away).
     const edge = m.spawn ? this.baseHeight(m.spawn.position[0], m.spawn.position[2]) : 2500;
     const R = RING;
-    const inner = Math.max(R.inner, fsize / 2 - 3000), outer = Math.min(inner + R.depth, R.maxRadius);
+    // Starts under the backdrop's sinking rim (which goes down from fsize/2 - 4000), so no flat
+    // sunken plain shows between the backdrop and the first ridges.
+    const inner = Math.max(R.inner, fsize / 2 - R.overlap), outer = Math.min(inner + R.depth, R.maxRadius);
     const NA = R.segments, NR = R.rings;
     const rnd = (i, j, seed) => {
       let h = (i * 374761393 + j * 668265263 + seed * 982451653) | 0;
@@ -620,7 +630,7 @@ export class Terrain {
       for (let i = 0; i <= NA; i++) {
         const az = (i / NA) * Math.PI * 2;
         const x = Math.cos(az) * r, z = Math.sin(az) * r;
-        const env = 0.35 + 0.65 * smooth(0, 0.12, t) * (1 - 0.3 * t);
+        const env = R.envStart + (1 - R.envStart) * smooth(0, R.envRise, t) * (1 - 0.3 * t);
         const big = vn(x / 14000, z / 14000, 3);                // massifs vs. lower ranges
         const rg = ridged(x / R.scale, z / R.scale);
         const h = edge - 600 + env * (R.base + R.height * Math.pow(rg, 1.5) * (0.45 + 0.9 * big));
@@ -668,6 +678,7 @@ export class Terrain {
       this.terrainUniforms.uDetail.value = q;
       this.farMaterial.defines = far;
       this.farMaterial.needsUpdate = true;
+      this.farUniforms.uFarNear.value.x = MIDTERRAIN.rockDetailDist * (q === 0 ? 0.4 : 1);
     }
     this._lastFocus = null;
   }

@@ -148,14 +148,21 @@ export const MIDTERRAIN = {
   chunkCells: 100,               // cells per chunk side (1 km)
   lodDist: [1400, 3200],         // metres: 10 m grid → 20 m → 40 m (scaled by quality)
   maskRes: 2048,                 // baked sun mask texels per side (≈ 6 m)
+  // Mid ring / backdrop seen from close (faces above a spawn near the tile edge):
+  rockDetailDist: 1500,          // metres: low / medium draw fracture blocks + ledge snow out to here (high: everywhere)
+  nearRelief: 1.0,               // strength of the 35–110 m ribs / gullies added to steep mid-ring faces
 };
 
 export const RING = {
-  inner: 12000,                  // metres from the centre where the ring starts (beyond the backdrop)
-  depth: 23000,
+  inner: 9500,                   // metres from the centre where the ring may start at the earliest
+  overlap: 5000,                 // ...and it starts this far inside the backdrop's edge (under its sinking rim)
+  depth: 25500,
   maxRadius: 37500,              // keep inside the camera far plane
-  segments: 512,
-  rings: 44,
+  segments: 1024,                // (was 512 × 44: 150–430 m facets read as blocky, aliased peaks)
+  rings: 64,
+  envStart: 0.5,                 // relief share at the ring's inner edge
+  envRise: 0.07,                 // share of the depth over which it rises to full relief
+  rimBelow: 800,                 // metres under the spawn height the backdrop's outer rim settles to (under the ranges)
   scale: 7000,                   // metres per ridged-noise unit (peak spacing)
   base: 500,                     // metres above the backdrop rim
   height: 2300,                  // metres of peak relief

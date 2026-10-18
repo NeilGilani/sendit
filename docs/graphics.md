@@ -193,6 +193,76 @@ Measured with the perf branch's `web/scripts/gfxperf.mjs` (rides and carves, rea
 
 The first version of this pass doubled quality 0, because the faceted rock and flutes ran on the backdrop and mid ring, which cover much of the screen. Those now run on high only. `web/scripts/gfxperf-ride.mjs` is a simpler throttle-only probe (CPU frame intervals plus hitch log). Its numbers are unreliable on this machine and it is kept only for hitch logging. Multi-second hitches appear in both builds and are environmental.
 
+## Mountain polish pass (overnight, `worktree-agent-a2e0b51091aae188c`)
+
+Surveyed all seven maps at quality 1 (and Dragonback / Ravenspire / Fjordline at quality 2) with the new
+`web/scripts/mtnshots.mjs`: the lobby view, then fixed cameras from the spawn (2.5 m over the snow down the
+run, 40 m up looking out in four directions, 150 m up down the run). Same cameras before and after.
+
+What read worst, in order:
+
+1. **Rock faces seen from close read as brown mud.** Big walls (the face above a spawn, a ridge you ride
+   past) were one smooth plane of photo grain and colour blotches: no blocks, no planes, no ledge snow.
+   On faces just outside the 3 km playable tile (the 10 m mid ring, e.g. behind the Ravenspire / Dragonback /
+   Fjordline / Kitsune starts) medium and low drew only a flat rock tone there.
+2. **A flat, haze-filled "lake" on the horizon.** The 30 km backdrop's outer rim sank ~900 m below the
+   lowest backdrop point, and the distant ranges only started at 12 km and rose slowly. Between the last
+   backdrop ridges and the ranges there was a flat sunken plain filled with valley mist (very visible on
+   Ravenspire, Dragonback, Kitsune, Valcrest's lobby view).
+3. **Blocky, aliased distant ranges.** The ring's grid was 512 × 44 (150–430 m facets) for a 6-octave
+   ridged noise whose finest octave is ~190 m.
+
+Not changed (checked, judged fine or someone else's): snow sparkle / normals don't alias at q1; chunk
+seams / skirts and the tile → mid-ring hand-over were not visible in any view; per-map fog is each map's
+own art direction; the pale impostor crowns seen from 150 m up are trees' (`gfx/trees.js`) business;
+Fjordline's white dashes along the shore are its sea-ice floes (by design). The loading screen's blocky
+mountains come from `src/loading/terrain.js` (its own terrain, not touched here).
+
+### What changed
+
+| Area | Where | Change |
+|---|---|---|
+| Near mid-ring relief | `gfx/snow.js` `FAR_SNOW_FRAG_GLSL`, `MIDTERRAIN.nearRelief` | Steep mid-ring / backdrop faces get the same 35–110 m buttresses, ribs and gullies (noise gradient, as the tile's steep ground) when seen from close. Faded out by pixel footprint (gone beyond ~9 m per pixel), so it never aliases at distance. |
+| Mid-ring rock on low / medium | same, `MIDTERRAIN.rockDetailDist` (1500 m; ×0.4 on low) | Real rock (fracture blocks, joints, snow on facet tops and ledges, via the shared `rockShade()` in its one-projection `ROCK_LITE` form) out to that distance, cross-faded to the old plain tone over its last 40 %. High already had the full rock everywhere. |
+| Tile rock | `gfx/snow.js` `rockLayer()` `ROCK_MACRO`, `PERF.rockMacro` (q1 / q2) | The buttress layer (51 m Voronoi slabs) the backdrop used on high now also runs on the playable tile at medium and high: big faces break into planes that turn toward / away from the light, and snow sits on their tops. Less blotching from the photo's 12 m layer (0.45 → 0.22), more tone per block (±12 % → ±21 %), facets tilt a bit more in lighting (0.7 → 0.95). Joint columns stay high-only (on medium they alone cost +3 % GPU). |
+| Horizon | `terrain.js` `buildFar()` / `buildRing()`, `RING` | The backdrop rim now settles to `spawn height − RING.rimBelow` (800 m), just under the ranges, instead of sinking 900 m under the lowest backdrop point. The ranges start 5 km inside the backdrop's edge (`RING.overlap`, i.e. 10 km out), with half their relief at the inner edge (`envStart`) rising to full by 7 % of the depth (`envRise`). Grid 1024 × 64 (was 512 × 44): about 130 k triangles in one draw, no faceted peaks. |
+| Tooling | `web/scripts/mtnshots.mjs` | Survey script above (`ONLY=far0,far2`, `SUF=_x`, `EXTRA=&param` env vars). `map3-perf.mjs` picks ANGLE Metal on macOS. |
+
+### Tunables
+
+- `MIDTERRAIN.rockDetailDist`, `MIDTERRAIN.nearRelief` (`scene.js`) — mid-ring rock / relief seen from close.
+- `RING.overlap`, `envStart`, `envRise`, `rimBelow`, `segments`, `rings` (`scene.js`) — the horizon.
+- `PERF.rockMacro` (`gfx/perf.js`) — tile buttress facets on medium / high (false = previous rock).
+
+### Cost (GPU ms per frame, q1, 1600 × 900, MacBook Air Apple GPU via ANGLE Metal)
+
+`gfxab2.mjs` with the old build and this one on two dev servers, alternated per pose (4 chase-camera poses
+down the run), machine shared with two other sessions:
+
+| Map | Before | After | |
+|---|---|---|---|
+| Ravenspire (rock-heavy) | 18.8 | 19.7 | +4.8 % (final build; an earlier run of the same config read +3 %. With medium joint columns it was +9 %: dropped) |
+| Blackspruce | 42.9 | 44.6 | +4 % (final build, `rockDetailDist` 1500 m; GPU shared with a busy QA run, per-pose spread ±25 %. A quieter earlier run with `rockDetailDist` 3000 m read 27.4 → 29.6, +8 %, which is why it was halved) |
+
+The measurements were very noisy tonight (two other sessions drove the GPU the whole time; a Blackspruce
+baseline read anywhere from 24 to 45 ms). Treat the cost as "about +3–5 % on q1", at the edge of the ±5 %
+budget. Knobs to win it back, cheapest visual loss first: `MIDTERRAIN.rockDetailDist` (1500 → 800),
+`MIDTERRAIN.nearRelief` (→ 0), `PERF.rockMacro` (→ false). Re-measure on the Surface with
+`node web/scripts/gfxab2.mjs <old>,<new> blackspruce 1`.
+
+Checks: `gfxpopin.mjs` q1 on Ravenspire, Dragonback, Blackspruce: 0 tree / shadow / scatter / terrain pops,
+0 mid-ride shader compiles or texture uploads, 0 errors. `mtnshots.mjs` on all seven maps (q1), plus q2 and
+q0 spot checks: 0 console errors. unittest, map3–map7-unit, loading-unit green; `npx vite build` passes.
+
+Still weak (next steps): big tile rock faces seen from very close (Dragonback's ridge walls) still read as
+fine grain more than as rock: the 1.25 m height field is smooth there, and only Valcrest sculpts relief
+into its walls (`sculptCliffs`). Doing that for the other maps changes the collision surface, so it needs
+each map owner's say. The far mid ring's 10 m normals sampled on its 40 m LOD read a little busy
+(salt-and-pepper) at 3–6 km. A thin pale haze band can remain under the ranges on Ravenspire from the
+highest spawns. The loading screen's stills use their own terrain (`src/loading/terrain.js`); if it is
+changed later, re-run `node web/scripts/loadingstills.mjs` (not needed for this pass: nothing here alters
+the loading scene).
+
 ## Known issues / not done
 
 - Performance: see `docs/graphics-perf.md`. Earlier versions of this file claimed about 2 ms per frame, and later about 13 / 27 / 29 ms. The first came from headless `requestAnimationFrame` deltas, which don't measure GPU cost. The second came from an unpipelined render plus `readPixels`, which overstates the frame time. Measured with GPU timer queries on an Intel Arc 130V iGPU at 1600×900, the game is GPU-bound at about **9 / 14 / 22 ms per frame** on quality 0 / 1 / 2 (about 110 / 72 / 45 fps). The main thread costs about 5 ms.
