@@ -76,6 +76,7 @@ Each map is a mountain with named trails picked in the lobby's Maps tab.
 | Loading screen (live random trick scene) | `loading/` | `loading-screen.md` |
 | Audio (layered snow, wind, air, ambience) | `audio.js`, `audio/` | `audio.md` |
 | Zen / Challenge modes, medals, ghosts | `activities.js` | — |
+| Thrill: instant restart / retry, spots & gaps, adrenaline cues, instant replay, versus links | `thrill/` | `game-feel.md` §7–8 |
 
 **Contracts between areas** (keep these shapes):
 - `registerMap({ ..., mountain: { id, name, region, blurb, accent }, trails: [{ id, name, difficulty, description, length, vertical }] })`
@@ -89,6 +90,7 @@ Each map is a mountain with named trails picked in the lobby's Maps tab.
 
 ```bash
 node web/scripts/unittest.mjs
+MAC=1 node web/scripts/thrill-smoke.mjs http://localhost:5180/ <outDir>   # thrill features in the real game (GPU=1 on Windows)
 GPU=1 node web/scripts/lobbytest.mjs http://localhost:5180/
 node web/scripts/physics-fuzz.mjs
 node web/scripts/physics-tricks.mjs

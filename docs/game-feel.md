@@ -564,6 +564,10 @@ unfound ones show as `???`, and the gaps found are listed.
 Events: `thrillSpot {mapId, name, found, total}` and `thrillGap {mapId, name, isNew, n}`. Tunables:
 `THRILL.spots`.
 
+Achievements (progression `recordThrill`): **Scout** (10 spots), **Mind the Gap** (a first gap), **Gap Master**
+(10 gaps) and **Bragging Rights** (beat a friend's versus link). The life counters are `spots`, `gaps` and
+`versusWins`.
+
 ### 8c. Adrenaline cues (thrill/adrenaline.js)
 
 An exposure level from 0 to 1 is the largest of three measures:
