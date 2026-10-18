@@ -396,7 +396,7 @@ export class EdgePhysics {
     // down a line and off a cliff mustn't flip you — but the key of a preload is the same throw, so it
     // carries on. A re-press works at any time (the late throw, flipStep).
     this._flipLock = { up: (c.up || 0) > 0.2 && !(front && this._flipCommit), brake: (c.brake || 0) > 0.2 && !(this._flipCommit && !front) };
-    this._lockHintT = 0;
+    this._lockHintT = 0; this._grabLate = false;
     // How long this air should last (sets how long the throw window stays open, flipStep / spinStep).
     this.airPred = this.timeToLand();
     // Rolling off a crest / lip without popping: the turn held from the ground is carving, not a spin
@@ -436,6 +436,8 @@ export class EdgePhysics {
     const tLand = this.timeToLand();
     // Grabs: reached for after the take-off, let go of just before touchdown (the legs land, not the hand).
     const grabbing = ctrl.active && ctrl.tuck > 0.5 && pl.airTime > 0.12 && tLand > C.grabLetGo;
+    // A grab held into the last moments leaves the spot no time (player.js hints once after such a crash).
+    if (grabbing && tLand < C.grabLetGo + 0.2) this._grabLate = true;
     this.spinStep(dt, ctrl, grabbing, tLand);
     if (this.takeoff) this.takeoff.spin += pl.spinRate * dt;
     this.flipStep(dt, ctrl, grabbing, tLand);

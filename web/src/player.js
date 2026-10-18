@@ -505,6 +505,11 @@ export class Player {
       // Why it went wrong (for UI / tuning): too hard, or yaw / pitch out of line.
       const reason = impact > P.crashImpact ? 'impact' : fl.result === 'crash' ? 'pitch' : 'yaw';
       this.lastCrash = { reason, impact, dev: ev.dev, flipDev: fl.dev, air: this.airTime, spins, flips: fl.flips, why: ev.why };
+      // A grab held to the end blocks the spot (the rider only spots once the hand lets go): say so, once.
+      if (reason !== 'impact' && this.dyn._grabLate && !Player._grabHinted && this.controllable()) {
+        Player._grabHinted = true;
+        setTimeout(() => emit('hint', 'Let go of the grab a moment before touchdown: the rider can only spot the landing once the hand is off'), 1200);
+      }
       this.crash('landing');
       return;
     }
