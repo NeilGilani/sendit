@@ -107,8 +107,10 @@
     #loading.out-quick { opacity: 0; transition: opacity var(--out) ease; }
     /* Lobby -> mountain load: the mountain being loaded, named like a game's map card (bottom-left). */
     #loading .ld-dest { position: absolute; left: clamp(20px, 4vw, 64px); bottom: calc(clamp(0px, calc((100vh - 100vw / 2.2) / 2), 16vh) + clamp(22px, 4vh, 44px));
-      opacity: 0; transform: translateY(8px); transition: opacity 1s ease .3s, transform 1s cubic-bezier(.2,.7,.2,1) .3s; text-shadow: 0 2px 24px rgba(0,0,0,.55); pointer-events: none; }
+      opacity: 0; transform: translateY(8px); transition: opacity 1s ease .3s, transform 1s cubic-bezier(.2,.7,.2,1) .3s; text-shadow: 0 2px 24px rgba(0,0,0,.55); pointer-events: none; isolation: isolate; }
     #loading .ld-dest.on { opacity: 1; transform: none; }
+    #loading .ld-dest::before { content: ""; position: absolute; z-index: -1; left: -30vw; right: -12vw; top: -14vh; bottom: -10vh;
+      background: radial-gradient(ellipse at 30% 70%, rgba(5,6,10,.5), rgba(5,6,10,0) 65%); }
     #loading .ld-dest small { display: block; font-size: 11px; font-weight: 800; letter-spacing: .3em; text-transform: uppercase; color: var(--accent, #ffcc94); }
     #loading .ld-dest b { display: block; margin-top: 6px; font-size: clamp(34px, 5vw, 76px); line-height: .95; font-weight: 900; font-style: italic; letter-spacing: .01em; text-transform: uppercase; }
     #loading .ld-dest span { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; letter-spacing: .14em; text-transform: uppercase; color: rgba(250,248,243,.85); }

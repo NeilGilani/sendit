@@ -359,11 +359,11 @@ export class LoadingScene {
     let trick = v.trick || r.pick(pool);
     if (!v.trick && trick === this.lastTrick) trick = r.pick(pool);
     // Night skies are the show: those loads favour the moves that look up or across (sky in frame).
-    const cams = v.time.aurora ? { close: CAMERAS.close, dolly: CAMERAS.dolly, low: CAMERAS.low, follow: CAMERAS.follow, orbit: { w: 0.5 } } : CAMERAS;
+    const cams = v.time.aurora ? { hero: CAMERAS.hero, close: CAMERAS.close, dolly: CAMERAS.dolly, low: CAMERAS.low, follow: CAMERAS.follow, orbit: { w: 0.5 } } : CAMERAS;
     // Most boots end during the first trick: open with a hero move and get to the lip quickly.
     const first = !this.shotCount;
     this.shotCount = (this.shotCount || 0) + 1;
-    let cam = v.cam || (first ? r.pick(v.time.aurora ? ['close', 'dolly', 'low'] : ['close', 'close', 'dolly', 'low', 'follow']) : r.weighted(cams, 'w'));
+    let cam = v.cam || (first ? r.pick(v.time.aurora ? ['hero', 'close', 'dolly', 'low'] : ['hero', 'hero', 'close', 'close', 'dolly', 'follow']) : r.weighted(cams, 'w'));
     if (!v.cam && cam === this.lastCam) cam = r.weighted(cams, 'w');
     this.lastTrick = trick; this.lastCam = cam;
     const shot = this.shot = new Shot({ H: this.height.H, line: this.height.line, trick, gear: v.gear, r });
@@ -500,6 +500,8 @@ export class LoadingScene {
     P.n++; P.sum += frameMs; P.max = Math.max(P.max, frameMs);
     if (frameMs > 25) P.over25++;
     if (frameMs > 50) P.over50++;
+    // Stalls (the GPU thread held by someone else), as [epoch start ms, ms] for lining up with the boot stages.
+    if (frameMs > 250 && (P.stalls || (P.stalls = [])).length < 40) P.stalls.push([Math.round(performance.timeOrigin + performance.now() - frameMs), Math.round(frameMs)]);
     if (this.opts.q === 'still') return;
     if (frameMs < STALL_MS) this.ft.push(frameMs);
     if (this.ft.length < 20) return;
@@ -516,7 +518,7 @@ export class LoadingScene {
     else if (p90 < T * 0.7 && this.scale < 1.3) next = this.scale * 1.05;             // headroom: toward native
     if (!this.fps30 && next < 0.8) { this.fps30 = true; next = Math.min(1, next * 1.4); }
     if (Math.abs(next - this.scale) > 0.01) { this.scale = next; this.resize(this.size); }
-    this.post('stats', { stats: { medMs: +med.toFixed(1), scale: +this.scale.toFixed(2), ratio: +this.ratio.toFixed(2), frames: this.frames, build: this.stats.build, compile: this.stats.compile, fps: +(1000 * P.n / P.sum).toFixed(1), fps30: !!this.fps30, over25: P.over25, over50: P.over50, maxMs: Math.round(P.max), px: `${Math.round(this.size.width * this.ratio)}x${Math.round(this.size.height * this.ratio)}` } });
+    this.post('stats', { stats: { medMs: +med.toFixed(1), scale: +this.scale.toFixed(2), ratio: +this.ratio.toFixed(2), frames: this.frames, build: this.stats.build, compile: this.stats.compile, fps: +(1000 * P.n / P.sum).toFixed(1), fps30: !!this.fps30, over25: P.over25, over50: P.over50, maxMs: Math.round(P.max), px: `${Math.round(this.size.width * this.ratio)}x${Math.round(this.size.height * this.ratio)}`, stalls: P.stalls || [] } });
   }
 }
 

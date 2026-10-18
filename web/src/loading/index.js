@@ -153,6 +153,8 @@ class LoadingScreen {
       this.frozen = m.info || true;
     } else if (m.type === 'stats') {
       this.sceneStats = m.stats;
+      // Stall start times relative to this page's T0 (same clock as `stages`).
+      if (m.stats.stalls) m.stats.stalls = m.stats.stalls.map(([t, ms]) => [Math.round(t - performance.timeOrigin - T0), ms]);
     } else if (m.type === 'error') {
       this.fail(m.message);
     } else if (m.type === 'shaderError') {

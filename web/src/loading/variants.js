@@ -98,8 +98,8 @@ export const TRICKS = {
 export const CAMERAS = {
   dolly: { name: 'Side dolly', w: 3 },          // tracking alongside the air, slow push, sun behind
   orbit: { name: 'Slow orbit', w: 2 },          // orbits the apex while the rider hangs in the air
-  low: { name: 'Low hero', w: 2 },              // from the landing, looking up: rider against the sky
-  tele: { name: 'Long lens', w: 2 },            // telephoto from across the bowl, peaks stacked behind
+  low: { name: 'Low hero', w: 0.8 },              // from the landing, looking up: rider against the sky
+  tele: { name: 'Long lens', w: 0.8 },            // telephoto from across the bowl, peaks stacked behind
   reveal: { name: 'Drone reveal', w: 2 },       // starts tight, pulls back and up over the range
   follow: { name: 'Chase', w: 1 },              // behind and above the rider off the lip, over the void
   close: { name: 'Close orbit', w: 3.5 },         // a drone swinging round the rider ~5 m away through the trick
