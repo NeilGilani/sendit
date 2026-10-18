@@ -17,7 +17,7 @@ const times = (process.argv[5] || '1,4,8,12,16').split(',').map(Number);
 const [W, H] = (process.argv[6] || '1600x900').split('x').map(Number);
 if (!variants.length) for (let i = 0; i < 4; i++) variants.push(`loadseed=${Math.floor(Math.random() * 1e6)}`);
 fs.mkdirSync(out, { recursive: true });
-const browser = await chromium.launch({ args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ args: [...(process.platform === 'darwin' ? ['--use-gl=angle', '--use-angle=metal'] : ['--use-angle=d3d11']), '--enable-gpu', '--ignore-gpu-blocklist'] });
 let bad = 0;
 for (const q of variants) {
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: Number(process.env.DPR || 1) });   // DPR=2 for high-DPI captures

@@ -96,7 +96,10 @@ export function makeHeight(v) {
     y += 0.12 * Math.max(0, z) * smooth(0, 600, z) * (1 - smooth(900, 2500, z));
     // Ranges: across the valley and down both sides, growing with distance.
     const big = ridged(x / 3400 + 11.3, z / 3400 + 4.1, 7);
-    const amp = (90 + 1900 * smooth(500, 7000, rr)) * M.range * M.peakScale;
+    // Massifs: a very low-frequency mask so the skyline has a few dominant groups of peaks and low cols
+    // between them (a uniform ridged field reads as an egg crate of same-size cones).
+    const mass = 0.35 + 1.05 * smooth(-0.35, 0.55, fbm(x / 11000 + 1.7, z / 11000 + 6.2, 3));
+    const amp = (90 + 1900 * smooth(500, 7000, rr) * mass) * M.range * M.peakScale;
     // Ranges across the valley and on both sides (side views from the arete need peaks too).
     const across = Math.max(smooth(2800, 8000, u), smooth(1500, 5200, ax));
     y += (Math.pow(big, 1.25) * 1.25 - 0.3) * amp * (0.35 + 0.65 * Math.min(1, across));
@@ -159,7 +162,7 @@ export function makeHeight(v) {
 const L = 420;            // near grid half-size (m)
 const NN = 210;           // near grid vertices per side
 const RFAR = 42000;       // far ring outer radius (m)
-const NR = 200;           // far ring rows
+const NR = 300;           // far ring rows
 const CZ = -14;           // near grid centre z (dense around the cliff and landing)
 
 function axis(n) {
@@ -213,7 +216,7 @@ export function buildTerrain(height, sunDir, material, farMaterial) {
   for (let j = NN - 1; j > 0; j--) ring.push([ax[0], ax[j]]);                 // x = −L edge, z ←
   // Row 0 = the near grid boundary (P0 vertices); rows 1.. use every other column (P1) and grow
   // exponentially, so far triangles stay roughly square (no radial streaks on distant faces).
-  const P0 = ring.length, P1 = P0 / 2;
+  const P0 = ring.length, P1 = P0;   // every boundary column: ~38 m spacing at 5 km (silhouettes stay smooth)
   const P = P0;
   const fPos = new Float32Array((P0 + P1 * (NR - 1)) * 3);
   for (let p = 0; p < P0; p++) {
@@ -223,7 +226,7 @@ export function buildTerrain(height, sunDir, material, farMaterial) {
   for (let rI = 1; rI < NR; rI++) {
     const t = rI / (NR - 1);
     for (let j = 0; j < P1; j++) {
-      const [bx, bzr] = ring[j * 2];
+      const [bx, bzr] = ring[j];
       const bz = bzr + CZ;
       const rb = Math.hypot(bx, bz);
       const f = (rb * Math.pow(RFAR / rb, t) - rb) / (RFAR - rb);
@@ -234,12 +237,8 @@ export function buildTerrain(height, sunDir, material, farMaterial) {
     }
   }
   const fIdx = [];
-  const out = (rI, j) => P0 + (rI - 1) * P1 + (j % P1);
-  for (let j = 0; j < P1; j++) {
-    const a0 = 2 * j, a1 = 2 * j + 1, a2 = (2 * j + 2) % P0;
-    fIdx.push(a0, a1, out(1, j), a1, out(1, j + 1), out(1, j), a1, a2, out(1, j + 1));
-  }
-  for (let rI = 1; rI < NR - 1; rI++) for (let j = 0; j < P1; j++) {
+  const out = (rI, j) => (rI === 0 ? j % P0 : P0 + (rI - 1) * P1 + (j % P1));
+  for (let rI = 0; rI < NR - 1; rI++) for (let j = 0; j < P1; j++) {
     const a = out(rI, j), b = out(rI, j + 1), c = out(rI + 1, j), d = out(rI + 1, j + 1);
     fIdx.push(a, b, c, b, d, c);
   }
@@ -369,8 +368,9 @@ const TERRAIN_FRAG = /* glsl */`
   float holdF = 0.2 + (texture2D(noiseTex, vW.xz * 0.0011 + 0.5).g - 0.5) * 0.2 + (texture2D(noiseTex, vW.xz * 0.0004 + 0.1).r - 0.5) * 0.1;
   rock = smoothstep(holdF - 0.04, holdF + 0.16, slope);
   // Conifers below the treeline on the gentler valley sides: near-black green, speckled.
-  float tree = (1.0 - smoothstep(uTreeLine - 120.0, uTreeLine + 120.0, vW.y + (n0 - 0.5) * 260.0)) * (1.0 - smoothstep(0.32, 0.5, slope));
-  tree *= smoothstep(0.3, 0.55, texture2D(noiseTex, vW.xz * 0.0023).g + 0.25);
+  float nT = texture2D(noiseTex, vW.xz * 0.0007 + 0.21).r;   // low-frequency treeline jitter (fine noise flecked the valleys)
+  float tree = (1.0 - smoothstep(uTreeLine - 260.0, uTreeLine + 220.0, vW.y + (nT - 0.5) * 320.0)) * (1.0 - smoothstep(0.32, 0.5, slope));
+  tree *= smoothstep(0.1, 0.4, texture2D(noiseTex, vW.xz * 0.0011).g + 0.25);   // dense forest, broken only in big glades
 #endif
   vec3 rc = vec3(0.3), Nr = N, Nh = N; float band = 0.0;
   if (rock > 0.01) {

@@ -10,7 +10,7 @@ const base = (process.argv[2] || 'http://localhost:5191/').replace(/\/?$/, '/');
 const runs = Number(process.argv[3] || 3);
 const configs = (process.argv[4] ?? '').split(';');
 const browser = await chromium.launch({
-  args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
+  args: [...(process.platform === 'darwin' ? ['--use-gl=angle', '--use-angle=metal'] : ['--use-angle=d3d11']), '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
 });
 const rows = [];
 for (let i = 0; i < runs * configs.length; i++) {

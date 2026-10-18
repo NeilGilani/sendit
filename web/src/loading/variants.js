@@ -67,6 +67,20 @@ export const MOUNTAINS = {
   inversion: { places: ['Valcrest · Above the Clouds', 'Blackspruce · Cloud Sea', 'Ravenspire · Inversion'], peakScale: 0.75, sharp: 0.85, horn: true, range: 0.9, seaLevel: -700, cloudSea: true },
 };
 
+// Each game map's own light and landform for the lobby → mountain load (loading/hint.js): the shot
+// is set on the mountain being loaded, in its light (course.atmosphere in maps/*). Several choices
+// each so repeat loads of one mountain still vary.
+export const MAP_LOOKS = {
+  'valcrest-gully': { tod: ['golden', 'golden', 'bluebird'], mtn: ['ranges', 'inversion'] },
+  'lake-tahoe': { tod: ['bluebird', 'golden'], mtn: ['ranges'] },
+  blackspruce: { tod: ['bluebird', 'storm', 'golden'], mtn: ['ranges', 'inversion'] },
+  ravenspire: { tod: ['golden', 'alpenglow', 'storm'], mtn: ['spires'] },
+  'voltage-park': { tod: ['aurora', 'aurora', 'bluebird'], mtn: ['ranges', 'spires'] },
+  dragonback: { tod: ['bluebird', 'golden', 'dawn'], mtn: ['ranges'] },
+  'kitsune-peak': { tod: ['alpenglow', 'alpenglow', 'dawn'], mtn: ['spires', 'inversion'] },
+  fjordline: { tod: ['golden', 'golden', 'dawn'], mtn: ['ranges', 'inversion'] },
+};
+
 // spin: total rotation about up (rad, sign = direction); flip: total rotation about a horizontal axis;
 // axis: 'lat' (the rider's left-right: back / front flips), 'travel' (corked: rolled about the way of
 // travel), 'diag' (rodeo / misty: between the two). grab: the rig's grab names (rider.js).
@@ -84,11 +98,12 @@ export const TRICKS = {
 export const CAMERAS = {
   dolly: { name: 'Side dolly', w: 3 },          // tracking alongside the air, slow push, sun behind
   orbit: { name: 'Slow orbit', w: 2 },          // orbits the apex while the rider hangs in the air
-  low: { name: 'Low hero', w: 2 },              // from the landing, looking up: rider against the sky
-  tele: { name: 'Long lens', w: 2 },            // telephoto from across the bowl, peaks stacked behind
+  low: { name: 'Low hero', w: 0.8 },              // from the landing, looking up: rider against the sky
+  tele: { name: 'Long lens', w: 0.8 },            // telephoto from across the bowl, peaks stacked behind
   reveal: { name: 'Drone reveal', w: 2 },       // starts tight, pulls back and up over the range
   follow: { name: 'Chase', w: 1 },              // behind and above the rider off the lip, over the void
   close: { name: 'Close orbit', w: 3.5 },         // a drone swinging round the rider ~5 m away through the trick
+  hero: { name: 'Hero three-quarter', w: 3 },    // 3/4 front, below the apex, backlit: the poster frame
 };
 
 export function rng(seed) {
@@ -127,12 +142,18 @@ export function tricksFor(gear) {
 export function pickVariant(opts = {}) {
   const seed = opts.seed != null && opts.seed !== '' ? Number(opts.seed) : Math.floor(Math.random() * 2 ** 31);
   const r = rng(seed);
-  const tod = TIMES[opts.tod] ? opts.tod : r.weighted(TIMES);
+  // Lobby → mountain load: the player's own rider on the picked mountain, in that mountain's light.
+  const hint = opts.hint && typeof opts.hint === 'object' ? opts.hint : null;
+  const own = !!hint?.transition;
+  const look = own ? MAP_LOOKS[hint.mapId] : null;
+  const tod = TIMES[opts.tod] ? opts.tod : look ? r.pick(look.tod) : r.weighted(TIMES);
   const T = TIMES[tod];
-  const mtn = MOUNTAINS[opts.mtn] ? opts.mtn : r.pick(Object.keys(MOUNTAINS));
+  const mtn = MOUNTAINS[opts.mtn] ? opts.mtn : look ? r.pick(look.mtn) : r.pick(Object.keys(MOUNTAINS));
   const M = MOUNTAINS[mtn];
-  const gear = opts.gear === 'ski' || opts.gear === 'skis' ? 'ski' : opts.gear === 'snowboard' || opts.gear === 'board' ? 'snowboard' : (r() < 0.5 ? 'ski' : 'snowboard');
-  const gearModel = r.pick(gear === 'ski' ? ['allmountain', 'powder', 'park', 'allmountain'] : ['allmountain', 'freeride', 'powder', 'park']);
+  const gearIn = opts.gear || (own ? hint.gear : null);
+  const gear = gearIn === 'ski' || gearIn === 'skis' ? 'ski' : gearIn === 'snowboard' || gearIn === 'board' ? 'snowboard' : (r() < 0.5 ? 'ski' : 'snowboard');
+  const pickedModel = r.pick(gear === 'ski' ? ['allmountain', 'powder', 'park', 'allmountain'] : ['allmountain', 'freeride', 'powder', 'park']);
+  const gearModel = own && hint.gearModel && !opts.gear ? hint.gearModel : pickedModel;
   // Outfit: usually one colourway head to toe, sometimes mixed like a real kit.
   const ways = Object.keys(COLORWAYS);
   const base = r.pick(ways);
@@ -145,9 +166,12 @@ export function pickVariant(opts = {}) {
     goggles: { garment: Object.keys(GARMENTS.goggles)[0], ...slot('goggles') },
     gloves: { garment: Object.keys(GARMENTS.gloves)[0], ...slot('gloves') },
   };
+  if (own && hint.outfit && Object.keys(hint.outfit).length) Object.assign(outfit, hint.outfit);
   const sunAz = r.range(T.sunAz[0], T.sunAz[1]) * D;
+  const place0 = r.pick(M.places);
+  const place = own && hint.mountain ? [hint.mountain, hint.trail].filter(Boolean).join(' · ') : place0;
   return {
-    seed, r, tod, time: T, mtn, mountain: M, place: r.pick(M.places),
+    seed, r, tod, time: T, mtn, mountain: M, place, own, riderName: own ? (hint.rider && hint.rider !== 'Rider' ? String(hint.rider).slice(0, 24) : 'You') : null,
     sunAz, sunElev: T.sunElev * D,
     gear, gearModel, stance: r() < 0.3 ? 'goofy' : 'regular', outfit,
     terrainSeed: Math.floor(r() * 1e6),

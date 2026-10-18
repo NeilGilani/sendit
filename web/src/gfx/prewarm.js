@@ -9,14 +9,61 @@
 //    settings doesn't stall either. The variant materials are kept alive so their programs stay cached.
 import * as THREE from 'three';
 
+/**
+ * Link the programs `scene` needs for the post stack's HDR target in parallel (KHR_parallel_shader_compile)
+ * before a warm frame draws them: a synchronous link in a draw holds Chrome's GPU thread, which the
+ * loading screen's worker shares (its hero shot froze for 2–4 s at the end of a map load).
+ */
+async function compileForTarget(renderer, scene, camera, post) {
+  const rt = post?.composer?.inputBuffer;
+  if (!renderer.compileAsync || !rt) return;
+  const prev = renderer.getRenderTarget();
+  renderer.setRenderTarget(rt);
+  let p;
+  try { p = renderer.compileAsync(scene, camera); } finally { renderer.setRenderTarget(prev); }
+  try { await p; } catch { /* the warm frames compile whatever is left */ }
+}
+
+/**
+ * Draw the scene's materials a few at a time, one frame per batch with a yield in between, so the
+ * driver-side work of first draws (ANGLE Metal builds pipeline states on the GPU thread at the first
+ * draw, even after a parallel link) comes in slices: the loading screen's worker gets the GPU thread
+ * between them instead of freezing through one multi-second block.
+ */
+async function warmInBatches(scene, post, batches = 10) {
+  const groups = new Map();
+  const visibleChain = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
+  scene.traverse((o) => {
+    if (!(o.isMesh || o.isPoints || o.isLine || o.isSprite) || !visibleChain(o)) return;
+    const m = [].concat(o.material || [])[0];
+    const key = (m?.uuid || 'none') + (o.isInstancedMesh ? 'i' : '') + (o.isSkinnedMesh ? 's' : '') + (o.isPoints ? 'p' : '');
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(o);
+  });
+  const list = [...groups.values()];
+  if (list.length < 2) return;
+  const all = list.flat();
+  const n = Math.min(batches, list.length);
+  for (let b = 0; b < n; b++) {
+    for (const o of all) o.visible = false;
+    for (let g = b; g < list.length; g += n) for (const o of list[g]) o.visible = true;
+    post.composer.render(1 / 60);
+    await new Promise((res) => setTimeout(res, 20));
+  }
+  for (const o of all) o.visible = true;
+}
+
 /** Every texture referenced by a material (maps and texture uniforms). */
 function materialTextures(m, out) {
   for (const k of ['map', 'alphaMap', 'normalMap', 'emissiveMap', 'aoMap', 'roughnessMap', 'metalnessMap']) if (m[k]?.isTexture) out.add(m[k]);
   for (const u of Object.values(m.uniforms || m.userData?.uniforms || {})) if (u?.value?.isTexture) out.add(u.value);
 }
 
+const mark = (n) => globalThis.__loading?.mark?.(n);   // loading screen timeline (stall hunting)
+
 export async function prewarm({ renderer, scene, camera, post, scatter, terrain, fx, spots = [] }) {
   const t0 = performance.now();
+  mark('prewarm:start');
   // 1. Geometry around the places the player first sees: terrain LOD (all chunks, no budget) and tree pools.
   for (const p of spots) terrain.update(p, Infinity);
   if (spots[0]) { scatter.trees.last.set(1e9, 0, 0); scatter.update(spots[0]); }
@@ -26,6 +73,7 @@ export async function prewarm({ renderer, scene, camera, post, scatter, terrain,
   for (const m of Object.values(scatter.trees.mats)) materialTextures(m, texs);
   for (const m of [terrain.material, terrain.farMaterial]) if (m) materialTextures(m, texs);
   for (const t of texs) if (t.image || t.isRenderTargetTexture || t.isDataTexture) { try { renderer.initTexture(t); } catch { /* not uploadable yet */ } }
+  mark('prewarm:textures');
   // 3. Warm frames with every variant in view.
   const restore = [];
   const target = new THREE.Vector3(0, 0, -12).applyQuaternion(camera.quaternion).add(camera.position);
@@ -62,18 +110,27 @@ export async function prewarm({ renderer, scene, camera, post, scatter, terrain,
     fx.track.flush(target.clone().add(new THREE.Vector3(fx.track.meters, 0, 0)));
     fx.track.clear();
   }
+  mark('prewarm:compile');
+  await compileForTarget(renderer, scene, camera, post);
+  mark('prewarm:batches');
+  await warmInBatches(scene, post);
+  mark('prewarm:frames');
   renderer.compile(scene, camera);
-  for (let i = 0; i < 2; i++) post.composer.render(1 / 60);
+  for (let i = 0; i < 2; i++) { post.composer.render(1 / 60); await new Promise((res) => setTimeout(res, 20)); }
+  mark('prewarm:shadowVariants');
   if (wind) wind.enabled = windOn;
   for (const r of restore) r();
   if (sp) { for (let i = 0; i < sp.cap; i++) sp.life[i] = 0; sp.update(0.001); }
   for (const pool of scatter.trees.pools || []) { const a = pool.im.instanceMatrix; a.clearUpdateRanges(); a.needsUpdate = true; }
   scatter.trees.last.set(1e9, 0, 0);
-  warmShadowVariants(renderer, scene, post);
-  warmHidden(renderer, scene, post);
+  await warmShadowVariants(renderer, scene, post, camera);
+  mark('prewarm:hidden');
+  await warmHidden(renderer, scene, post, camera);
+  mark('prewarm:readPixels');
   // Let the driver finish (a 1-pixel read waits for the GPU) so the cost lands behind the loading screen.
   const gl = renderer.getContext();
   gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+  mark('prewarm:done');
   return performance.now() - t0;
 }
 
@@ -83,11 +140,11 @@ export async function prewarm({ renderer, scene, camera, post, scatter, terrain,
  * depends on draw order (a double-sided textured roof first seen mid-ride compiled then). Render a
  * tiny shadow pass where every distinct caster variant follows a dummy that forces the re-pick.
  */
-function warmShadowVariants(renderer, scene, post) {
+async function warmShadowVariants(renderer, scene, post, camera) {
   const group = new THREE.Group();
   group.name = 'warmShadowVariants';
-  const box = new THREE.BoxGeometry(0.1, 0.1, 0.1), basic = new THREE.MeshLambertMaterial();
-  const seen = new Set(), made = [];
+  const box = new THREE.BoxGeometry(0.1, 0.1, 0.1), basic = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, fog: false });   // cheap, unlit, invisible
+  const seen = new Set(), made = [], proxies = [];
   scene.traverse((o) => {
     if (!o.isMesh || !o.castShadow || o.customDepthMaterial || o.isSkinnedMesh || Array.isArray(o.material)) return;
     const m = o.material;
@@ -96,13 +153,30 @@ function warmShadowVariants(renderer, scene, post) {
     seen.add(key);
     // A dummy of the opposite instancing kind right before it forces three to pick a program for it.
     const dummy = o.isInstancedMesh ? new THREE.Mesh(box, basic) : new THREE.InstancedMesh(box, basic, 1);
-    const clone = o.isInstancedMesh ? new THREE.InstancedMesh(o.geometry, m, 1) : new THREE.Mesh(o.geometry, m);
+    // The clone carries a stand-in material with exactly the fields three's shadow pass derives the depth
+    // program from (maps with alpha test, sides, displacement), invisible in the main pass. With the real
+    // material, a bare clone of e.g. the terrain (without the chunk's own setup) compiled a whole new
+    // terrain program synchronously in the main pass: a 2 s freeze at the end of every load.
+    const proxy = new THREE.MeshBasicMaterial({ map: m.map || null, alphaMap: m.alphaMap || null, alphaTest: m.alphaTest || 0, side: m.side, colorWrite: false, depthWrite: false, fog: false });
+    proxy.shadowSide = m.shadowSide;
+    if (m.displacementMap) { proxy.displacementMap = m.displacementMap; proxy.displacementScale = m.displacementScale; proxy.displacementBias = m.displacementBias; }
+    proxies.push(proxy);
+    const clone = o.isInstancedMesh ? new THREE.InstancedMesh(o.geometry, proxy, 1) : new THREE.Mesh(o.geometry, proxy);
     for (const x of [dummy, clone]) { x.castShadow = true; x.frustumCulled = false; group.add(x); made.push(x); }
   });
-  // In the game scene itself (same lights, so the program keys match), for one frame.
+  // In the game scene itself (same lights, so the program keys match), a few pairs per frame with a
+  // yield in between (each first draw builds pipeline states on the GPU thread the loading worker shares).
   scene.add(group);
-  post.composer.render(1 / 60);
+  await compileForTarget(renderer, scene, camera, post);   // the stand-ins' main-pass programs, in parallel
+  const kids = [...group.children];
+  const PER = 8;   // four dummy + clone pairs per frame (their depth programs still link synchronously)
+  for (let i = 0; i < kids.length; i += PER) {
+    for (let k = 0; k < kids.length; k++) kids[k].visible = k >= i && k < i + PER;
+    post.composer.render(1 / 60);
+    if (i + PER < kids.length) await new Promise((res) => setTimeout(res, 20));
+  }
   scene.remove(group);
+  for (const p of proxies) p.dispose();
   box.dispose();
   for (const x of made) if (x.isInstancedMesh) x.dispose();
 }
@@ -112,7 +186,7 @@ function warmShadowVariants(renderer, scene, post) {
  * hooks of their own) drawn for one frame through the post stack in the game scene, so their real
  * programs exist before they first appear.
  */
-function warmHidden(renderer, scene, post) {
+async function warmHidden(renderer, scene, post, camera) {
   const temp = new THREE.Group();
   temp.name = 'warmHidden';
   const seen = new Set();
@@ -130,6 +204,7 @@ function warmHidden(renderer, scene, post) {
   });
   if (temp.children.length) {
     scene.add(temp);
+    if (camera) await compileForTarget(renderer, scene, camera, post);
     post.composer.render(1 / 60);
     scene.remove(temp);
   }
