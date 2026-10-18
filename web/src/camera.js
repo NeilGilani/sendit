@@ -44,6 +44,7 @@ export class CameraController {
     on('landed', ({ impact }) => this.addTrauma(Math.max(0, impact - 4) * C.landTrauma));
     on('crashed', () => { this.addTrauma(C.crashTrauma); this.snapT = 0.6; });
     on('hardBrake', () => { this.snapT = 0.35; this.addTrauma(0.12); });
+    on('ragdollImpact', ({ k }) => this.addTrauma(Math.min(0.3, k * 0.22)));   // the tumbling body slamming down again
     on('flowState', ({ on: st }) => { if (st) { this.flowKick = 1; this.addTrauma(0.25); } this.flowHold = st ? 0.5 : 0; });
     on('slowmo', ({ scale }) => { this.slow = 1 - scale; });   // apex slow motion: the lens tightens a touch
     on('bump', (v) => this.addTrauma(Math.min(1, v * 0.06) * C.obstacleTrauma));

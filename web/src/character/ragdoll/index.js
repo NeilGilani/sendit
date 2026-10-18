@@ -214,6 +214,7 @@ export class RagdollController {
     const p0 = seed.bones.pelvis.p;
     const rnd = rng(Math.floor(p0.x * 131 + p0.z * 977 + (pl.simTime || 0) * 61));
     seedMotion(H, { vCom: mot.v, w: mot.w, com, cause: { kind: this.kind, reason }, groundN, rnd, C });
+    this.stats.seed = { kind: this.kind, reason, v: +mot.v.length().toFixed(2), vy: +mot.v.y.toFixed(2), w: +mot.w.length().toFixed(2), pl: +pl.velocity.length().toFixed(2), tracked: this.frames.length, shift: +shift.length().toFixed(3) };
     this.fallDir = new THREE.Vector3(mot.v.x, 0, mot.v.z);
     if (this.fallDir.lengthSq() < 1e-4) this.fallDir.set(-Math.sin(pl.heading), 0, -Math.cos(pl.heading));
     this.fallDir.normalize();

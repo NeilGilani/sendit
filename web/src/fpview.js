@@ -58,7 +58,7 @@ export const FP_BREATH = {
 // Crash: the helmet cam is knocked out of the head and settles a few
 // metres back / up the way you came, watching the body tumble, so the crash stays readable and nobody
 // gets a tumbling-eye spin. First person resumes on the respawn.
-export const FP_CRASH = { back: 2.6, up: 1.4, settle: 0.9, follow: 5, lookRate: 7, floor: 0.45 };
+export const FP_CRASH = { back: 2.6, up: 1.4, settle: 0.9, follow: 5, lookRate: 7, floor: 0.45, minDist: 1.7 };
 // Terrain chatter: bumps (how fast the ground normal under the rider changes) kick the helmet cam.
 export const FP_BOB = { gain: 0.0035, max: 0.05, spring: 260, damp: 22 };
 
@@ -208,6 +208,9 @@ export class FPView {
     const e = THREE.MathUtils.smoothstep(this.crashT, 0, F.settle);
     const want = _cv2.copy(chest).addScaledVector(this.crashBack, F.back * e).add(_v.set(0, 0.2 + F.up * e, 0));
     this.crashPos.lerp(want, k(F.follow * (0.4 + e)));
+    // Never inside the tumbling body (the ragdoll can roll back toward the camera).
+    const dc = this.crashPos.distanceTo(chest);
+    if (dc < F.minDist * e) this.crashPos.sub(chest).multiplyScalar(F.minDist * e / Math.max(dc, 1e-3)).add(chest);
     const floor = ctl.terrain.getHeight(this.crashPos.x, this.crashPos.z) + F.floor;
     if (this.crashPos.y < floor) this.crashPos.y = floor;
     cam.position.copy(this.crashPos);

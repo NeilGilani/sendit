@@ -81,7 +81,7 @@ export class SoundScape {
     E('takeoff'); E('landed'); E('crashed'); E('hardBrake'); E('parkLanding'); E('landingGrade');
     E('grindStart'); E('grindKink'); E('grindHop'); E('grindEnd'); E('grindClip');
     E('nearMiss', (d) => ({ ...d, pan: this.sideOf(d.x, d.z) }));
-    E('gate'); E('liftBoarded'); E('liftArrived'); E('stumble'); E('fjordSplash');   // fjordSplash: the Fjordline map (another branch)
+    E('gate'); E('liftBoarded'); E('liftArrived'); E('stumble'); E('fjordSplash'); E('ragdollImpact');   // fjordSplash: the Fjordline map (another branch)
     on('rideStarted', ({ equipment }) => this.engine.event('rideStarted', { board: equipment === 'snowboard' ? 1 : 0 }, c.currentTime));
     on('crashed', () => this.oneShot('crash', 0.3, 1, this.engine.fxBus));
     if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('audiodebug')) this.mountDebug();

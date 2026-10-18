@@ -25,7 +25,7 @@ export function rotateBy(q, d, s = 1) {
   q.y = qy + dy * qw + dz * qx - dx * qz;
   q.z = qz + dz * qw + dx * qy - dy * qx;
   q.w = qw - dx * qx - dy * qy - dz * qz;
-  const l = Math.hypot(q.x, q.y, q.z, q.w) || 1;
+  const l = Math.sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w) || 1;
   q.x /= l; q.y /= l; q.z /= l; q.w /= l;
 }
 
@@ -33,7 +33,7 @@ export function rotateBy(q, d, s = 1) {
 export function rotVec(q, out) {
   let x = q.x, y = q.y, z = q.z, w = q.w;
   if (w < 0) { x = -x; y = -y; z = -z; w = -w; }
-  const s = Math.hypot(x, y, z);
+  const s = Math.sqrt(x * x + y * y + z * z);
   if (s < 1e-9) return out.set(2 * x, 2 * y, 2 * z);
   const ang = 2 * Math.atan2(s, w);
   return out.set(x / s * ang, y / s * ang, z / s * ang);
@@ -67,12 +67,28 @@ export class Body {
   /** World position of a local point. */
   point(local, out) { return out.copy(local).applyQuaternion(this.q).add(this.x); }
 
+  /** World inverse inertia R·I⁻¹·Rᵀ for this sub-step (orientation at its start: it turns by milliradians). */
+  updateInertia() {
+    const { x, y, z, w } = this.q, M = this.Iw || (this.Iw = new Float64Array(9)), d = this.invI;
+    const xx = x * x, yy = y * y, zz = z * z, xy = x * y, xz = x * z, yz = y * z, wx = w * x, wy = w * y, wz = w * z;
+    const r00 = 1 - 2 * (yy + zz), r01 = 2 * (xy - wz), r02 = 2 * (xz + wy);
+    const r10 = 2 * (xy + wz), r11 = 1 - 2 * (xx + zz), r12 = 2 * (yz - wx);
+    const r20 = 2 * (xz - wy), r21 = 2 * (yz + wx), r22 = 1 - 2 * (xx + yy);
+    M[0] = r00 * r00 * d.x + r01 * r01 * d.y + r02 * r02 * d.z;
+    M[1] = r00 * r10 * d.x + r01 * r11 * d.y + r02 * r12 * d.z;
+    M[2] = r00 * r20 * d.x + r01 * r21 * d.y + r02 * r22 * d.z;
+    M[4] = r10 * r10 * d.x + r11 * r11 * d.y + r12 * r12 * d.z;
+    M[5] = r10 * r20 * d.x + r11 * r21 * d.y + r12 * r22 * d.z;
+    M[8] = r20 * r20 * d.x + r21 * r21 * d.y + r22 * r22 * d.z;
+    M[3] = M[1]; M[6] = M[2]; M[7] = M[5];
+  }
+
   /** out = I⁻¹ · v (world frame). */
   invIw(v, out) {
-    const q = this.q;
-    _q2.set(-q.x, -q.y, -q.z, q.w);
-    out.copy(v).applyQuaternion(_q2).multiply(this.invI).applyQuaternion(q);
-    return out;
+    const M = this.Iw;
+    if (!M) { this.updateInertia(); return this.invIw(v, out); }
+    const vx = v.x, vy = v.y, vz = v.z;
+    return out.set(M[0] * vx + M[1] * vy + M[2] * vz, M[3] * vx + M[4] * vy + M[5] * vz, M[6] * vx + M[7] * vy + M[8] * vz);
   }
 
   /** Generalised inverse mass for a correction along unit n at world offset r. */
@@ -164,7 +180,7 @@ export class World {
     this.stats = { substeps: 0 };
   }
 
-  add(b) { this.bodies.push(b); if (!this.groups.has(b.group)) this.groups.set(b.group, { asleep: false, still: 0 }); return b; }
+  add(b) { this.bodies.push(b); if (!this.groups.has(b.group)) this.groups.set(b.group, { asleep: false, still: 0 }); b.G = this.groups.get(b.group); return b; }
   joint(j) { this.joints.push(j); return j; }
   asleep(group) { return this.groups.get(group)?.asleep ?? true; }
 
@@ -186,31 +202,32 @@ export class World {
     this.ticks++; this.t = this.ticks * h; this.stats.substeps++;
     const damp = Math.max(0, 1 - C.airDrag * h);
     for (const b of this.bodies) {
-      if (this.groups.get(b.group).asleep) continue;
+      if (b.G.asleep) continue;
       b.xp.copy(b.x); b.qp.copy(b.q);
       b.v.y -= g * h;
       b.v.multiplyScalar(damp);
       b.x.addScaledVector(b.v, h);
       rotateBy(b.q, b.w, h);
+      b.updateInertia();
       b.touch = 0; b.touchN.set(0, 0, 0);
     }
     this.nc = 0;
     // --- positions: joints (anchors, limits, drives), self-collision, then the world (priority)
-    for (const j of this.joints) if (!this.groups.get(j.b1.group).asleep) this.solveJoint(j, h);
+    for (const j of this.joints) if (!j.b1.G.asleep) this.solveJoint(j, h);
     this.np = 0;
     for (const p of this.pairs) this.solvePair(p);
-    for (const b of this.bodies) if (!this.groups.get(b.group).asleep) this.collide(b, h);
+    for (const b of this.bodies) if (!b.G.asleep) this.collide(b, h);
     // A second joint pass (anchors + limits, no drives): contacts are solved last and stiff, and a hard impact
     // would otherwise leave the joints stretched / past their limits for that sub-step.
-    for (const j of this.joints) if (!this.groups.get(j.b1.group).asleep) this.solveJoint(j, h, true);
+    for (const j of this.joints) if (!j.b1.G.asleep) this.solveJoint(j, h, true);
     // … and the snow once more for whatever was touching it (positions only; the contacts are already recorded).
     this.rec = false;
-    for (const b of this.bodies) if (b.touch && !this.groups.get(b.group).asleep) this.collide(b, h);
+    for (const b of this.bodies) if (b.touch && !b.G.asleep) this.collide(b, h);
     this.rec = true;
     // --- velocities from the positions
     const ih = 1 / h;
     for (const b of this.bodies) {
-      if (this.groups.get(b.group).asleep) continue;
+      if (b.G.asleep) continue;
       b.v.subVectors(b.x, b.xp).multiplyScalar(ih);
       _q.copy(b.q).multiply(_q2.set(-b.qp.x, -b.qp.y, -b.qp.z, b.qp.w));
       const s = _q.w < 0 ? -2 * ih : 2 * ih;
@@ -220,14 +237,14 @@ export class World {
     for (let i = 0; i < this.nc; i++) this.contactVel(this.contacts[i], h);
     for (let i = 0; i < this.np; i++) this.pairVel(this.pc[i]);
     for (const b of this.bodies) {
-      if (!b.touch || this.groups.get(b.group).asleep) continue;
+      if (!b.touch || b.G.asleep) continue;
       const n = _n.copy(b.touchN).normalize();
       const vn = b.v.dot(n);
       const k = Math.min(1, b.plough * h);
       b.v.addScaledVector(_a.copy(b.v).addScaledVector(n, -vn), -k);
       b.w.multiplyScalar(Math.max(0, 1 - b.ploughSpin * h));
     }
-    for (const j of this.joints) if (j.damp > 0 && !this.groups.get(j.b1.group).asleep) this.dampJoint(j, h);
+    for (const j of this.joints) if (j.damp > 0 && !j.b1.G.asleep) this.dampJoint(j, h);
     // Settling: once a group is crawling (its centre of mass slower than settleSpeed, touching something), it
     // loses what's left quickly instead of creeping for seconds (people come to rest, gear stops wobbling).
     this.settling = false;
@@ -370,7 +387,7 @@ export class World {
 
   /** Two capsules / spheres of the same body never overlap: push apart. */
   solvePair([A, sa, B, sb]) {
-    if (this.groups.get(A.group).asleep) return;
+    if (A.G.asleep) return;
     A.point(sa.a, _a); A.point(sa.kind === 'c' ? sa.b : sa.a, _b);
     B.point(sb.a, _c); B.point(sb.kind === 'c' ? sb.b : sb.a, _d);
     closestSegSeg(_a, _b, _c, _d, _p0, _p1);
@@ -411,26 +428,28 @@ export class World {
     for (const s of b.samples) {
       b.point(s.p, _p0);
       const r = s.r;
-      // Snow (height field): distance along the local normal.
-      const H = env.height(_p0.x, _p0.z);
-      const gap = _p0.y - H;
-      if (gap < 2.2 * r + 0.03) {
-        const n = env.normal(_p0.x, _p0.z, _n);
-        const pen = r - gap * n.y;
-        if (pen > 0) {
-          if (pen > C.wallPen) {
-            // A step in the height field (a kicker's side, a roof edge) met sideways: a wall, not a floor.
-            // Where was this sample at the start of the sub-step?
-            _p1.copy(s.p).applyQuaternion(b.qp).add(b.xp);
-            const prevGap = _p1.y - env.height(_p1.x, _p1.z);
-            if (prevGap > -0.05) { b.x.x = b.xp.x; b.x.z = b.xp.z; continue; }
-            // Already deep (started underground): ease out without gaining speed.
-            const lift = Math.min(pen, 0.01);
-            b.x.y += lift; b.xp.y += lift;
-            continue;
-          }
-          this.contact(b, _p0, n, r, pen, b.mu, b.muS, b.e, h);
+      // Snow: the height field as a local plane per sample (re-read every 8 sub-steps or 25 cm: terrain
+      // queries are the expensive part), distance along its normal.
+      if (s.tk === undefined || this.ticks - s.tk >= 8 || Math.abs(_p0.x - s.x0) + Math.abs(_p0.z - s.z0) > 0.25) {
+        s.tk = this.ticks; s.x0 = _p0.x; s.z0 = _p0.z; s.h0 = env.height(_p0.x, _p0.z);
+        env.normal(_p0.x, _p0.z, _n); s.nx = _n.x; s.ny = _n.y; s.nz = _n.z;
+        this.stats.queries = (this.stats.queries || 0) + 5;
+      }
+      const dist = s.nx * (_p0.x - s.x0) + s.ny * (_p0.y - s.h0) + s.nz * (_p0.z - s.z0);
+      const pen = r - dist;
+      if (pen > 0) {
+        if (pen > C.wallPen) {
+          // A step in the height field (a kicker's side, a roof edge) met sideways: a wall, not a floor.
+          // Where was this sample at the start of the sub-step?
+          _p1.copy(s.p).applyQuaternion(b.qp).add(b.xp);
+          const prevGap = _p1.y - env.height(_p1.x, _p1.z);
+          if (prevGap > -0.05) { b.x.x = b.xp.x; b.x.z = b.xp.z; s.tk = undefined; continue; }
+          // Already deep (started underground): ease out without gaining speed.
+          const lift = Math.min(pen, 0.01);
+          b.x.y += lift; b.xp.y += lift;
+          continue;
         }
+        this.contact(b, _p0, _n.set(s.nx, s.ny, s.nz), r, pen, b.mu, b.muS, b.e, h);
       }
       // Obstacles: vertical cylinders from the snow to their top (trees, rocks, posts).
       for (const o of env.obstacles) {
@@ -484,17 +503,18 @@ export class World {
 
   contactVel(c, h) {
     const b = c.b;
-    if (this.groups.get(b.group).asleep) return;
+    if (b.G.asleep) return;
     const v = b.velAt(c.r, _a);
     const vn = v.dot(c.n);
     const vt = _b.copy(v).addScaledVector(c.n, -vn);
     const vtl = vt.length();
     const dv = _c.set(0, 0, 0);
     // Coulomb: the friction impulse is at most μ · the normal impulse (λ / h); as a speed change at this point
-    // that is μ · λ / h · w_t (the generalised inverse mass along the slip).
+    // that is μ · λ / h · w_t (the generalised inverse mass along the slip). A slam counts as at most
+    // impactGrip m/s into the snow: the snow gives way, the body doesn't stop dead on its first hit.
     if (vtl > 1e-9) {
       const wt = b.wPos(c.r, _d.copy(vt).divideScalar(vtl));
-      dv.addScaledVector(vt, -Math.min(c.mu * Math.abs(c.lam) * wt / h, vtl) / vtl);
+      dv.addScaledVector(vt, -Math.min(c.mu * Math.min(Math.abs(c.lam) * wt / h, this.C.impactGrip ?? 1e9), vtl) / vtl);
     }
     const target = c.vn < -2 * this.g * h ? Math.max(-c.e * c.vn, 0) : 0;
     dv.addScaledVector(c.n, target - vn);

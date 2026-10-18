@@ -10,6 +10,7 @@
 //     turn, heel-side sit / toe-side drive, nose / tail press with board flex, ollie crouch, grabs
 //   • pre-jump squat, mid-air hip lean, flailing arms while stumbling, sinking into deep powder
 //   • landing squash & stretch (damped sine, 2–3 bounces), high-speed chatter
+//   • crashes: the crash ragdoll (character/ragdoll/) poses the body while the player is in State.CRASH
 // Public API: setEquipment(type, variant?), getContactPoints(), update(dt, camera), load(loader).
 import * as THREE from 'three';
 import { State } from './player.js';
@@ -192,6 +193,8 @@ export class Rider {
     p.t += dt;
     this._dtLast = dt;   // (airLook smoothing)
     this.snapT += dt;
+    // Crashed: the crash ragdoll (character/ragdoll/, installed on the game's own rider only) poses the body.
+    if (this.ragdoll?.drives(pl)) { this.ragdoll.pose(this); fpShadow(this); return; }
     this.root.position.copy(pl.renderPos);
     // Deep powder swallows the gear a little when slow (less in first person).
     this.sinkVis = (pl.sink || 0) * ANIM.gearSinkVisual * (this.fp ? 0.45 : 1);

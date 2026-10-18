@@ -450,19 +450,20 @@ export const RAGDOLL = {
     ankle: { cone: 22, twist: 12 },   // snowboard: boots in the bindings
   },
   // Snow and obstacles
-  muSnow: 0.8, muStaticSnow: 1.0,     // body on snow (dynamic / static: a body digs in)
-  plough: 2.5,                 // 1/s tangential drag while touching the snow (ploughing through it)
+  muSnow: 0.45, muStaticSnow: 0.9,    // body on snow (dynamic: sliding on the jacket / static: dug in)
+  plough: 2,                   // 1/s tangential drag while touching the snow (ploughing through it)
   ploughSpin: 5,               // 1/s angular drag while touching (a body sinks in: it doesn't roll like a log)
   restitution: 0.08,
+  impactGrip: 3,               // m/s: a slam into the snow grips as if it were at most this hard (it gives way)
   muGear: 0.3, ploughGear: 2, // released skis (brakes out) / poles
   muBark: 0.6,
   airDrag: 0.02,               // 1/s
   jointDamping: { spine: 10, neck: 12, shoulder: 10, elbow: 8, hip: 8, knee: 10, ankle: 12 },   // 1/s relative spin (near critical for the tone below)
   // Muscle tone: drives toward a protective tuck, strong at first and relaxing (N·m/rad)
   tone: { spine: 220, neck: 20, shoulder: 18, elbow: 6, hip: 150, knee: 80, ankle: 0 },
-  toneEnd: 0.08,               // share of tone left after relaxing
+  toneEnd: 0.06,               // share of tone left after relaxing
   toneTau: 0.7,                // s
-  tuck: { spine: 22, neck: 22, hip: 50, knee: 70, elbow: 75, shoulder: [0.35, -0.55, 0.75] },   // deg / arm direction (armature: x left, y up, z fwd)
+  tuck: { spine: 14, neck: 18, hip: 35, knee: 50, elbow: 55, shoulder: [0.45, -0.6, 0.6] },   // deg / arm direction (armature: x left, y up, z fwd)
   braceTime: 0.55,             // s: hands reach toward the snow the body falls onto
   braceTone: 1.6,              // × shoulder / elbow tone while bracing
   // Seeding from the crash

@@ -39,6 +39,8 @@ import { Lobby, LobbyStage, applyEquipment } from './lobby/index.js';
 import { normalizeType } from './equipment/registry.js';
 import { installJuice } from './juice/index.js';
 import { installThrill } from './thrill/index.js';
+import { installRagdoll } from './character/ragdoll/index.js';
+import { FP_POLE } from './fpview.js';
 import { trackProgression } from './progression/index.js';
 import { mountProgressionUi } from './progression/ui.js';
 import './progression/lobby.js';
@@ -74,6 +76,7 @@ const ui = new UI({
 
 let activities, life;
 let course, snowfall, terrain, sky, scatter, lifts, features, player, rider, cam, fx, sound, composer, post;
+let ragdoll = null;             // crash ragdoll controller (character/ragdoll/)
 let currentMap = null;          // { map, variant, trail, course } from the map registry
 let defaultSpawn = null;        // the course's own spawn (terrain.meta.spawn before any trail moved it)
 let pinnedSpawn = false;        // ?at / ?kicker debug starts win over trails
@@ -158,6 +161,8 @@ async function boot() {
   player.setEquipment(profileStore.equipment, gearVariant ?? profileStore.gearModel());
   if (params.has('stance')) player.setStance(params.get('stance'));                       // ?stance=regular|goofy
   rider = new Rider(player);
+  // Crash ragdoll (docs/body.md): only ever active in State.CRASH; ?ragdoll=0 keeps the old slide-and-roll crash.
+  if (params.get('ragdoll') !== '0') ragdoll = installRagdoll({ player, rider, scatter, course, fpPoleLength: FP_POLE.length });
   await rider.load(loader);
   scene.add(rider.root);
   applyGameEquipment(profileStore.equipment);
@@ -226,7 +231,7 @@ async function boot() {
   window.__sendit = {
     activities, life,
     fx, course, player, rider, terrain, camera, game, scene, renderer, features, scatter,
-    lobby, stage, profile: profileStore, services, map: currentMap, ui, selectTrail,
+    lobby, stage, profile: profileStore, services, map: currentMap, ui, selectTrail, ragdoll,
   };
 }
 
@@ -566,6 +571,7 @@ function frame(now) {
   if (replaying) thrill.replay.update(dt);   // poses the rig from the recording and flies the drone camera
   else {
     rider.update(paused ? 0 : dt, camera);
+    if (!paused && !inLobby) ragdoll?.track();   // (reads the posed rig: the crash's momentum)
     if (!inLobby) cam.update(paused ? 0 : dt);
   }
   sky.update(camera, inLobby ? stage.focusPoint : game.mode === Mode.MENU ? camera.position.clone().add(new THREE.Vector3(0, -200, 0)) : player.renderPos, time);
