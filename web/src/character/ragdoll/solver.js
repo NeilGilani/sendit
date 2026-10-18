@@ -217,21 +217,17 @@ export class World {
     this.np = 0;
     for (const p of this.pairs) this.solvePair(p);
     for (const b of this.bodies) if (!b.G.asleep) this.collide(b, h);
-    // A second joint pass (anchors + limits, no drives): contacts are solved last and stiff, and a hard impact
-    // would otherwise leave the joints stretched / past their limits for that sub-step.
+    // More rounds of joints (anchors + limits, no drives) and snow for whatever touches it (positions only; the
+    // contacts are recorded): contacts are solved last and stiff, and a hard landing would otherwise leave a joint
+    // pulled apart or past its limit for a frame. The anchors get the last word (closed loops: the board, legs).
+    for (let it = 0; it < C.iterations; it++) {
+      for (const j of this.joints) if (!j.b1.G.asleep) this.solveJoint(j, h, true);
+      this.rec = false;
+      for (const b of this.bodies) if (b.touch && !b.G.asleep) this.collide(b, h);
+      this.rec = true;
+    }
     for (const j of this.joints) if (!j.b1.G.asleep) this.solveJoint(j, h, true);
-    // … and the snow once more for whatever was touching it (positions only; the contacts are already recorded).
-    this.rec = false;
-    for (const b of this.bodies) if (b.touch && !b.G.asleep) this.collide(b, h);
-    this.rec = true;
-    // Joints and snow once more, the anchors last (a hard landing's contact push would otherwise leave a joint
-    // pulled apart or past its limit for a frame).
-    for (const j of this.joints) if (!j.b1.G.asleep) this.solveJoint(j, h, true);
-    this.rec = false;
-    for (const b of this.bodies) if (b.touch && !b.G.asleep) this.collide(b, h);
-    this.rec = true;
-    for (const j of this.joints) if (!j.b1.G.asleep) this.solveJoint(j, h, true);
-    for (const j of this.joints) if (!j.b1.G.asleep) this.anchor(j, h);   // (closed loops: the board, both legs)
+    for (const j of this.joints) if (!j.b1.G.asleep) this.anchor(j, h);
     // --- velocities from the positions
     const ih = 1 / h;
     for (const b of this.bodies) {
@@ -418,6 +414,12 @@ export class World {
   /** Two capsules / spheres of the same body never overlap: push apart. */
   solvePair([A, sa, B, sb]) {
     if (A.G.asleep) return;
+    // Bounding spheres first (most pairs are far apart): shape centre ± half its length + radius.
+    if (sa.c === undefined) for (const sh of [sa, sb]) { sh.c = sh.kind === 'c' ? sh.a.clone().lerp(sh.b, 0.5) : sh.a.clone(); sh.ext = (sh.kind === 'c' ? sh.a.distanceTo(sh.b) / 2 : 0) + sh.r; }
+    if (sb.c === undefined) { sb.c = sb.kind === 'c' ? sb.a.clone().lerp(sb.b, 0.5) : sb.a.clone(); sb.ext = (sb.kind === 'c' ? sb.a.distanceTo(sb.b) / 2 : 0) + sb.r; }
+    A.point(sa.c, _a); B.point(sb.c, _b);
+    const ext = sa.ext + sb.ext;
+    if (_a.distanceToSquared(_b) > ext * ext) return;
     A.point(sa.a, _a); A.point(sa.kind === 'c' ? sa.b : sa.a, _b);
     B.point(sb.a, _c); B.point(sb.kind === 'c' ? sb.b : sb.a, _d);
     closestSegSeg(_a, _b, _c, _d, _p0, _p1);

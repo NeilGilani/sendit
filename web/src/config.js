@@ -433,7 +433,8 @@ export const HUD = {
 export const RAGDOLL = {
   enabled: true,
   substep: 1 / 960,            // s, fixed internal step (frame-rate independent)
-  maxSubsteps: 64,             // per call (a long hitch just drops time)
+  maxSubsteps: 96,             // per call (a long hitch just drops time)
+  iterations: 2,               // extra joint + snow rounds per sub-step after the first pass
   gravity: 9.81,
   // Masses (kg): an ~80 kg rider in kit
   mass: { pelvis: 11, chest: 24, head: 5.5, upperarm: 2.2, forearm: 1.7, thigh: 8.5, shin: 4.6, boot: 1.4, board: 3.5, ski: 1.8, pole: 0.25 },
