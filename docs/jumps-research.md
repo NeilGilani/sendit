@@ -298,3 +298,232 @@ spotted (checked back) from 0.1 s — pressing steer 0.2 s later on a small air 
 
 Side effect: physics-fuzz (random inputs) sees a few more yaw crashes (28 → 33 in 4 × 120 s), since random
 steering in the air now builds a late spin.
+
+## 8. Spin and flip together: corks, rodeos, misties, double corks
+
+Players found combined spins and flips messy: "the air time and trajectory get messed with and the animation
+isn't clean". Code: `web/src/physics/offaxis.js` (new), `player.js`, `physics/edge.js`, `rider.js`. Benches:
+`node web/scripts/physics-combo.mjs [ski|snowboard|both] [--check]` (headless) and
+`node web/scripts/combo-shots.mjs <url> <outDir> [ski|snowboard] [tricks]` (frame sequences in the game).
+
+### Research
+
+**The flight.** In the air the centre of mass flies a parabola set at the lip; twisting, tucking and arm throws
+cannot change it, only drag does [S: Yeadon, aerial movement (lboro.ac.uk/microsites/ssehs/biomechanics);
+Open University MST209 "rotating bodies"]. Hang time comes from take-off speed, lip angle and the landing
+[S/C, §1]. Tuck vs open changes the drag area by up to ≈ 0.35 → 0.55 m² (wind-tunnel postures vary by up to 64 %,
+mostly the arms) [S: Elfmark et al. 2022, Sports Engineering; arXiv 2410.02767] — worth ≈ 1–5 % of a 20–25 m
+flight [C] and best left out of a game (the user's ask: rotation must not change the arc).
+
+**What a cork is.**
+- Corks are off-axis spins (the lead shoulder dropped into the spin); a rodeo is an off-axis backflip with spin,
+  a misty the forward (frontflip) one; a double / triple counts the off-axis passes, the number the whole spin
+  [S: SkiTalk freestyle glossary; snowboardingdays.com; NBC Olympics glossary; FIS park & pipe tricks list].
+- **Axis tilt:** "a cork tilts that axis 45°–60° from vertical" (Google Cloud / US Ski & Snowboard sensor tool,
+  which measures the angle between the instantaneous rotation axis and vertical, the "cork ribbon") [S:
+  cloud.google.com/blog "measure physics of freestyle snowboarding and skiing"].
+- **Geometry [C]:** a body that starts upright and turns about an axis tilted α from vertical has its long axis
+  ride a cone round that axis, deepest at 2α half a revolution in: α = 45° lays it flat on its side, 60° leaves
+  the feet a little above the head (120°), 90° is a plain flip (180°). So corks ≈ 90–120° at the deepest, rodeos
+  / misties ≈ 130–160° (α ≈ 65–80°), a flip 180°.
+- **It is not one rigid rotation for the whole trick.** Measured corks come out a median 25° short of their name
+  and flatspins 21° long [S: Merz et al. 2025, Sports Biomechanics 24(7), 149 tricks]; Shaun White's cab double
+  cork 1440 measured ≈ 1122° [S: Google Cloud]. A cork 720 has "two distinct off-axis spins" with the invert in
+  one of them [S: Skiing mag "how to corkscrew 720"]. The physics is a twisting somersault [S: Yeadon 1993; Hiley
+  & Yeadon; Mikl & Rye arXiv 1510.08046]: the angular momentum is fixed, the body turns about it with its long
+  axis tilted off it and twists about that long axis (faster the more it tilts); equipment raises the long-axis
+  inertia, so skiers need much more tilt than gymnasts [S: Yeadon 2013, aerials]. The tilt is set on the lip
+  (shoulder drop, pop direction) and changed a little in the air [S: Snowboard Addiction BS cork 540; Yeadon].
+- **Rates:** rotation amount is driven 3–5× more by the angular velocity than by the air time [S: Merz et al.
+  2025 J Sports Sci 43(3); Beijing 2022 halfpipe IMU study]. A double cork 1440 averages ≈ 400–550°/s [C].
+- **Technique:** "lead with your head and let the rest of your body follow as one unit" [S: Fall-Line]; spot the
+  landing at ≈ 540° of a 720 [S: Fall-Line, Skiing mag] — the last 25–35 % of the rotation; tuck to spin faster,
+  open to stall [S: Skiing mag; Scientific American]; grabs taken after the set and held through the middle,
+  let go to spot [E]; open up (let go, extend, reach for the landing) ≈ 0.3–0.5 s before touchdown [E, no source].
+
+**Games.** Steep: left stick spins (longer hold = more) and flips, the right stick shifts the body 90° mid-trick;
+corks are undocumented ("rodeos and corks are yours to master"); reviewers found its tricks clumsy to aim [S:
+Twinfinite, Steam discussions, Game Informer]. Riders Republic encodes the order: flip first then spin = rodeo /
+misty, spin first then tip = cork [S: Attack of the Fanboy trick list]. Shredders pre-loads flips and spins
+before the lip [S: TheGamer]. Infinite Air: hard to control, narrow landing window [S: Push Square].
+
+### What was wrong
+
+1. **The flight did change a little** — the flip tuck lowered the air drag (compact × 0.7): +0.75 % air time,
+   +0.9–1.7 % distance for every flip or cork vs a straight air (physics-combo, flat and 32° landing). Nothing
+   else in the physics depended on rotation (gravity, landing detection and the ground probes use the point
+   mass; rotation is drawn on top).
+2. **The rotation path was two independent rotations** — `renderOrient = base(heading) · Rx(flip)`: the flip
+   turned about the gear's own sideways axis while the heading spun, so the flip axis turned with the rider.
+   Every combo went fully upside down (179–180° at the deepest, even a cork 720), and the body's up axis drew a
+   spiral instead of a clean loop (16–26° off the best cone fit).
+3. **The body orbited the path**: flips pivoted 0.85 m above the feet and spins about the feet, not about the
+   posed body's own centre of mass — the drawn body strayed 0.21–0.24 m round the flight path in a cork.
+4. **Poses fought each other**: a flip's stretched layout (arms flung up above the head, legs long) came on in
+   the middle of corks while the spin wanted the arms in.
+5. **The spot parked the spin mid-flip**: letting go of the stick while the spin passed an alignment checked it
+   there even with half a flip to go — the cork turned into a plain flip half-way (a double cork with the stick
+   let go at 540° landed as a "Double Cork 720" with the spin frozen for ≈ 0.9 s upside down).
+
+### What changed
+
+1. Drag no longer depends on the flip tuck (a grab still compacts the body).
+2. `physics/offaxis.js`: the flip axis is fixed in the world when the flip starts; each flip is one revolution
+   about an axis tilted α from vertical toward it, and the spin beyond that revolution's 360° is a twist about
+   the long axis (cork 720 = one off-axis revolution + 360° of twist; double cork 1080 = two + 360°). α from the
+   spin : flip rate ratio r (`alphaTable`): 72° at r ≈ 1 (backflip 360 / rodeo 360), 64° at 1.5 (rodeo 540,
+   double cork), 58° at 2 (cork 720), 52° at 3, 50° floor; +6° for frontflips (misties invert early, like
+   rodeos). Little spin per flip (r under 0.45–0.75) keeps a plain flip about the fixed axis with an aerials-style
+   twist. The shape changes only within 16° of upright, where both forms coincide; whole flips are exactly the
+   plain heading, so take-offs, landings, the trick names, the scoring and every rate are unchanged. The landing
+   pitch check reads the drawn attitude (the body's tilt off upright: the flip angle for a plain flip, a little
+   less in a cork — the window is the same 22° / 42° of real tilt).
+3. rider.js: the body pivots about its own posed centre of mass (measured from the bones each frame) for the
+   spin and the flip, held on the flight path; the head leads (into the spin, back for a backflip, chin in for a
+   frontflip) then spots the landing over the last 0.8 → 0.35 s; a spin + flip holds a compact shape (knees up,
+   arms wrapped in) and opens over the last 0.55 → 0.3 s; arms "out wide" sit at shoulder height.
+4. physics/edge.js: with more than 120° of a flip to come (`flipBusy`), the spot keeps the spin going (open if the
+   next alignment is out of reach) and checks only as the flip comes out.
+
+### Before and after (physics-combo.mjs, take-off 11 m/s forward + 11 m/s up, 13 up for the double cork; ski · board)
+
+| | before | after |
+|---|---|---|
+| air time / landing point vs straight air, flat | +0.75 % / +0.8–1.0 % (every flip) | 0.00 % / 0.00 % |
+| same, 32° landing (double cork) | +0.4–0.9 % / +1.2–1.7 % | 0.00 % / 0.00 % |
+| deepest body tilt: backflip | 180° | 180° |
+| backflip 360 / rodeo 360 | 180° · 180° | 144° · 143° |
+| cork 720 (board: FS rodeo 720) | 179° · 179° | 104° · 111° |
+| misty 720 | 179° · 179° | 117° · 124° |
+| rodeo 540 (board) | 179° | 130° |
+| double cork 1080 (two passes) | 180° · 179° | 140° · 135° |
+| up-axis path off a clean cone (corks) | 16–26° | 0.3–5° |
+| double cork, stick let go at 540° of spin | spin parked upside down, "Double Cork 720" · "720" | spins on: "Double Cork 1080" · "900" |
+| drawn body's centre of mass round the flight path (combo-shots, ski cork 720 · double cork) | 0.24 · 0.21 m | ≈ 0.03–0.06 m |
+| landings (flat): cork 720, misty, rodeo 540, bf 360 | clean | clean (pitch ≤ 2°) |
+
+Unchanged: physics-tricks (the most flips per air time 0.92 / 1.41 / 1.85 / 2.25 / 2.61 / 2.91 at 1.1–3.0 s on
+skis; double cork 1080 lands at 2.6 s, triple at 3.2 s), physics-rotation `--check`, the names and points.
+
+Frame sequences (combo-shots, side camera tracking the centre of mass, every 0.12 s): a cork 720 now drops the
+head to the side and rolls through with the skis passing above at ≈ 105–125°, body balled up, arms in, then
+opens and reaches for the landing; before it went straight upside down with the skis vertical overhead, the body
+stretched long and an arm flung above the head. The double cork shows two clean off-axis loops with a near-upright
+moment between them; the snowboard rodeo 540 goes over the heel side with the board overhead at ≈ 130°.
+
+## 9. Polish pass: rotation that takes too long "for no reason", air input, landings
+
+Players still met "weird scenarios where spinning or flipping takes way too long for seemingly no reason". The rule
+for this pass: the game stays exactly as skilful (no rate, cap or set changed; the most flips / spins a perfect set
+allows is unchanged), and every change is backed by a bot. Benches (headless, the real Player):
+
+- `node web/scripts/physics-sweep.mjs [--quick] [--csv f]` — **the scenario sweep**: 21 930 airs off flat ground ×
+  equipment (ski, board; all-mountain, GS, park) × map physics (default, Ravenspire, Dragonback, Voltage) × stance /
+  switch × take-off (air 1.2–3 s) × pop timing (at the lip, early, flat, rolled off) × what was held through the
+  take-off (nothing, a carve's pre-wind with / against the spin, the key itself, W, S, carving the other way, the
+  other axis under way) × press time (0–1.4 s) × grab × physics step (1/30, 1/60, 1/144 s). It measures the time
+  from the key press to 180° *the way it was asked for* and lists the outliers (slow or never with ≥ 1.5 s of air
+  left for a spin, ≥ 1.9 s for a flip) grouped by cause.
+- `node web/scripts/physics-polish.mjs [--check]` — the regression for everything fixed below.
+- Scratch probes (in the notes below): a release sweep (a spin set, steer held to R°, let go with ≥ 0.6 s left —
+  where does the spot land it?), a gamepad stick probe (input.js on a fake controller) and a frame-rate probe.
+
+### What was found
+
+| scenario (sweep) | cause | verdict |
+|---|---|---|
+| late spin while grabbing: 1.42 / 1.32 s to 180° (1.22 / 1.18 s without the grab) | the grab pose (0.6) replaced the tuck the late spin uses | **fixed** |
+| carve pre-wind the other way + grab, stick against it after the throw window: never (board) | against a spin the stick only opens up (× 0.6) and momentum never turns round; the grab also switched off the spot that would have bled it | **fixed** |
+| a throw reversed late in its window (vy 15, 0.25 s in) | left at 1.3 rad/s the old way, the stick against it opened up: 45°/s the wrong way for 2.4 s | **fixed** |
+| full set let go early (board, 45° on a 2.4 s air): crash at 266° | the spot's check passing 180° shed most of the momentum, overshot its 12° window (the rate lags) and let go below `spinMinH`: no plan left, a slow drift sideways into the snow | **fixed** |
+| check-backs ending 20–40° short at touchdown | the check aimed to arrive exactly at touchdown, but the spin rate follows with a 1/`spinResponse` lag | **fixed** |
+| gamepad: diagonal stick (cork) flip 1.18–1.30 s vs 0.92 s on keys; stick-up flip 0.97 s | a round stick gate gives 0.71 per axis on a diagonal, stick-up is scaled to 0.8 (the ground tuck) and the flip input has a 0.4 dead zone | **fixed** |
+| gamepad: < 45 % stick tilt never spins in the air | the carving curve (exponent 1.35) makes half a push 0.27, under the 0.2 spin threshold until ~45 % | **fixed** |
+| a key held through the take-off (W tuck, S brake, a carve off a roller) does nothing until re-pressed | deliberate: a tuck / brake / carve isn't a trick; one-time hint for the flip keys | kept |
+| a flip pressed after the throw window with < 1.7 s left: nothing | the late-throw gate. On flat ground a press 0.05 s inside the window and one 0.05 s after it land identically for every air left (1.0–1.8 s: crash below 1.7 s, stumble at 1.7, clean at 1.8) — the gate is where a flip stops coming round | kept |
+| spin pressed late in its throw window: 1.23–1.25 s vs 0.90 s at the lip | the throw fades over its window into the late spin (no cliff: 0.93 → 1.25 → 1.28 s for 0.1 / 0.25 / 0.4 s) | kept (the set is made at the lip) |
+| popped carving one way, steered the other way after the whole window | a real thrown set (up to 3.4 rad/s): the stick against it stalls | kept (by design) |
+| GS skis 10 % slower late spins | gear `spin` 0.9 | kept (equipment) |
+| maps (Ravenspire, Dragonback, Voltage), switch, goofy | no outliers of their own (same medians ± 0.02 s) | — |
+| physics step 1/30 vs 1/60 vs 1/144 s | ± 0.04 s to 180°; the game steps physics at a fixed 60 Hz anyway (main.js), so display rate never changes the rotation; slow-mo only scales the step | — |
+| Ravenspire slow-mo (huge airs) | rotation in real seconds × 1/0.7 around the apex | kept (visible, intended) |
+
+Two frame-rate dependences outside the physics turned up and were fixed: the rider's force-driven body reactions
+(character/dynamics.js) differentiated the physics velocity by the render frame time — at 144 / 165 Hz frames
+alternate between zero and one physics step, a 14 % frame-to-frame ripple in a steady carve (0 % at 30 / 60 Hz) —
+and the first-person terrain chatter (fpview.js) kicked per frame from the ground normal's change rate (2.4× as
+strong at 144 Hz, half at 30 Hz). Both now use the physics clock (`player.simTime`).
+
+### What changed (physics/edge.js unless noted)
+
+1. **Slow spins the other way turn round.** With the stick against a spin no bigger than the late throw makes
+   (`spinDrift` × `spinLateMax`, 2.2 / 2.4 rad/s) and ≥ `spinLateAir` of air left, the late spin turns it round
+   instead of opening it up. Bigger sets still only stall, and so does everything in the last 0.8 s.
+2. **Grabbed late spins tuck.** Building a late spin (or one no bigger) with the stick into it while grabbing uses
+   the full tuck, as without the grab. Thrown / wound-up sets keep the grab's 0.6 (the cork 720 + grab is unchanged).
+3. **The spot finishes the checks it starts**, even once the momentum it sheds drops below `spinMinH`, and checks
+   aim one 1/`spinResponse` before touchdown. A rider who was never spinning still settles only within
+   `spinCheckAngle` (or `airSettleAngle`).
+4. **Gamepad in the air** (input.js `airStrength`, player.js, edge.js `air()`): the rotation reads the left stick
+   linearly past its dead zone, mapped from its round gate onto a square, and takes the stronger of that and the
+   plain controls. Keyboards read exactly as before; the stick on the snow keeps its carving curve.
+5. **Landings say why** (player.js `landingWhy`, juice/hud.js): a stumble's announcement carries "OVER-ROTATED 31°",
+   "FLIP UNDER-ROTATED 35°", "40° SIDEWAYS" or "HARD LANDING"; a landing crash shows it as a call-out under the
+   rider. A crash with a grab held to the end (the spot only works once the hand is off) gives a one-time hint.
+6. **HUD keeps the landing clear** (juice/hud.js, progression/ui.js): the chase camera frames the landing near the
+   middle of the screen, where the live rotation read-out (33 %), the trick announcer (37 %) and the level-up card
+   (42 %, 3.2 s) sat. The read-out moved to 24 % and is gone for the last 0.5 s before touchdown, the announcer to
+   30 %, the level-up card to 32 % and it fades on the next take-off.
+
+### Before and after
+
+| | before | after |
+|---|---|---|
+| sweep: outliers / never (7 891 airs with enough air left, by-design locks excluded) | 486 / 120 | 221 / 48 (all left: short-air reversals, see above) |
+| sweep: spins, median · 90th percentile to 180° | 1.20 · 1.42 s | 1.20 · 1.33 s |
+| sweep: spins while grabbing, median · 90th pct · never | 1.32 · 1.52 s · 90 | 1.18 · 1.37 s · 24 |
+| sweep: flips, median · 90th pct · worst | 1.03 · 1.08 · 1.13 s | unchanged |
+| late spin pressed 0.5 s in while grabbing (vy 12), ski / board | 1.42 / 1.32 s | 1.27 / 1.18 s |
+| pre-wind the other way + grab, stick against it at 0.5 / 0.9 s | ski 1.52 s, board never | 1.37 / 1.30 s |
+| throw reversed 0.25 s in (vy 15) | never (wrong way all air) | 180° the asked way in 2.1 s |
+| board, full set let go at 45° (2.4 s air) | crash at 266° | clean 180 |
+| release sweep: 10 922 spins (ski / board, all-mountain / park, default / Ravenspire, wind-up 0–1, pop 0.6–1) let go with ≥ 0.6 s left | clean 9 559, stumble 1 230, slide 35, crash 98 | clean 9 633, stumble 1 247, slide 12, crash 30 |
+| gamepad diagonal stick: flip to 180° | 1.18–1.30 s | 0.92 s (keys 0.92 s) |
+| gamepad 40 / 50 / 60 % stick push: spin to 180° | never / 1.32 s at 60 % | 1.45 / 1.32 / 1.17 s |
+| body reactions at 144 Hz (steady carve) | 14 % ripple | 0 % |
+| keyboard spin / flip thrown at the lip | 0.90 · 0.83 / 0.92 s | unchanged |
+| physics-tricks (most flips per air), physics-rotation `--check`, jumps-bench max flips / spins | — | unchanged (jumps-bench: 0 crashes; the send bot's line differs a little where its spins now land) |
+
+On the real maps (`jumps-bench.mjs all both --quiet --spin`, new: every big take-off on Valcrest, Blackspruce and
+Ravenspire replayed with the ways a player tries a spin; clean with ≥ 180° / landed, all airs > 1 s, ski + board;
+the Ravenspire set differs by a couple of airs because the riding bot's line changed slightly):
+
+| pattern | before | after |
+|---|---|---|
+| A at the lip, let go at 300° | 93 % / 98 % | 92 % / 98 % |
+| wound up, let go at 540° | 88 % / 93 % | 92 % / 93 % |
+| A 0.4 s in, let go at 120° (a late 180; non-twin skis can't land it backwards) | 51 % / 69 % | 52 % / 68 % |
+| A 0.4 s in **+ grab**, let go at 120° | 45 % / 66 % | 52 % / 71 % (= without the grab) |
+| carving the other way off the lip, A at 0.3 s | 95 % / 99 % | 97 % / 99 % |
+| A at the lip + grab held to the end (no spot) | 39 % / 75 % | 39 % / 76 % (the skill stays) |
+
+Tried and dropped: letting the spot check back whenever neither alignment is in reach and back looks nearer —
+the release sweep improved (crash 30 → 11) but on the maps a late spin on non-twin skis landed 14/61 instead of
+23/61 (a check-back from a fast spin is slower than the estimate), so it was reverted.
+
+### Ground and landing windows (measured, left as they are)
+
+- **Steering curve** (steady path turn rate °/s at a pinned speed, flat, steer input 0.1 · 0.3 · 0.5 · 0.7 · 0.9 · 1):
+  skis at 12 m/s 6 · 32 · 38 · 50 · 69 · 82; at 20 m/s 5 · 34 · 38 · 44 · 51 · 52; Ravenspire at 28 m/s
+  3 · 14 · 22 · 30 · 40 · 40; board at 16 m/s 5 · 37 · 49 · 53 · 57 · 57. Monotonic everywhere, no dead zone
+  and no step; between 16 and 24 m/s the middle of the range is flatter (the grip-limited carve, before
+  `carveInput` phases in) and the last 10 % of input at 16–22 m/s on default maps adds skid (4° → 11–14°) rather
+  than turn — full lock at top speed scrubs a little speed, a real cost of over-steering. Keys start at 65 % lock,
+  so they live in the steep part. Response 0.10–0.22 s, edge-to-edge links 0.09–0.16 s (physics-steer).
+- **Speeds and brakes** (physics-sim, map3-speeds): top speeds, carve radii, stops and the tuck match their
+  research targets; terminal speed rises smoothly with the slope (no hard cap: the soft cap is quadratic drag).
+- **Physics step:** fixed 60 Hz in main.js, so ground handling can't depend on the display rate.
+- **Landing windows:** yaw clean / stumble / slide-or-crash 15 / 30 / 38° (skis), 15 / 45 / 82° (board), tighter
+  ×0.75 at 32 m/s on the big maps; pitch 22 / 42° of the drawn tilt (corks read their own, smaller tilt, the same
+  as a plain flip within 16° of upright). Near misses were fair but unreadable — a random wipeout word — which is
+  what change 5 addresses.

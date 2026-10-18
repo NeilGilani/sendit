@@ -43,7 +43,21 @@ Loose clothes ripple in the wind with speed (`uFlutter` in `character/materials.
 
 All tunables are in `DYN` at the top of `dynamics.js`.
 
-## Crash ragdoll (`ragdoll.js`)
+## In the air: tricks (`rider.js`)
+
+- **The body turns about its own centre of mass.** `rider.measureCom()` takes the posed skeleton's centre of
+  mass (segment midpoints, rough Dempster shares, boots with the feet) in root-local coordinates every air
+  frame; the next frame places the root so that point sits on the flight path (`player.renderCom()`) whatever
+  the spin, flip or tuck does. With the old fixed 0.85 m pivot (and spins about the feet) the drawn body orbited
+  the path by 0.2–0.25 m in a cork; now it stays within ≈ 4 cm (`combo-shots.mjs`).
+- **Head leads, then spots** (`airLook`, `ANIM.airHead*` / `airSpot*`): turned over the leading shoulder into a
+  spin, thrown back into a backflip / chin in for a frontflip; over the last 0.8 → 0.35 s before touchdown it
+  turns (with a third of it in the shoulders) to where the flight meets the snow.
+- **Combos stay compact** (`p.combo`, `ANIM.combo*`): a spin and a flip together hold the knees up and the arms
+  wrapped in through the off-axis part (no stretched layout, no arms flung overhead) and open up over the last
+  0.55 → 0.3 s. "Arms wide" (slowing a plain spin, a flip's layout) is at shoulder height now, not above the head.
+
+
 
 On `player.crash(kind)` the rider hands the body to a ragdoll until the respawn:
 

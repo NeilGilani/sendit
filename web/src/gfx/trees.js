@@ -44,7 +44,8 @@ const IMP_DEFS = /* glsl */`
 // ---------------------------------------------------------------- textures
 /** Needle frond (RGBA): a twig along u with needles fanning out; alpha cut-out, tapered outline. */
 function makeNeedleTexture(size = 256) {
-  const c = document.createElement('canvas');
+  // OffscreenCanvas in a worker (the loading scene, src/loading/, plants these trees too).
+  const c = typeof document !== 'undefined' ? document.createElement('canvas') : new OffscreenCanvas(size, size);
   c.width = size; c.height = size;
   const g = c.getContext('2d');
   const rnd = mulberry32(77);

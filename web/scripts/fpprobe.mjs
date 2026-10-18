@@ -6,7 +6,7 @@ import fs from 'node:fs';
 const [base = 'http://localhost:5191/', file, equip = 'ski', query = 'kicker=2'] = process.argv.slice(2);
 const snippets = (0, eval)(fs.readFileSync(file, 'utf8'));
 const browser = await chromium.launch({
-  args: process.env.GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+  args: process.env.GPU ? [process.platform === 'darwin' ? '--use-angle=metal' : '--use-angle=d3d11', '--use-gl=angle', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
 });
 const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));

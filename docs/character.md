@@ -10,7 +10,7 @@ research behind the look (cuts, offsets, helmet and goggle dimensions, colourway
 
 ```
 npm --prefix web run dev -- --port 5181 --strictPort
-http://localhost:5181/                    lobby → Character tab: colourways + mix and match
+http://localhost:5181/                    lobby → Locker tab: earned colourways + mix and match
 http://localhost:5181/?ride               chase cam (C toggles the helmet cam)
 http://localhost:5181/?ride&equip=snowboard
 ```
@@ -28,7 +28,7 @@ web/src/character/
   garments.js   the pieces: collar, jacket body, sleeves, pant legs, gaiter, stowed hood or hood up, mitts, gauntlets
   helmet.js     helmet shell + liner edge + brim, toric goggle lens + gasket, strap with rear clip
   materials.js  fabricMaterial, bodyMaterial, helmetMaterial, lensMaterial (all on world.js toonMaterial)
-web/src/lobby/tabs/character.js   the Character tab
+web/src/lobby/tabs/locker.js      the Locker tab (replaced the old Character tab)
 web/src/profile/catalog.js        clothing items generated from outfits.js (one item per garment)
 ```
 
@@ -169,7 +169,7 @@ jaw and blended into the neck below; it replaces the stowed hood roll.
 `model: { kind: 'outfit', ref: <garment id> }` and one variant per colourway (`variant.id` = colourway id,
 `variant.colors` = that slot's colours). The profile stores `{ item, variant }` per slot as before.
 
-**Flow.** Character tab (a colourway card, a swatch, or the item name to cycle garments in a slot) →
+**Flow.** Locker tab (a colourway card, a swatch, or the item name to cycle garments in a slot) →
 `profile.equip(itemId, colourwayId)` → `loadout` event → `rider.js` →
 `outfitSlotsFromProfile()` → `resolveOutfit()` → `look.apply()`: colours are uniform writes; a different
 cut rebuilds (and caches) the geometry. Both the lobby preview and the game rider follow the profile.
@@ -178,7 +178,7 @@ cut rebuilds (and caches) the geometry. Both the lobby preview and the game ride
 
 ### Add a colourway
 Add an entry to `COLORWAYS` in `outfits.js` with all five slot blocks. The catalog picks it up as a new
-variant of every clothing item, and the Character tab shows it as a card and as swatches. Hex colours
+variant of every clothing item, and the Locker tab shows it as a card and as swatches. Hex colours
 are sRGB; keep fabric albedo between about `#141516` and `#efece4` (pure white / black look fake under
 the HDR sun).
 
@@ -245,5 +245,6 @@ No new asset files: everything is generated in code, so CREDITS.md is unchanged.
 - Poles and skis / board keep their equipment-catalog colours (pink poles), which can clash with
   earth-tone colourways; equipment colours are the equipment code's business.
 - Logos are abstract marks (no text rendering); the strap wordmark is blocky glyphs.
-- Helmet cam: sleeves and gauntlets are slimmed 25 % in first person, but the pole shafts still run
-  along the forearms (`placePoles()`, animation code untouched here), so they are mostly hidden.
+- Helmet cam: sleeves and gauntlets are slimmed 25 % in first person; the poles, gloves and goggle lens
+  in the helmet cam are described in `docs/first-person.md`. The hidden face pieces (`uHide`) are also
+  discarded in the fragment shader, since the collapsed vertices still skinned into thin strands.

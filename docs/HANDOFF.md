@@ -93,6 +93,7 @@ GPU=1 node web/scripts/lobbytest.mjs http://localhost:5180/
 node web/scripts/physics-fuzz.mjs
 node web/scripts/physics-tricks.mjs
 node web/scripts/physics-rotation.mjs both --check
+node web/scripts/physics-combo.mjs both --check
 node web/scripts/jumps-valcrest.mjs --check
 node web/scripts/equipment-check.mjs
 node web/scripts/map2-bot.mjs --verify --tuck --check
@@ -104,6 +105,7 @@ node web/scripts/map7-unit.mjs
 node web/scripts/trails-check.mjs --check
 node web/scripts/gfxpopin.mjs http://localhost:5180 <mapId> 1 20
 node web/scripts/map3-perf.mjs http://localhost:5180 1600 900 1 60 <mapId>
+MAC=1 node web/scripts/combo-shots.mjs http://localhost:5180/ <outDir> ski cork720,dc1080   # side-camera frames of combo tricks
 GPU=1 node web/scripts/gfxshots.mjs "http://localhost:5180/?map=<id>&ride" <outDir> '[{"name":"r","wait":5,"keys":"ArrowUp"}]' 1280 720
 ```
 
@@ -111,15 +113,13 @@ Performance target: quality 1 around 14–16 ms GPU at 1600×900. Screenshots go
 
 ## Known issues / good next steps
 
-1. **First person** — the overnight session crashed after its first commit (camera turns with the body through
-   flips, gloves framed, poles placed). Arms / poles in every scenario and flips still need the full pass the user
-   asked for. Its leftover uncommitted work-in-progress may still sit in the Surface's
-   `.claude/worktrees/first-person-*` folder (untested).
-2. `trails-check --check` flags the declared length of two trails (Kitsune `okama` 2730 m vs 2415 m measured,
-   Fjordline `skaret` 3000 m vs 2400 m). The check measures along the map's main course path; those trails follow
-   their own lines. Fix either the numbers or the check.
+1. **First person** — finished (see `docs/first-person.md`): gloves framed on skis and snowboard in every
+   scenario, detailed poles with plants, goggle lens tint / fog / snow, breath, crash cam on the ragdoll.
+2. ~~`trails-check` length mismatches~~ fixed: Kitsune and Fjordline courses expose `rideLine(trailId)` and the check measures
+   along each trail's own line (docs/maps.md § Measuring trails). `--check` passes for all built-in maps.
 3. Voltage Park: no wallrides; the superpipe is hard to ride with keys.
-4. The chase camera trails ~20° behind in hard turns, which makes turns feel longer than they are.
+4. **Chase camera** — fixed: hard turns now trail ~5° (was ~20°), and airs / flips / spins frame the predicted
+   landing from ~0.9 s out with a level horizon and no snaps (see `docs/game-feel.md` §3c, `web/scripts/camshots.mjs`).
 5. Pink default poles/skis clash with the earth-tone outfits.
 6. Blackspruce's densest section peaks slightly above the 16 ms GPU target.
 7. On the user's Surface, a separate project (`Desktop/lap4lap`) leaves a Chrome profile in `%TEMP%` on every

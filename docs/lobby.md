@@ -5,8 +5,8 @@ the selected map's run, **inside the real game world**: same terrain, trees, sky
 post stack as a ride. You can rotate them like a turntable. Around the rider sit a tab bar, one
 panel, your profile chip, the selected map, the **Zen / Challenge** mode switch and the **Ride**
 button (it reads **Race** in Challenge; the choice is saved in `sendit.mode`). **Equipment**
-(Skis / Snowboard) and **Character** (outfit colourways, see [character.md](character.md)) are real
-features. The other areas are stubs or registries that later work plugs into: maps, multiplayer,
+(Skis / Snowboard) and the **Locker** (earned outfit colourways, see [character.md](character.md) and
+[rewards.md](rewards.md)) are real features. The other areas are stubs or registries that later work plugs into: maps, multiplayer,
 leaderboards, profile and settings.
 
 ```
@@ -39,7 +39,7 @@ main.js ── boot: loadMap(resolveMapSelection()) → world → LobbyStage at 
    │   ├─ stage.js            LobbyStage: plinth + preview Rider in the world scene, turntable,
    │   │                      camera shots, activate()/deactivate() camera ownership
    │   ├─ tabs.js             registerLobbyTab registry
-   │   ├─ tabs/*.js           equipment (real), character (real), maps, multiplayer, leaderboards,
+   │   ├─ tabs/*.js           equipment (real), locker (real), cases, maps, multiplayer, leaderboards,
    │   │                      profile, settings (minimal / coming soon)
    │   ├─ equipmentBridge.js  the two optional calls into rider.js / player.js (see below)
    │   ├─ nav.js              spatial focus navigation (lobby, pause, settings, credits)

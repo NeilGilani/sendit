@@ -4,7 +4,9 @@
 // Messages out: frame (first frame shown), shot {info}, stats, log, error.
 let errors = 0;
 let scene = null, running = false, last = 0, due = 0, visible = true, sentFrame = false;
-const post = (type, payload = {}) => self.postMessage({ type, ...payload });
+// Every message carries the worker's clock as epoch ms (wt): the page's main thread may receive it seconds
+// late (long tasks), so timing stats use wt, not the arrival time.
+const post = (type, payload = {}) => self.postMessage({ type, wt: performance.timeOrigin + performance.now(), ...payload });
 
 self.addEventListener('error', (e) => post('error', { message: e.message || 'error' }));
 self.addEventListener('unhandledrejection', (e) => post('error', { message: e.reason?.message || String(e.reason) }));
@@ -35,12 +37,24 @@ function loop(now) {
   if (!sentFrame) { sentFrame = true; post('frame'); }
 }
 
+// Warm the HTTP cache for the rider (glTF + its buffers / textures) and the rock texture while the
+// scene's modules load and the terrain builds: the rider is what the first shot waits for.
+function prefetch() {
+  const base = new URL('/models/skier/skier.gltf', self.location.href);
+  fetch(base).then((r) => r.json()).then((j) => {
+    for (const x of [...(j.buffers || []), ...(j.images || [])]) if (x.uri && !x.uri.startsWith('data:')) fetch(new URL(x.uri, base)).then((r) => r.arrayBuffer()).catch(() => {});
+  }).catch(() => {});
+  fetch(new URL('/textures/web/rock_face_03_packed_1k.jpg', self.location.href)).then((r) => r.arrayBuffer()).catch(() => {});
+}
+
 self.onmessage = async (e) => {
   const m = e.data;
   if (m.type === 'init') {
+    prefetch();
     try {
       const ti = performance.now();
       const { LoadingScene } = await import('./scene.js');
+      post('modules');   // the page starts the game's own download now (loading/index.js whenStarted)
       scene = new LoadingScene(m.canvas, { ...m, opts: { ...m.opts, modulesMs: Math.round(performance.now() - ti) } }, post);
       await scene.init();
       running = true;

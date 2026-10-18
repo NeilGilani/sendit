@@ -104,7 +104,6 @@ class DragonbackCourse {
 | `trailSpawnFor(course, trailId, terrain.getSpawn())` | `{ x, z, heading, fallback }` |
 | `trailFinishFor(course, trailId)` | `{ x, z, radius }`, `{ progress }` or `null` |
 | `trailBoardId(mapId, trailId)` | leaderboard id |
-| `extendMap(id, extra)` | re-register a map with extra fields |
 | `adaptMap(id, { mountain, trails })` | adapter for a map owned elsewhere: fills `mountain` / `trails` only where its own registration has none |
 | `findDropZone(course, name)` | |
 
@@ -175,6 +174,62 @@ stacked lanes, spines, a superpipe and a big air tower. The map declares its own
 | `superpipe` | The Conduit | ◆ black | 651 m | 219 m | drop zone 6 (top of the pipe) |
 | `big-air` | The Tower ★ | ◆◆ double-black | 679 m | 228 m | drop zone 5 (the scaffold deck) |
 
+### Dragonback (Serrated range · wild)
+
+Map `dragonback` ([map5.md](map5.md)). A 40° face combed into arêtes under a serrated summit ridge: ride the crests, fly the
+gaps, hop ridge to ridge. Every trail ends at the valley line; `course.trailSpawn` puts you on the top of the trail's first ridge.
+
+| trail id | name | difficulty | length | vertical | start |
+| --- | --- | --- | --- | --- | --- |
+| `ride-the-dragon` | Ride the Dragon ★ | ◆◆ double-black | 2280 m | 1555 m | the Shoulder (default spawn) |
+| `twin-hop` | Twin Hop ★ | ◆ black | 2140 m | 1480 m | course.trailSpawn (Left Twin) |
+| `scale-jump` | Scale Jump | ◆ black | 2090 m | 1470 m | course.trailSpawn (the Spine) |
+| `bladerunner` | Bladerunner | ◆◆ double-black | 2180 m | 1520 m | course.trailSpawn (the Blade) |
+| `the-blade` | The Blade | ◆◆ double-black | 2150 m | 1515 m | course.trailSpawn (the Blade) |
+| `dragons-tooth` | The Dragon's Tooth ★ | ◆◆ double-black | 2180 m | 1515 m | course.trailSpawn (the Keel) |
+| `wishbone` | West Fin & Wishbone | ◆ black | 2180 m | 1525 m | course.trailSpawn (West Fin) |
+| `the-staircase` | The Staircase | ◆ black | 1500 m | 960 m | course.trailSpawn (Stair 1) |
+| `the-knife` | The Knife | ◆◆ double-black | 1040 m | 585 m | course.trailSpawn (the Knife) |
+| `organ-pipes` | The Organ Pipes | ◆ black | 1160 m | 685 m | course.trailSpawn |
+| `the-gullies` | The Gullies | ■ blue | 2160 m | 1495 m | course.trailSpawn |
+| `the-slot` | The Slot | ■ blue | 2190 m | 1525 m | course.trailSpawn |
+
+### Kitsune Peak (Hokkaido, Japan · dusk powder)
+
+Map `kitsune-peak` ([map6.md](map6.md)). A powder volcano at dusk: a rim spine, pillow stacks, a birch glade, a lantern-lit
+gully and a shrine village with rideable roofs. Every trail ends on one finish line across the base (`trailFinish` →
+`{ progress }`). Lengths / verticals are measured along each trail's own line (`course.rideLine`, see below).
+
+| trail id | name | difficulty | length | vertical | start |
+| --- | --- | --- | --- | --- | --- |
+| `okama` | Okama Bowl | ■ blue | 2730 m | 1150 m | course.trailSpawn (u 25, the summit bowl; default) |
+| `kazan` | Kazan Rim ★ | ◆ black | 2720 m | 1140 m | course.trailSpawn (the crater rim) |
+| `makura` | Makura Pillows ★ | ◆◆ double-black | 2070 m | 780 m | course.trailSpawn (u 640) |
+| `shirakaba` | Shirakaba Weave | ◆ black | 2180 m | 760 m | course.trailSpawn (u 650) |
+| `kitsunebi` | Kitsunebi Gully | ■ blue | 2300 m | 920 m | course.trailSpawn (the gondola top station) |
+| `senbon` | Senbon Torii ★ | ▬ park | 1070 m | 325 m | course.trailSpawn (u 1430, the village jump line) |
+
+### Fjordline (Lyngen, Troms · Norway · golden hour)
+
+Map `fjordline` ([map7.md](map7.md)). From the summit col to the sea: couloir, spines, a headland over the fjord, a
+rollers shoulder, a red-cabin village and the harbour. Each trail has its own line (`RIDE_LINES` in `layout.js`) and
+starts at its drop zone.
+
+| trail id | name | difficulty | length | vertical | start |
+| --- | --- | --- | --- | --- | --- |
+| `skaret` | Skaret | ◆◆ double-black | 3000 m | 1445 m | drop zone "Skaret" (default) |
+| `kvalneset` | Kvalneset | ◆◆ double-black | 2580 m | 975 m | drop zone "Kvalneset" |
+| `solvryggen` | Sølvryggene | ◆ black | 2830 m | 1335 m | drop zone "Sølvryggene" |
+| `fjordlopa` | Fjordløypa | ■ blue | 3040 m | 1105 m | drop zone "Fjordryggen" |
+| `brygga` | Brygga | ▬ park | 975 m | 265 m | drop zone "Brygga" |
+| `sjosiden` | Sjøsiden | ● green | 710 m | 135 m | drop zone "Sjøsiden" |
+
+### Measuring trails
+
+`trails-check.mjs` measures a trail from its start to the map's finish. A course may also provide
+`course.rideLine(trailId)` (world `[x, z]` points, spawn → finish): the check then measures the 3D length and drop
+along that line instead of the main course path. Kitsune and Fjordline give each trail its own line this way.
+
 ### Lake Tahoe (Sierra Nevada · California / Nevada)
 
 Map `lake-tahoe`. Ten real resorts around the lake, from elevation data and OpenStreetMap, with their real lifts.
@@ -211,3 +266,10 @@ Map `lake-tahoe`. Ten real resorts around the lake, from elevation data and Open
 | `diamond_peak:0` | Crystal Ridge → Lakeview → Penguin (Diamond Peak) | ■ blue | 2820 m | 536 m | variant {"resort":"diamond_peak","run":0} |
 | `diamond_peak:1` | The Great Flume → Spillway → Lodgepole (Diamond Peak) | ■ blue | 2531 m | 535 m | variant {"resort":"diamond_peak","run":1} |
 | `diamond_peak:2` | G. S. → School Yard (Diamond Peak) | ◆ black | 634 m | 216 m | variant {"resort":"diamond_peak","run":2} |
+
+## Map events nothing listens to (on purpose)
+
+Maps emit a few bus events as hooks; these have no listener because the scoring already shows the result:
+`ridgeHop` (dragonback; the score label "Ridge hop / Ridge run ×n" is on the HUD), `toriiTunnel` (kitsune; "Senbon Torii ·
+km/h" score label), `slopeJudged` (voltage; `voltage/hud.js` shows the judging card itself). `parkPump` (voltage) gets a
+"PERFECT PUMP" call-out in `juice/hud.js`.

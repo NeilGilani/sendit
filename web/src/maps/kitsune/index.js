@@ -30,7 +30,7 @@ export const KITSUNE_THUMB = svg(`
   <path d="M65 63 Q82 66 99 63 Q82 64.6 65 63 Z" fill="#ffffff"/>
   <rect x="64" y="65.5" width="36" height="1.4" fill="#1d1d24"/>`);
 
-/** Every trail's numbers (layout.js TRAILS + the measured length / vertical; map6-unit checks they match the course). */
+/** Every trail's numbers (layout.js TRAILS + length / vertical measured along each trail's own line, spawn to finish by scripts/trails-check.mjs; map6-unit checks they match the course). */
 export const TRAIL_STATS = {
   okama: { length: 2730, vertical: 1150 },
   kazan: { length: 2720, vertical: 1140 },

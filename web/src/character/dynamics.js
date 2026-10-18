@@ -102,13 +102,16 @@ export class BodyDynamics {
     // A teleport (respawn, drop zone, a debug place()) is not a force: start over from the new state.
     if (this.pPrev && this.pPrev.distanceTo(pl.renderPos) > 1 + (pl.speed + 5) * dt * 2) this.reset();
     this.pPrev = (this.pPrev || new THREE.Vector3()).copy(pl.renderPos);
-    // World acceleration from the physics velocity (low-passed: frames and physics steps don't line up).
-    if (this.vPrev && pl.simulated) {
-      _v.subVectors(pl.velocity, this.vPrev).divideScalar(dt);
+    // World acceleration from the physics velocity, over the physics time it changed in (pl.simTime): frames and
+    // the fixed 60 Hz steps don't line up, and dividing by the frame dt read 0 on frames without a step and 2.4×
+    // on the others at 144 Hz — a 14 % ripple in every force-driven reaction (physics steady, 30 / 60 Hz exact).
+    const simDt = pl.simTime !== undefined && this.simPrev !== undefined ? pl.simTime - this.simPrev : dt;
+    if (this.vPrev && pl.simulated && simDt > 1e-6) {
+      _v.subVectors(pl.velocity, this.vPrev).divideScalar(simDt);
       if (_v.lengthSq() > 900 * 900) _v.set(0, 0, 0);                       // teleports (respawn, drop zones)
-      this.acc.lerp(_v, 1 - Math.exp(-dt / 0.035));
+      this.acc.lerp(_v, 1 - Math.exp(-simDt / 0.035));
     }
-    this.vPrev = (this.vPrev || new THREE.Vector3()).copy(pl.velocity);
+    if (simDt > 1e-6 || !this.vPrev) { this.vPrev = (this.vPrev || new THREE.Vector3()).copy(pl.velocity); this.simPrev = pl.simTime; }
     // Felt (specific) force: what the snow / rail pushes on the body with. Weightless in the air.
     _f.copy(this.acc); _f.y += G;
     if (air) _f.set(0, 0, 0);

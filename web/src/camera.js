@@ -6,11 +6,13 @@
 //     mouse/stick look, and a slow flyover for the menu.
 //   • first person helmet cam (settings.view === 'fp'): see firstPerson()
 import * as THREE from 'three';
-import { CAMERA as C } from './config.js';
+import { CAMERA as C, PHYSICS } from './config.js';
 import { State } from './player.js';
 import { game, Mode, settings, on } from './state.js';
-import { lerpAngle, clamp, smoothstep } from './world.js';
+import { lerpAngle, angleDiff, clamp, smoothstep } from './world.js';
 import { FPView } from './fpview.js';
+
+const _v = new THREE.Vector3();
 
 export class CameraController {
   constructor(camera, player, terrain, input) {
@@ -21,6 +23,9 @@ export class CameraController {
     this.still = 0; this.orbit = 0; this.fov = C.baseFov; this.dist = C.distance; this.arm = C.distance;
     this.side = 0; this.sideSign = 1; this.roll = 0;
     this.trauma = 0;
+    // Air framing (follow): eased amounts, springs, the predicted touchdown, the smoothed turn rate.
+    this.airK = 0; this.preK = 0; this.airTotal = 0; this.turnRate = 0; this.prevVelYaw = null; this.armLift = 0;
+    this.sv = {}; this.landPt = new THREE.Vector3(); this._land = { t: 0, p: new THREE.Vector3() };
     this.reducedMotion = !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;   // gentler default shake
     this.snapT = 0;            // > 0 while the FoV snaps back (crash / hard brake)
     this.t = 0;
@@ -74,6 +79,7 @@ export class CameraController {
     this.vel = [0, 0, 0];
     this.yaw = this.player.heading + ((this.player.travelSign ?? 1) < 0 ? Math.PI : 0);
     this.lookYaw = 0; this.lookPitch = 0; this.side = 0;
+    this.airK = 0; this.preK = 0; this.airTotal = 0; this.turnRate = 0; this.prevVelYaw = null; this.armLift = 0; this.sv = {}; this.landPt.set(0, 0, 0);
   }
 
   startIntro() {
@@ -88,7 +94,12 @@ export class CameraController {
     this.snapT = Math.max(0, this.snapT - dt);
     if (game.mode === Mode.MENU) { this.flyover(dt); this.wasMenu = true; this.setNear(0.25); this.fpView?.reset(); this.fpWas = false; return; }
     if (this.wasMenu) { this.wasMenu = false; if (this.intro >= 1) this.snap(); }
-    // First person (helmet cam) — crashes cut to the chase camera so the tumble stays readable.
+    // First person (helmet cam). Crashes: the camera is knocked out of the head and follows the ragdoll
+    // from a few metres back (FPView.crash), so the tumble stays readable.
+    if (settings.view === 'fp' && this.rider && this.player.state === State.CRASH && this.intro >= 1 && this.fpWas) {
+      this.fpView.crash(dt);
+      return;
+    }
     if (settings.view === 'fp' && this.rider && this.player.state !== State.CRASH && this.intro >= 1) {
       this.firstPerson(dt);
       this.fpWas = true;
@@ -131,35 +142,66 @@ export class CameraController {
 
   follow(dt) {
     const s = this.player;
+    const air = s.state === State.AIR, lift = s.state === State.LIFT, crash = s.state === State.CRASH;
+    const k = (rate) => 1 - Math.exp(-rate * dt);
     // Big-mountain framing (CAMERA.heightAtSpeed / steepLift, 0 by default): higher at speed and on steep faces.
     const steep = Math.max(0, THREE.MathUtils.radToDeg(Math.acos(Math.min(1, s.groundNormal.y))) - 30) / 10;
-    this.steep = (this.steep || 0) + (steep - (this.steep || 0)) * (1 - Math.exp(-2 * dt));
+    this.steep = (this.steep || 0) + (steep - (this.steep || 0)) * k(2);
     const target = s.renderPos.clone().add(new THREE.Vector3(0, C.height + s.speedRatio * C.heightAtSpeed + this.steep * C.steepLift, 0));
-    const lift = s.state === State.LIFT;
     const sm = lift ? 0.35 : C.followSmooth;
+    // The anchor follows the path (renderPos), never the rotating body: flips turn about the rider's centre of
+    // mass (rider.js) and spins about the vertical, so the anchor stays on the flight line and the horizon level.
     this.pos.x = this.damp(this.pos.x, target.x, 0, sm, dt);
     this.pos.z = this.damp(this.pos.z, target.z, 2, sm, dt);
     // CAMERA.airFollowY: a tighter vertical follow in the air (long drops would leave the rider at the frame edge).
-    this.pos.y = this.damp(this.pos.y, target.y, 1, s.state === State.AIR && C.airFollowY != null ? C.airFollowY : sm * 1.8, dt);
+    this.pos.y = this.damp(this.pos.y, target.y, 1, air ? C.airFollowY ?? sm * 1.2 : sm * 1.8, dt);
     if (this.pos.distanceTo(target) > 40) this.snap();
 
+    // ---- Air framing: where and when the rider comes down (ballistic, against the real terrain).
+    //   big  0..1  how big this air is (predicted total air time): hops change nothing
+    //   pre  0..1  the landing approach: 0 until CAMERA.landLead s before touchdown, 1 at landSettle s
+    // Both are eased (airK, preK) so take-off and touchdown never snap the view.
+    const L = air ? this.predictLanding(s) : null;
+    if (air && L) this.airTotal = s.airTime + L.t;
+    else if (!air) this.airTotal = 0;
+    const big = air ? smoothstep(C.airFrameFrom, C.airFrameFull, this.airTotal) : 0;
+    const pre = L ? 1 - smoothstep(C.landSettle, C.landLead, L.t) : 0;
+    this.airK = this.spring('airK', air ? big : 0, air ? C.airIn : C.airOut, dt);
+    this.preK = this.spring('preK', L ? pre * big : 0, L ? 9 : C.airOut, dt);
+    if (L) { if (this.landPt.lengthSq() === 0) this.landPt.copy(L.p); else this.landPt.lerp(L.p, k(12)); }
+    else if (this.preK < 0.001) this.landPt.set(0, 0, 0);
+
     const speed = s.speed;
-    const air = s.state === State.AIR;
     // Follow the direction of travel: the nose, or the tail when riding switch. During a slide /
-    // hockey stop the gear turns ~90° across the path, so hold the current framing instead.
+    // hockey stop the gear turns ~90° across the path, so hold the current framing instead. In the air the
+    // heading spins with the rider, so only the flight direction counts (held when there is hardly any).
     const travelYaw = s.heading + ((s.travelSign ?? 1) < 0 ? Math.PI : 0);
-    let wantYaw = (s.stop ?? 0) > 0.3 && s.state === State.GROUNDED ? this.yaw : travelYaw;
-    if (speed > 2.5 && s.state !== State.CRASH) {
-      wantYaw = lerpAngle(wantYaw, Math.atan2(-s.velocity.x, -s.velocity.z), clamp((speed - 2.5) / 4, 0, 1));
-    }
-    this.yaw = lerpAngle(this.yaw, wantYaw, 1 - Math.exp(-(air ? 1.0 : 3.2) * dt));
+    const velYaw = Math.atan2(-s.velocity.x, -s.velocity.z), hSpeed = Math.hypot(s.velocity.x, s.velocity.z);
+    const holding = (s.stop ?? 0) > 0.3 && s.state === State.GROUNDED;
+    let wantYaw = holding ? this.yaw : travelYaw;
+    if (air) wantYaw = hSpeed > 1 ? velYaw : this.yaw;
+    // (hSpeed, not speed: on a lift ride speed is the cable speed and the velocity is zero, which used to pull the
+    // yaw toward world north.)
+    else if (hSpeed > 2.5 && !crash) wantYaw = lerpAngle(wantYaw, velYaw, clamp((hSpeed - 2.5) / 4, 0, 1));
+    // Turn lag (HANDOFF #4): a plain exponential chase trails a steady carve by turnRate / yawRate (≈20° in a hard
+    // turn). Lead the target by the smoothed turn rate and chase a little harder while turning: the camera stays a
+    // few degrees behind the carve, and the low-passed rate keeps edge changes from twitching it.
+    const vr = this.prevVelYaw == null || dt <= 0 ? 0 : angleDiff(this.prevVelYaw, velYaw) / dt;
+    this.prevVelYaw = velYaw;
+    const turning = s.state === State.GROUNDED && !holding && speed > 4;
+    this.turnRate += ((turning ? clamp(vr, -2.5, 2.5) : 0) - this.turnRate) * k(C.turnRateSmooth);
+    if (turning) wantYaw += this.turnRate * C.turnLead;
+    // Big air chases the flight line gently; the ground rate comes back as the air framing eases out (no snap).
+    const gRate = C.yawRate + C.yawRateTurn * Math.min(1, Math.abs(this.turnRate));
+    const yawRate = gRate + (C.airYawRate - gRate) * clamp(this.airK, 0, 1);
+    this.yaw = lerpAngle(this.yaw, wantYaw, k(yawRate));
 
     const look = this.input.takeLook();
     const pad = this.input.pad;
     if (Math.abs(look.x) + Math.abs(look.y) > 0) {
-      const k = settings.mouseSens * 0.0025;
-      this.lookYaw -= look.x * k;
-      this.lookPitch = clamp(this.lookPitch - look.y * k * 57.3, -35, 40);
+      const ks = settings.mouseSens * 0.0025;
+      this.lookYaw -= look.x * ks;
+      this.lookPitch = clamp(this.lookPitch - look.y * ks * 57.3, -35, 40);
       this.lookIdle = 0;
     }
     if (Math.abs(pad.rx) + Math.abs(pad.ry) > 0.1) {
@@ -171,52 +213,92 @@ export class CameraController {
     if (speed < 0.5 && s.state === State.GROUNDED) this.still += dt; else this.still = 0;
     const orbiting = this.still > 3;
     if (orbiting) this.orbit += dt * 0.15 * clamp(this.still - 3, 0, 1);
-    else this.orbit = lerpAngle(this.orbit, 0, 1 - Math.exp(-1.5 * dt));
+    else this.orbit = lerpAngle(this.orbit, 0, k(1.5));
     if (this.lookIdle > 2.0 && !orbiting) {
-      this.lookYaw = lerpAngle(this.lookYaw, 0, 1 - Math.exp(-1.6 * dt));
-      this.lookPitch += -this.lookPitch * (1 - Math.exp(-1.6 * dt));
+      this.lookYaw = lerpAngle(this.lookYaw, 0, k(1.6));
+      this.lookPitch += -this.lookPitch * k(1.6);
     }
 
-    // Big air: swing to a cinematic side angle.
+    // Big air: swing out to a three-quarter side angle (shows flips and spins together) and come most of the way
+    // back behind for the landing approach, so the player reads the line and the slope (airSideLand of the swing
+    // is left at touchdown, then it eases home at sideReturn).
     const above = s.position.y - this.terrain.getHeight(s.position.x, s.position.z);
-    const big = air && (above > 3 || s.airTime > 0.8);
-    if (big && this.side < 0.05) this.sideSign = s.spinRate <= 0 ? 1 : -1;
-    this.side += ((big ? 1 : 0) - this.side) * (1 - Math.exp(-(big ? 2.4 : 6) * dt));
+    const sideBig = air ? smoothstep(C.airSideFrom, C.airSideFull, this.airTotal) : 0;
+    if (sideBig > 0 && this.side < 0.05) this.sideSign = s.spinRate <= 0 ? 1 : -1;
+    const sideWant = sideBig * (1 - this.preK * (1 - C.airSideLand));
+    this.side = this.spring('side', sideWant, sideWant > this.side ? C.sideIn : C.sideReturn, dt);
 
     const r = s.speedRatio;
-    const yawT = this.yaw + this.lookYaw + this.orbit + this.side * this.sideSign * THREE.MathUtils.degToRad(70);
+    const yawT = this.yaw + this.lookYaw + this.orbit + this.side * this.sideSign * THREE.MathUtils.degToRad(C.airSideDeg);
     const back = new THREE.Vector3(Math.sin(yawT), 0, Math.cos(yawT));
     const n = s.groundNormal;
     const rise = -back.dot(new THREE.Vector3(n.x, 0, n.z)) / Math.max(n.y, 0.2);
     const slopeDeg = THREE.MathUtils.radToDeg(Math.atan(Math.max(rise, 0)));
     let wantPitch = C.pitch - r * 5 - slopeDeg * 0.75 * (1 - this.side) + this.lookPitch - this.steep * C.steepPitch;
-    wantPitch = wantPitch * (1 - this.side) + (-4 + this.lookPitch) * this.side;
+    wantPitch = wantPitch * (1 - this.side) + (C.airSidePitch + this.lookPitch) * this.side;
+    // The landing approach: a higher arm looks down onto the landing over the rider, steeper by the landing's
+    // slope like on the snow (so a steep landing doesn't rise into the arm at the last moment).
+    if (this.preK > 0.001) {
+      const ln = this.terrain.getNormal(this.landPt.x, this.landPt.z, 2, _v);
+      const lr = -(back.x * ln.x + back.z * ln.z) / Math.max(ln.y, 0.2);
+      const landSlope = THREE.MathUtils.radToDeg(Math.atan(Math.max(lr, 0)));
+      wantPitch += (C.landPitch - landSlope * 0.75 + this.lookPitch - wantPitch) * this.preK;
+    }
     if (orbiting) wantPitch = -8 + this.lookPitch;
     if (lift) wantPitch = -9 + this.lookPitch;
-    this.pitch += (wantPitch - this.pitch) * (1 - Math.exp(-3 * dt));
-    let wantDist = C.distance + r * C.distanceAtSpeed - s.tuck * 0.4;
-    wantDist = wantDist * (1 - this.side) + 7.5 * this.side;
+    this.pitch += (wantPitch - this.pitch) * k(3);
+    let wantDist = C.distance + r * C.distanceAtSpeed - s.tuck * 0.4 + this.airK * C.airPull;
+    wantDist = wantDist * (1 - this.side) + (C.airSideDist + this.airK * C.airPull) * this.side;
     if (orbiting) wantDist = 6.5;
     if (lift) wantDist = 7.5;
-    if (s.state === State.CRASH) wantDist = 7;
-    this.dist += (wantDist - this.dist) * (1 - Math.exp(-2 * dt));
+    if (crash) wantDist = 7;
+    this.dist += (wantDist - this.dist) * k(2);
 
     const pr = THREE.MathUtils.degToRad(-this.pitch);
     const dir = new THREE.Vector3(back.x * Math.cos(pr), Math.sin(pr), back.z * Math.cos(pr));
+    // Terrain in the way of the arm. In the air (a landing slope or knuckle rising behind the rider) the arm tilts
+    // up over it (armLift, m at the camera end: quick to rise, slow to settle) instead of collapsing toward the rider
+    // in one frame; on the snow, and for anything lift can't clear, the arm shortens as before.
+    const up = this.airK * C.airRise;
+    let need = 0;
+    if (this.airK > 0.01 || this.armLift > 0.01) {
+      for (let i = 2; i <= 8; i++) {
+        const f = i / 8, q = this.pos.clone().addScaledVector(dir, f * this.dist);
+        need = Math.max(need, (this.terrain.getHeight(q.x, q.z) + C.armClear - q.y - up * f) / f);
+      }
+      need = Math.min(C.liftMax, need) * clamp(this.airK * 3, 0, 1);
+    }
+    this.armLift += (need - this.armLift) * k(need > this.armLift ? 10 : 1.5);
     let len = this.dist;
     for (let i = 1; i <= 8; i++) {
-      const t = (i / 8) * this.dist;
+      const f = i / 8, t = f * this.dist;
       const q = this.pos.clone().addScaledVector(dir, t);
-      if (q.y < this.terrain.getHeight(q.x, q.z) + 0.6) { len = Math.max(0.8, t - this.dist / 8); break; }
+      if (q.y + (this.armLift + up) * f < this.terrain.getHeight(q.x, q.z) + 0.6) { len = Math.max(0.8, t - this.dist / 8); break; }
     }
-    this.arm = len < this.arm ? len : this.arm + (len - this.arm) * (1 - Math.exp(-3 * dt));
+    this.arm = len < this.arm ? len : this.arm + (len - this.arm) * k(3);
     const cp = this.pos.clone().addScaledVector(dir, this.arm);
+    cp.y += (up + this.armLift) * (this.arm / Math.max(this.dist, 1e-3));
     cp.y = Math.max(cp.y, this.terrain.getHeight(cp.x, cp.z) + 0.7);
     this.camera.position.copy(cp);
-    this.camera.lookAt(this.pos.clone().addScaledVector(dir, -4).add(new THREE.Vector3(0, -0.4 + this.side * 0.3 - this.side * C.airLook * Math.min(18, Math.max(0, above)), 0)));
+    // Aim: just past the rider, a little low so the snow ahead shows; in big air on maps with airLook further down
+    // toward the drop. On the landing approach the aim moves to a point between the rider and the predicted
+    // landing (landLook), never so far that the rider leaves the middle landKeep of the frame.
+    const aim = this.pos.clone().addScaledVector(dir, -4);
+    aim.y += -0.4 + this.side * 0.3 - this.side * C.airLook * Math.min(18, Math.max(0, above)) * (1 - this.preK);
+    if (this.preK > 0.001) {
+      const rider = this.pos.clone();
+      rider.y -= C.height * 0.5;
+      const mid = rider.clone().lerp(_v.copy(this.landPt).setY(this.landPt.y + 0.5), C.landLook);
+      aim.lerp(mid, this.preK);
+      const toR = rider.sub(cp).normalize(), toA = aim.clone().sub(cp), dA = toA.length();
+      toA.divideScalar(dA);
+      const maxA = THREE.MathUtils.degToRad(this.camera.fov * 0.5 * C.landKeep), ang = toR.angleTo(toA);
+      if (ang > maxA) aim.copy(cp).addScaledVector(toR.lerp(toA, maxA / ang).normalize(), dA);
+    }
+    this.camera.lookAt(aim);
     // Carve tilt
     const wantRoll = -s.turnInput * r * THREE.MathUtils.degToRad(7) * (1 - this.side) * (s.state === State.GROUNDED ? 1 : 0);
-    this.roll += (wantRoll - this.roll) * (1 - Math.exp(-4 * dt));
+    this.roll += (wantRoll - this.roll) * k(4);
     this.camera.rotateZ(this.roll);
     // Juice punches (kick()): landing dip, near-miss roll; the FoV part is added below.
     const kk = this.stepKicks(dt);
@@ -246,7 +328,7 @@ export class CameraController {
     this.fov += (wantFov - this.fov) * (1 - Math.exp(-rate * dt));
     // Juice: punches (kick) and the combo build-up (juiceFov, eased; set by juice/index.js).
     this.juiceFovS = (this.juiceFovS || 0) + ((this.juiceFov || 0) - (this.juiceFovS || 0)) * (1 - Math.exp(-1.5 * dt));
-    let fov = this.fov - this.side * 6 + (kk ? kk.fov[0] : 0) + this.juiceFovS;
+    let fov = this.fov + this.airK * C.airFov - this.side * C.airSideFov + (kk ? kk.fov[0] : 0) + this.juiceFovS;
 
     if (this.intro < 1) {
       this.intro = Math.min(1, this.intro + dt / 2.8);
@@ -260,7 +342,45 @@ export class CameraController {
     }
     this.camera.fov = clamp(fov, 30, 110);
     this.camera.updateProjectionMatrix();
-    void smoothstep;
+  }
+
+  /**
+   * Critically damped spring toward `target` (state in this.sv[name]): starts and stops without the velocity
+   * step of an exponential chase, so swinging out at take-off and home after touchdown never jerks.
+   * `rate` is in the same units as the exponential rates (1/s): ω = 2 · rate.
+   */
+  spring(name, target, rate, dt) {
+    const sv = this.sv[name] ||= [this[name] ?? target, 0];   // named after the field it drives
+    if (dt <= 0) return sv[0];
+    const w = 2 * rate, n = Math.max(1, Math.ceil(dt / 0.01)), h = dt / n;
+    for (let i = 0; i < n; i++) { sv[1] += (w * w * (target - sv[0]) - 2 * w * sv[1]) * h; sv[0] += sv[1] * h; }
+    return sv[0];
+  }
+
+  /**
+   * Predicted touchdown: march the flight (gravity, air drag) against the real terrain. Returns { t (s), p }
+   * (a reused object) or null if nothing within 4 s.
+   */
+  predictLanding(s) {
+    const T = this.terrain, g = PHYSICS.gravity * (PHYSICS.airGravity ?? 1), kd = PHYSICS.airDrag ?? 0, h = 1 / 30;
+    let x = s.position.x, y = s.position.y, z = s.position.z;
+    let vx = s.velocity.x, vy = s.velocity.y, vz = s.velocity.z;
+    let d0 = y - T.getHeight(x, z);
+    for (let t = h; t <= 4; t += h) {
+      const v = Math.hypot(vx, vy, vz), a = kd * v;
+      vx -= vx * a * h; vz -= vz * a * h; vy -= (g + vy * a) * h;
+      const px = x, py = y, pz = z;
+      x += vx * h; y += vy * h; z += vz * h;
+      const gy = T.getHeight(x, z), d1 = y - gy;
+      if (d1 <= 0) {
+        const f = d0 > 0 ? d0 / (d0 - d1) : 1;
+        this._land.t = t - h + f * h;
+        this._land.p.set(px + (x - px) * f, py + (y - py) * f, pz + (z - pz) * f);
+        return this._land;
+      }
+      d0 = d1;
+    }
+    return null;
   }
 
   setNear(n) {

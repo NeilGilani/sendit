@@ -103,6 +103,26 @@ export function planMove(kind, shot, sun, r, H) {
       m.endAfterLanding = 1.2;
       return m;
     }
+    case 'hero': {
+      // The poster frame: a drone hanging a few metres off the rider's 3/4 front, a little below the
+      // apex, on the side away from the sun (backlit rim, glowing spray). It tracks the rider loosely
+      // and creeps round toward the side and in over the trick: grab, face and gear all read, with the
+      // range behind. Lands in the frame too (the touchdown is below and ahead).
+      const R = r.range(6.2, 8.2), a0 = r.range(0.95, 1.2), a1 = r.range(1.3, 1.6), h = r.range(-3.2, -1.8);   // below: rider against the sky / range
+      m.fov = r.range(34, 40);
+      m.fov1 = m.fov - r.range(2, 5);                     // a slow push in
+      m.pos = (s, com) => {
+        const a = a0 + (a1 - a0) * ease(s);              // angle from straight ahead (−Z) toward the side
+        const c = A.clone().lerp(com, 0.7);              // tracks loosely (the operator, not a rail)
+        return V(c.x + side * Math.sin(a) * R, c.y + h, c.z - Math.cos(a) * R);
+      };
+      m.look = (s, com) => com.clone().add(V(0, 0.15, 0));
+      m.lag = 6;
+      m.t0 = -0.7;
+      m.endAfterLanding = 1.1;
+      m.targets = [A, M, shot.com(shot.Ta * 0.25, V(0, 0, 0))];
+      break;
+    }
     case 'follow': {
       // Behind the rider on the in-run, then drifts out over the cliff (like a drone that keeps flying).
       m.fov = 56;

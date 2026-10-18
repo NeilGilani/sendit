@@ -6,6 +6,43 @@
   <title>SENDIT</title>
   <meta name="description" content="A peaceful skiing game on a real mountain at golden hour." />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f6c58e'/%3E%3Cstop offset='1' stop-color='%238fb3d9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='128' height='128' rx='24' fill='url(%23s)'/%3E%3Cpath d='M14 104 L52 40 L66 60 L80 30 L114 104 Z' fill='%23f4f7fb'/%3E%3C/svg%3E" />
+  <script>
+    // Loading screen, first paint: pick one of the stills rendered by the loading scene itself
+    // (scripts/loadingstills.mjs → assets/loading/*.webp) and start fetching it before anything else.
+    // The live scene (src/loading/) then starts from the same variant and cross-fades in over it.
+    // A lobby → mountain load (localStorage sendit.loadhint, src/loading/hint.js) prefers a still in that
+    // mountain's light. ?loadstill=<name> pins one, ?nostill skips it (the painted CSS screen only).
+    (function () {
+      var S = /*STILLS*/[{"f":"golden-method.webp","seed":7101,"tod":"golden","mtn":"spires","gear":"snowboard"},{"f":"golden-backflip.webp","seed":7101,"tod":"golden","mtn":"spires","gear":"ski"},{"f":"bluebird-japan.webp","seed":7412,"tod":"bluebird","mtn":"ranges","gear":"ski"},{"f":"bluebird-cork.webp","seed":7533,"tod":"bluebird","mtn":"spires","gear":"snowboard"},{"f":"alpenglow-method.webp","seed":7377,"tod":"alpenglow","mtn":"spires","gear":"snowboard"},{"f":"dawn-japan.webp","seed":7690,"tod":"dawn","mtn":"inversion","gear":"ski"},{"f":"storm-japan.webp","seed":7801,"tod":"storm","mtn":"ranges","gear":"ski"},{"f":"aurora-backflip.webp","seed":7955,"tod":"aurora","mtn":"spires","gear":"ski"},{"f":"aurora-method.webp","seed":7955,"tod":"aurora","mtn":"spires","gear":"snowboard"},{"f":"dawn-method.webp","seed":7690,"tod":"dawn","mtn":"inversion","gear":"snowboard"},{"f":"bluebird-method.webp","seed":7412,"tod":"bluebird","mtn":"ranges","gear":"snowboard"},{"f":"alpenglow-backflip.webp","seed":7377,"tod":"alpenglow","mtn":"spires","gear":"ski"}]/*END*/;
+      var LOOK = { 'valcrest-gully': 'golden bluebird', 'lake-tahoe': 'bluebird golden', blackspruce: 'bluebird storm golden', ravenspire: 'golden alpenglow storm',
+        'voltage-park': 'aurora bluebird', dragonback: 'bluebird golden dawn', 'kitsune-peak': 'alpenglow dawn', fjordline: 'golden dawn' };
+      var q = location.search, pool = S, s = null, h = null, last = null;
+      if (!S.length || /[?&]nostill/.test(q)) return;
+      try { h = JSON.parse(localStorage.getItem('sendit.loadhint') || 'null'); last = localStorage.getItem('sendit.laststill'); } catch (e) { /* storage off */ }
+      if (h && h.transition && Date.now() - (h.at || 0) < 120000 && LOOK[h.mapId]) {
+        var f = S.filter(function (x) { return LOOK[h.mapId].indexOf(x.tod) >= 0; });
+        if (f.length) pool = f;
+      }
+      var m = /[?&]loadstill=([\w-]+)/.exec(q);
+      if (m) s = S.filter(function (x) { return x.f.indexOf(m[1]) === 0; })[0];
+      if (!s) { var p2 = pool.filter(function (x) { return x.f !== last; }); if (p2.length) pool = p2; s = pool[Math.floor(Math.random() * pool.length)]; }
+      try { localStorage.setItem('sendit.laststill', s.f); } catch (e) { /* ignore */ }
+      window.__ldStill = s;
+      var url = '/loading/' + s.f, root = document.documentElement, img = new Image();
+      root.classList.add('ld-still-pending');   // no flash of the CSS mountains before the still decodes
+      var l = document.createElement('link'); l.rel = 'preload'; l.as = 'image'; l.href = url; l.setAttribute('fetchpriority', 'high'); document.head.appendChild(l);
+      // Ken Burns: a slow drift whose direction differs per load.
+      root.style.setProperty('--ld-still', 'url("' + url + '")');
+      root.style.setProperty('--kbx', ((Math.random() - 0.5) * 4).toFixed(2) + '%');
+      root.style.setProperty('--kby', ((Math.random() - 0.3) * 2.4).toFixed(2) + '%');
+      img.setAttribute('fetchpriority', 'high');
+      img.src = url;
+      (img.decode ? img.decode() : Promise.resolve()).then(function () {
+        window.__ldStillAt = performance.now();
+        root.classList.add('ld-has-still');
+      }, function () { window.__ldStillFailed = true; root.classList.remove('ld-still-pending'); });
+    })();
+  </script>
   <link rel="stylesheet" href="/src/style.css" />
   <style>
     /* Loading screen (src/loading/index.js) — inline so it paints before anything else loads. */
@@ -16,13 +53,26 @@
     #loading .ld-sun { position: absolute; left: 62%; top: 70%; width: 46vmax; height: 46vmax; transform: translate(-50%, -50%); border-radius: 50%;
       background: radial-gradient(circle, rgba(255,236,200,0.95) 0%, rgba(255,208,150,0.55) 6%, rgba(255,170,130,0.18) 26%, rgba(255,160,140,0) 60%); }
     #loading .ld-ridges { position: absolute; left: 0; bottom: 0; width: 100%; height: 100%; }
+    /* The engine-rendered still (index.html head script): fades up the moment it is decoded, drifts. */
+    #loading .ld-still { position: absolute; inset: -2%; background: #0b0e16 var(--ld-still, none) center / cover no-repeat; opacity: 0;
+      transition: opacity .5s ease; transform-origin: 50% 55%; animation: ld-kb 30s cubic-bezier(.25,.1,.25,1) both; will-change: transform; }
+    .ld-has-still #loading .ld-still { opacity: 1; }
+    .ld-still-pending #loading .ld-sun, .ld-still-pending #loading .ld-ridges { display: none; }
+    .ld-still-pending #loading .ld-static { background: #0b0e16; }
+    .ld-still-pending:not(.ld-has-still) #loading .ld-snow { opacity: 0; }
+    @keyframes ld-kb { from { transform: scale(1.03) translate3d(0, 0, 0); } to { transform: scale(1.13) translate3d(var(--kbx, -1.5%), var(--kby, -0.8%), 0); } }
+    #loading .ld-flakes.c { background-image: radial-gradient(circle, rgba(255,255,255,.55) 0 3px, rgba(255,255,255,.18) 5px, transparent 7px);
+      background-size: 523px 611px; background-position: 120px 40px; filter: blur(2.2px); opacity: .5; animation-duration: 6.5s; }
     #loading .ld-flakes { position: absolute; inset: -40% 0 0 0; will-change: transform; opacity: .7;
       background-image: radial-gradient(circle, rgba(255,255,255,.95) 0 1.4px, transparent 2.2px), radial-gradient(circle, rgba(255,255,255,.7) 0 1px, transparent 1.6px);
       background-size: 173px 211px, 97px 131px; background-position: 0 0, 41px 67px; animation: ld-fall 16s linear infinite; }
     #loading .ld-flakes.b { background-size: 331px 367px, 229px 263px; background-position: 30px 90px, 160px 10px; filter: blur(1.2px); opacity: .55; animation-duration: 9s; }
     @keyframes ld-fall { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-60px, 28.57%, 0); } }
-    #loadcanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 1.8s ease; }
-    #loading.live #loadcanvas { opacity: 1; }
+    /* Shown from the start: it stays transparent until the worker's first frame, which redraws the painted
+       still exactly (src/loading/still.js) and dissolves into the live shot itself. */
+    #loadcanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    #loading .ld-snow { position: absolute; inset: 0; overflow: hidden; pointer-events: none; transition: opacity 2.5s ease; }
+    #loading.live .ld-snow { opacity: 0; }
     #loading.live .ld-static { opacity: 0; }
     #loading.static #loadcanvas { display: none; }
     /* Cinematic 2.2:1 bars: the overlay lives in them; they retract on the hand-off. */
@@ -57,15 +107,29 @@
     #loading.out, #loading.out-quick { pointer-events: none; background: transparent; }
     #loading.out .ld-ui, #loading.out-quick .ld-ui { opacity: 0; }
     #loading.out .ld-bars i { transform: scaleY(0); }
-    #loading.out #loadcanvas, #loading.out .ld-static { opacity: 0; transform: scale(1.07); transition: opacity var(--out) cubic-bezier(.4,0,.2,1), transform var(--out) cubic-bezier(.3,0,.1,1); }
+    #loading.out #loadcanvas, #loading.out .ld-static, #loading.out .ld-snow { opacity: 0; transform: scale(1.07); transition: opacity var(--out) cubic-bezier(.4,0,.2,1), transform var(--out) cubic-bezier(.3,0,.1,1); }
     #loading.out-quick { opacity: 0; transition: opacity var(--out) ease; }
+    /* Lobby -> mountain load: the mountain being loaded, named like a game's map card (bottom-left). */
+    #loading .ld-dest { position: absolute; left: clamp(20px, 4vw, 64px); bottom: calc(clamp(0px, calc((100vh - 100vw / 2.2) / 2), 16vh) + clamp(22px, 4vh, 44px));
+      opacity: 0; transform: translateY(8px); transition: opacity 1s ease .3s, transform 1s cubic-bezier(.2,.7,.2,1) .3s; text-shadow: 0 2px 24px rgba(0,0,0,.55); pointer-events: none; isolation: isolate; }
+    #loading .ld-dest.on { opacity: 1; transform: none; }
+    #loading .ld-dest::before { content: ""; position: absolute; z-index: -1; left: -30vw; right: -12vw; top: -14vh; bottom: -10vh;
+      background: radial-gradient(ellipse at 30% 70%, rgba(5,6,10,.5), rgba(5,6,10,0) 65%); }
+    #loading .ld-dest small { display: block; font-size: 11px; font-weight: 800; letter-spacing: .3em; text-transform: uppercase; color: var(--accent, #ffcc94); }
+    #loading .ld-dest b { display: block; margin-top: 6px; font-size: clamp(34px, 5vw, 76px); line-height: .95; font-weight: 900; font-style: italic; letter-spacing: .01em; text-transform: uppercase; }
+    #loading .ld-dest span { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; letter-spacing: .14em; text-transform: uppercase; color: rgba(250,248,243,.85); }
+    #loading .ld-dest em { font-style: normal; color: rgba(250,248,243,.55); }
+    #loading .ld-dest em::before { content: "·"; margin-right: 10px; }
+    #loading .ld-dest .dot { width: 10px; height: 10px; border-radius: 50%; background: #9aa; flex: none; }
+    #loading .ld-dest .dot.green { background: #3fbf6f; } #loading .ld-dest .dot.blue { background: #3f8cff; }
+    #loading .ld-dest .dot.black, #loading .ld-dest .dot.double-black { background: #111; box-shadow: 0 0 0 1.5px #fff; } #loading .ld-dest .dot.park { background: #ff8a2a; }
     @media (max-aspect-ratio: 1/1) { #loading .ld-bars { display: none; }
       #loading .ld-ui::before, #loading .ld-ui::after { content: ""; position: absolute; left: 0; right: 0; height: 26vh; pointer-events: none; }
       #loading .ld-ui::before { top: 0; background: linear-gradient(rgba(5,6,10,.55), transparent); }
       #loading .ld-ui::after { bottom: 0; background: linear-gradient(transparent, rgba(5,6,10,.7)); }
       #loading .ld-brand, #loading .ld-foot { z-index: 1; } #loading .ld-brand { top: 18px; } #loading .ld-foot { bottom: 22px; } }
     @media (max-width: 640px) { #loading .ld-foot { flex-direction: column; align-items: stretch; gap: 12px; } #loading .ld-progress { width: 100%; } #loading .ld-msg { text-align: left; } #loading .ld-cap { display: none; } }
-    @media (prefers-reduced-motion: reduce) { #loading .ld-flakes, #loading .bar::after { animation: none; } }
+    @media (prefers-reduced-motion: reduce) { #loading .ld-flakes, #loading .bar::after, #loading .ld-still { animation: none; } }
   </style>
 </head>
 <body>
@@ -84,13 +148,15 @@
         <path fill="#c7cde3" opacity=".55" d="M812 270 L790 300 L748 380 L760 385 L780 350 L800 330 Z"/>
         <path fill="#232a45" d="M-20 900 L-20 820 L180 790 L380 820 L600 780 L820 830 L1040 790 L1260 830 L1460 800 L1620 820 L1620 900 Z"/>
       </svg>
-      <div class="ld-flakes a"></div><div class="ld-flakes b"></div>
+      <div class="ld-still"></div>
     </div>
     <canvas id="loadcanvas"></canvas>
+    <div class="ld-snow" aria-hidden="true"><div class="ld-flakes a"></div><div class="ld-flakes b"></div><div class="ld-flakes c"></div></div>
     <div class="ld-bars" aria-hidden="true"><i></i><i></i></div>
     <div class="ld-ui">
       <div class="ld-brand"><div class="title">SENDIT</div></div>
       <div id="loadcap" class="ld-cap" aria-hidden="true"></div>
+      <div id="loaddest" class="ld-dest" aria-live="polite"></div>
       <div class="ld-foot">
         <div id="loadtips" class="ld-tips" aria-live="off"></div>
         <div class="ld-progress" role="progressbar" aria-label="Loading">
@@ -145,6 +211,8 @@
         <label for="set-sfx">Effects volume</label><input id="set-sfx" type="range" min="0" max="1" step="0.01" data-key="sfx" />
         <label for="set-mouseSens">Mouse sensitivity</label><input id="set-mouseSens" type="range" min="0.2" max="3" step="0.01" data-key="mouseSens" />
         <label for="set-camSens">Camera sensitivity</label><input id="set-camSens" type="range" min="0.2" max="3" step="0.01" data-key="camSens" />
+        <label for="set-fpStable">Steady helmet cam (flips)</label><input id="set-fpStable" type="checkbox" data-key="fpStable" />
+        <label for="set-fpLens">Goggle lens effects</label><input id="set-fpLens" type="range" min="0" max="1" step="0.05" data-key="fpLens" />
         <label for="set-snowfall">Light snowfall</label><input id="set-snowfall" type="checkbox" data-key="snowfall" />
         <label for="set-fullscreen">Fullscreen</label><input id="set-fullscreen" type="checkbox" data-key="fullscreen" />
       </div>
@@ -176,7 +244,11 @@
   </div>
 
   <div id="fade"></div>
-  <script type="module" src="/src/loading/index.js"></script>
-  <script type="module" src="/src/main.js"></script>
+  <!-- The loading screen first; the game's own code is fetched once the loading worker has its modules
+       (or after 2.5 s at most), so the hero shot isn't stuck behind the game's downloads. -->
+  <script type="module">
+    import('/src/loading/index.js').then(({ loadingScreen }) => loadingScreen.whenStarted(2500))
+      .catch((e) => console.error('[loading]', e)).then(() => import('/src/main.js'));
+  </script>
 </body>
 </html>

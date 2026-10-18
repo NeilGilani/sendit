@@ -140,6 +140,7 @@ export const PHYSICS = {
     spinThrowMax: 3.4,        // … up to this without a wind-up (rad/s)
     spinLateMax: 2.2, spinLateRate: 6, spinLateAir: 0.8,   // after the window steering still builds a spin: up to 2.2 rad/s (neutral) at 6 rad/s², with ≥ 0.8 s of air left
     spinMinH: 0.5, spinCheck: 3.2, airTwist: 1.0,   // below spinMinH not spinning; check-back / hip-twist rates (rad/s)
+    spinDrift: 1,             // a spin the other way no faster than this × spinLateMax (pre-wind, a late-reversed throw) turns round with the stick against it (late spin rules)
     poseTime: 0.22,           // s to tuck in / open up fully (the rotation speeds up and slows gradually)
     rollSet: 0.6,             // set share rolling off without a pop
     // Flips (W = front, S = back): rad/s in the open (layout) pose, × flipTuckGain tucked.
@@ -190,6 +191,7 @@ export const PHYSICS = {
     // Rotation (see ski): a board spins a little faster (one platform, arms free): 390°/s neutral, 565°/s tucked.
     spinSet: 6.8, spinTuckGain: 1.45, spinOpen: 0.6, spinResponse: 9, prewind: 0.55, windupSpin: 3.2,
     spinThrow: 0.3, spinThrowAir: 0.1, spinThrowRate: 20, spinThrowMax: 3.8, spinMinH: 0.5, spinCheck: 3.2, airTwist: 1.0,
+    spinDrift: 1,
     spinLateMax: 2.4, spinLateRate: 6.5, spinLateAir: 0.8,
     poseTime: 0.22, rollSet: 0.6,
     // Flips (W = tamedog / front, S = wildcat / back, over the toe-heel axis): 185°/s open, 425°/s tucked.
@@ -251,6 +253,18 @@ export const ANIM = {
   restCrouch: 0.12,           // crouch (0..1) standing still: people stand tall at rest, the athletic stance comes with speed
   skiHipsFwd: 0.035,          // m the hips sit forward of the hip joints' rest spot: centred over the boots, shins pressed into the tongues
   powderBack: 0.03,           // m skiers sit back in deep powder (tips up)
+  // Head in the air (rider.airLook): leads the rotation, then spots the landing point.
+  airHeadLead: 0.09,          // rad of head yaw per rad/s of spin (into the spin) …
+  airHeadLeadMax: 0.55,       // … up to this
+  airHeadFlip: 0.35,          // rad: head thrown back into a backflip / chin in for a frontflip
+  airSpot: [0.8, 0.35],       // s before touchdown the eyes start finding the landing … and are on it
+  airSpotYaw: 1.25,           // rad the head (and shoulders) turn to it at most
+  airSpotPitch: 0.75,         // rad down at most
+  airSpotShoulders: 0.35,     // share of the head's turn the shoulders take
+  airHeadResponse: 9,         // 1/s smoothing
+  comboOpen: [0.55, 0.3],     // s before touchdown a cork / rodeo stays compact until … and is open by
+  comboCrouch: 0.45,          // crouch a combo holds through the off-axis part (knees up)
+  comboArmsIn: 0.7,           // how far the arms wrap in through it
   spotLanding: 0.3,           // rad the head pitches down to spot the landing in the last ~0.8 s of a jump
   gearSinkVisual: 0.15,       // share of the physics powder sink shown (the snow reads as packed, so the gear rides on top)
   board: {
@@ -278,8 +292,11 @@ export const ANIM = {
 // ------------------------------------------------------------------ CameraController
 export const CAMERA = {
   baseFov: 66,
-  fpFov: 80,                  // first person: wide helmet-cam lens
-  fpFovBonus: 14,
+  // First person (helmet cam, fpview.js): vertical FoV (deg) of the wide helmet-cam lens, the extra at
+  // top speed, and the extra while rotating fast (deg at 2π rad/s). The only source for these values.
+  fpFov: 74,
+  fpFovBonus: 10,
+  fpSpinFov: 5,
   maxFovBonus: 8,             // currentFoV = baseFoV + velocityRatio * maxFovBonus
   fovRiseRate: 2.2,           // 1/s easing up
   fovSnapRate: 14,            // 1/s snapping back on crash / hard brake
@@ -304,20 +321,44 @@ export const CAMERA = {
   steepPitch: 0,              // extra downward pitch (deg) per 10° beyond 30°
   flowFov: 0,                 // FoV kick (deg) entering the flow state (physics/flow.js), half of it held while it lasts
   airLook: 0,                 // in big air, look this share further down toward the landing (0..1)
-  airFollowY: null,           // s: vertical follow smoothing in the air (null = followSmooth · 1.8)
+  airFollowY: null,           // s: vertical follow smoothing in the air (null = followSmooth · 1.2)
+  // Turns (docs/game-feel.md "Chase camera"): the yaw chases the travel direction at yawRate (1/s), harder by
+  // yawRateTurn at a turn rate of 1 rad/s, and leads it by turnLead s of the turn rate (low-passed at turnRateSmooth
+  // 1/s). Steady-carve lag ≈ turnRate · (1 / rate − turnLead): ~20° before, a few degrees now.
+  yawRate: 3.2,
+  yawRateTurn: 2,
+  turnLead: 0.14,
+  turnRateSmooth: 6,
+  // Air framing. The camera follows the flight line, never the rotating body; the horizon stays level.
+  airYawRate: 1.0,            // 1/s yaw chase in the air (the flight direction barely changes)
+  airFrameFrom: 0.5,          // s of predicted total air where the air framing starts …
+  airFrameFull: 1.2,          // … and is full (hops change nothing)
+  airIn: 2.5, airOut: 2.2,    // 1/s easing into / out of the air framing (no snap at take-off or touchdown)
+  airPull: 0.3,               // m further back in the air
+  airRise: 0.6,               // m higher in the air
+  airFov: 2,                  // deg wider in the air
+  // Big air side swing: a three-quarter angle that shows flips and spins together.
+  airSideFrom: 0.9, airSideFull: 1.6,   // s of predicted total air where the swing starts / is full
+  airSideDeg: 50,             // deg off the travel line at full swing
+  airSideDist: 6.2,           // arm length (m) at full swing (+ airPull)
+  airSidePitch: -6,           // arm pitch (deg) at full swing
+  airSideFov: 2,              // deg narrower at full swing
+  sideIn: 2.4, sideReturn: 2.5,          // 1/s swinging out / back
+  airSideLand: 0.4,           // share of the swing kept at touchdown (the rest swings back on the approach)
+  // Landing approach: from landLead s before the predicted touchdown to landSettle s the camera raises its arm to
+  // landPitch and aims landLook of the way from the rider toward the landing point, keeping the rider within
+  // landKeep of the half-frame from the centre.
+  landLead: 0.9,
+  landSettle: 0.25,
+  landPitch: -16,
+  landLook: 0.5,
+  landKeep: 0.72,
+  armClear: 0.9,              // m: in the air the arm tilts up to keep this clear of the snow behind the rider …
+  liftMax: 4,                 // … by at most this much at the camera (beyond it the arm shortens)
 };
 
 // ------------------------------------------------------------------ FXManager
 export const FX = {
-  maxParticles: 4500,
-  cruiseRate: 26,             // fog particles / s while cruising
-  cruiseLife: 2.6,
-  carveRate: 170,             // wedge particles / s on hard carves
-  carveLife: 0.75,
-  carveSpeed: 9,
-  brakeBurst: 90,             // particles in the braking fan
-  brakeLife: 1.0,
-  landBurst: 110,
   nearMissRadius: 3.2,        // proximity speed lines when this close to a tree/rock/flag
   speedLineCount: 160,
   speedLineLife: 0.45,
@@ -327,9 +368,6 @@ export const FX = {
   skiSpacing: 0.26,           // metres between the two grooves
   plowWidth: 0.8,             // the shallow trough the boots + skis push through powder
   plowStrength: 0.42,
-  grainRate: 320,             // sugar grains / s from the skis (scaled by speed + powder)
-  grainLife: 0.9,
-  puffRate: 22,               // soft powder clouds / s
 };
 
 // ------------------------------------------------------------------ Art style (materials)
@@ -338,8 +376,6 @@ export const ART = {
   rimLightColor: [1.0, 0.78, 0.5],
   rimPower: 3.0,
   rimStrength: 0.45,
-  neonColor: [0.1, 1.0, 0.85],        // cyan neon trim
-  neonColor2: [1.0, 0.2, 0.75],       // pink neon trim
   windSpeed: 1.3,
   windIntensity: 0.05,
 };
@@ -392,5 +428,6 @@ function restore(dst, def) {
 export const HUD = {
   speedMilestones: [20, 35, 50],      // km/h — the speed readout bounces when crossing these
   windStreakFrom: 0.92,               // speed ratio where corner wind streaks start
+  fpWindEarly: 0.2,                   // first person: streaks start this much earlier (fainter, see main.js)
   windStreakFull: 1.0,
 };

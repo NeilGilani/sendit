@@ -78,5 +78,5 @@ export const SCENARIOS = {
   doubleback: { setup: kick({ v: 16, flip: 2, every: 0.1 }) },
   cork720: { setup: kick({ v: 15, flip: 1, spin: 4, every: 0.08 }) },
   misty: { setup: kick({ v: 14, flip: -1, spin: 3, every: 0.08 }) },
-  crash: { setup: timed('if (t > 0.5 && p.state === 1) p.crash("test");', [[0.45, 'pre'], [0.7, 'crash'], [1.4, 'tumble']], RUN, 12) },
+  crash: { setup: timed('if (t > 0.5 && p.state === 1) p.crash("test");', [[0.45, 'pre'], [0.7, 'crash'], [1.4, 'tumble'], [2.4, 'settled']], RUN, 12) },
 };

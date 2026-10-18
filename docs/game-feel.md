@@ -75,9 +75,9 @@ The HUD regions, from top to bottom:
 
 - **Combo panel.** It appears from ×1.5 and shows ×mult (cyan, then gold from ×2.5, then blazing orange from ×4), the points, the last three moves and a timer bar. The multiplier bumps on every increase.
 - **At risk.** While a chain of ×3 or more rides on an air or a rail, the screen edge pulses pink at 0.55 s to show the stakes. It is off with reduced motion.
-- **Announcer, at 37 % of the height**, under the combo panel and above the rider. A grade badge sits over the trick name in big slanted type, with +points and extras (drop height, SWITCH) below. It slams in at 1.9× scale with blur and settles in about 0.2 s.
+- **Announcer, at 30 % of the height**, under the combo panel and above the landing the chase camera frames near the middle of the screen (it was at 37 %, on top of it). A grade badge sits over the trick name in big slanted type, with +points and extras (drop height, SWITCH) below. It slams in at 1.9× scale with blur and settles in about 0.2 s.
 - **Combo tiers.** Under the multiplier a tier word pops in as each tier is reached: NICE from ×2, SICK ×3, INSANE ×4, UNREAL ×5, GODLIKE ×6 (`TIERS`).
-- **Live air, at 33 % of the height.** Air and announcer never show together. A straight air with no spin, flip or grab shows its hang time ticking ("1.4s") from 1 s, and the height above the snow once it passes 4 m. The number heats up with the rotation: white, then cyan from 360, gold from 720, orange from 1080. Once the air passes 0.45 s, the rotation shows in 180° steps and bumps on each new 180. It also shows flips (`FLIP`, `2× FLIP`) and the grab being held.
+- **Live air, at 24 % of the height, gone for the last 0.5 s before touchdown** (`liveAirClear`) so the landing is clear to spot (it was at 33 %, over the landing). Air and announcer never show together. A stumble's announcement carries why on its sub-line ("OVER-ROTATED 31°", "40° SIDEWAYS", "HARD LANDING": player.js `landingWhy`); a landing crash shows it as a call-out. A straight air with no spin, flip or grab shows its hang time ticking ("1.4s") from 1 s, and the height above the snow once it passes 4 m. The number heats up with the rotation: white, then cyan from 360, gold from 720, orange from 1080. Once the air passes 0.45 s, the rotation shows in 180° steps and bumps on each new 180. It also shows flips (`FLIP`, `2× FLIP`) and the grab being held.
 - **Floating score pops.** Minor scores under 100 points rise off the rider's screen position as "+15 CLOSE SHAVE" or "+20 GATE", with at most 4 alive, one per 0.4 s, and no repeat of the same move within 1 s. They skip tricks (the announcer has those), distance markers and combo bonuses.
 - **Call-outs, below centre.** CLOSE SHAVE, then ×n for a streak within 2.6 s (gold from ×3). RAZOR CLOSE! appears under 0.8 m. RAIL LOST and line-goal steps also show here.
 - **Streak call-outs.** STOMP STREAK ×n appears from 3 stomped or perfect landings in a row. n CLEAN IN A ROW appears every 5 named tricks landed without a crash.
@@ -169,6 +169,80 @@ The best run's splits are saved only when the activity reports a new best time, 
 
 Events: `juiceSplit {i, time, best, delta}` and `juiceSplitFinal {time, best, delta, isBest}`.
 
+## 3c. Chase camera (camera.js)
+
+The chase camera follows the path, not the body. Its anchor is the rider's interpolated position (`renderPos`,
+the feet on the flight line). Flips turn the body about its centre of mass in `rider.js`, and spins turn it about
+the vertical, so neither moves the camera. `lookAt` uses the world up, so the horizon stays level in the air. The
+only roll is the carve tilt (on the snow only), the juice punches and the shake. The heading spins with the rider,
+so in the air the yaw follows the flight direction (held when there is almost no horizontal speed). First person
+(`fpview.js`), the lift ride, the crash follow and the menu flyover are unchanged.
+
+**Air framing.** Every air frame, `predictLanding()` marches the flight against the real terrain (gravity ×
+`airGravity`, air drag; one `getHeight` per 1/30 s, ≤ 4 s) to get the touchdown time `tl` and point. From that:
+
+| Phase | What the camera does |
+|---|---|
+| Take-off | Nothing snaps. Every change below goes through critically damped springs (`spring()`), so they start and stop with zero velocity. The old exponential chase jumped to full speed in one frame. |
+| In the air (`airK`, from the predicted total air: 0 below `airFrameFrom` s, 1 from `airFrameFull` s, so hops change nothing) | `airRise` m higher, `airPull` m further back, `airFov`° wider, and a gentler yaw chase (`airYawRate`). |
+| Big air (`airSideFrom`–`airSideFull` s of total air) | It swings `airSideDeg` (50°, was 70°) to a three-quarter angle that shows a flip and a spin together. The side is picked from the spin direction (as before). |
+| Landing approach (`preK`, 0 until `landLead` 0.9 s before touchdown, 1 at `landSettle` 0.25 s) | The swing comes most of the way back behind (`airSideLand` of it is left). The arm rises to `landPitch`, steeper by the landing's own slope (as on the snow), and the aim moves `landLook` of the way from the rider toward the landing point. The rider is held within `landKeep` of the half-frame. The player sees the landing slope beside or above the rider, and their angle to it, in time to adjust. |
+| Touchdown and after | The springs ease back over ~0.5 s (`airOut`, `sideReturn`). The ground yaw rate blends back in through `airK`. The juice landing punch (dip and lens) still plays on top. |
+
+In the air the arm tilts up over terrain behind the rider (`armLift`), up to `liftMax` m, keeping `armClear` m clear.
+It rises fast and settles slowly. Before, the arm collapsed toward the rider in one frame when a steep landing
+rose into it, which pitched the view ~5° per frame just before touchdown. On the snow, and beyond `liftMax`, the
+arm shortens as before. Maps with `airLook` (Ravenspire, Kitsune, Fjordline, Dragonback, Voltage) still look
+down toward the drop in big air. That fades out as the landing approach takes over.
+
+**Turns (HANDOFF #4).** A plain exponential yaw chase trails a steady carve by turn rate / `yawRate`, about 14–20°
+in a hard turn. The camera now leads the travel direction by `turnLead` s of the turn rate, low-passed at
+`turnRateSmooth` 1/s so edge changes don't twitch it. It also chases `yawRateTurn` harder while turning. A hard
+carve now trails ~5–6° and a slalom ~4°.
+
+**Tunables** (`CAMERA` in config.js; per-map `course.camera` can override any of them):
+
+| Key | Default | Meaning |
+|---|---|---|
+| `yawRate`, `yawRateTurn` | 3.2, 2 | 1/s yaw chase on the snow, plus this much at a 1 rad/s turn |
+| `turnLead`, `turnRateSmooth` | 0.14 s, 6 /s | how far the yaw leads the turn, the turn rate's low-pass |
+| `airYawRate` | 1.0 | 1/s yaw chase in big air |
+| `airFrameFrom`, `airFrameFull` | 0.5, 1.2 s | predicted total air where the air framing starts / is full |
+| `airIn`, `airOut` | 2.5, 2.2 | spring rates into / out of the air framing (ω = 2 × rate) |
+| `airPull`, `airRise`, `airFov` | 0.3 m, 0.6 m, 2° | further back, higher, wider in the air |
+| `airSideFrom`, `airSideFull` | 0.9, 1.6 s | total air where the side swing starts / is full |
+| `airSideDeg`, `airSideDist`, `airSidePitch`, `airSideFov` | 50°, 6.2 m, −6°, 2° | the swing's angle, arm, arm pitch and lens narrowing |
+| `sideIn`, `sideReturn` | 2.4, 2.5 | swing spring rates out / back |
+| `airSideLand` | 0.4 | share of the swing left at touchdown |
+| `landLead`, `landSettle` | 0.9, 0.25 s | landing approach window (before the predicted touchdown) |
+| `landPitch`, `landLook`, `landKeep` | −16°, 0.5, 0.72 | arm pitch on the approach (minus 0.75 × landing slope), aim share toward the landing, rider kept within this share of the half-frame |
+| `armClear`, `liftMax` | 0.9 m, 4 m | the arm's clearance over terrain in the air, and the most it tilts up |
+| `airFollowY` | null | vertical follow smoothing in the air (null = `followSmooth` × 1.2, was × 1.8) |
+
+The shake slider (`settings.juiceShake`), reduced motion and the punches work as before.
+
+**Checking it.** `node web/scripts/camshots.mjs <url> <outDir> [ski|snowboard] [scenario,…|all]` rides the
+scenarios in `camscenarios.mjs` in the real game. The scenarios are backflip, frontflip, 360, 720, cork 720,
+rodeo 540, misty, a 360 with a backflip ("flatspin": there is no separate flat-spin input), a Voltage Park big-air
+720 and double cork 1080, the Ravenspire First Stack cliff (straight and with a 360), a hard carve, a slalom and a
+crash. `requestAnimationFrame` gets virtual time, so the camera sees exact 60 Hz frames however slow the headless
+renderer is. The script logs the camera every frame and writes a contact sheet per scenario, with the predicted
+landing ringed in red, the pelvis in cyan and the HUD hidden (`HUD=1` keeps it). Its metrics: `rollAir` (horizon
+tilt), `wMax` / `accMax` (fastest view turn and its change, i.e. snaps), `riderOut` (share of frames with the
+rider near the edge), `landVis06` (share of the last 0.6 s with the landing in frame), `yawErrMean` on the snow
+(turn lag) and `clearMin` (terrain clearance).
+
+Before → after (ski; snowboard is the same within a few %):
+
+| | before | after |
+|---|---|---|
+| landing in frame, last 0.6 s (Valcrest L / Voltage big air / cliff) | 21–32 % / 24–26 % / 6–15 % | 100 % / 100 % / 100 % |
+| landing on screen at 0.6 s before touchdown (y, −1 = bottom edge) | −1.06 … −1.46 (off screen) | −0.49 … −0.62 |
+| fastest view turn, take-off / touchdown | 300 / 700–840 °/s (one-frame snaps) | ≤ 80 / ≤ 190 °/s (≤ 80 on big air) |
+| horizon roll in the air | ≤ 1.7° | ≤ 1.7° (both are the carve tilt easing out) |
+| carve / slalom yaw lag (mean) | 14° / 13° | 6° / 4° |
+| min terrain clearance, Voltage / Ravenspire | 0.42–0.48 m | 1.8–1.9 m |
+
 ## 4. Speed rush (juice/speedfx.js)
 
 This is one `EffectPass`, inserted before SMAA through `composer.addPass(pass, index)`; the gfx internals are not edited. It applies a radial zoom blur and a chromatic fringe that grow toward the screen edges, with the centre (radius 0.22) left clear. Rush lines (thin bright radial streaks) appear on boost moments.
@@ -225,6 +299,7 @@ Bus events: `musicEnergy {level}` at 5 Hz, and `musicDrop {kind, strength}`.
 - **Ranks (`RANKS`).** Rookie from level 1, Shredder from 5, Ripper from 10, Pro from 20, Legend from 35, Mountain God from 60. Each rank has a colour, used for the badge, the celebration and the Progress tab.
 - **Rank emblems.** `rankEmblem(level)` draws one chevron per rank tier (up to four), with a star from Legend. They appear on the chip badge and the Progress card, where the next rank is shown too ("Ripper at level 10", `nextRank()`).
 - **Ride button.** It glows gold while today's 2× XP is unused.
+- **Level-up card** at 32 % of the height (was 42 %, over the landing); it waits for the trick announcement and fades back as soon as the rider takes off again.
 - **Stacked level-ups.** Several levels gained at once (a big XP jump) play as one celebration of the highest level ("LEVEL UP · +4").
 - **Level-up.** If a trick is announced while it plays, it fades back to let the trick read. It waits (up to 4 s) while the rider is in the air or a trick is being announced, then plays a full-screen celebration (rings, the level number slamming in, the rank and XP to the next level) plays over the ride and the lobby. Level-ups queue, rumble, give a music drop and flash.
 - **XP bar.** A small bar under the speedometer fills in ride and fades out after 2.5 s.
