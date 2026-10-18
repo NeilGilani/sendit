@@ -20,13 +20,13 @@ import { State } from './player.js';
 import { ANIM, ART, PHYSICS } from './config.js';
 import { chairGeo } from './lifts.js';
 import { toonMaterial, outlineMaterial, mulberry32 } from './world.js';
-import { on } from './state.js';
+import { on, emit } from './state.js';
 import { createEquipmentModel, disposeEquipmentModel, poleGeometry } from './equipment/models.js';
 import { getEquipmentSpec, normalizeType } from './equipment/registry.js';
 import { dressRider, HEAD_SCALE, OUTFIT_SLOTS } from './character/index.js';
 import { outfitSlotsFromProfile } from './character/profile.js';
 import { proportionRig } from './character/body.js';
-import { FP, FP_BOARD, fpSkiArm, fpBoardArm, fpPoleDir, fpProtract, fpHand, fpShadow } from './fpview.js';
+import { FP, FP_BOARD, FP_POLE, fpPoleGeometry, fpSkiArm, fpBoardArm, fpPoleDir, fpProtract, fpHand, fpShadow } from './fpview.js';
 import { BodyDynamics } from './character/dynamics.js';
 import { Ragdoll } from './character/ragdoll.js';
 
@@ -167,7 +167,7 @@ export class Rider {
 
   buildGear() {
     // Poles: placed every frame from the hands (see placePoles).
-    const pg = poleGeometry();
+    const pg = this.poleGeo = poleGeometry();
     const pm = toonMaterial({ name: 'pole', vertexColors: true, rim: 0.4 });
     this.poles = [0, 1].map(() => { const m = new THREE.Mesh(pg, pm); m.castShadow = true; this.visual.add(m); return m; });
     // Lift chair (personal seat while riding up).
@@ -1005,30 +1005,44 @@ export class Rider {
     const hand = new THREE.Vector3(), dir = new THREE.Vector3(), q = new THREE.Quaternion();
     const down = new THREE.Vector3(0, -1, 0);
     [['hand_l', -1], ['hand_r', 1]].forEach(([name, sx], i) => {
-      if (this.fp) this.bones[name].localToWorld(hand.set(0, 0.075, 0.012));   // first person: the grip sits in the fist, not at the wrist
+      const pole = this.poles[i], fp = !!this.fp;
+      const geo = fp ? fpPoleGeometry() : this.poleGeo;
+      if (pole.geometry !== geo) pole.geometry = geo;   // first person: the detailed pole (fpview.js)
+      if (fp) this.bones[name].localToWorld(hand.set(0, 0.075, 0.012));   // first person: the grip sits in the fist, not at the wrist
       else this.bones[name].getWorldPosition(hand);
       this.visual.worldToLocal(hand);
       const plant = p.plant[i];
-      dir.set(sx * 0.16, -1, 0.42 - plant * 0.9).normalize();
-      if (p.idle > 0.01) dir.lerp(_v2.set(sx * 0.12, -1, -0.12), p.idle * (1 - p.air)).normalize();   // planted ahead at rest
-      if (this.fp) fpPoleDir(this, i, sx, dir);   // first person: shafts angled out past the gloves (fpview.js)
-      if (p.push > 0.01) { const ph = p.pushPhase || 0; dir.lerp(new THREE.Vector3(sx * 0.1, -1, ph < 0.4 ? 0.1 : 0.55 + (ph - 0.4)), p.push).normalize(); }
-      dir.lerp(new THREE.Vector3(sx * 0.08, -0.3, 1).normalize(), p.tuck).normalize();
-      dir.lerp(new THREE.Vector3(sx * 0.22, -0.7, 0.68).normalize(), p.air * 0.6).normalize();   // air: trailing back
-      // The tip rests on the snow, not through it: with the hand low (deep crouch, long arms) the shaft
-      // swings further back. Snow in this (lean-rolled) frame sits at y = x · tan(lean), as for the skis.
-      if (!this.fp && p.air < 0.5) {
-        const L = this.poleLen ?? (this.poleLen = (this.poles[i].geometry.computeBoundingBox(), -this.poles[i].geometry.boundingBox.min.y));
-        const snowY = (hand.x + dir.x * L) * Math.tan(p.lean) - 0.04;
-        const maxDown = (hand.y - snowY) / L;
-        if (-dir.y > maxDown && maxDown > 0.15) {
-          const h = Math.hypot(dir.x, dir.z), c = Math.sqrt(1 - maxDown * maxDown);
-          dir.set(dir.x / h * c, -maxDown, dir.z / h * c);
+      let L;
+      if (fp) { fpPoleDir(this, i, sx, dir, hand); L = FP_POLE.length; }   // first person (fpview.js)
+      else {
+        dir.set(sx * 0.16, -1, 0.42 - plant * 0.9).normalize();
+        if (p.idle > 0.01) dir.lerp(_v2.set(sx * 0.12, -1, -0.12), p.idle * (1 - p.air)).normalize();   // planted ahead at rest
+        if (p.push > 0.01) { const ph = p.pushPhase || 0; dir.lerp(new THREE.Vector3(sx * 0.1, -1, ph < 0.4 ? 0.1 : 0.55 + (ph - 0.4)), p.push).normalize(); }
+        dir.lerp(new THREE.Vector3(sx * 0.08, -0.3, 1).normalize(), p.tuck).normalize();
+        dir.lerp(new THREE.Vector3(sx * 0.22, -0.7, 0.68).normalize(), p.air * 0.6).normalize();   // air: trailing back
+        // The tip rests on the snow, not through it: with the hand low (deep crouch, long arms) the shaft
+        // swings further back. Snow in this (lean-rolled) frame sits at y = x · tan(lean), as for the skis.
+        L = this.poleLen ?? (this.poleLen = (this.poleGeo.computeBoundingBox(), -this.poleGeo.boundingBox.min.y));
+        if (p.air < 0.5) {
+          const snowY = (hand.x + dir.x * L) * Math.tan(p.lean) - 0.04;
+          const maxDown = (hand.y - snowY) / L;
+          if (-dir.y > maxDown && maxDown > 0.15) {
+            const h = Math.hypot(dir.x, dir.z), c = Math.sqrt(1 - maxDown * maxDown);
+            dir.set(dir.x / h * c, -maxDown, dir.z / h * c);
+          }
         }
       }
-      this.poles[i].position.copy(hand);
-      this.poles[i].quaternion.copy(q.setFromUnitVectors(down, dir));
-      this.poles[i].visible = p.sit < 0.5;
+      pole.position.copy(hand);
+      pole.quaternion.copy(q.setFromUnitVectors(down, dir));
+      pole.visible = p.sit < 0.5;
+      // Pole plant touch-down (a quarter into the plant): a puff of snow at the basket (fx.js).
+      const prev = this._plantPrev?.[i] ?? 0;
+      if (prev > 0.75 && plant <= 0.75 && p.air < 0.1 && pole.visible) {
+        const tip = hand.clone().addScaledVector(dir, L);
+        this.visual.localToWorld(tip);
+        emit('polePlant', { x: tip.x, y: tip.y, z: tip.z, side: sx });
+      }
+      (this._plantPrev ||= [0, 0])[i] = plant;
     });
     void pl;
   }

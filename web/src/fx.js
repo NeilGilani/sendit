@@ -111,6 +111,8 @@ export class FXManager {
     const pw = () => this.player.powder ?? 0.5;
     on('jumped', (depth) => this.spray.puff(this.player.renderPos, 8 + depth * 22, pw(), 2 + depth * 2));
     on('landed', ({ impact }) => this.spray.landing(this.player.renderPos, impact, pw()));
+    // Ski pole plants (rider.js placePoles): a small puff of snow where the basket touches down.
+    on('polePlant', (e) => this.spray.puff(new THREE.Vector3(e.x, e.y, e.z), 5, pw(), 0.8));
     on('hardBrake', (speed) => {
       const pl = this.player;
       this.spray.stopFan(pl.renderPos, pl.forward(), speed || pl.speed, pw(), Math.sign(pl.turnInput || 1));

@@ -12,6 +12,7 @@ import { CAMERA as C } from './config.js';
 import { State } from './player.js';
 import { settings } from './state.js';
 import { lerpAngle, clamp } from './world.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export const FP = {
   // Eye: from the head bone (base of the skull), in the view frame: up / forward, metres.
@@ -228,10 +229,13 @@ export class FPView {
 // they frame the same way whatever the crouch: gloves in the bottom corners at arm's length (never a
 // giant mitt in the lens), pole shafts angled out past the gloves so they never hide behind the forearms.
 export const FP_ARMS = {
-  ski: { x: 0.27, y: -0.37, z: 0.33 },    // glove relative to the eye (x outward)
+  ski: { x: 0.3, y: -0.32, z: 0.38 },     // glove relative to the eye (x outward, y up, z along the view's heading)
   skiSpeed: { x: -0.02, y: 0.03, z: 0.08 },
-  skiTuck: { x: 0.12, y: -0.4, z: 0.3 },
-  plantReach: 0.14, turnReach: 0.06,
+  skiTuck: { x: 0.13, y: -0.35, z: 0.34 },
+  plantReach: 0.14, turnReach: 0.06, plantDrop: 0.05,
+  air: { x: 0.06, y: 0.05, z: -0.02 },     // in the air: gloves a little wider and higher (balance), poles out
+  flipTuck: { x: -0.08, y: -0.14, z: 0.02 },// flip tuck: hands in toward the shins
+  grind: { x: 0.1, y: 0.04 },
   minEye: 0.46,                             // gloves never closer to the eye than this (m)
   protract: 0.42, shrug: 0.0,               // shoulder blades forward (rad about Y) / up
   handScale: 0.86,                          // viewmodel glove scale
@@ -321,7 +325,7 @@ export function fpSkiArm(rider, side, pl, u, l) {
   const sway = Math.sin(p.t * 1.3 + side) * 0.012;
   const fp = new THREE.Vector3(
     side * (A.ski.x + A.skiSpeed.x * r),
-    A.ski.y + A.skiSpeed.y * r + env * 0.06 + sway,
+    A.ski.y + A.skiSpeed.y * r - env * A.plantDrop + sway,
     A.ski.z + A.skiSpeed.z * r + env * A.plantReach + reach,
   );
   // Tuck: gloves together in front of the chin, poles under the arms.
@@ -330,15 +334,34 @@ export function fpSkiArm(rider, side, pl, u, l) {
   const pu = p.push || 0;
   if (pu > 0.01) {
     const q = p.pushPhase || 0, f = q < 0.4 ? q / 0.4 : 1 - (q - 0.4) / 0.6;
-    fp.lerp(_b.set(side * 0.27, -0.85 + f * 0.33, 0.05 + f * 0.47), pu);
+    fp.lerp(_b.set(side * 0.27, -0.62 + f * 0.3, 0.12 + f * 0.36), pu);
   }
   // Looking down: the gloves part so the knees and skis show between them.
   const ld = THREE.MathUtils.smoothstep(-(rider.fpLookPitch ?? -20), 30, 55);
   fp.x += side * 0.16 * ld; fp.y -= 0.05 * ld;
   // Hockey stop / plough: hands forward and a little wider for balance.
   fp.x += side * 0.06 * Math.max(p.stop || 0, p.plow || 0); fp.z += 0.05 * (p.stop || 0);
+  // Air: balance hands stay framed (wider, higher, a slow sway); flip tuck pulls them in toward the
+  // shins; a spin wrap brings them in, flung wide lets them out; on a rail they go wide.
+  const air = p.air || 0, ft = clamp(p.flipTuck || 0, 0, 1), si = clamp(p.spinTuck || 0, -1, 1);
+  fp.x += side * (A.air.x * air + A.flipTuck.x * ft - 0.08 * si + A.grind.x * (p.grind || 0));
+  fp.y += A.air.y * air + Math.sin(p.t * 3.1 + side) * 0.02 * air + A.flipTuck.y * ft - 0.05 * Math.max(0, si) + A.grind.y * (p.grind || 0);
+  fp.z += A.air.z * air + A.flipTuck.z * ft;
+  // Into armature space along the helmet cam's heading (level, body-relative): in a hockey stop or a
+  // counter-rotated carve the skis and hips point away from where you look, the gloves stay framed.
+  const fpEye = _be2, fw = _bz2, lf = _bx2;
+  if (viewArmature(rider, lf, _by, fw, fpEye)) {
+    fw.y = 0;
+    if (fw.lengthSq() < 0.05) fw.set(0, 0, 1); else fw.normalize();
+    lf.crossVectors(Y, fw);                      // armature +X is the rider's left
+    eye.copy(fpEye);
+    fp.set(lf.x * fp.x + fw.x * fp.z, fp.y, lf.z * fp.x + fw.z * fp.z);
+  }
   fp.add(eye);
-  const w = (1 - (p.air || 0)) * (1 - (p.stumble || 0)) * (1 - (p.crash || 0)) * (1 - (p.grind || 0)) * (1 - (p.sit || 0)) * (1 - (p.grab || 0));
+  // The grabbing hand reaches for real (third-person arm); stumbles flail half of it; the chair sits.
+  const name = pl.grabName || 'Safety', grabHand = name === 'Mute' ? -1 : 1;
+  const grab = side === grabHand || name === 'Truck driver' ? (p.grab || 0) : 0;
+  const w = (1 - 0.6 * (p.stumble || 0)) * (1 - (p.crash || 0)) * (1 - (p.sit || 0)) * (1 - grab);
   const hand = tp.lerp(fp, w);
   if ((p.sit || 0) < 0.5 && (p.crash || 0) < 0.5) keepOffEye(hand, eye, A.minEye);
   return armIK(rider, side, hand, _c.set(side * A.elbow[0], A.elbow[1], A.elbow[2]).normalize().clone());
@@ -368,6 +391,7 @@ export const FP_BOARD = {
 };
 
 const _bq = new THREE.Quaternion(), _bq2 = new THREE.Quaternion(), _bm = new THREE.Matrix4();
+const _bx2 = new THREE.Vector3(), _bz2 = new THREE.Vector3(), _be2 = new THREE.Vector3();
 const _bx = new THREE.Vector3(), _by = new THREE.Vector3(), _bz = new THREE.Vector3(), _be = new THREE.Vector3();
 
 /**
@@ -437,16 +461,83 @@ export function fpBoardArm(rider, side, front, pl, u, l) {
   return armIK(rider, side, hand, pole);
 }
 
+// Poles in first person: a detailed pole (grip with knob and finger ridges, wrist strap, tapered shaft,
+// basket with spokes, carbide tip) at a real length for the rider, placed from the fist.
+export const FP_POLE = {
+  length: 1.24,                  // m, fist to tip (about 0.7 x rider height; the grip sits in the fist)
+  glide: [0.52, -1, -0.2],        // shaft direction gliding (visual frame: x out, y up, +z back)
+  plant: [0.2, -1, -0.42],       // swung forward to the snow on a plant
+  air: [0.5, -0.85, -0.12],      // in the air: out and a touch forward, in view below the gloves
+  tuck: [0.1, -0.35, 1],         // under the arms
+  shaft: [1.0, 0.24, 0.5],       // vertex colours (the catalog's pink shaft)
+  grip: [0.035, 0.035, 0.045], ring: [0.55, 0.55, 0.6], strap: [0.06, 0.06, 0.08], basket: [0.03, 0.03, 0.04], tip: [0.7, 0.72, 0.75],
+};
+
+let _fpPoleGeo = null;
+/** The first-person pole (origin at the fist, pointing down -Y). Built once. */
+export function fpPoleGeometry() {
+  if (_fpPoleGeo) return _fpPoleGeo;
+  const P = FP_POLE, L = P.length;
+  const paint = (g, c) => {
+    g = g.index ? g.toNonIndexed() : g;
+    const n = g.attributes.position.count, a = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) a.set(c, i * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(a, 3));
+    if (g.attributes.uv) g.deleteAttribute('uv');
+    return g;
+  };
+  const parts = [];
+  // Grip: a slightly waisted moulded handle with a knob on top and three finger ridges.
+  const grip = new THREE.LatheGeometry([[0, 0.07], [0.019, 0.07], [0.022, 0.06], [0.018, 0.05], [0.0165, 0.03], [0.0185, 0.015], [0.0165, 0], [0.0185, -0.015], [0.0165, -0.03], [0.0185, -0.045], [0.016, -0.075], [0.012, -0.095], [0.0095, -0.1]].map(([r, y]) => new THREE.Vector2(r, y)), 14);
+  parts.push(paint(grip, P.grip));
+  const ring = new THREE.CylinderGeometry(0.0172, 0.0172, 0.008, 14); ring.translate(0, -0.062, 0); parts.push(paint(ring, P.ring));
+  // Wrist strap: a flat loop hanging from the top of the grip around the back of the glove.
+  const strap = new THREE.TorusGeometry(0.05, 0.0045, 4, 18, Math.PI * 1.55);
+  strap.scale(1, 1.35, 0.35); strap.rotateY(Math.PI / 2); strap.rotateX(Math.PI * 0.05); strap.translate(0, 0.02, 0.012);
+  parts.push(paint(strap, P.strap));
+  // Shaft: tapered, from the grip to the ferrule.
+  const sh = new THREE.CylinderGeometry(0.0092, 0.0062, L - 0.16, 10, 1, true); sh.translate(0, -0.1 - (L - 0.16) / 2, 0); parts.push(paint(sh, P.shaft));
+  // Basket: hub cone, a flat spoked disc and an outer ring.
+  const yb = -L + 0.075;
+  const hub = new THREE.CylinderGeometry(0.009, 0.014, 0.025, 10); hub.translate(0, yb, 0); parts.push(paint(hub, P.basket));
+  const disc = new THREE.CylinderGeometry(0.043, 0.043, 0.003, 18, 1); disc.translate(0, yb - 0.004, 0); parts.push(paint(disc, P.basket));
+  const rim = new THREE.TorusGeometry(0.043, 0.0045, 5, 20); rim.rotateX(Math.PI / 2); rim.translate(0, yb - 0.004, 0); parts.push(paint(rim, P.basket));
+  for (let k = 0; k < 4; k++) {
+    const sp = new THREE.BoxGeometry(0.084, 0.004, 0.006); sp.rotateY((k * Math.PI) / 4); sp.translate(0, yb - 0.001, 0); parts.push(paint(sp, P.ring));
+  }
+  // Tip: ferrule and carbide point.
+  const fer = new THREE.CylinderGeometry(0.0062, 0.0058, 0.05, 8); fer.translate(0, -L + 0.03, 0); parts.push(paint(fer, P.tip));
+  const tip = new THREE.ConeGeometry(0.0058, 0.02, 8); tip.rotateX(Math.PI); tip.translate(0, -L, 0); parts.push(paint(tip, P.tip));
+  _fpPoleGeo = mergeGeometries(parts);
+  _fpPoleGeo.computeBoundingSphere();
+  return _fpPoleGeo;
+}
+
+const V3 = (a) => _d.set(a[0], a[1], a[2]);
 /**
- * First-person pole shaft direction (rider.visual frame: +X right, −Z forward; `sx` −1 left / +1 right):
- * angled out past the glove and trailing a little while gliding, swung forward to the snow on a plant,
- * tucked back under the arms in a tuck. Air / push / grind blends are applied by the caller.
+ * First-person pole shaft direction (rider.visual frame: +X right, -Z forward; `sx` -1 left / +1 right):
+ * angled out past the glove while gliding, swung forward to the snow on a plant (the basket touches down
+ * at the envelope's peak), forward then back through a double-pole push, under the arms in a tuck, out
+ * and back in the air. With `hand` given (visual frame), the tip is kept on / above the snow.
  */
-export function fpPoleDir(rider, i, sx, out) {
-  const p = rider.p, plant = p.plant[i];
+export function fpPoleDir(rider, i, sx, out, hand) {
+  const p = rider.p, P = FP_POLE, plant = p.plant[i];
   const ph = 1 - plant, env = plant > 0 ? (ph < 0.25 ? ph / 0.25 : 1 - (ph - 0.25) / 0.75) : 0;
-  out.set(sx * 0.4, -1, -0.12).normalize();
-  out.lerp(_a.set(sx * 0.2, -1, -0.62).normalize(), env).normalize();
+  const g = V3(P.glide); out.set(sx * g.x, g.y, g.z).normalize();
+  const w = V3(P.plant); out.lerp(_a.set(sx * w.x, w.y, w.z).normalize(), env).normalize();
+  out.x += sx * 0.12 * Math.max(p.stop || 0, p.plow || 0);
+  if ((p.push || 0) > 0.01) { const q = p.pushPhase || 0; out.lerp(_a.set(sx * 0.14, -1, q < 0.4 ? -0.3 + q : 0.3 + (q - 0.4) * 1.4).normalize(), p.push).normalize(); }
+  const t = V3(P.tuck); out.lerp(_a.set(sx * t.x, t.y, t.z).normalize(), p.tuck || 0).normalize();
+  const a = V3(P.air); out.lerp(_a.set(sx * a.x, a.y, a.z).normalize(), (p.air || 0) * (1 - (p.grab || 0) * 0.5)).normalize();
+  if (hand && (p.air || 0) < 0.5) {
+    // Tip on the snow, not through it (snow in this lean-rolled frame: y = x * tan(lean)).
+    const L = P.length, snowY = (hand.x + out.x * L) * Math.tan(p.lean || 0) - 0.02;
+    const maxDown = (hand.y - snowY) / L;
+    if (-out.y > maxDown && maxDown > 0.15) {
+      const h = Math.hypot(out.x, out.z), c = Math.sqrt(1 - maxDown * maxDown);
+      out.set(out.x / h * c, -maxDown, out.z / h * c);
+    }
+  }
   return out;
 }
 
