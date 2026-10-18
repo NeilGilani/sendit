@@ -180,7 +180,9 @@ export class CameraController {
     const holding = (s.stop ?? 0) > 0.3 && s.state === State.GROUNDED;
     let wantYaw = holding ? this.yaw : travelYaw;
     if (air) wantYaw = hSpeed > 1 ? velYaw : this.yaw;
-    else if (speed > 2.5 && !crash) wantYaw = lerpAngle(wantYaw, velYaw, clamp((speed - 2.5) / 4, 0, 1));
+    // (hSpeed, not speed: on a lift ride speed is the cable speed and the velocity is zero, which used to pull the
+    // yaw toward world north.)
+    else if (hSpeed > 2.5 && !crash) wantYaw = lerpAngle(wantYaw, velYaw, clamp((hSpeed - 2.5) / 4, 0, 1));
     // Turn lag (HANDOFF #4): a plain exponential chase trails a steady carve by turnRate / yawRate (≈20° in a hard
     // turn). Lead the target by the smoothed turn rate and chase a little harder while turning: the camera stays a
     // few degrees behind the carve, and the low-passed rate keeps edge changes from twitching it.

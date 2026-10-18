@@ -95,5 +95,8 @@ export const SCENARIOS = {
   cliff360: { query: R, setup: jump(RAVEN, { v: 18, spin: 2, pop: false, back: 30 }) },
   carve: { query: V, setup: timed('c.steer = t < 1.4 ? 1 : -1;', [[0.3, 'in'], [0.7, 'r1'], [1.1, 'r2'], [1.5, 'sw'], [1.9, 'l1'], [2.4, 'l2']], RUN, 17) },
   slalom: { query: V, setup: timed('c.steer = Math.sin(t * 3.0) > 0 ? 1 : -1;', [[0.6, 'a'], [1.1, 'b'], [1.6, 'c'], [2.1, 'd'], [2.6, 'e'], [3.1, 'f']], RUN, 15) },
+  lift: { query: V, setup: `const L = pl.lifts?.nearestBase(pl.position); if (L) pl.board(L); else window.__done = true;
+    let t = 0; const at = [[1.5, 'seat'], [3, 'ride'], [5, 'ride2']]; window.__phase = 'lift';
+    pl.script = (c, p) => { t += 1 / 60; if (at.length && t >= at[0][0]) snap(at.shift()[1]); if (!at.length) window.__done = true; };` },
   crash: { query: V, setup: timed('if (t > 0.5 && p.state === 1) p.crash("test");', [[0.45, 'pre'], [0.7, 'crash'], [1.4, 'tumble'], [2.4, 'settled']], RUN, 12) },
 };
