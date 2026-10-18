@@ -229,15 +229,114 @@ machine.
   muddy maroon to blue-violet. Its own exposure / ambient are still dark; the suggested values were
   passed to the coordinator.
 
+## Trees growing in front of you (impostor pass)
+
+Branch `worktree-agent-a42180ad93d159b85`, measured on a MacBook Air (Apple GPU, ANGLE Metal, headless
+Chromium), shared with three other sessions. The user's report: *"Trees are being rendered as you go — you
+can see new leaves and snow being added in front of your eyes."*
+
+### What caused it
+
+The zero-pop pass made every tree LOD change continuous, so `gfxpopin.mjs` (which counts *jumps*) read 0.
+But the continuous changes were themselves visible, and close:
+
+1. **Near → mid geomorph.** Across the near band, the odd frond cards (and the snow on them) slid out of
+   the trunk while the even cards narrowed. Branches visibly grew as you approached. On Blackspruce
+   (`course.perf.treeNear 0.44`) that band sat at **14–18 m** on quality 1, and at 36–41 m on other maps.
+2. **Mid → far retract.** Mid-LOD cards grew out of the lumpy cone shells at 84–98 m on Blackspruce
+   (241–260 m elsewhere). A cone stack and a frond tree look different, so whole crowns turned from
+   blobs into needles and snow ridges.
+3. **Shadow shapes.** Fronds' shadows cross-faded into shadow-only cones at the same 18 m. Cones have a
+   different silhouette, so shadow edges on the snow moved.
+
+Not found: cell streaming (every tree is built at load), mid-ride shader compiles or texture uploads
+(`gfxpopin`: 0), alpha-boost jumps (continuous with mip level), shadow cascade pops (single texel-snapped
+map).
+
+### The fix (`gfx/trees.js`, `PERF.trees`)
+
+- **One far hand-over, nothing morphs.** 3D frond trees out to 36 / 58 / 80 m (q0 / q1 / q2); dense maps
+  may shrink that, but never below 30 / 45 / 60 m. Beyond that, every tree is an **impostor**: one
+  camera-facing card per tree that blends the 2 × 2 nearest of 36 pictures (12 directions × 3 elevations)
+  of the *same* frond tree. Across the last 30 % before the hand-over, fronds and impostor cross-fade with
+  complementary screen-door dither. No geometry moves, so nothing grows. The mid LOD and the cone shells are
+  gone.
+- **The pictures match the live tree.** They are baked at load by the frond shader itself, for both species
+  and 3 snow-load levels: albedo (snow included), normal and AO (atlas 1440 × 3600, RGBA8 ×2). The card is
+  lit live from the baked normals (sun, sky, shadows, fog, backlit needle glow). To make the fronds and the
+  pictures agree exactly, per-tree snow load is quantised to the 3 baked levels in both, branch-snow noise
+  is in tree-local space in both, and the per-tree needle tint is re-applied on the card.
+- **Shadows match too.** In the shadow pass the impostor card turns to face the sun and uses a silhouette
+  baked from the sun's own elevation (one extra R8 row per kind and load). That is exactly the frond tree's
+  shadow, so the shadow hand-over moves no edges. The coloured card offsets its own shadow lookup toward
+  the sun so it doesn't shadow itself.
+- **Built for the whole map at load.** Impostor cells (750 m) are static. The frond pool holds every tree up
+  to the hand-over + 3 m and refills every 3 m, so trees enter it already invisible.
+- **Memory.** The bake renders into a temporary target, reads back into two mipmapped textures (~27 MB
+  each on the GPU) plus a 2.3 MB silhouette texture, then frees the target and the CPU copies.
+
+### Measurements (quality 1)
+
+`gfxgrow.mjs`: 40 steps of 2 m down each run. At each step the frame is rendered twice in one JS task,
+with the tree LOD eye where the camera is and 1 m behind it. Every differing pixel is something that
+changes only because you came closer. "Blocks" counts 16 × 16 px blocks whose mean brightness moved by
+more than 5 levels: structural change (branches, snow, shapes). Pixel counts also include dither speckle
+between two matching pictures. Mean % of the image per metre travelled (p95 in brackets):
+
+| Map | Structural, before | Structural, after | Pixels, before | Pixels, after |
+|---|---|---|---|---|
+| Blackspruce | 2.51 (6.08) | **0.16** (0.83) | 2.06 (4.59) | 0.57 (1.30) |
+| Ravenspire (trees at 78 %) | 0.39 (1.78) | **0.006** (0.03) | 0.36 (1.45) | 0.41 (0.80) |
+| Kitsune Peak (78 %) | 0.28 (1.25) | **0** (0) | 0.41 (1.23) | 0.22 (0.35) |
+| Valcrest | 0.85 (2.06) | **0.06** (0.19) | 0.69 (1.50) | 0.30 (0.50) |
+| Fjordline (70 %, few trees) | 0.02 (0.17) | **0** (0) | 0.01 (0.06) | 0.01 (0.07) |
+
+Structural change is 13× to 60× smaller wherever there are trees. The diff masks
+(`gfxgrow … outDir`) show what's left: dither speckle on trees 40–58 m away, and no shadow edges. Before,
+there were solid red crowns at 15–18 m and 90 m and moving shadow edges.
+
+GPU ms per frame, 1600 × 900, q1, old and new build alternated on the same machine (`gfxab.mjs` with two
+dev servers, quietest of 2–3 rounds, 5–6 poses). This Apple GPU is about 1.8× slower than the Surface's
+Arc iGPU, so compare ratios:
+
+| Map | Before | After | |
+|---|---|---|---|
+| Blackspruce | 24.2 | 25.7 | +6 % (sun-facing shadow cards ~1 ms; without them it measured +1 %) |
+| Valcrest | 23.3 | 19.6 | −9 % to −16 % (impostors replace the 41–260 m mid fronds) |
+| Ravenspire | 19.4 | 18.7 | −4 % |
+
+On the Surface that is roughly 13.4 → 14.2 ms median on Blackspruce (still in the 14–16 ms target) and
+cheaper everywhere else. Triangles per frame went down 8–25 %.
+
+`gfxpopin.mjs` (q1 on all five maps, plus q0 / q2 on Blackspruce): 0 tree / shadow / scatter / terrain pops, 0 shader
+compiles and 0 texture uploads mid-ride, no errors.
+
+### Load time
+
+Navigation to the first riding frame, q1, both builds back to back on a quiet moment of the machine
+(`gfxgrow` boots): Blackspruce 11.6 → 12.1 s, Ravenspire 9.4 → 10.1 s, Valcrest 5.5 → 6.2 s,
+Fjordline 16.7 → 16.9 s (Kitsune 16.8 → 21.3 s, a noisy run). The impostor bake costs 0.2–0.7 s (1.1–1.6 s while the machine was busy;12 × 3 × 3 ×
+2 + 72 small renders and three read-backs, logged as `[gfx] tree impostors … ms`). In the game it runs
+as `bakeImpostorsAsync()` in `main.js` right after the trees are placed, before the warm-up: it yields every
+~12 ms and reports progress through `ui.loading(0.62–0.72, 'Planting pines…')`, so the live loading scene
+stays smooth. The loading scene (`src/loading/scene.js`) plants the same trees and bakes its own atlas
+synchronously in its worker (`bakeImpostors()`, part of its ~650 ms "trees" time).
+
+### Knobs
+
+`PERF.trees[q]` = `{ near, band, minNear, far, farBand }`. `IMP` in `gfx/trees.js` sets the atlas layout:
+directions, elevations, load levels, frame size in pixels and metres. Bigger frames are sharper at the
+hand-over but cost memory. At q1 / 1600 × 900, one frame pixel is about one screen pixel at 50 m.
+
 ## Next levers, if a weaker GPU needs more
 
 - **Shadow map**: casters inside a 1200 m-deep ortho box. Pulling the far plane in would cull up-sun terrain
   chunks, but the crisp wall shadows near the rider come from that map, so check the visuals.
-- **Mid trees**: alpha-tested cards cover a lot of screen. A cheaper fragment path for LOD1, without the snow
-  noise, would change the look slightly.
+- **Trees**: the frond hand-over (`PERF.trees[q].near`) is the main tree cost. Impostors are cheap, but
+  their sun-facing shadow cards cost ~1 ms on a dense map. Casting only from trees up-sun of the rider
+  would roughly halve that.
 - **Terrain**: q1 could also drop glints (about 1 ms).
-- **Pop-in budget**: the near hand-over could move further out on quality 2 (`PERF.trees[2].minNear`:
-  more frond trees, so measure with `gfxperf.mjs` / `map2-perf.mjs`). Wider bands look smoother but cost
-  more on dense maps.
+- **Pop-in budget**: a wider dither band looks smoother but rasterises both representations over more
+  trees.
 - **CPU** (not the bottleneck): `getProgramParameter` shows up at about 0.3 ms per frame on the main thread.
   Worth tracking down if the game ever becomes CPU-bound.
