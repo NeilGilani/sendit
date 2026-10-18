@@ -21,7 +21,10 @@ import { chromium } from '@playwright/test';
 const base = (process.argv[2] || 'http://localhost:5175/').replace(/\/?$/, '/');
 const shotDir = process.argv[3] || '';
 const browser = await chromium.launch({
-  args: process.env.GPU
+  // ANGLE=metal (macOS) / ANGLE=vulkan: a real GPU backend other than Windows' d3d11 (GPU=1).
+  args: process.env.ANGLE
+    ? ['--use-gl=angle', `--use-angle=${process.env.ANGLE}`, '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required']
+    : process.env.GPU
     ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required']
     : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
 });
