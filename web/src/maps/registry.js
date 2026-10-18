@@ -85,13 +85,6 @@ export function registerMap(def) {
   return entry;
 }
 
-/** Re-register a map with extra fields (adapters for maps owned by other modules). */
-export function extendMap(id, extra) {
-  const m = maps.get(id);
-  if (!m) return null;
-  return registerMap({ ...m, mountain: m.declared.mountain ? m.mountain : null, trails: m.declared.trails ? m.trails : null, ...extra });
-}
-
 /**
  * Adapter for a map whose registerMap call lives elsewhere: gives it `mountain` / `trails` (and any
  * `extra` fields) only where its own registration did not declare them, so the owner's data wins.

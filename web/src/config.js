@@ -324,15 +324,6 @@ export const CAMERA = {
 
 // ------------------------------------------------------------------ FXManager
 export const FX = {
-  maxParticles: 4500,
-  cruiseRate: 26,             // fog particles / s while cruising
-  cruiseLife: 2.6,
-  carveRate: 170,             // wedge particles / s on hard carves
-  carveLife: 0.75,
-  carveSpeed: 9,
-  brakeBurst: 90,             // particles in the braking fan
-  brakeLife: 1.0,
-  landBurst: 110,
   nearMissRadius: 3.2,        // proximity speed lines when this close to a tree/rock/flag
   speedLineCount: 160,
   speedLineLife: 0.45,
@@ -342,9 +333,6 @@ export const FX = {
   skiSpacing: 0.26,           // metres between the two grooves
   plowWidth: 0.8,             // the shallow trough the boots + skis push through powder
   plowStrength: 0.42,
-  grainRate: 320,             // sugar grains / s from the skis (scaled by speed + powder)
-  grainLife: 0.9,
-  puffRate: 22,               // soft powder clouds / s
 };
 
 // ------------------------------------------------------------------ Art style (materials)
@@ -353,8 +341,6 @@ export const ART = {
   rimLightColor: [1.0, 0.78, 0.5],
   rimPower: 3.0,
   rimStrength: 0.45,
-  neonColor: [0.1, 1.0, 0.85],        // cyan neon trim
-  neonColor2: [1.0, 0.2, 0.75],       // pink neon trim
   windSpeed: 1.3,
   windIntensity: 0.05,
 };
