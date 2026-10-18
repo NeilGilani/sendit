@@ -168,7 +168,36 @@ const CSS = /* css */`
 #chal #comboHud { display: none; }
 #chal:not(.hidden) ~ #juiceHud .cb { top: 122px; }
 #chal:not(.hidden) ~ #juiceHud .bn { top: 196px; }
+/* With the combo panel up (it ends ~225 px down), the live air and the announcer go under it instead of on it:
+   at 720p 24 % / 30 % sat on its last lines. From ~1000 px tall the percentages already clear it. */
+#juiceHud .cb.on ~ .air { top: max(24%, 232px); }
+#juiceHud .cb.on ~ .an { top: max(30%, 290px); }
+#chal:not(.hidden) ~ #juiceHud .cb.on ~ .air { top: max(24%, 258px); }
+#chal:not(.hidden) ~ #juiceHud .cb.on ~ .an { top: max(30%, 316px); }
 body.fp #juiceHud .an { top: 42%; }   /* helmet cam: no rider in the middle, keep clear of the combo panel */
+/* Short screens (phones in landscape): the combo panel moves to the right under the score, everything shrinks, so
+   the announcer, live air and the rider in the middle stay clear of each other. */
+@media (max-height: 500px) {
+  #juiceHud .cb, #chal:not(.hidden) ~ #juiceHud .cb { left: auto; right: 20px; top: 96px; transform: none; text-align: right; }
+  #juiceHud .cb .m { font-size: 30px; }
+  #juiceHud .cb .p { font-size: 16px; margin-left: 8px; }
+  #juiceHud .cb .tr { font-size: 12px; height: 14px; }
+  #juiceHud .cb .it { font-size: 11px; margin-top: 3px; }
+  #juiceHud .cb .tm { width: 130px; margin: 4px 0 0 auto; }
+  #juiceHud .cb .rk { font-size: 11px; height: 13px; margin-top: 3px; }
+  #juiceHud .cb.on ~ .air, #juiceHud .air { top: 20%; }
+  #juiceHud .air .d { font-size: 32px; }
+  #juiceHud .air .x { font-size: 13px; }
+  #juiceHud .cb.on ~ .an, #juiceHud .an, #chal:not(.hidden) ~ #juiceHud .cb.on ~ .an { top: 28%; }
+  #juiceHud .an .g { font-size: 14px; margin-bottom: 3px; }
+  #juiceHud .an .t { font-size: 28px; -webkit-text-stroke: 2px #1b1446; }
+  #juiceHud .an .s { font-size: 17px; }
+  #juiceHud .an .s small { font-size: 11px; }
+  #juiceHud .co { top: 60%; font-size: 18px; }
+  #juiceHud .bn { top: 120px; font-size: 26px; }
+  #juiceHud .ts { top: 92px; transform: scale(.8); transform-origin: top left; }
+  body.fp #juiceHud .an { top: 34%; }
+}
 body.fp #notes { bottom: 130px; }      /* the helmet cam's speed read-out sits bottom right */
 `;
 
