@@ -68,7 +68,7 @@ const CSS = /* css */`
 #juiceHud .an.show { animation: jhSlam var(--hold, 1.6s) cubic-bezier(.2,.9,.3,1) forwards; }
 #juiceHud .an .g { display: inline-block; font-size: 22px; letter-spacing: .28em; padding: 3px 14px 3px 18px; border-radius: 3px; transform: skewX(-12deg); color: #1b1446; margin-bottom: 6px; }
 #juiceHud .an .g span { display: inline-block; transform: skewX(12deg); }
-#juiceHud .an .t { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.05; letter-spacing: .02em; -webkit-text-stroke: 3px #1b1446; paint-order: stroke fill; text-shadow: 0 5px 0 rgba(27,20,70,.55); }
+#juiceHud .an .t { font-size: min(clamp(34px, 4.6vw, 64px), var(--an-fit, 100vw)); line-height: 1.05; letter-spacing: .02em; -webkit-text-stroke: 3px #1b1446; paint-order: stroke fill; text-shadow: 0 5px 0 rgba(27,20,70,.55); }
 #juiceHud .an .s { font-size: 26px; color: #2ff5d6; margin-top: 2px; -webkit-text-stroke: 1.5px #1b1446; paint-order: stroke fill; }
 #juiceHud .an .s small { font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 900; font-size: 14px; letter-spacing: .16em; color: #fffaf0; margin-left: 10px; -webkit-text-stroke: 0; text-shadow: 0 1px 2px #1b1446, 0 0 8px rgba(27,20,70,.9); }
 #juiceHud .an .nw { display: none; margin: 6px auto 0; width: max-content; font-size: 13px; letter-spacing: .3em; padding: 3px 10px 3px 13px; border-radius: 3px; color: #1b1446;
@@ -190,7 +190,7 @@ body.fp #juiceHud .an { top: 42%; }   /* helmet cam: no rider in the middle, kee
   #juiceHud .air .x { font-size: 13px; }
   #juiceHud .cb.on ~ .an, #juiceHud .an, #chal:not(.hidden) ~ #juiceHud .cb.on ~ .an { top: 28%; }
   #juiceHud .an .g { font-size: 14px; margin-bottom: 3px; }
-  #juiceHud .an .t { font-size: 28px; -webkit-text-stroke: 2px #1b1446; }
+  #juiceHud .an .t { font-size: min(28px, var(--an-fit, 100vw)); -webkit-text-stroke: 2px #1b1446; }
   #juiceHud .an .s { font-size: 17px; }
   #juiceHud .an .s small { font-size: 11px; }
   #juiceHud .co { font-size: 18px; }
@@ -299,6 +299,8 @@ export function mountJuiceHud({ player, combo, input, camera }) {
     anG.style.display = G ? '' : 'none';
     if (G) { anG.firstChild.textContent = G.text; anG.style.background = G.color; anG.style.boxShadow = `0 0 24px ${G.glow}`; }
     anT.textContent = title || '';
+    // Long combo names ("BS RODEO 720 TWEAKED TAIL GRAB") ran off both edges at 1280 px: shrink to fit the width.
+    anT.style.setProperty('--an-fit', title && title.length > 18 ? `${(120 / title.length).toFixed(2)}vw` : '100vw');
     anT.style.color = G && grade !== 'clean' ? G.color : '#fffaf0';
     anS.innerHTML = sub || '';
     an.style.setProperty('--hold', `${hold + 0.35}s`);
