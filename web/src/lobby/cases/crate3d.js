@@ -1072,7 +1072,7 @@ class CrateShow {
     pose = mix(sDrop, sPush, smooth(T.land, T.lid, t));
     if (t >= T.lid) pose = mix(pose, sBurst, easeOut3((t - T.lid) / 0.35));
     if (t >= T.lid + 0.3) pose = mix(pose, sReel, smooth(T.lid + 0.3, T.spin + 0.2, t));
-    let offX = 0;
+    let offX = 0, offY = 0;
     if (o.revealAt != null && t >= o.revealAt) {
       const k = easeOut3((t - o.revealAt) / 0.7);
       let sRev;
@@ -1081,7 +1081,8 @@ class CrateShow {
       pose = mix(pose, sRev, k);
       // Lens shift: the subject sits left of centre on wide screens (the text panel is on the right).
       const { w: W, h: H } = st.size;
-      offX = W / H > 1.15 ? W * 0.15 * k : 0;
+      // (Tall screens: the panel is at the bottom, so the subject moves up instead.)
+      if (W / H > 1.15) offX = W * 0.15 * k; else offY = H * 0.17 * k;
     }
     // Opening blend from the lobby camera.
     const root = st.root;
@@ -1103,7 +1104,7 @@ class CrateShow {
     if (t >= T.lid) fov -= 2.2 * Math.exp(-(t - T.lid) * 5) * Math.sin(Math.min(Math.PI, (t - T.lid) * 12));
     cam.fov = fov;
     const { w: W, h: H } = st.size;
-    if (offX) cam.setViewOffset(W, H, offX, 0, W, H); else cam.clearViewOffset();
+    if (offX || offY) cam.setViewOffset(W, H, offX, offY, W, H); else cam.clearViewOffset();
     cam.updateProjectionMatrix();
     cam.updateMatrixWorld();
     this.lastPose = { pos: pos.clone(), look: look.clone(), fov };
