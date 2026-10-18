@@ -321,7 +321,40 @@ export const CAMERA = {
   steepPitch: 0,              // extra downward pitch (deg) per 10° beyond 30°
   flowFov: 0,                 // FoV kick (deg) entering the flow state (physics/flow.js), half of it held while it lasts
   airLook: 0,                 // in big air, look this share further down toward the landing (0..1)
-  airFollowY: null,           // s: vertical follow smoothing in the air (null = followSmooth · 1.8)
+  airFollowY: null,           // s: vertical follow smoothing in the air (null = followSmooth · 1.2)
+  // Turns (docs/game-feel.md "Chase camera"): the yaw chases the travel direction at yawRate (1/s), harder by
+  // yawRateTurn at a turn rate of 1 rad/s, and leads it by turnLead s of the turn rate (low-passed at turnRateSmooth
+  // 1/s). Steady-carve lag ≈ turnRate · (1 / rate − turnLead): ~20° before, a few degrees now.
+  yawRate: 3.2,
+  yawRateTurn: 2,
+  turnLead: 0.14,
+  turnRateSmooth: 6,
+  // Air framing. The camera follows the flight line, never the rotating body; the horizon stays level.
+  airYawRate: 1.0,            // 1/s yaw chase in the air (the flight direction barely changes)
+  airFrameFrom: 0.5,          // s of predicted total air where the air framing starts …
+  airFrameFull: 1.2,          // … and is full (hops change nothing)
+  airIn: 2.5, airOut: 2.2,    // 1/s easing into / out of the air framing (no snap at take-off or touchdown)
+  airPull: 0.3,               // m further back in the air
+  airRise: 0.6,               // m higher in the air
+  airFov: 2,                  // deg wider in the air
+  // Big air side swing: a three-quarter angle that shows flips and spins together.
+  airSideFrom: 0.9, airSideFull: 1.6,   // s of predicted total air where the swing starts / is full
+  airSideDeg: 50,             // deg off the travel line at full swing
+  airSideDist: 6.2,           // arm length (m) at full swing (+ airPull)
+  airSidePitch: -6,           // arm pitch (deg) at full swing
+  airSideFov: 2,              // deg narrower at full swing
+  sideIn: 2.4, sideReturn: 2.5,          // 1/s swinging out / back
+  airSideLand: 0.4,           // share of the swing kept at touchdown (the rest swings back on the approach)
+  // Landing approach: from landLead s before the predicted touchdown to landSettle s the camera raises its arm to
+  // landPitch and aims landLook of the way from the rider toward the landing point, keeping the rider within
+  // landKeep of the half-frame from the centre.
+  landLead: 0.9,
+  landSettle: 0.25,
+  landPitch: -16,
+  landLook: 0.5,
+  landKeep: 0.72,
+  armClear: 0.9,              // m: in the air the arm tilts up to keep this clear of the snow behind the rider …
+  liftMax: 4,                 // … by at most this much at the camera (beyond it the arm shortens)
 };
 
 // ------------------------------------------------------------------ FXManager

@@ -118,7 +118,8 @@ Performance target: quality 1 around 14–16 ms GPU at 1600×900. Screenshots go
 2. ~~`trails-check` length mismatches~~ fixed: Kitsune and Fjordline courses expose `rideLine(trailId)` and the check measures
    along each trail's own line (docs/maps.md § Measuring trails). `--check` passes for all built-in maps.
 3. Voltage Park: no wallrides; the superpipe is hard to ride with keys.
-4. The chase camera trails ~20° behind in hard turns, which makes turns feel longer than they are.
+4. **Chase camera** — fixed: hard turns now trail ~5° (was ~20°), and airs / flips / spins frame the predicted
+   landing from ~0.9 s out with a level horizon and no snaps (see `docs/game-feel.md` §3c, `web/scripts/camshots.mjs`).
 5. Pink default poles/skis clash with the earth-tone outfits.
 6. Blackspruce's densest section peaks slightly above the 16 ms GPU target.
 7. On the user's Surface, a separate project (`Desktop/lap4lap`) leaves a Chrome profile in `%TEMP%` on every
