@@ -226,18 +226,6 @@ const FABRIC_LIGHT = /* glsl */`
   }
 `;
 
-// Wind flutter (bind space, before skinning): travelling ripples along the loose fabric, faster and
-// bigger with speed. Jacket and hood flap most, sleeves and pant legs less, gloves / gaiter not at all.
-const FLUTTER = /* glsl */`
-  if (uFlutter > 0.001) {
-    float fid = floor(aG.x + 0.5);
-    float loose = fid < 0.5 ? 1.0 : fid < 1.5 ? 0.75 : fid < 2.5 ? 0.65 : (fid < 4.5 || fid > 7.5) ? 0.45 : 0.0;
-    float ft = uTime * (8.0 + 16.0 * uFlutter);
-    float fw = sin(position.y * 29.0 - ft + position.x * 7.0) * 0.6 + sin(position.y * 51.0 + position.z * 17.0 - ft * 1.37) * 0.4;
-    transformed += objectNormal * fw * loose * uFlutter * 0.0065;
-  }
-`;
-
 /**
  * Fabric for the merged outfit geometry (garments.js). Attributes: aG = (piece, u, v, side), aLin.
  * Uniforms (THREE.Color): uJacket, uPanel, uAccent, uGaiter, uPants, uCuff, uMitt, uGauntlet; uStyle.
@@ -250,7 +238,6 @@ export function fabricMaterial() {
     uMitt: { value: col('#9c6f45') }, uGauntlet: { value: col('#1c1c1b') }, uStyle: { value: 0 },
     uHemY: { value: new THREE.Vector3(0.84, 0.15, 0.69) },    // jacket hem, pants cuff, sleeve end
     uHide: { value: 0 },
-    uFlutter: { value: 0 },   // 0..1 wind at speed: loose fabric ripples (set by rider.js)
     // Reward looks (applyLook): x = print, y = scale, z = finish; A / B = the print's colours.
     uJPat: { value: new THREE.Vector4(0, 1, 0, 0) }, uJPatA: { value: col('#222222') }, uJPatB: { value: col('#888888') },
     uPPat: { value: new THREE.Vector4(0, 1, 0, 0) }, uPPatA: { value: col('#222222') }, uPPatB: { value: col('#888888') },
@@ -259,8 +246,8 @@ export function fabricMaterial() {
   };
   const m = toonMaterial({
     name: 'riderFabric', rim: 0.25, uniforms: U,
-    vertPars: 'attribute vec4 aG; attribute float aLin; attribute float aCrease; varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj; uniform float uHide; uniform float uFlutter;',
-    vertPre: FLUTTER + 'vG = aG; vLin = aLin; vCrease = aCrease; vObj = position;\n  if (uHide > 0.5 && ((aG.x > 2.5 && aG.x < 5.5) || aG.x > 7.5)) transformed *= 0.0;\n  if (uHide > 0.5 && (abs(aG.x - 1.0) < 0.5 || abs(aG.x - 7.0) < 0.5)) transformed.yz = mix(transformed.yz, vec2(1.45, -0.075), 0.25 * smoothstep(0.4, 0.6, abs(position.x)));',
+    vertPars: 'attribute vec4 aG; attribute float aLin; attribute float aCrease; varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj; uniform float uHide;',
+    vertPre: 'vG = aG; vLin = aLin; vCrease = aCrease; vObj = position;\n  if (uHide > 0.5 && ((aG.x > 2.5 && aG.x < 5.5) || aG.x > 7.5)) transformed *= 0.0;\n  if (uHide > 0.5 && (abs(aG.x - 1.0) < 0.5 || abs(aG.x - 7.0) < 0.5)) transformed.yz = mix(transformed.yz, vec2(1.45, -0.075), 0.25 * smoothstep(0.4, 0.6, abs(position.x)));',
     fragPars: `${COMMON}
 varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj; uniform float uHide;
 uniform vec3 uJacket, uPanel, uAccent, uGaiter, uPants, uCuff, uMitt, uGauntlet; uniform float uStyle; uniform vec3 uHemY;

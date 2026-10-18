@@ -176,7 +176,7 @@ export class Player {
     this.prevFlip = this.visFlip;
     if (this.state === State.FROZEN || this.debugFreeze) return;   // debugFreeze: hold a pose for inspection
     if (P.slowmo) dt *= this.slowmoScale(dt);                      // huge airs: a moment of slow motion (opt-in)
-    this.simTime = (this.simTime || 0) + dt;                        // physics clock (character/dynamics.js reads forces per step)
+    this.simTime = (this.simTime || 0) + dt;                        // physics clock (fpview.js terrain chatter reads the ground per step)
     this.readInput(dt);
     switch (this.state) {
       case State.GROUNDED: this.groundStep(dt); break;

@@ -1,5 +1,5 @@
 // Dev helper: a pose sheet of the rider in the real game. Drives scripted situations (standing, cruising,
-// carving, tuck, snowplough, hockey stop, pop, air, landing, crash, tree near-miss), freezes the physics
+// carving, tuck, snowplough, hockey stop, pop, air, landing, crash), freezes the physics
 // at a chosen moment and photographs the rider from the side / front / behind with the inspect camera.
 // Usage: [GPU=1] node web/scripts/rider-poses.mjs <baseUrl> <outDir> [ski|snowboard] [scenario,…]
 // Screenshots go to outDir (keep them out of the repo). Prints one JSON line per shot.
@@ -10,6 +10,7 @@ fs.mkdirSync(outDir, { recursive: true });
 const browser = await chromium.launch({
   args: process.env.GPU
     ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required']
+    : process.platform === 'darwin' ? ['--use-gl=angle', '--use-angle=metal', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required']
     : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
 });
 const W = Number(process.env.W || 560), H = Number(process.env.H || 560);
@@ -41,8 +42,6 @@ const SCEN = {
   squat: { setup: `go(11); pl.script = (c) => { c.jump = true; };`, until: `T > 0.4`, views: [90] },
   air: { setup: `kick(13); pl.script = (c, p) => { if (p.state === 1) c.jump = aheadOfLip(p) ; };`, until: `pl.state === 2 && pl.airTime > 0.35`, views: [90, 0] },
   landing: { setup: `kick(13); window.__l0 = pl.landingEvent; pl.script = (c, p) => { if (p.state === 1) c.jump = aheadOfLip(p); };`, until: `pl.landingEvent !== window.__l0 && (window.__lt = (window.__lt ?? T)) && T - window.__lt > 0.07`, views: [90, 0] },
-  flinch: { setup: `go(14); import(stateUrl()).then((m) => { pl.script = () => { if (T > 0.8 && !window.__fl) { window.__fl = 1; const r = pl.forward(); m.emit('nearMiss', { dist: 0.3, kind: 'tree', x: pl.position.x - r.z * 1.2, z: pl.position.z + r.x * 1.2 }); } }; }); window.__fl = 0;`, until: `window.__fl && T > 0.95`, views: [150, 90] },
-  dab: { setup: `go(10); import(stateUrl()).then((m) => { pl.script = () => { if (T > 0.8 && !window.__fl) { window.__fl = 1; m.emit('landed', { impact: 13, rawImpact: 13, result: 'clean' }); } }; }); window.__fl = 0;`, until: `window.__fl && T > 1.05`, views: [150, 90] },
   crash: { setup: `go(14); pl.script = () => { if (T > 0.3 && pl.state === 1) pl.crash('tree'); };`, until: `pl.state === 3 && pl.crashT > 0.45`, views: [90, 0] },
   crashLate: { setup: `go(14); pl.script = () => { if (T > 0.3 && pl.state === 1) pl.crash('landing'); };`, until: `pl.state === 3 && pl.crashT > 1.2`, views: [90, 30] },
 };
@@ -70,7 +69,7 @@ for (const name of list) {
   }, sc);
   const ok = await page.waitForFunction((u) => { const S = window.__sendit, pl = S.player; const T = window.__simT; try { return new Function('S', 'pl', 'T', `return (${u});`)(S, pl, T); } catch { return false; } }, sc.until, { timeout: 240000, polling: 50 }).then(() => true).catch(() => false);
   await page.evaluate(() => { window.__sendit.player.debugFreeze = true; });
-  const info = await page.evaluate(() => { const p = window.__sendit.player, D = window.__sendit.rider?.dyn; return { dyn: D && { absorb: +D.absorb.x.toFixed(3), fore: +D.fore.x.toFixed(3), flinch: +D.flinch.toFixed(2), dab: +D.dab.toFixed(2), arm: D.arm.map((a) => +a.x.toFixed(2)), crouch: +window.__sendit.rider.p.crouch.toFixed(2) }, state: p.state, speed: +p.speed.toFixed(1), edge: +(p.edgeAngle * 57.3).toFixed(0), lean: +(window.__sendit.rider?.p.lean * 57.3 || 0).toFixed(0), air: +p.airTime.toFixed(2), crashT: +(p.crashT || 0).toFixed(2) }; });
+  const info = await page.evaluate(() => { const p = window.__sendit.player; return { crouch: +(window.__sendit.rider?.p.crouch || 0).toFixed(2), state: p.state, speed: +p.speed.toFixed(1), edge: +(p.edgeAngle * 57.3).toFixed(0), lean: +(window.__sendit.rider?.p.lean * 57.3 || 0).toFixed(0), air: +p.airTime.toFixed(2), crashT: +(p.crashT || 0).toFixed(2) }; });
   for (const yaw of sc.views) {
     await page.evaluate(([yaw, dist]) => { window.__cam.inspect = { yaw, dist, height: 0.15, fov: 38 }; }, [yaw, Number(process.env.DIST || 4.2)]);
     await page.waitForTimeout(Number(process.env.SETTLE || 900));
