@@ -88,11 +88,15 @@ export class Input {
         return [x * k, y * k];
       };
       [this.pad.lx, this.pad.ly] = stick(gp.axes[0] || 0, gp.axes[1] || 0);
-      // The same stick mapped from its round gate onto a square for in-air rotation (airStrength): a full
-      // diagonal (a cork: spin + flip) is full on both axes, not 0.71 each.
-      const m = Math.max(Math.abs(this.pad.lx), Math.abs(this.pad.ly)), r = Math.hypot(this.pad.lx, this.pad.ly);
-      const k = m > 1e-6 ? r / m : 0;
-      this.pad.sx = Math.max(-1, Math.min(1, this.pad.lx * k)); this.pad.sy = Math.max(-1, Math.min(1, this.pad.ly * k));
+      // The same stick for in-air rotation (airStrength): linear past the dead zone (the carving curve above made
+      // half a push a 0.27 input, under the 0.2–0.4 rotation thresholds for most of the travel) and mapped from
+      // its round gate onto a square, so a full diagonal (a cork: spin + flip) is full on both axes, not 0.71 each.
+      {
+        const x = gp.axes[0] || 0, y = gp.axes[1] || 0, r0 = Math.hypot(x, y);
+        const r = r0 < 0.16 ? 0 : Math.min(1, (r0 - 0.16) / 0.84), m = Math.max(Math.abs(x), Math.abs(y));
+        const k = r0 > 1e-6 && m > 1e-6 ? r / m : 0;
+        this.pad.sx = Math.max(-1, Math.min(1, x * k)); this.pad.sy = Math.max(-1, Math.min(1, y * k));
+      }
       [this.pad.rx, this.pad.ry] = stick(gp.axes[2] || 0, gp.axes[3] || 0);
       this.pad.lt = gp.buttons[PAD.LT]?.value || 0; this.pad.rt = gp.buttons[PAD.RT]?.value || 0;
       this.pad.buttons = gp.buttons.map((b) => b.pressed);
