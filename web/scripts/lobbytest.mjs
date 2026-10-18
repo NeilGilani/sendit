@@ -21,7 +21,10 @@ import { chromium } from '@playwright/test';
 const base = (process.argv[2] || 'http://localhost:5175/').replace(/\/?$/, '/');
 const shotDir = process.argv[3] || '';
 const browser = await chromium.launch({
-  args: process.env.GPU
+  // ANGLE=metal / ANGLE=vulkan picks a GPU backend explicitly; GPU=1 uses Metal on macOS, D3D11 elsewhere.
+  args: process.env.ANGLE
+    ? ['--use-gl=angle', `--use-angle=${process.env.ANGLE}`, '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required']
+    : process.env.GPU
     ? [...(process.platform === 'darwin' ? ['--use-gl=angle', '--use-angle=metal'] : ['--use-angle=d3d11']), '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required']
     : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
 });
@@ -267,8 +270,9 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   ok(await page.evaluate(() => !!document.querySelector('.cn.case')), '"Case earned" notification');
   // Open it: the case box, then the reel (60 cards), then Skip to the reveal.
   await page.click('.cs-open');
-  await page.waitForSelector('.cr-overlay .cr-case', { timeout: 10000 });
-  ok(true, 'the case box appears');
+  await page.waitForSelector('.cr-overlay', { timeout: 15000 });
+  const d3 = await page.evaluate(() => ({ crate: !!window.__senditCrate?.active, box: !!document.querySelector('.cr-overlay .cr-case') }));
+  ok(d3.crate || d3.box, `the case appears (${d3.crate ? '3D crate on the lobby stage' : '2D case box'})`);
   await page.waitForFunction(() => document.querySelector('.cr-overlay.reel'), null, { timeout: 15000 });
   const reel = await page.evaluate(() => ({ cards: document.querySelectorAll('.cr-strip .cr-card').length, gold: document.querySelectorAll('.cr-strip .cr-card.r-gold').length, tiers: new Set([...document.querySelectorAll('.cr-strip .cr-card')].map((c) => c.className.match(/\br-(\w+)/)[1])).size }));
   ok(reel.cards === 60 && reel.tiers >= 4, `reel of ${reel.cards} cards in ${reel.tiers} grades`);
@@ -276,8 +280,11 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   const moved = await page.waitForFunction(() => { const o = window.__senditCases.opener; const t = o.trace; return t.length > 2 && t.at(-1).x - o.x0 > o.pitch * 10; }, null, { timeout: 30000 }).then(() => true, () => false);
   const tr = await page.evaluate(() => window.__senditCases.opener.trace.length);
   ok(moved, `the reel scrolls (${tr} frames)`);
-  await page.keyboard.press('Space');
-  await page.waitForSelector('.cr-reveal:not([hidden]) h2', { timeout: 10000 });
+  // Hold Space to skip (a tap does nothing).
+  await page.keyboard.down('Space');
+  await page.waitForTimeout(900);
+  await page.keyboard.up('Space');
+  await page.waitForSelector('.cr-reveal:not([hidden]) h2', { timeout: 15000 });
   const rv = await page.evaluate(() => ({ name: document.querySelector('.cr-reveal h2').textContent, res: window.__senditCases.result.key, grade: document.querySelector('.cr-grade').textContent }));
   ok(rv.name.includes('|') && rv.grade.length > 3, `reveal: ${rv.name.replace(/\s+/g, ' ').trim()} (${rv.grade})`);
   await shot(page, 't4_reveal');

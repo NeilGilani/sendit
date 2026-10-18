@@ -15,6 +15,7 @@
 //   attachPointer(el)            drag to rotate, wheel / pinch to zoom, double-click to reset
 //   update(dt) · resize(w, h)    per frame (camera + animation) · window size
 //   focusPoint                   world position the sun's shadow box should centre on
+//   cameraOverride               optional fn(camera, dt) → true while it drives the camera (case opening)
 //   gearMode                     'native' (rider.setEquipment did it) | 'builtin' | 'unsupported'
 import * as THREE from 'three';
 import { Rider } from '../rider.js';
@@ -340,7 +341,8 @@ export class LobbyStage {
     this.plinthU?.uPlinthAxis.value.setFromMatrixColumn(this.turntable.matrixWorld, 0).normalize();
 
     this.animateRider(dt);
-    this.updateCamera(dt);
+    // A full-screen show (the 3D case opening, lobby/cases/crate3d.js) can take the camera.
+    if (!this.cameraOverride?.(this.camera, dt)) this.updateCamera(dt);
 
     // Neon rim breathes; flashes when the gear changes.
     this.pulse = Math.max(0, this.pulse - dt * 1.4);

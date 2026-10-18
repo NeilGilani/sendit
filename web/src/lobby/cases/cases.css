@@ -134,6 +134,51 @@
 .rv-gold.shake { animation-duration: .8s; }
 @keyframes crShake { 10% { translate: -8px 4px; } 20% { translate: 7px -5px; } 30% { translate: -6px -3px; } 40% { translate: 5px 4px; } 55% { translate: -3px 2px; } 70% { translate: 2px -1px; } 100% { translate: 0 0; } }
 
+/* ---------------------------------------------------------------- 3D crate mode (crate3d.js)
+   The studio, crate, beam, rays and particles are rendered in 3D; the overlay carries the reel and text. */
+body.cr-open #lobby, body.cr-open .cn-stack { opacity: 0 !important; pointer-events: none !important; transition: opacity .3s; }
+.cr-overlay.d3 .cr-dim { background: radial-gradient(ellipse at 50% 55%, transparent 45%, rgba(2, 3, 10, .5) 100%); }
+.cr-overlay.d3.revealed .cr-dim { animation: none; background: radial-gradient(ellipse at 32% 50%, transparent 40%, rgba(2, 3, 10, .45) 100%); }
+.cr-overlay.d3 .cr-head { top: 5.5%; }
+.cr-overlay.d3 .cr-reel { top: 33%; transform-origin: 50% 100%; transform: translateY(35%) scaleY(.15); }
+.cr-overlay.d3.reel .cr-reel { transform: none; }
+.cr-overlay.d3.revealed .cr-reel { transform: translateY(-20%) scale(.96); }
+.cr-overlay.d3 .cr-window { background: linear-gradient(180deg, rgba(4, 5, 14, .82), rgba(14, 16, 34, .66) 50%, rgba(4, 5, 14, .82)); }
+.cr-overlay.d3 .cr-reel::before { background: linear-gradient(90deg, rgba(3, 4, 11, 1) 0%, rgba(3, 4, 11, 0) 18%, rgba(3, 4, 11, 0) 82%, rgba(3, 4, 11, 1) 100%); }
+.cr-overlay.d3 .cr-reveal { display: flex; align-items: center; justify-content: flex-end; padding: 0 5vw; }
+.cr-overlay.d3 .cr-reveal[hidden] { display: none; }
+.cr-overlay.d3 .cr-rtext { text-align: left; width: min(32em, 42vw); margin: 0; padding: 1.3em 1.5em; border-radius: 1em;
+  background: linear-gradient(100deg, rgba(5, 7, 18, 0), rgba(5, 7, 18, .55) 22%, rgba(5, 7, 18, .62)); animation: crSide .55s .2s cubic-bezier(.2, 1.1, .3, 1) both; }
+@keyframes crSide { from { transform: translateX(2em); opacity: 0; } }
+.cr-overlay.d3.rv-gold .cr-rtext { animation-delay: .55s; }
+.cr-overlay.d3 .cr-actions { justify-content: flex-start; }
+.cr-overlay.d3 .cr-rtext h2 { font-size: 2.3em; text-shadow: 0 0 30px color-mix(in srgb, var(--rc) 60%, transparent); }
+@media (max-aspect-ratio: 23/20) {
+  .cr-overlay.d3 .cr-reveal { align-items: flex-end; justify-content: center; padding: 0 3vw 3vh; }
+  .cr-overlay.d3 .cr-rtext { width: 94vw; text-align: center; background: linear-gradient(180deg, rgba(5, 7, 18, 0), rgba(5, 7, 18, .7) 25%); }
+  .cr-overlay.d3 .cr-actions, .cr-overlay.d3 .cr-meta { justify-content: center; }
+  .cr-overlay.d3 .cr-stats { margin-left: auto; margin-right: auto; }
+}
+.cr-meta { display: flex; flex-wrap: wrap; gap: .25em 1.1em; margin: 0 0 .65em; font-size: .72em; color: rgba(255, 255, 255, .6); letter-spacing: .08em; text-transform: uppercase; font-weight: 800; }
+.cr-meta span:last-child { color: var(--rc); }
+.cr-stats { display: grid; grid-template-columns: 5.5em 1fr; gap: .32em .7em; align-items: center; font-size: .74em; margin: 0 0 .75em; max-width: 21em; }
+.cr-stats span { color: rgba(255, 255, 255, .65); font-weight: 700; }
+.cr-stats i { position: relative; height: .42em; border-radius: 999px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+.cr-stats i::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--v) * 100%); border-radius: 999px; background: var(--rc); box-shadow: 0 0 8px var(--rc); animation: crBar .9s .45s cubic-bezier(.2, .9, .3, 1) both; }
+@keyframes crBar { from { width: 0; } }
+.cr-summary { margin: .9em 0 0; }
+.cr-summary small { display: block; font-size: .7em; letter-spacing: .14em; text-transform: uppercase; color: rgba(255, 255, 255, .55); font-weight: 800; margin-bottom: .35em; }
+.cr-summary div { display: flex; flex-wrap: wrap; gap: .3em; }
+.cr-summary .cr-card { width: 3.3em; height: 3.3em; font-size: .7em; }
+.cr-auto { margin: .9em 0 0; font-size: .74em; color: rgba(255, 255, 255, .6); }
+.cr-auto kbd, .cr-quick kbd { font: 700 .85em/1.4 inherit; padding: 0 .35em; border-radius: .3em; background: rgba(255, 255, 255, .15); }
+.cr-quick { position: absolute; left: 2em; bottom: 2.2em; display: flex; gap: .45em; align-items: center; font-size: .8em; font-weight: 800; color: rgba(255, 255, 255, .7); cursor: pointer; }
+.cr-quick[hidden] { display: none; }
+.cr-quick input { accent-color: #ffe36a; width: 1.1em; height: 1.1em; }
+.cr-skip { overflow: hidden; }
+.cr-hold { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--hold, 0) * 100%); background: rgba(255, 227, 106, .35); pointer-events: none; }
+.cr-overlay.landed .cr-quick { display: none; }
+
 /* ---------------------------------------------------------------- Cases tab */
 .cs-hero { display: flex; gap: 1em; align-items: center; margin: .2em 0 1em; }
 .cs-hero .cb { font-size: .9em; flex: none; animation: csBob 2.6s ease-in-out infinite; }
@@ -237,3 +282,20 @@
 @media (prefers-reduced-motion: reduce) {
   .cr-case, .cr-overlay.lid .cb-lid, .cr-rays, .cr-rcard, .cs-hero .cb, .cs-open.pulse, .lb-tab .cs-badge { animation: none !important; }
 }
+#lobby .cs-all { display: block; width: 100%; margin-top: .45em; padding: .45em 1em; border-radius: .7em; font-weight: 900; font-style: italic; font-size: .9em; color: #ffe36a; background: rgba(255, 227, 106, .1); border: 1px solid rgba(255, 227, 106, .45); }
+#lobby .cs-all small { font-style: normal; font-weight: 700; opacity: .7; }
+#lobby .cs-all:hover { background: rgba(255, 227, 106, .18); }
+.cr-overlay.d3 .cr-rtext { align-self: center; }
+@media (max-aspect-ratio: 23/20) { .cr-overlay.d3 .cr-rtext { align-self: flex-end; } }
+/* The canvas reel (reelCanvas.js) replaces the DOM strip. */
+.cr-overlay.cv .cr-strip { display: none; }
+.cr-reelcv { position: absolute; left: 0; top: 0; display: block; }
+.cr-stamp { position: absolute; left: 0; right: 0; top: 40%; text-align: center; pointer-events: none; z-index: 3;
+  font-size: 4.4em; font-weight: 900; font-style: italic; letter-spacing: .06em; text-transform: uppercase; color: #fff;
+  text-shadow: 0 0 .25em var(--rc), 0 0 .7em var(--rc), 0 .06em 0 rgba(0, 0, 0, .4); animation: crStamp 1.7s cubic-bezier(.2, 1.2, .3, 1) both; }
+.rv-gold .cr-stamp { animation-delay: .32s; background: linear-gradient(100deg, #fff6c8, #ffd24a 40%, #fff 55%, #e4ae39 70%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+@keyframes crStamp { 0% { transform: scale(1.9); opacity: 0; } 14% { transform: scale(1); opacity: 1; } 70% { transform: scale(1.03); opacity: 1; } 100% { transform: scale(1.08) translateY(-.5em); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .cr-stamp { animation: crStampR 1.7s both; } @keyframes crStampR { 0%, 100% { opacity: 0; } 15%, 70% { opacity: 1; } } }
+/* The stamp sits over the 3D subject (left of the panel on wide screens, above it on tall ones). */
+.cr-overlay.d3 .cr-stamp { top: 12%; right: 38%; font-size: 3.6em; }
+@media (max-aspect-ratio: 23/20) { .cr-overlay.d3 .cr-stamp { right: 0; top: 10%; font-size: 2.6em; } }
