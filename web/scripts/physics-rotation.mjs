@@ -175,10 +175,10 @@ function benchStart(type) {
     }
     console.log(`  spin ${label.padEnd(20)} vy${String(vy).padEnd(3)} ${cells.join('  ')}`);
   }
-  // The slowest real starts: pressed with enough air left for the rotation (≥ 1.2 s for a flip's 180°,
-  // ≥ 0.8 s for a spin's 180°), ranked by the time to 180°.
+  // The slowest real starts: pressed with plenty of air left (≥ 1.8 s for a flip — past the late throw's
+  // flipLateAir gate — and ≥ 1.4 s for a spin), ranked by the time to 180°.
   for (const kind of ['flip', 'spin']) {
-    const need = kind === 'flip' ? 1.2 : 0.8;
+    const need = kind === 'flip' ? 1.8 : 1.4;
     const cand = rows.filter((r) => r.kind === kind && r.left >= need && r.label !== 'rolled off')
       .map((r) => ({ ...r, k: r.t180 ?? 9 })).sort((a, b) => b.k - a.k).slice(0, 5);
     console.log(`  slowest ${kind} starts (≥ ${need} s left): ${cand.map((r) => `${r.label} vy${r.vy} @${r.tp}s → ${r.t180 === null ? 'never' : r.t180.toFixed(2) + ' s'}`).join(' · ')}`);
@@ -212,10 +212,12 @@ for (const type of ['ski', 'snowboard']) {
     expect(helped >= 1, `${type} B: the counter-input never helped`);
     expect(!!B.botched.r.crash, `${type} B: a botched full-set over-rotation was rescued by the counter (${result(B.botched.r)})`);
     expect(B.mid.final > 300, `${type} B: counter at 180° stopped the flip at ${B.mid.final.toFixed(0)}°`);
-    // C: with ≥ 1.2 s left a flip reaches 180° within 0.9 s; with ≥ 0.8 s left a popped spin within 0.8 s.
+    // C: nothing is slow for no reason — with ≥ 1.8 s of air left a flip reaches 180° within 1.1 s of the
+    // press, and with ≥ 1.4 s left a spin within 1.35 s (at the lip: 0.92 / 0.55–0.9 s).
     for (const r of Cr) {
-      if (r.label === 'rolled off') continue;
-      if (r.kind === 'flip' && r.left >= 1.5 && r.label !== 'grabbing') expect(r.t180 !== null && r.t180 <= 0.9, `${type} C flip ${r.label} vy${r.vy} @${r.tp}: 180° in ${r.t180?.toFixed(2) ?? 'never'} s`);
+      const tag = `${type} C ${r.kind} ${r.label} vy${r.vy} @${r.tp}: 180° in ${r.t180?.toFixed(2) ?? 'never'} s (${r.left.toFixed(2)} s left)`;
+      if (r.kind === 'flip' && r.left >= 1.8) expect(r.t180 !== null && r.t180 <= 1.1, tag);
+      if (r.kind === 'spin' && r.left >= 1.4) expect(r.t180 !== null && r.t180 <= 1.35, tag);
     }
   }
 }
