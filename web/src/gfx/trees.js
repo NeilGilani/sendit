@@ -587,8 +587,8 @@ varying vec2 vImpUv; varying vec3 vImpA; varying vec3 vImpE; varying float vImpR
     vec2 u = clamp(vImpUv, vec2(0.004), vec2(0.996));
     vec2 gx = dFdx(vImpUv) * fsz, gy = dFdy(vImpUv) * fsz;
     float row = floor(vImpRow / IMP_NE + 0.5);
-    float cov = mix(textureGrad(uImpAlb, (vec2(vImpA.x, row) + u) * fsz, gx, gy).r,
-                    textureGrad(uImpAlb, (vec2(vImpA.y, row) + u) * fsz, gx, gy).r, vImpA.z);
+    // The sun and each tree are fixed, so the nearest direction never changes: one tap is enough.
+    float cov = textureGrad(uImpAlb, (vec2(vImpA.z < 0.5 ? vImpA.x : vImpA.y, row) + u) * fsz, gx, gy).r;
     if (cov < 0.5) discard;
   }`);
   };
