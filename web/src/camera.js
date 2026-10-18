@@ -13,6 +13,8 @@ import { lerpAngle, angleDiff, clamp, smoothstep } from './world.js';
 import { FPView } from './fpview.js';
 
 const _v = new THREE.Vector3();
+const LIFT_SMOOTH = 0.12;   // s, follow smoothing on a lift ride
+const LIFT_SIDE = 1.1;      // rad the lift camera sits off the cable line (straight behind, the cable and the chair back hid the rider; from the side the seated rider shows)
 
 export class CameraController {
   constructor(camera, player, terrain, input) {
@@ -151,7 +153,9 @@ export class CameraController {
     const steep = Math.max(0, THREE.MathUtils.radToDeg(Math.acos(Math.min(1, s.groundNormal.y))) - 30) / 10;
     this.steep = (this.steep || 0) + (steep - (this.steep || 0)) * k(2);
     const target = s.renderPos.clone().add(new THREE.Vector3(0, C.height + s.speedRatio * C.heightAtSpeed + this.steep * C.steepLift, 0));
-    const sm = lift ? 0.35 : C.followSmooth;
+    // Lift: long chairs run at up to ~20 m/s (length / liftRideSeconds); a 0.35 s smoothing trailed 7 m behind the
+    // set 7.5 m arm, so the chair was a speck 14-29 m away with the haul cable drawn straight through it.
+    const sm = lift ? LIFT_SMOOTH : C.followSmooth;
     // The anchor follows the path (renderPos), never the rotating body: flips turn about the rider's centre of
     // mass (rider.js) and spins about the vertical, so the anchor stays on the flight line and the horizon level.
     this.pos.x = this.damp(this.pos.x, target.x, 0, sm, dt);
@@ -232,7 +236,7 @@ export class CameraController {
     this.side = this.spring('side', sideWant, sideWant > this.side ? C.sideIn : C.sideReturn, dt);
 
     const r = s.speedRatio;
-    const yawT = this.yaw + this.lookYaw + this.orbit + this.side * this.sideSign * THREE.MathUtils.degToRad(C.airSideDeg);
+    const yawT = this.yaw + this.lookYaw + this.orbit + this.side * this.sideSign * THREE.MathUtils.degToRad(C.airSideDeg) + (lift ? LIFT_SIDE : 0);
     const back = new THREE.Vector3(Math.sin(yawT), 0, Math.cos(yawT));
     const n = s.groundNormal;
     const rise = -back.dot(new THREE.Vector3(n.x, 0, n.z)) / Math.max(n.y, 0.2);
@@ -248,12 +252,12 @@ export class CameraController {
       wantPitch += (C.landPitch - landSlope * 0.75 + this.lookPitch - wantPitch) * this.preK;
     }
     if (orbiting) wantPitch = -8 + this.lookPitch;
-    if (lift) wantPitch = -9 + this.lookPitch;
+    if (lift) wantPitch = -12 + this.lookPitch;
     this.pitch += (wantPitch - this.pitch) * k(3);
     let wantDist = C.distance + r * C.distanceAtSpeed - s.tuck * 0.4 + this.airK * C.airPull;
     wantDist = wantDist * (1 - this.side) + (C.airSideDist + this.airK * C.airPull) * this.side;
     if (orbiting) wantDist = 6.5;
-    if (lift) wantDist = 7.5;
+    if (lift) wantDist = 6.5;
     if (crash) wantDist = 7;
     this.dist += (wantDist - this.dist) * k(2);
 
