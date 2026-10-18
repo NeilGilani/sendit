@@ -395,5 +395,6 @@ function restore(dst, def) {
 export const HUD = {
   speedMilestones: [20, 35, 50],      // km/h — the speed readout bounces when crossing these
   windStreakFrom: 0.92,               // speed ratio where corner wind streaks start
+  fpWindEarly: 0.2,                   // first person: streaks start this much earlier (fainter, see main.js)
   windStreakFull: 1.0,
 };

@@ -46,6 +46,17 @@ export const FP_LENS = {
   fogRise: 0.035, fogClear: 0.4, fogMax: 0.5,   // per s while stopped after effort / at speed, cap
 };
 
+// Breath: a soft puff of vapour drifting out below the view on each exhale, quicker after hard riding,
+// visible standing / riding slowly (at speed the cold air takes it away instantly).
+export const FP_BREATH = {
+  rest: 3.4, hard: 1.7,       // s per breath at rest / right after effort
+  exhale: 1.1,                // s a puff lives
+  opacity: 0.32, size: 0.18,  // at its fullest, metres across at birth (grows ×2.4)
+  fadeSpeed: 6,               // m/s above which it is gone
+};
+// Terrain chatter: bumps (how fast the ground normal under the rider changes) kick the helmet cam.
+export const FP_BOB = { gain: 0.0035, max: 0.05, spring: 260, damp: 22 };
+
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _e = new THREE.Euler(0, 0, 0, 'YXZ');
 const _m = new THREE.Matrix4(), _s = new THREE.Vector3(), _col = new THREE.Color(), _col2 = new THREE.Color();
@@ -87,11 +98,57 @@ export class FPView {
     this.dip = 0; this.dipV = 0; this.fov = C.fpFov; this.rot = 0;
     this.lens = { tint: new THREE.Color(1, 1, 1), amount: 0, fringe: 0, fog: 0, snow: 0 };
     this.snow = 0; this.fog = 0; this.effort = 0; this._edge = 0;
+    this.bob = 0; this.bobV = 0; this.prevN = new THREE.Vector3(0, 1, 0);
+    this.breathT = 0; this.puff = null;
     on('crashed', () => { this.snow = Math.max(this.snow, FP_LENS.snowCrash); });
     on('landed', ({ impact }) => {
       const pl = this.c.player;
       if ((pl.powder ?? 0) > 0.5 && impact > 5) this.snow = Math.min(1, this.snow + FP_LENS.snowLand * Math.min(1.5, impact / 10));
     });
+  }
+
+  /** Breath puffs in front of the face (a single soft sprite in the scene, placed from the camera). */
+  updateBreath(dt) {
+    const B = FP_BREATH, cam = this.c.camera, rider = this.c.rider, pl = this.c.player;
+    let scene = rider.root; while (scene.parent) scene = scene.parent;
+    if (!this.puff) {
+      if (scene === rider.root || typeof document === 'undefined') return;
+      const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+      const g = cv.getContext('2d');
+      for (let i = 0; i < 14; i++) {   // a few overlapping soft blobs: a cloud, not a disc
+        const x = 32 + (Math.random() - 0.5) * 22, y = 32 + (Math.random() - 0.5) * 22, r = 10 + Math.random() * 14;
+        const gr = g.createRadialGradient(x, y, 0, x, y, r);
+        gr.addColorStop(0, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+      }
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, fog: false, color: new THREE.Color(1.5, 1.55, 1.65), opacity: 0 });
+      this.puff = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+      this.puff.name = 'fpBreath'; this.puff.renderOrder = 5; this.puff.frustumCulled = false;
+      this.puffPos = new THREE.Vector3(); this.puffVel = new THREE.Vector3(); this.puffAge = 9;
+      scene.add(this.puff);
+    }
+    const moving = clamp(pl.speed / B.fadeSpeed, 0, 1);
+    this.breathT += dt;
+    const period = B.rest + (B.hard - B.rest) * this.effort;
+    if (this.breathT > period) {
+      this.breathT = 0; this.puffAge = 0;
+      // Out of the mouth: below and a little ahead of the eye, drifting forward / down with the rider's velocity.
+      this.puffPos.copy(this.eye).add(_v.set(0, -0.13, -0.16).applyQuaternion(this.q));
+      this.puffVel.copy(_v.set(0, -0.05, -0.35).applyQuaternion(this.q)).addScaledVector(pl.velocity, 0.7);
+    }
+    this.puffAge += dt;
+    const a = this.puffAge / B.exhale;
+    const vis = a < 1 ? Math.sin(Math.min(1, a * 3) * Math.PI * 0.5) * (1 - a) * (1 - a) : 0;
+    this.puffPos.addScaledVector(this.puffVel, dt);
+    this.puffVel.multiplyScalar(Math.exp(-1.5 * dt));
+    const m = this.puff;
+    m.visible = vis * (1 - moving) > 0.003 && pl.state !== State.LIFT;
+    if (!m.visible) return;
+    m.position.copy(this.puffPos);
+    m.quaternion.copy(cam.quaternion);
+    m.scale.setScalar(B.size * (1 + 1.4 * Math.min(1, a)));
+    m.material.opacity = B.opacity * vis * (1 - moving);
   }
 
   /** Lens state for the grade pass (this.lens): tint from the worn goggles, fog, snow flecks. */
@@ -126,7 +183,11 @@ export class FPView {
   kick(impact) { this.dipV += Math.min(FP.dipMax, impact * FP.dipKick); }
 
   /** Next update starts fresh (after the chase camera, a respawn or a menu). */
-  reset() { this.active = false; if (this.c.rider?.fpCam) this.c.rider.fpCam.ok = false; }
+  reset() {
+    this.active = false;
+    if (this.c.rider?.fpCam) this.c.rider.fpCam.ok = false;
+    if (this.puff) this.puff.visible = false;
+  }
 
   update(dt) {
     const ctl = this.c, cam = ctl.camera, s = ctl.player, rider = ctl.rider, rp = rider.p;
@@ -239,6 +300,15 @@ export class FPView {
     const chat = ground ? (0.003 + r * r * 0.012) : 0.0008;
     this.eye.y += (noise1(t * 26, 2.1) * 0.7 + noise1(t * 53, 4.4) * 0.3) * chat;
     this.eye.y -= this.dip * 0.5;
+    // Terrain chatter: a stiff spring kicked by how fast the ground normal changes (bumps, ruts, crud).
+    if (ground && dt > 1e-4) {
+      const dn = _v.copy(s.groundNormal).sub(this.prevN).length() / dt;
+      this.bobV += Math.min(FP_BOB.max, dn * FP_BOB.gain * (0.4 + r)) * (noise1(t * 40, 6.6) > 0 ? 1 : -1);
+    }
+    this.prevN.copy(s.groundNormal);
+    this.bobV -= (this.bob * FP_BOB.spring + this.bobV * FP_BOB.damp) * dt;
+    this.bob += this.bobV * dt;
+    this.eye.y += this.bob;
     cam.position.copy(this.eye);
     cam.quaternion.copy(this.q);
     if (ground) cam.rotateZ(noise1(t * 31, 9.3) * chat * 0.6);
@@ -264,6 +334,7 @@ export class FPView {
       if (Math.abs(g - (this._g ?? -1)) > 0.01) { this._g = g; document.body.style.setProperty('--fp-rush', g.toFixed(2)); }
     }
     this.updateLens(dt);
+    this.updateBreath(dt);
     if (typeof document !== 'undefined' && this._lensCss !== settings.fpLens) { this._lensCss = settings.fpLens; document.body.style.setProperty('--fp-lens', String(settings.fpLens ?? 1)); }
     rider.fpLookPitch = THREE.MathUtils.radToDeg(_e.setFromQuaternion(this.q, 'YXZ').x);
     // The arms (rider.js → fpBoardArm) frame the gloves in this view next frame.
