@@ -291,25 +291,24 @@ function saveLoadHint(mapId = currentMap?.map.id, trail = null, transition = fal
 }
 
 /**
- * Shader programs without blocking the GPU process: KHR_parallel_shader_compile via compileAsync, so the
- * loading screen's worker (which shares Chrome's GPU thread) keeps drawing while the game's ~100
- * programs link. Falls back to the synchronous compile.
- */
-async function compileAsync() {
-  try { await renderer.compileAsync(scene, camera); } catch (e) { console.warn('[gfx] compileAsync failed, compiling synchronously', e); renderer.compile(scene, camera); }
-}
-
-/**
  * Compile the programs the game will actually draw with: it renders into the post stack's HDR target
  * (linear output, another program variant than the canvas), so compile with that target bound. The
  * frame loop holds off meanwhile (`warming`): a frame would link the same programs synchronously.
  */
 async function compileForPost() {
   warming = true;
-  const prev = renderer.getRenderTarget();
   const rt = composer?.inputBuffer;
-  if (rt) renderer.setRenderTarget(rt);
-  try { await compileAsync(); } finally { renderer.setRenderTarget(prev); }
+  if (!rt || !renderer.compileAsync) { renderer.compile(scene, camera); return; }
+  // One top-level group at a time with a yield between: ANGLE translates each shader on the GPU thread
+  // before the parallel part, and ~100 programs in one go held it ~0.9 s (a hitch in the loading shot).
+  for (const child of [...scene.children]) {
+    const prev = renderer.getRenderTarget();
+    renderer.setRenderTarget(rt);
+    let p;
+    try { p = renderer.compileAsync(child, camera, scene); } catch (e) { console.warn('[gfx] compileAsync failed', e); } finally { renderer.setRenderTarget(prev); }
+    try { await p; } catch { /* the first frames compile what's left */ }
+    await new Promise((res) => setTimeout(res, 0));
+  }
 }
 
 /**

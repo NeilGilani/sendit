@@ -90,7 +90,7 @@ the machine was quiet (load average 2–4); boot → lobby, then lobby → Raven
 | boot → lobby ready | 11.1 / 11.4 / 12.9 / 12.0 s (median ≈ 11.7) | 9.5 / 12.9 / 13.9 / 11.4 s (median ≈ 12.1) |
 | live render size, boot | 960×600 – 1183×739 (scale 0.52–0.64) | **2277×1423** (scale 1.0) |
 | live fps during boot | 18–20 | 32–33 (locked 30 by design) |
-| worst live frame, boot | 1.5–3.4 s | 0.7–1.4 s (one, in "Setting up the lobby"; then fixed, see below) |
+| worst live frame, boot | 1.5–3.4 s | 0.7–1.4 s in that round; **83 ms (no stall) after the last two fixes below** |
 | lobby → mountain ready | 8.1 / 8.6 / 9.0 / 9.0 s (median ≈ 8.8) | 8.2 / 9.4 / 9.5 / 10.4 s (median ≈ 9.5) |
 | live on the map load | 0.9–1.1 s, random rider / made-up place | 1.4–1.9 s (still before), **the player's rider, the real mountain + card** |
 | live render size, map load | 1563×977 | **2277×1423** |
@@ -98,8 +98,11 @@ the machine was quiet (load average 2–4); boot → lobby, then lobby → Raven
 
 So boot is within noise of before (+0.4 s median), a map load ~0.7 s longer (the heavier hero scene and the
 sliced warm-up), and the screen is a real, sharp picture from the first ~150 ms and smooth throughout.
-The remaining boot hitch (0.7–1.4 s while the lobby stage was set up) was a wasted canvas-variant compile
-in `ensureStage()`; it is now skipped during the boot (compileForPost covers the stage).
+Two more boot hitches were then removed: a wasted canvas-variant compile in `ensureStage()` (skipped during
+the boot; compileForPost covers the stage), and compileForPost itself issuing ~100 programs at once
+(ANGLE translates each on the GPU thread first: ~0.9 s) — it now compiles one top-level group at a time with
+a yield. Final check (02:15, load ≈ 5): **boot ready 10.2 s, map load 9.1 s, worst live frame 83 ms in
+both, still at 117 ms, live rider at 2.5 s (boot) / 1.6 s (map)**.
 
 Earlier runs the same night with the machine at load average 15–90 (other sessions' browsers) showed the
 same picture in proportion: old map loads froze the hero shot for 2–4 s at the end (prewarm), boot for
