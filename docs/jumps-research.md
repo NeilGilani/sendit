@@ -508,8 +508,8 @@ the Ravenspire set differs by a couple of airs because the riding bot's line cha
 | A at the lip + grab held to the end (no spot) | 39 % / 75 % | 39 % / 76 % (the skill stays) |
 
 Tried and dropped: letting the spot check back whenever neither alignment is in reach and back looks nearer —
-the release sweep improved (crash 30 → 11) but on the maps a late 180 on non-twin skis landed 0/22 instead of
-8/25 (the check-back from a fast spin is slower than the estimate), so it was reverted.
+the release sweep improved (crash 30 → 11) but on the maps a late spin on non-twin skis landed 14/61 instead of
+23/61 (a check-back from a fast spin is slower than the estimate), so it was reverted.
 
 ### Ground and landing windows (measured, left as they are)
 
