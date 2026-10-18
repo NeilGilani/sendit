@@ -1,29 +1,41 @@
 // The case opening, CS:GO style (docs/rewards.md "The opening, frame by frame"):
-//   0.00 s  the overlay dims the lobby, the case box drops in and rattles (two latch clunks)
-//   1.00 s  the lid flips open, light pours out, the case lifts away
-//   1.90 s  the reel slides in: a strip of item cards under a gold centre marker
-//   2.00 s  the reel spins for 6.0 s on CS2's own curve, cubic-bezier(0.075, 0.82, 0.165, 1):
+//   0.00 s  the lobby fades into a dark studio; a real 3D crate drops onto the plinth (crate3d.js),
+//           the camera pushes in, two latches snap open, light leaks from the seam
+//   1.38 s  the lid bursts open: beam, sparks, spilled snow
+//   1.95 s  the reel slides in above the glowing crate: a strip of item cards under a gold marker
+//   2.25 s  the reel spins for 6.0 s on CS2's own curve, cubic-bezier(0.075, 0.82, 0.165, 1):
 //           ~75 % of the distance in the first second, then a long crawl; a tick per card that
-//           crosses the marker (≥ 55 ms apart), the ticks slowing with the reel
-//   8.00 s  it stops on the winner (often a hair away from a rarer card: the near miss); 0.6 s hold
-//   8.60 s  the reveal: rarity-coloured flash, rays, particles, stinger, then Equip now / Open next
-// Skip (Space / the button) jumps to the reveal. The overlay lives on document.body above the lobby.
+//           crosses the marker (≥ 55 ms apart, dropping in pitch as it slows); the crate's light
+//           takes the colour of the card under the marker
+//   8.25 s  it stops on the winner (often a hair away from a rarer card: the near miss); 0.6 s hold
+//   8.85 s  the reveal: the pull rises out of the crate (skis / boards on a turntable) or appears on
+//           your rider (clothing); rays, shockwave, particles and a fanfare that grow with the grade
+// Skip: the button or Esc at once, or hold Space / Enter / gamepad A. Quick open (toggle) plays the same
+// beats in a third of the time; "Open all" chains every case with quick timing.
+// Without the lobby stage (no WebGL stage) the old 2D case box plays instead.
 import { profileStore } from '../../profile/store.js';
-import { rarityOf } from '../../profile/rarity.js';
-import { skin } from '../../profile/rewards.js';
+import { rarityOf, RARITIES } from '../../profile/rarity.js';
+import { skin, CASE_XP, seeded, rollCase, caseOdds, casePool, PITY } from '../../profile/rewards.js';
 import { SERIES } from '../../profile/items.js';
-import { SLOTS } from '../../profile/catalog.js';
-import { CASE_XP, seeded } from '../../profile/rewards.js';
+import { SLOTS, STATS } from '../../profile/catalog.js';
 import { itemArt, goldArt } from './art.js';
 import { caseArt } from './caseArt.js';
 import { caseSfx } from './sfx.js';
+import { crateSfx } from '../../audio/crate.js';
+import { crateShow } from './crate3d.js';
 import './cases.css';
 
-import { TIMING, REEL_EASE, cubicBezier } from './timing.js';
+import { TIMING, TIMING_QUICK, REEL_EASE, cubicBezier } from './timing.js';
 
-export { TIMING, REEL_EASE, cubicBezier };
+export { TIMING, TIMING_QUICK, REEL_EASE, cubicBezier };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const HOLD_SKIP = 0.4;   // seconds of Space / Enter / A to skip
+const QUICK_KEY = 'sendit.cases.quick';
+export const quickOpen = {
+  get() { try { return localStorage.getItem(QUICK_KEY) === '1'; } catch { return false; } },
+  set(v) { try { localStorage.setItem(QUICK_KEY, v ? '1' : '0'); } catch { /* private mode */ } },
+};
 
 /** A reel / grid card for a skin key (or the anonymous gold card). */
 export function cardHtml(key, rarity, { big = false, label = true } = {}) {
@@ -39,28 +51,49 @@ export function cardHtml(key, rarity, { big = false, label = true } = {}) {
   </div>`;
 }
 
+/**
+ * Debug only: ?caseforce=<grade> (common | uncommon | rare | epic | legendary | gold, or grey, blue,
+ * purple, pink, red) picks a seeded RNG whose roll lands in that grade, so every grade's reveal can be
+ * checked. The roll itself is the normal one (same odds code, same reel, same save).
+ */
+const ALIAS = { grey: 'common', gray: 'common', blue: 'uncommon', purple: 'rare', pink: 'epic', red: 'legendary', covert: 'legendary', knife: 'gold' };
+export function forcedRng(series) {
+  let want = null;
+  try { want = new URLSearchParams(location.search).get('caseforce'); } catch { return undefined; }
+  if (!want) return undefined;
+  want = ALIAS[want] || want;
+  if (!RARITIES.some((r) => r.id === want)) return undefined;
+  const pity = (profileStore.rewards?.sinceRed ?? 0) >= PITY - 1;
+  const salt = (profileStore.rewards?.opened ?? 0) * 7919;
+  for (let k = 1; k < 200000; k++) if (rollCase(series, seeded(k + salt), pity).rarity === want) return seeded(k + salt);
+  return undefined;
+}
+
 let active = null;
-// Test / capture hook (scripts/casesshot.mjs): open with a seeded RNG for a reproducible reel.
-if (typeof window !== 'undefined') window.__senditCasesApi = { open: (id, seed) => openCaseShow(id, { rng: seed != null ? seeded(seed) : undefined }), seeded };
+// Test / capture hook (scripts/casesshot.mjs, crateshot.mjs): open with a seeded RNG for a reproducible reel.
+if (typeof window !== 'undefined') window.__senditCasesApi = { open: (id, seed, o = {}) => openCaseShow(id, { ...o, rng: seed != null ? seeded(seed) : undefined }), seeded, crate: crateShow };
 
 /** Is the opener on screen? */
 export const openerActive = () => !!active;
 
 /**
  * Open a case with the full show. `caseId` = an unopened case (first one if omitted).
+ * opts: { onClose, rng, quick (default: the Quick open toggle), chain ({ pulls: [] } = "Open all") }.
  * Returns a promise for the result once the overlay closes: { result, equipped }.
  */
-export function openCaseShow(caseId, { onClose, rng } = {}) {
+export function openCaseShow(caseId, { onClose, rng, quick, chain } = {}) {
   if (active) return active.promise;
   const c = caseId ? profileStore.unopened.find((x) => x.id === caseId) : profileStore.unopened[0];
   if (!c) return Promise.resolve(null);
   caseSfx.unlock();
-  const result = profileStore.openCase(c.id, rng, { defer: true });   // announced at the reveal (no spoilers)
+  crateSfx.unlock();
+  const result = profileStore.openCase(c.id, rng ?? forcedRng(c.series), { defer: true });   // announced at the reveal (no spoilers)
   if (!result) return Promise.resolve(null);
   let resolve;
   const promise = new Promise((r) => { resolve = r; });
   active = { promise };
-  const ov = new Opener(result, () => { active = null; onClose?.(); resolve({ result, equipped: ov.equipped }); });
+  if (chain) chain.pulls.push(result);
+  const ov = new Opener(result, { quick: quick ?? (!!chain || quickOpen.get()), chain }, () => { active = null; onClose?.(); resolve({ result, equipped: ov.equipped }); });
   ov.userClose = onClose;
   active.opener = ov;
   globalThis.__senditCases = { opener: ov, result };
@@ -68,39 +101,52 @@ export function openCaseShow(caseId, { onClose, rng } = {}) {
 }
 
 class Opener {
-  constructor(result, done) {
+  constructor(result, { quick = false, chain = null } = {}, done) {
     this.result = result;
     this.done = done;
+    this.quick = quick;
+    this.chain = chain;
+    this.T = quick ? TIMING_QUICK : TIMING;
     this.equipped = false;
     this.trace = [];          // per-frame { t, x, v, card } for frame-by-frame checks (scripts/casesshot.mjs)
     this.ticks = [];
     this.series = SERIES[result.case.series];
-    this.build();
     this.t0 = performance.now();
+    // The 3D crate on the lobby stage; the 2D case box if the stage is not up.
+    this.cs = { result, timing: this.T, quick, clock: () => this.time(), under: null, tickPulse: 0, landed: false, revealAt: null, onCue: (n) => this.cue(n) };
+    this.d3 = crateShow.begin(this.cs);
+    this.build();
     this.phase = 'case';
     this.raf = requestAnimationFrame((n) => this.frame(n));
     this.onKey = (e) => this.key(e);
+    this.onKeyUp = (e) => { if (e.code === 'Space' || e.code === 'Enter') this.holdSince = null; };
     addEventListener('keydown', this.onKey, true);
+    addEventListener('keyup', this.onKeyUp, true);
     // A resize mid-spin re-measures the strip (cards are em-sized), so it still stops on the winner.
     this.onResize = () => { if (this.el && this.phase !== 'reveal') this.measure(); };
     addEventListener('resize', this.onResize);
     this.lobby = globalThis.__sendit?.lobby;
     if (this.lobby) this.lobby.overlay = this;
-    caseSfx.open();
+    this.padHeld = this.padA();   // an A press that opened the case does not count as a hold
+    this.holdSince = null;
+    if (!this.d3) caseSfx.open();
   }
+
+  /** Show time in seconds since the click (frozen while a capture seeks). */
+  time(now = performance.now()) { return this.frozen ?? (now - this.t0) / 1000; }
 
   build() {
     const { reel } = this.result;
     const el = document.createElement('div');
-    el.className = 'cr-overlay';
+    el.className = `cr-overlay${this.d3 ? ' d3' : ''}${this.quick ? ' quick' : ''}`;
     el.setAttribute('role', 'dialog');
     el.setAttribute('aria-label', `Opening ${this.series.name}`);
     el.style.setProperty('--sc', this.series.color);
     el.style.setProperty('--sa', this.series.accent);
     el.innerHTML = `
       <div class="cr-dim"></div>
-      <div class="cr-head"><small>Unlocking</small><b>${esc(this.series.name)}</b></div>
-      <div class="cr-case">${caseArt(this.result.case.series)}<div class="cr-light"></div></div>
+      <div class="cr-head"><small>${this.chain ? `Opening all · ${this.chain.pulls.length} of ${this.chain.pulls.length + profileStore.unopened.length}` : 'Unlocking'}</small><b>${esc(this.series.name)}</b></div>
+      ${this.d3 ? '' : `<div class="cr-case">${caseArt(this.result.case.series)}<div class="cr-light"></div></div>`}
       <div class="cr-reel" aria-hidden="true">
         <div class="cr-window"><div class="cr-strip">${reel.cards.map((c) => cardHtml(c.key, c.rarity)).join('')}</div></div>
         <div class="cr-streaks"></div>
@@ -108,8 +154,10 @@ class Opener {
       </div>
       <div class="cr-reveal" hidden></div>
       <canvas class="cr-fx"></canvas>
-      <button type="button" class="cr-skip">Skip <kbd>Space</kbd></button>`;
+      <label class="cr-quick"><input type="checkbox" ${this.quick ? 'checked' : ''} ${this.chain ? 'disabled' : ''}> Quick open</label>
+      <button type="button" class="cr-skip"><span class="cr-hold"></span>Skip <kbd>hold Space</kbd></button>`;
     document.body.appendChild(el);
+    if (this.d3) document.body.classList.add('cr-open');
     this.el = el;
     this.strip = el.querySelector('.cr-strip');
     this.win = el.querySelector('.cr-window');
@@ -117,7 +165,9 @@ class Opener {
     this.marker = el.querySelector('.cr-marker');
     this.streaks = el.querySelector('.cr-streaks');
     this.fx = el.querySelector('.cr-fx');
-    el.querySelector('.cr-skip').addEventListener('click', () => this.skip());
+    this.skipBtn = el.querySelector('.cr-skip');
+    this.skipBtn.addEventListener('click', () => this.skip());
+    el.querySelector('.cr-quick input').addEventListener('change', (e) => { quickOpen.set(e.target.checked); e.target.blur(); });
     requestAnimationFrame(() => el.classList.add('on'));
     this.measure();
   }
@@ -137,11 +187,40 @@ class Opener {
 
   cellAt(x) { return Math.floor((x + this.cx) / this.pitch); }
 
+  /** Is gamepad A down on any pad? */
+  padA() {
+    try { for (const p of navigator.getGamepads?.() || []) if (p?.buttons?.[0]?.pressed) return true; } catch { /* no pads */ }
+    return false;
+  }
+
+  /** Beats of the 3D crate: rumble / phone haptics. */
+  cue(name) {
+    if (name === 'land') this.rumble(0.35, 0.3, 120);
+    else if (name === 'latchL' || name === 'latchR') { this.rumble(0, 0.5, 45); this.vibrate(15); }
+    else if (name === 'lid') { this.rumble(0.6, 0.6, 220); this.vibrate([30, 20, 40]); }
+  }
+
+  vibrate(p) { try { if (!reduced()) navigator.vibrate?.(p); } catch { /* unsupported */ } }
+
   frame(now) {
     if (!this.el) return;
     this.raf = requestAnimationFrame((n) => this.frame(n));
-    const t = this.frozen ?? (now - this.t0) / 1000;
-    const T = TIMING;
+    const t = this.time(now);
+    const dt = Math.min(0.1, (now - (this.lastNow ?? now)) / 1000);
+    this.lastNow = now;
+    const T = this.T;
+    // Hold to skip (keyboard or pad A), with a ring filling on the Skip button.
+    if (this.phase !== 'reveal' && this.phase !== 'closing' && this.phase !== 'hold') {
+      const a = this.padA();
+      if (a && !this.padHeld && this.holdSince == null) this.holdSince = now;
+      if (!a && this.padHeld) this.padHeld = false;
+      if (!a && this.holdPad) { this.holdPad = false; this.holdSince = null; }
+      if (a && this.holdSince != null) this.holdPad = true;
+      const h = this.holdSince != null ? Math.min(1, (now - this.holdSince) / 1000 / HOLD_SKIP) : 0;
+      if (Math.abs(h - (this.holdShown ?? 0)) > 0.01) { this.holdShown = h; this.skipBtn.style.setProperty('--hold', h.toFixed(3)); }
+      if (h >= 1) { this.holdSince = null; this.holdPad = false; this.padHeld = a; this.skip(); }
+    }
+    this.cs.tickPulse *= Math.exp(-dt * 12);
     if (this.phase === 'case' && t >= T.lid) { this.el.classList.add('lid'); this.phase = 'lid'; }
     if (this.phase === 'lid' && t >= T.reelIn) { this.el.classList.add('reel'); this.phase = 'reelIn'; }
     if (this.phase === 'reelIn' && t >= T.spin) this.phase = 'spin';
@@ -158,29 +237,33 @@ class Opener {
       if (Math.abs(spd - (this.spd ?? -1)) > 0.02) { this.spd = spd; this.streaks.style.opacity = reduced() ? 0 : spd.toFixed(2); }
       const cell = this.cellAt(x);
       if (cell !== this.lastCell) {
-        if (t - this.lastTick >= T.tickGap) {
-          caseSfx.tick(Math.min(1, Math.abs(v) / 6000));
+        if (t - this.lastTick >= T.tickGap && !this.frozen) {
+          const s = Math.min(1, Math.abs(v) / 6000);
+          if (this.d3) crateSfx.tick(s, k); else caseSfx.tick(s);
           if (k > 0.35) this.rumble(0, 0.12, 25);   // a light buzz per card once the reel is readable
           this.lastTick = t;
           this.ticks.push(+t.toFixed(3));
+          this.cs.tickPulse = 1;
           this.marker.animate?.([{ filter: 'brightness(1.8)' }, { filter: 'brightness(1)' }], { duration: 90 });   // no reflow per tick
         }
         // A red or ★ card sliding under the marker in the slow part: the marker flashes its colour and
         // a soft shimmer plays (the near-miss teaser next to the winner gets the same treatment).
         const under = this.result.reel.cards[cell];
         if (under && k > 0.25 && cell !== this.result.reel.winAt && (under.rarity === 'legendary' || under.rarity === 'gold')) {
-          caseSfx.tease();
+          if (!this.frozen) { if (this.d3) crateSfx.tease(rarityOf(under.rarity).rank); else caseSfx.tease(); }
           const c = rarityOf(under.rarity).color;
           this.marker.animate?.([{ filter: `drop-shadow(0 0 10px ${c}) drop-shadow(0 0 22px ${c}) brightness(1.6)` }, { filter: 'none' }], { duration: 600, easing: 'ease-out' });
         }
         this.lastCell = cell;
       }
+      this.cs.under = this.result.reel.cards[cell]?.rarity ?? null;
       if (k > 0.55 && !this.tense) { this.tense = true; this.el.classList.add('tense'); }
       if (k > 0.3 && k < 0.9 && !this.stopRiser && !this.frozen && !this.skipped) this.stopRiser = caseSfx.riser(T.spinDur * 0.7);
       this.trace.push({ t: +t.toFixed(4), x: +x.toFixed(2), v: +v.toFixed(1), card: cell });
       if (k >= 1 && this.phase === 'spin') { this.phase = 'hold'; this.land(); }
     }
-    if (this.phase === 'hold' && t >= T.spin + T.spinDur + T.hold) { this.phase = 'reveal'; this.reveal(); }
+    if (this.phase === 'hold' && t >= T.spin + T.spinDur + T.hold) { this.phase = 'reveal'; this.reveal(t); }
+    if (this.phase === 'reveal' && this.autoAt != null && t >= this.autoAt && !this.frozen) { this.autoAt = null; this.act('next'); }
     if (this.particles) this.drawFx(now);
   }
 
@@ -188,29 +271,53 @@ class Opener {
   rumble(strong, weak, ms) { try { this.lobby?.input?.rumble?.(strong, weak, ms); } catch { /* no pad */ } }
 
   /** Capture helper: hold the show at time t (seconds since the click); null resumes. */
-  seek(t) { this.frozen = t; }
+  seek(t) {
+    if (t == null && this.frozen != null) this.t0 = performance.now() - this.frozen * 1000;   // resume from the frozen time
+    this.frozen = t;
+  }
 
   land() {
     this.stopRiser?.();
     caseSfx.land();
     this.rumble(0.25, 0.4, 120);
+    this.vibrate(25);
+    this.cs.landed = true;
     this.streaks.style.opacity = 0;
     this.cards[this.result.reel.winAt].classList.add('win');
     this.el.classList.add('landed');
-    this.el.querySelector('.cr-skip').hidden = true;
+    this.skipBtn.hidden = true;
   }
 
   skip() {
     if (!['case', 'lid', 'reelIn', 'spin'].includes(this.phase)) return;
     this.skipped = true;
-    this.t0 = performance.now() - (TIMING.spin + TIMING.spinDur) * 1000;
+    this.stopRiser?.();
+    const to = this.T.spin + this.T.spinDur;
+    if (this.frozen != null) this.frozen = to; else this.t0 = performance.now() - to * 1000;
     this.el.classList.add('lid', 'reel');
     this.phase = 'spin';
   }
 
-  reveal() {
+  /** Grade odds of one item and the details line (CS:GO's float / StatTrak line, our version). */
+  details(res) {
+    const odds = caseOdds(res.case.series)[res.rarity] ?? 0;
+    const n = casePool(res.case.series)[res.rarity]?.length || 1;
+    const each = odds / n;
+    const fmt = (v) => (v >= 1 ? v.toFixed(1) : v >= 0.1 ? v.toFixed(2) : v.toFixed(3));
+    const fin = res.variant.colors?.finish || res.variant.colors?.pat || (res.item.model?.kind === 'equipment' ? res.item.model.ref : '');
+    const serial = String(profileStore.rewards?.opened ?? 0).padStart(4, '0');
+    return `<p class="cr-meta"><span>${esc(res.item.brand || this.series.name.replace(/ Case$/, ''))}</span>${fin ? `<span>${esc(String(fin).replace(/-/g, ' '))}</span>` : ''}<span>Pull #${serial}</span><span>${fmt(each)} % chance</span></p>`;
+  }
+
+  statsHtml(item) {
+    if (!item.stats || !Object.keys(item.stats).length) return '';
+    return `<div class="cr-stats">${Object.entries(item.stats).map(([k, v]) => `<span>${esc(STATS[k]?.label || k)}</span><i style="--v:${(v / 10).toFixed(2)}"></i>`).join('')}</div>`;
+  }
+
+  reveal(t) {
     const res = this.result;
     res.announce?.();
+    this.cs.revealAt = t;
     const r = rarityOf(res.rarity);
     const slot = SLOTS[res.item.slot]?.label || '';
     const pct = Math.round((res.dupeXp / CASE_XP) * 100);
@@ -222,27 +329,38 @@ class Opener {
     this.el.style.setProperty('--rc', r.color);
     this.el.classList.add('revealed', `rv-${r.id}`);
     rv.hidden = false;
+    const chainDone = this.chain && !more && this.chain.pulls.length > 1;
     rv.innerHTML = `
-      <div class="cr-rays"></div>
-      <div class="cr-rcard">${cardHtml(res.key, res.rarity, { big: true, label: false })}</div>
+      ${this.d3 ? '' : `<div class="cr-rays"></div>
+      <div class="cr-rcard">${cardHtml(res.key, res.rarity, { big: true, label: false })}</div>`}
       <div class="cr-rtext">
-        <span class="cr-grade">${esc(r.name)}${res.rarity === 'gold' ? ' ★' : ''} · ${esc(slot)}</span>
+        <span class="cr-grade">${res.rarity === 'gold' ? '★ ' : ''}${esc(r.name)} · ${esc(slot)}</span>
         <h2>${esc(res.item.name)} <em>|</em> ${esc(res.variant.name)}</h2>
+        ${this.details(res)}
+        ${this.statsHtml(res.item)}
         ${res.dupe
           ? `<p class="cr-dupe">Duplicate · converted to <b>+${res.dupeXp} case XP</b> (${pct} % of a case)${res.cases.length ? ' · <b>a new case!</b>' : ''}</p>`
           : '<p class="cr-new">NEW · added to your locker</p>'}
         <p class="cr-col">Collection ${col.owned} / ${col.total} · ${Math.round(col.pct * 100)} %</p>
         ${res.completed ? `<p class="cr-new">${esc(SERIES[res.completed].name.replace(/ Case$/, ''))} collection complete! +${res.cases.length} cases</p>` : ''}
+        ${chainDone ? `<div class="cr-summary"><small>This session · ${this.chain.pulls.length} cases</small><div>${this.chain.pulls.slice().sort((a, b) => rarityOf(b.rarity).rank - rarityOf(a.rarity).rank).map((p) => cardHtml(p.key, p.rarity, { label: false })).join('')}</div></div>` : ''}
         <div class="cr-actions">
           ${worn ? '' : `<button type="button" class="cr-btn${res.dupe ? '' : ' primary'}" data-act="equip">Equip now</button>`}
-          ${more ? `<button type="button" class="cr-btn${res.dupe ? ' primary' : ''}" data-act="next">Open next <small>${more} left</small></button>` : ''}
+          ${more ? `<button type="button" class="cr-btn${res.dupe || worn ? ' primary' : ''}" data-act="next">Open another <small>${more} left</small></button>` : ''}
           <button type="button" class="cr-btn ghost" data-act="close">Close</button>
         </div>
+        ${this.chain && more && r.rank < 3 ? '<p class="cr-auto">Opening the next one… <kbd>Esc</kbd> stops</p>' : ''}
       </div>`;
     rv.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => this.act(b.dataset.act)));
     rv.querySelector('.cr-btn')?.focus({ preventScroll: true });
-    caseSfx.reveal(res.rarity);
+    this.skipBtn.hidden = true;
+    this.el.querySelector('.cr-quick').hidden = true;
+    // "Open all": keep going on everything below Classified; stop and celebrate the big ones.
+    if (this.chain && more && r.rank < 3) this.autoAt = t + 1.7;
     this.rumble(Math.min(1, 0.15 * r.rank + 0.1), Math.min(1, 0.2 * r.rank + 0.3), 180 + r.rank * 90);
+    this.vibrate(r.rank >= 4 ? [60, 40, 120, 40, 200] : r.rank >= 3 ? [50, 30, 90] : 30);
+    if (this.d3) return;   // crate3d.js plays the fanfare and draws the reveal in 3D
+    caseSfx.reveal(res.rarity);
     if (r.rank >= 3 && !reduced()) this.el.classList.add('shake');
     this.burst(r);
   }
@@ -257,8 +375,8 @@ class Opener {
       profileStore.markSeen(res.key);
       this.close();
     } else if (a === 'next') {
-      const oc = this.userClose;
-      this.close(() => openCaseShow(null, { onClose: oc }));
+      const oc = this.userClose, chain = this.chain, quick = this.quick;
+      this.close(() => openCaseShow(null, { onClose: oc, chain, quick: chain ? true : quick }));
     } else this.close();
   }
 
@@ -268,8 +386,17 @@ class Opener {
     e.stopPropagation();
     const btns = [...this.el.querySelectorAll('.cr-btn')];
     const onBtn = btns.includes(document.activeElement);
-    if (e.code === 'Escape') { e.preventDefault(); if (this.phase === 'reveal') this.close(); else this.skip(); return; }
-    if (this.phase !== 'reveal') { if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); this.skip(); } return; }
+    if (e.code === 'Escape') {
+      e.preventDefault();
+      if (this.autoAt != null) { this.autoAt = null; this.el.querySelector('.cr-auto')?.remove(); return; }
+      if (this.phase === 'reveal') this.close(); else this.skip();
+      return;
+    }
+    if (this.phase !== 'reveal') {
+      // Hold Space / Enter to skip (a tap does nothing, so mashing Enter on Open never skips the show).
+      if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); if (!e.repeat && this.holdSince == null) this.holdSince = performance.now(); }
+      return;
+    }
     // Reveal: Tab and arrows cycle the buttons; Enter / Space press the focused one (or the first).
     if (e.code === 'Tab' || e.code.startsWith('Arrow')) {
       e.preventDefault();
@@ -279,16 +406,16 @@ class Opener {
     } else if ((e.code === 'Enter' || e.code === 'Space') && !onBtn) { e.preventDefault(); btns[0]?.click(); }
   }
 
-  /** Gamepad (via Lobby.onAction): A skips / presses, d-pad moves between buttons, B closes. Eats the rest. */
+  /** Gamepad (via Lobby.onAction): hold A skips (polled in frame), B skips at once; in the reveal the d-pad moves, A presses, B closes. */
   onAction(a) {
     if (!this.el || this.phase === 'closing') return true;
-    if (this.phase !== 'reveal') { if (a === 'accept' || a === 'back' || a === 'alt2') this.skip(); return true; }
+    if (this.phase !== 'reveal') { if (a === 'back' || a === 'alt2') this.skip(); return true; }
     const btns = [...this.el.querySelectorAll('.cr-btn')];
     const i = btns.indexOf(document.activeElement);
     if (a === 'left' || a === 'up') btns[Math.max(0, i - 1)]?.focus();
     else if (a === 'right' || a === 'down') btns[Math.min(btns.length - 1, i + 1)]?.focus();
     else if (a === 'accept') (btns[i] || btns[0])?.click();
-    else if (a === 'back') this.close();
+    else if (a === 'back') { if (this.autoAt != null) this.autoAt = null; else this.close(); }
     return true;
   }
 
@@ -299,7 +426,11 @@ class Opener {
     removeEventListener('resize', this.onResize);
     if (this.lobby?.overlay === this) this.lobby.overlay = null;
     removeEventListener('keydown', this.onKey, true);
+    removeEventListener('keyup', this.onKeyUp, true);
     this.stopRiser?.();
+    // Chaining straight into the next case keeps the studio up (the next crate drops in from there).
+    if (this.d3 && !then) crateShow.end({ equipped: this.equipped });
+    if (!then) document.body.classList.remove('cr-open');
     this.el.classList.add('out');
     const el = this.el;
     setTimeout(() => {
@@ -308,10 +439,10 @@ class Opener {
       this.el = null;
       this.done();
       then?.();
-    }, 260);
+    }, then ? 120 : 260);
   }
 
-  // ------------------------------------------------------------ particles
+  // ------------------------------------------------------------ particles (2D fallback)
   burst(r) {
     const cv = this.fx;
     const dpr = Math.min(2, devicePixelRatio || 1);

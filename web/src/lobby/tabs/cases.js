@@ -5,6 +5,7 @@ import { registerLobbyTab } from '../tabs.js';
 import { esc, fmtKm } from './common.js';
 import { caseArt } from '../cases/caseArt.js';
 import { openCaseShow, cardHtml, openerActive } from '../cases/opener.js';
+import { crateShow } from '../cases/crate3d.js';
 import { lastGains } from '../cases/notify.js';
 import { caseSfx } from '../cases/sfx.js';
 import { RARITIES, rarityOf } from '../../profile/rarity.js';
@@ -37,6 +38,14 @@ registerLobbyTab({
       if (!id) return;
       openCaseShow(id, { onClose: () => render() });
     };
+    // "Open all": every case back to back with quick timing; it pauses on Classified and up.
+    const openAll = () => {
+      if (openerActive() || !ctx.profile.unopened.length) return;
+      openCaseShow(ctx.profile.unopened[0].id, { chain: { pulls: [] }, onClose: () => render() });
+    };
+    debugGrant(ctx.profile);
+    // Build the 3D crates and compile their shaders while the tab is open, so Open starts at once.
+    (globalThis.requestIdleCallback || ((f) => setTimeout(f, 300)))(() => crateShow.prewarm(), { timeout: 1500 });
 
     const render = () => {
       const P = ctx.profile;
@@ -62,6 +71,7 @@ registerLobbyTab({
         <button type="button" class="cs-open${pick ? ' pulse' : ''}" ${pick ? '' : 'disabled'} data-autofocus>
           ${pick ? `Open case <small>${cases.length > 1 ? `· ${cases.length} ready` : ''}</small>` : 'No case ready'}
         </button>
+        ${cases.length > 1 ? `<button type="button" class="cs-all">Open all ${cases.length} <small>quick</small></button>` : ''}
         ${bySeries.length > 1 ? `<div class="cs-queue" role="group" aria-label="Case to open">${bySeries.map(([s, l]) => `
           <button type="button" class="cs-q${s === series ? ' on' : ''}" style="--sc:${SERIES[s].color}" data-pick="${esc(l[0].id)}">${esc(SERIES[s].name)} ×${l.length}</button>`).join('')}</div>` : ''}
 
@@ -103,6 +113,7 @@ registerLobbyTab({
         <p class="lp-hint">Bad-luck protection: if ${PITY - 1} cases in a row give nothing Covert or better, the next one is Covert (${Math.max(0, PITY - 1 - r.sinceRed)} to go).</p>
         <p class="lp-hint"><span class="g-pad"><kbd>Y</kbd> open a case</span><span class="g-kb">Odds are fixed and shown before you open. Cases are only earned by riding.</span></p>`;
       root.querySelector('.cs-open').addEventListener('click', () => { caseSfx.click(); open(); });
+      root.querySelector('.cs-all')?.addEventListener('click', () => { caseSfx.click(); openAll(); });
       // Animate the bar: up to 100 % per case earned since last time, then to the current XP.
       const bar = root.querySelector('.cs-xp i');
       const wraps = shown ? Math.max(0, r.earned - shown.earned) : 0;
@@ -137,6 +148,21 @@ registerLobbyTab({
     return true;
   },
 });
+
+/**
+ * Debug only (docs/rewards.md): ?casegrant=N adds N test cases (rotating through the series) once per
+ * page load; ?caseforce=<grade> adds one if you have none, so the forced opening can be tried at once.
+ */
+let granted = false;
+function debugGrant(P) {
+  if (granted) return;
+  granted = true;
+  let q;
+  try { q = new URLSearchParams(location.search); } catch { return; }
+  const n = Math.min(50, Number(q.get('casegrant')) || (q.has('caseforce') && !P.unopened.length ? 1 : 0));
+  const series = q.get('caseseries');
+  for (let i = 0; i < n; i++) P.grantCase('test', series && SERIES[series] ? series : SERIES_ORDER[i % SERIES_ORDER.length]);
+}
 
 /** The contents panel: odds by grade, then every skin in the case (owned ones ticked). */
 function contents(series, profile) {

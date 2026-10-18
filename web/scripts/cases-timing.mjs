@@ -16,7 +16,7 @@ for (let f = 0; f <= (TIMING.spin + TIMING.spinDur + TIMING.hold) * fps; f++) {
   const v = (D * cubicBezier(REEL_EASE, k2) - x) * fps;
   const cell = Math.floor(x + 0.5);
   if (cell !== lastCell) { if (t - lastTick >= TIMING.tickGap) { ticks.push(t); lastTick = t; } lastCell = cell; }
-  const phase = t < TIMING.lid ? 'case drops in, rattles' : t < TIMING.reelIn ? 'lid flips, light' : t < TIMING.spin ? 'case lifts, reel in' : k < 1 ? 'reel' : 'hold on winner';
+  const phase = t < TIMING.land ? 'crate drops onto the plinth' : t < TIMING.latchL ? 'lands in the snow' : t < TIMING.lid ? 'latches snap, lid strains, seam glows' : t < TIMING.reelIn ? 'lid bursts open: beam, sparks, snow' : t < TIMING.spin ? 'reel slides in over the crate' : k < 1 ? 'reel' : 'hold on winner';
   rows.push({ f, t, x, v, cell, phase });
 }
 console.log('frame   t(s)   cards   cards/s  under marker  phase');
