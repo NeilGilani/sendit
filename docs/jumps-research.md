@@ -181,7 +181,7 @@ little more rotation, not proportionally more.
   pop), not because of a cap.
 - The control change players will notice: **spins and flips are thrown at the lip** — steer / S while loading
   the pop, release at the lip, keep the stick in for the throw. Steering late in the air no longer starts a
-  spin (only a small hip twist). The in-game hint text (ui.js, not part of this change) should say so.
+  full spin (since §7: only a slow late 180 / 360 on a big air). The in-game hint text (ui.js, not part of this change) should say so.
 
 ## 6. Follow-up: flips on big airs (easier singles, no dead keys)
 
@@ -209,3 +209,92 @@ needs `flipLateAir` 1.7 s left) so W / S always start a flip when one can still 
 grabbing (a grab only stops the full layout); a stretched layout (`flipOpen` 0.75) lets an over-set single
 slow down; the frontflip preload (Space, then W, still held at the lip); one-time hints for a locked held key
 and a too-late press.
+
+## 7. Follow-up: rotation feel (carry-over, counter key, slow starts)
+
+Players found in-air rotation frustrating — but the skill ceiling stays. Three small changes
+(physics/edge.js, config.js; ski and board alike), measured with `node web/scripts/physics-rotation.mjs
+[ski|snowboard|both] [--check]` (new; the real Player on flat ground, frame-exact inputs):
+
+1. **Carry-over.** Holding W / S through most of a single on a big air and letting go, the stretched
+   layout kept 75 % of the momentum for the whole rest of the air (≈ 86°/s for a thrown flip), and with
+   ≥ 1.6 s left the spot often decided to tuck for a *second* flip — which the tiring tuck couldn't finish.
+   Now stretching out of an over-set flip **sheds momentum** (`flipSpotBleed` 2 rad/s², down to what the
+   landing needs) and the spot's "can I reach the next upright" counts the tuck fading (`tuckReach`), so it
+   rides out a small over-rotation instead of chasing an extra flip. A rate, so small airs are unchanged.
+2. **Counter key.** The key against the flip used to only stretch (× `flipOpen`), so it couldn't even out an
+   over-rotation. Now within `flipCounterAngle` (50°) past upright — or half that before it — it sheds
+   momentum at `flipCounter` (4 rad/s²); further past it sheds like the spot (never worse than letting go).
+   It never stops a flip (floor 1.2 × `flipMinH`) and, outside the window, a stretch mid-flip is unchanged.
+3. **Slow starts.** The throw's push fades to zero at the end of its window, so a press there was slower
+   than a press after it (the late throw); spins had no late throw at all — steering 0.3 s after a
+   thrown-only take-off on a 2.4 s air never reached 180°. Now both throws push at least at the late rate,
+   the flip's late rate is 5 (was 4) rad/s², and spins get a **late spin** (`spinLateMax` 2.2 / 2.4 rad/s
+   neutral, `spinLateRate` 6 / 6.5 rad/s², needs `spinLateAir` 0.8 s left): a late 180 / 360, never a set.
+
+| tunable (ski / board) | before | after |
+|---|---|---|
+| `flipSpotBleed` | — (0) | 2.0 rad/s² |
+| `flipCounter` / `flipCounterAngle` | — | 4.0 rad/s² / 50° |
+| `flipLateRate` | 4 rad/s² | 5 rad/s² |
+| `spinLateMax` / `spinLateRate` / `spinLateAir` | — (no late spin) | 2.2 / 2.4 rad/s, 6 / 6.5 rad/s², 0.8 s |
+| throw push (flip / spin) | `rate × (1 − (t/win)²)` | never below the late rate |
+
+**A. Let go after R° of a thrown single** (carry = rotation after letting go, then where it lands; ski,
+back and front identical, board within a degree):
+
+| air (time left at release) | before | after |
+|---|---|---|
+| 1.65 s air, any R (0.1–0.5 s left) | lands clean | unchanged |
+| 2.4 s, R 240° (1.24 s) | carry 151° → stumble 36° over | 116° → clean |
+| 2.4 s, R 270° (1.12 s) | 141° → crash 57° over | 100° → clean 15° |
+| 2.4 s, R 300° (1.04 s) | 132° → crash 74° | 97° → stumble 38° |
+| 2.4 s, R 330° (0.92 s) | 122° → crash 95° | 93° → crash 65° (held far too long) |
+| 3.2 s, R 240° (2.0 s) | 349° (chased a 2nd flip) → crash | 127° → lands (stumble: hard flat landing) |
+| 3.2 s, R 270° (1.88 s) | 377° (chased) → crash | 123° → stumble 38° |
+| 3.2 s, R 300° (1.8 s) | 384° (chased) → stumble short of a double | 120° → crash 61° |
+
+On the real maps (`jumps-bench.mjs all both --quiet --ease`): a preload held through the throw then let go
+on Ravenspire's 2.2–2.8 s airs lands a clean single 3/12 → 11/12 (ski), 5/10 → 9/10 (board); on ≥ 2.8 s
+airs 0/10 → 9/10 and 0/11 → 9/11 (it used to over-rotate to 1.5–1.7 flips). The ceiling (most flips a
+perfect set allows: physics-tricks table, jumps-bench "max flips") is unchanged; preloaded doubles, the
+double cork 1080 and the triple at 3.2 s land as before.
+
+**B. Counter key** (let go at R°, the opposite key from 345° to touchdown; pitch off upright at touchdown):
+
+| air, R | no counter (after #1) | with counter | before: no counter → counter |
+|---|---|---|---|
+| 1.85 s, 310° | stumble 35° | stumble 29° | crash 48° → crash 48° |
+| 2.4 s, 280° | stumble 22° | clean 15° | crash 62° → crash 62° |
+| 2.4 s, 310° | crash 50° | stumble 38° | crash 83° → crash 83° |
+| 2.4 s, 340° | crash 77° | crash 61° | crash 104° → crash 104° |
+| 3.2 s, 280° | crash 46° | stumble 29° | crash 53° → crash 129° (it cut the chased double short) |
+| 3.2 s, 310° | crash 73° | crash 52° | stumble 27° (a chased double) → crash 149° |
+
+So the counter recovers ≈ 5–20°: a near miss up to ≈ 50° becomes a landing, while a botched flip (a full
+set tucked to 300° on a 1.85 s air) still crashes. A counter held from 180° doesn't kill the flip.
+
+**C. Slowest starts** (key held from the press, time to 180° of rotation; ≥ 1.8 s of air left for flips,
+≥ 1.4 s for spins; ski / board):
+
+| | before | after |
+|---|---|---|
+| flip at the lip (thrown, no preload) | 0.92 s | 0.92 s |
+| flip pressed at the end of the throw window (0.45–0.6 s) | 1.15–1.17 s (slowest) | 1.07 s |
+| late flip (0.8–1.4 s in) | 1.12 s; at 1.4 s of a 3.2 s air never | 1.07 s |
+| spin at the lip, thrown only | 0.90 / 0.83 s | unchanged |
+| spin pressed 0.2 s in, thrown only (2.4 s air) | 1.38 s | 1.22 / 1.13 s |
+| spin pressed 0.3–1.0 s in: thrown only, rolled off, low pop | never (90° took 1.5–1.8 s: a hip twist) | 1.28 / 1.20 s |
+| spin wound up, pressed late | 0.90–0.98 s | 0.85–0.98 s |
+
+Which situations were slow: a press in the last ≈ 40 % of a throw window (the throw's push had faded below
+the late throw's), a late flip right at the `flipLateAir` gate (ramping too slowly to stay above
+`flipMinH`), and every spin not started within ≈ 0.25 s of the take-off without a wind-up (rolled off,
+popped early, or pressed a moment late). Flip start rates don't depend on a spin or a grab. Still by
+design: no flip starts with < 1.7 s of air left after the window (it couldn't come round), a key held
+through the take-off stays locked until re-pressed, and a wind-up popped with the stick released is
+spotted (checked back) from 0.1 s — pressing steer 0.2 s later on a small air rebuilds it at the late rate
+(1.1 s to 180° instead of 0.55 s).
+
+Side effect: physics-fuzz (random inputs) sees a few more yaw crashes (28 → 33 in 4 × 120 s), since random
+steering in the air now builds a late spin.

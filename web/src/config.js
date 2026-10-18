@@ -138,6 +138,7 @@ export const PHYSICS = {
     spinThrowAir: 0.1,        // … + this many s per s of expected air beyond 1 s (up to +0.2 s on a 3 s air) …
     spinThrowRate: 18,        // … at this rate (rad/s²), fading over the window …
     spinThrowMax: 3.4,        // … up to this without a wind-up (rad/s)
+    spinLateMax: 2.2, spinLateRate: 6, spinLateAir: 0.8,   // after the window steering still builds a spin: up to 2.2 rad/s (neutral) at 6 rad/s², with ≥ 0.8 s of air left
     spinMinH: 0.5, spinCheck: 3.2, airTwist: 1.0,   // below spinMinH not spinning; check-back / hip-twist rates (rad/s)
     poseTime: 0.22,           // s to tuck in / open up fully (the rotation speeds up and slows gradually)
     rollSet: 0.6,             // set share rolling off without a pop
@@ -148,8 +149,10 @@ export const PHYSICS = {
     flipPreload: 0.55,        // share of flipSet a full preload (S while charging) sets at the pop (holding S through the throw finishes it)
     flipThrow: 0.4, flipThrowRate: 11, flipThrowMax: 2.0,   // the in-air throw window (s), rate, cap without a preload
     flipThrowAir: 0.15,       // s of extra throw window per s of expected air beyond 1 s (0.7 s on a 3 s air)
-    flipLateMax: 1.8, flipLateRate: 4, flipLateAir: 1.7,   // after the window W / S still start a flip: up to 1.8 rad/s at 4 rad/s², with ≥ 1.7 s of air left
+    flipLateMax: 1.8, flipLateRate: 5, flipLateAir: 1.7,   // after the window W / S still start a flip: up to 1.8 rad/s at 5 rad/s², with ≥ 1.7 s of air left
     flipOpen: 0.75,           // a stretched layout (key against the flip, or spotting an over-set flip) slows it to this share
+    flipSpotBleed: 2.0,       // rad/s² of flip momentum a spotting rider sheds stretching out of an over-set flip (down to what the landing needs)
+    flipCounter: 4.0, flipCounterAngle: 50,   // key against the flip within this many ° of upright: sheds momentum at this rate (rad/s²) — evens out a near miss
     flipMinH: 0.35, flipMinAir: 0.45, flipCheck: 1.2,       // not flipping below flipMinH; no new flip with < flipMinAir s left
     flipSpot: 0.35,           // s: let go and the rider plans to come round early and open up (layout) for the last flipSpot s
     flipLandClean: 22, flipLandStumble: 42,
@@ -187,12 +190,14 @@ export const PHYSICS = {
     // Rotation (see ski): a board spins a little faster (one platform, arms free): 390°/s neutral, 565°/s tucked.
     spinSet: 6.8, spinTuckGain: 1.45, spinOpen: 0.6, spinResponse: 9, prewind: 0.55, windupSpin: 3.2,
     spinThrow: 0.3, spinThrowAir: 0.1, spinThrowRate: 20, spinThrowMax: 3.8, spinMinH: 0.5, spinCheck: 3.2, airTwist: 1.0,
+    spinLateMax: 2.4, spinLateRate: 6.5, spinLateAir: 0.8,
     poseTime: 0.22, rollSet: 0.6,
     // Flips (W = tamedog / front, S = wildcat / back, over the toe-heel axis): 185°/s open, 425°/s tucked.
     flipSet: 3.2, flipTuckGain: 2.3, flipResponse: 8, flipPreload: 0.55,
     flipTuckHold: 1.6, flipTuckFade: 1.0, flipTuckFloor: 0.2,
     flipThrow: 0.4, flipThrowAir: 0.15, flipThrowRate: 11, flipThrowMax: 2.0, flipMinH: 0.35,
-    flipLateMax: 1.8, flipLateRate: 4, flipLateAir: 1.7, flipOpen: 0.75, flipMinAir: 0.45, flipCheck: 1.2,
+    flipLateMax: 1.8, flipLateRate: 5, flipLateAir: 1.7, flipOpen: 0.75, flipMinAir: 0.45, flipCheck: 1.2,
+    flipSpotBleed: 2.0, flipCounter: 4.0, flipCounterAngle: 50,
     flipSpot: 0.35,
     flipLandClean: 22, flipLandStumble: 42,
     grabRate: 7, grabRelease: 9, grabLetGo: 0.22,
@@ -208,9 +213,9 @@ export const ANIM = {
   rollRelease: 15,            // 1/s the lean eases back up once the steer is let go (rollResponse tipping in)
   landLeanTime: 0.35, landLeanResponse: 30,   // s after a landing the lean catches up at this rate (1/s): plumb at once on a steep face
   leadRelease: 10,            // 1/s the upper-body turn lead eases back to neutral once the steer is let go (6 leading in)
-  squatMax: 0.25,             // pre-jump Y compression (25%)
-  squatXZ: 0.12,              // X/Z expansion while squatting (volume preservation)
-  landSquashPerMs: 0.035,     // squash per m/s of vertical landing speed
+  squatMax: 0.25,             // legacy (the whole-body squash is gone: squats and landings bend the knees, character/dynamics.js)
+  squatXZ: 0.12,              // legacy
+  landSquashPerMs: 0.035,     // landing spring per m/s of vertical speed (lobby previews only; riders use DYN.absorb)
   landSquashMax: 0.45,
   springFreq: 13,             // rad/s of the damped squash & stretch oscillation
   springDamping: 4.5,         // 1/s decay — settles in ~2-3 bounces
@@ -243,6 +248,10 @@ export const ANIM = {
   flipLoadArch: 0.45,         // rad the upper body arches back while preloading a backflip (S while charging)
   flipPivot: 0.85,
   flipTuckLift: 0.14,         // m the feet pull up toward the hips while flipping            // m above the feet the rider flips about (centre of mass)
+  restCrouch: 0.12,           // crouch (0..1) standing still: people stand tall at rest, the athletic stance comes with speed
+  skiHipsFwd: 0.035,          // m the hips sit forward of the hip joints' rest spot: centred over the boots, shins pressed into the tongues
+  powderBack: 0.03,           // m skiers sit back in deep powder (tips up)
+  spotLanding: 0.3,           // rad the head pitches down to spot the landing in the last ~0.8 s of a jump
   gearSinkVisual: 0.15,       // share of the physics powder sink shown (the snow reads as packed, so the gear rides on top)
   board: {
     crouch: 0.17,             // m pelvis drop at rest (riders stand lower than skiers)
