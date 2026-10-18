@@ -782,6 +782,8 @@ class CrateShow {
     const dark = this.cont ? 1 : smooth(0.0, q ? 0.3 : 0.55, t);
     this.fadeStudio(dark);
     if (dark >= 1) this.hideWorld();
+    // (Some world systems set .visible every frame, e.g. distance culling in life.js: keep them hidden.)
+    if (this.hidden) for (const o of this.hidden) o.visible = false;
     for (const m of [this.dome, this.floor]) { m.material.uniforms.uTime.value = t; m.material.uniforms.uTint.value.copy(this.tint); }
     this.snowU.uTime.value = t;
     // ---------------------------------------------------------- drop + land
@@ -847,6 +849,9 @@ class CrateShow {
     if (o.landed) this.lightCol.copy(this.rcol);
     const reveal = o.revealAt != null ? t - o.revealAt : -1;
     if (reveal >= 0) I = this.gear ? 6 : Math.max(0, 6 - reveal * 20);
+    // Gold: the beat of darkness before the flash takes the crate's light too.
+    const blackout = this.rarity.id === 'gold' && reveal >= 0 && reveal < 0.32;
+    if (blackout) I = 0.4;
     c.seamMat.color.copy(this.lightCol).multiplyScalar(I * 1.4);
     c.poolU.uCol.value.copy(this.lightCol);
     c.poolU.uI.value = t >= T.lid ? I * 0.9 : 0;
@@ -859,7 +864,7 @@ class CrateShow {
     this.beam.position.copy(g.position).add(this._v.set(0, C.Hb, 0));
     const bu = this.beam.userData.u;
     bu.uCol.value.copy(this.lightCol);
-    bu.uI.value = beamOn * (0.25 + I * 0.05) * (reveal >= 0 ? Math.max(0.35, 1 - reveal) : 1);
+    bu.uI.value = blackout ? 0 : beamOn * (0.25 + I * 0.05) * (reveal >= 0 ? Math.max(0.35, 1 - reveal) : 1);
     bu.uTime.value = t;
     STUDIO.uStudioTint.value.copy(this.lightCol).multiplyScalar(0.25 + Math.min(1, I * 0.05));
     // Plinth neon follows the light.
@@ -913,9 +918,9 @@ class CrateShow {
       this.itemPivot.rotation.z = Math.sin(t * 0.9) * 0.04;
     } else if (!this.gear) {
       // The crate collapses into a burst of snow; the rider is standing there in the new kit.
-      const k = clamp01(x / 0.16);
+      const k = clamp01(x / 0.12);
       c.group.scale.setScalar(Math.max(0.001, 1 - easeOut3(k)));
-      if (!this.riderShown && this.rider?.root) { this.rider.root.visible = true; this.riderShown = true; }
+      if (k > 0.75 && !this.riderShown && this.rider?.root) { this.rider.root.visible = true; this.riderShown = true; }
       if (this.rider?.root) this.rider.root.scale.setScalar(0.94 + 0.06 * spring(x, 8, 18));
     }
     // FX around the subject: glow, rays (purple and up), flare (red and up), floor shockwave.
@@ -930,13 +935,15 @@ class CrateShow {
       u(m).uTime.value = t;
     }
     const pop = Math.exp(-x * 2.2);
-    u(this.glow).uI.value = (0.22 + rank * 0.06) * (0.5 + 1.3 * pop);
-    this.glow.scale.setScalar(0.9 + rank * 0.12);
-    u(this.rays).uI.value = rank >= 2 ? (0.07 + (rank - 2) * 0.045) * smooth(0, 0.25, x) * (1 + 1.5 * pop) * (reduced() ? 0.5 : 1) : rank === 1 ? 0.04 * smooth(0, 0.3, x) : 0;
+    // Effects scale with the framing (a helmet close-up must not drown in rays).
+    const fk = (this.gear ? (this.itemLen || 1.6) + 0.9 : this.slotFocus().h + 0.25) / 2.5;
+    u(this.glow).uI.value = (gold ? 0.3 : 0.22 + rank * 0.06) * (0.5 + 1.3 * pop);
+    this.glow.scale.setScalar((0.9 + rank * 0.12) * fk);
+    u(this.rays).uI.value = rank >= 2 ? (0.1 + (rank - 2) * 0.045) * smooth(0, 0.25, x) * (1 + 1.5 * pop) * (reduced() ? 0.5 : 1) : rank === 1 ? 0.04 * smooth(0, 0.3, x) : 0;
     u(this.rays).uSpin.value = reduced() ? 0 : 0.35 + rank * 0.06;
-    this.rays.scale.setScalar(0.6 + 0.25 * easeOutBack(x / 0.5) + rank * 0.06);
+    this.rays.scale.setScalar((0.6 + 0.25 * easeOutBack(x / 0.5) + rank * 0.06) * fk);
     u(this.flare).uI.value = rank >= 4 ? (gold ? 2.4 : 1.4) * Math.exp(-x * 2.5) + (gold ? 0.12 : 0) : rank >= 3 ? 0.8 * Math.exp(-x * 4) : 0;
-    this.flare.scale.setScalar(gold ? 1.6 : 1.1);
+    this.flare.scale.setScalar((gold ? 1.6 : 1.1) * fk);
     const ringK = clamp01(x / 0.9);
     u(this.ring).uRing.value = ringK;
     u(this.ring).uCol.value.copy(this.rcol);
@@ -954,8 +961,8 @@ class CrateShow {
   /** Where the camera looks for a clothing reveal (on the rider), per slot. */
   slotFocus() {
     return {
-      helmet: { y: 1.62, h: 0.75 }, goggles: { y: 1.6, h: 0.65 }, face: { y: 1.52, h: 0.7 },
-      jacket: { y: 1.25, h: 1.25 }, gloves: { y: 1.15, h: 1.3 }, pants: { y: 0.85, h: 1.55 },
+      helmet: { y: 1.66, h: 0.85 }, goggles: { y: 1.64, h: 0.8 }, face: { y: 1.56, h: 0.85 },
+      jacket: { y: 1.2, h: 1.5 }, gloves: { y: 1.1, h: 1.45 }, pants: { y: 0.85, h: 1.7 },
     }[this.slot] || { y: 1.2, h: 1.6 };
   }
 
@@ -970,10 +977,10 @@ class CrateShow {
   }
 
   sparkAt(p, t0, n) {
-    const col = new THREE.Color(3, 2.6, 2);
+    const col = new THREE.Color(1.6, 1.4, 1.1);
     for (let i = 0; i < n; i++) {
-      const v = this._v2.set((Math.random() - 0.5) * 1.6, Math.random() * 1.2, 0.4 + Math.random() * 1.2);
-      this.add.emit(p, v, t0, 0.25 + Math.random() * 0.25, col, 0.012, 1, 3, 3);
+      const v = this._v2.set((Math.random() - 0.5) * 2.4, 0.3 + Math.random() * 1.6, 0.6 + Math.random() * 1.4);
+      this.add.emit(p, v, t0, 0.18 + Math.random() * 0.22, col, 0.006 + Math.random() * 0.004, 1, 3, 4);
     }
   }
 
@@ -1049,8 +1056,8 @@ class CrateShow {
     const drift = reduced() ? 0 : Math.sin(t * 0.35) * 4;
     // Key shots (root-local), blended over the timeline.
     const sDrop = this.shotPose([0, 0.32, 0], 1.65, 15, -10 + drift);
-    const sPush = this.shotPose([0, 0.34, 0], 1.18, 19, 4 + drift * 0.5);
-    const sBurst = this.shotPose([0, 0.5, 0], 1.6, 16, 2 + drift * 0.5);
+    const sPush = this.shotPose([0, 0.36, 0], 1.42, 18, 4 + drift * 0.5);
+    const sBurst = this.shotPose([0, 0.55, 0], 1.8, 16, 2 + drift * 0.5);
     const sReel = this.shotPose([0, 0.92, 0], 2.55, 12, drift);
     let pose = sDrop;
     const mix = (a, b, k) => ({ pos: a.pos.clone().lerp(b.pos, k), look: a.look.clone().lerp(b.look, k) });

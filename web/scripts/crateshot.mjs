@@ -1,7 +1,7 @@
 // Frame sequences of the 3D case opening (docs/rewards.md "The opening, frame by frame"), per case
 // and per grade, plus frame-time stats of a real-time run. Usage:
 //   node scripts/crateshot.mjs <url> <outDir> [times]      times: comma list of seconds (default: key beats)
-// Env: SERIES=first-chair|night-park|backcountry (default first-chair), RARITY=common…gold (forced via a
+// Env: ITEM=<part of a skin key> (e.g. board-, helmet), SERIES=first-chair|night-park|backcountry (default first-chair), RARITY=common…gold (forced via a
 //      seed, like ?caseforce), W, H (viewport, default 1280×720), PERF=1 (also time a live run: fps and
 //      the worst frames), QUICK=1 (quick-open timing), EQUIP=1 (press Equip now at the end and shoot),
 //      ANGLE=metal|d3d11|swiftshader (default: metal on macOS, d3d11 with GPU=1, else swiftshader).
@@ -36,13 +36,13 @@ try {
   await page.waitForFunction(() => window.__senditReelPending?.() === 0, null, { timeout: 60000 }).catch(() => console.log('reel cards still rasterising'));
   console.log("prewarm ms", await page.evaluate(() => Math.round(window.__senditCrate.warmMs) + " " + (window.__senditCrate.warmLog || []).join(", ")));
   const n = (process.env.PERF ? 2 : 1) + (process.env.CHAIN ? 2 : 0);
-  const seedFor = () => page.evaluate(async ({ series, want }) => {
+  const seedFor = () => page.evaluate(async ({ series, want, item }) => {
     const R = await import('/src/profile/rewards.js');
     const P = window.__sendit.profile;
     const pity = P.rewards.sinceRed >= R.PITY - 1;
-    for (let k = 1; k < 200000; k++) if (!want || R.rollCase(series, R.seeded(k), pity).rarity === want) return k;
+    for (let k = 1; k < 200000; k++) { const r = R.rollCase(series, R.seeded(k), pity); if ((!want || r.rarity === want) && (!item || r.key.includes(item))) return k; }
     return 1;
-  }, { series, want });
+  }, { series, want, item: process.env.ITEM || '' });
   await page.evaluate(({ series, n }) => { for (let i = 0; i < n; i++) window.__sendit.profile.grantCase('test', series); }, { series, n });
   await page.waitForTimeout(600);
   const fpsRun = async () => {
