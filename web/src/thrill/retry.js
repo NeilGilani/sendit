@@ -50,6 +50,7 @@ export function installRetry({ player, input, activities, ui, cam }) {
       return;
     }
     if (player.state === State.FROZEN || player.state === State.LIFT) return;
+    if (pending !== null && player.state === State.AIR && player.airTime >= C.minAir) trail.markTakeoff(pending);   // mid-air: this jump
     const p = trail.pick(C.lead);
     if (!p) { emit('hint', 'Retry needs a jump first · take off, then Backspace (d-pad ▼) puts you back on the approach'); return; }
     quick(() => {
@@ -66,8 +67,12 @@ export function installRetry({ player, input, activities, ui, cam }) {
     });
   }
 
-  on('takeoff', () => { if (game.mode === Mode.RIDING) trail.markTakeoff(clock); });
-  on('rideStarted', () => { trail.clear(); clock = 0; });
+  // A take-off counts once it proves to be a real air (≥ minAir s, or a crash), not a bump on the way out.
+  let pending = null;
+  on('takeoff', () => { if (game.mode === Mode.RIDING) pending = clock; });
+  on('landed', (e) => { if (pending !== null && (e.air >= C.minAir || e.result === 'crash')) trail.markTakeoff(pending); pending = null; });
+  on('crashed', () => { if (pending !== null) trail.markTakeoff(pending); pending = null; });
+  on('rideStarted', () => { trail.clear(); clock = 0; pending = null; });
   on('dropZone', () => trail.clear());
 
   return {

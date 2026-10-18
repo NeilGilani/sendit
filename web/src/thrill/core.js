@@ -18,6 +18,7 @@ export const THRILL = {
   },
   retry: {
     lead: 2.6,             // s before the last take-off to put you back (on the approach, with its speed)
+    minAir: 0.4,           // s: shorter airs (bumps, rollers) don't move the retry point
     sampleHz: 8,           // ground samples per second
     keep: 30,              // s of samples kept
   },

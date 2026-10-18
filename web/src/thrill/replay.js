@@ -36,7 +36,7 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
   on('equipmentChanged', () => { ring = null; });
   on('rideStarted', () => { ring?.clear(); moment = null; cuts = []; crash = null; });
   // A teleport: frames after it are elsewhere, so a replay stops at it. Old cuts fall out with the ring.
-  on('respawned', () => { cuts = cuts.filter((c) => ring && c >= ring.t0); cuts.push(recClock + 1e-6); ui?.prompt(false); });
+  on('respawned', () => { cuts = cuts.filter((c) => ring && c >= ring.t0); cuts.push(recClock + 1e-6); if (moment?.kind !== 'wipeout' || recClock - moment.t > 8) ui?.prompt(false); });   // juice reports the wipeout from its own respawned listener, before this one
   on('crashed', () => { if (game.mode === Mode.RIDING && activities?.mode !== 'challenge') crash = { t: recClock, before: C.wipeBefore, after: C.wipeAfter, kind: 'wipeout' }; });
   // Juice reports the tumble on the respawn: a big one offers its replay ("relive your wipeouts", STEEP).
   on('juiceWipeout', ({ tumble, speed }) => {
