@@ -397,3 +397,17 @@ the game's noise texture generator and post grade.
 - The worker duplicates three.js and the rig modules (a second copy in memory while loading; the
   bundle has a separate worker chunk).
 - No other people around the rider; far valleys get a forest tint, the near slopes real trees.
+
+## Round 3 — the live shot always shows (2026-10-18)
+
+- **Reduced motion no longer disables the live scene.** It is a slow-motion shot with eased moves and no shake;
+  `?loadscene=0` still forces the painted screen only.
+- **Hand-off hold** (`loading/index.js` `holdForShot`, called by `main.js` through `ui.holdLoading()` before the
+  lobby or the ride starts): when the game is ready before the rider's first trick shot is up (slow GPUs, Safari,
+  remote dev servers), the screen waits up to `HOLD.waitMs` (5 s) for it, then keeps it up at least `HOLD.showMs`
+  (2.5 s). Fast devices, whose shot is long up, never wait. `?loadnohold` skips it.
+- **`?loadwhy`** shows on screen why the live scene could not run (devices without a console).
+- **`npm run play`** (in `web/`) builds and serves the bundled game: on a remote dev box (e.g. GitHub Codespaces)
+  the dev server's hundreds of module requests make the live scene start late; the build serves a few bundles.
+- Measured: Chrome live at 2.9 s (reduced motion too), WebKit desktop / phone 7.7–7.9 s, Chrome with 4× CPU
+  throttling 3.7 s; lobbytest 86/86.

@@ -196,6 +196,11 @@ export class UI {
     loadingScreen.progress(p, msg);
   }
 
+  /** The game is ready: let the loading screen's live trick show first (resolves at once on fast devices). */
+  holdLoading() {
+    return loadingScreen.holdForShot();
+  }
+
   /** Loading finished: the loading screen dissolves into the lobby (resolves when it is gone). */
   doneLoading() {
     return loadingScreen.finish();

@@ -18,6 +18,9 @@ import { readLoadHint, consumeTransition } from './hint.js';
 const $ = (id) => (typeof document !== 'undefined' ? document.getElementById(id) : null);
 const params = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
 const T0 = performance.now();
+// Hand-off hold (finish → holdForShot): wait at most waitMs for the first live trick shot, then keep it
+// up at least showMs before dissolving. ?loadnohold skips it (timing tests).
+const HOLD = { waitMs: 5000, showMs: 2500 };
 
 // Boot stage weights: ui.loading() reports main.js's own fractions; these map them onto measured wall
 // time (docs/loading-screen.md: terrain ≈ 55–65 % of a warm boot, the final compile + prewarm ≈ 15 % warm
@@ -53,10 +56,10 @@ class LoadingScreen {
     this.hint = readLoadHint();
     if (this.hint?.transition) { consumeTransition(); this.showDestination(this.hint); }
     this.buildTips();
-    // Reduced motion: no flips and swooping cameras, just the painted screen (its snow is CSS and
-    // stops too). ?loadscene=1 forces the live scene anyway.
-    const reduce = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (params.get('loadscene') === '1' || (params.get('loadscene') !== '0' && !reduce)) this.startScene();
+    // The live hero shot runs everywhere it can, reduced motion included: it is a slow-motion shot with
+    // eased drone moves and no shake, and the game's look is the point of this screen. ?loadscene=0
+    // keeps the painted screen only.
+    if (params.get('loadscene') !== '0') this.startScene();
     else { this.root.classList.add('static'); this._start(); }
   }
 
@@ -184,6 +187,9 @@ class LoadingScreen {
   /** The live scene could not run: keep the painted backdrop (it is already showing). */
   fail(reason) {
     console.warn('[loading] live scene unavailable, showing the static screen:', reason);
+    this.failed = String(reason || 'unknown');
+    // ?loadwhy: say on screen why (for devices without a console, e.g. phones).
+    if (params.has('loadwhy') && this.msg) this.msg.textContent = `Live scene off: ${this.failed}`;
     this.root?.classList.remove('live');
     this.root?.classList.add('static');
     this._start?.();
@@ -223,6 +229,28 @@ class LoadingScreen {
   finish() {
     if (!this.root || this.done) return Promise.resolve();
     if (params.has('loadhold')) { this.progress(1, 'Ready (held by ?loadhold)'); return Promise.resolve(); }
+    return this.dissolve();
+  }
+
+  /**
+   * The live trick is what this screen is for: on a device where the game loads before the rider's
+   * first shot is up, wait for it (up to HOLD.waitMs), then keep it on screen for HOLD.showMs. Fast
+   * devices, whose shot is long up by the time the game is ready, never wait.
+   */
+  async holdForShot() {
+    if (!this.root || this.done || !this.worker || this.failed || params.has('loadnohold') || params.has('loadhold')) return;
+    const now = () => performance.now() - T0;
+    const tWait = now() + HOLD.waitMs;
+    if (!this.firstShotAt) {
+      if (this.msg) this.msg.textContent = 'Ready — dropping in…';
+      while (!this.firstShotAt && !this.failed && this.worker && now() < tWait) await new Promise((r) => setTimeout(r, 50));
+    }
+    if (!this.firstShotAt || this.failed || !this.worker) return;
+    const shownFor = now() - Math.max(this.firstShotAt, this.liveAt || 0);
+    if (shownFor < HOLD.showMs) await new Promise((r) => setTimeout(r, HOLD.showMs - shownFor));
+  }
+
+  dissolve() {
     this.done = true;
     this.readyAt = performance.now() - T0;
     clearTimeout(this._creep);

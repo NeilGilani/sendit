@@ -217,6 +217,7 @@ async function boot() {
   warming = false;
   setTimeout(() => warmQualityVariants({ renderer, camera, scene, current: settings.quality, makeVariants: (q) => terrain.qualityMaterials(q) }), 1500);
   ui.loading(1, '');
+  await ui.holdLoading();   // a slow device's live loading trick gets its moment before the hand-off
   ui.doneLoading();
   saveLoadHint();
   ui.fade(false, 2.0);
