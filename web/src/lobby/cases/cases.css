@@ -296,3 +296,6 @@ body.cr-open #lobby, body.cr-open .cn-stack { opacity: 0 !important; pointer-eve
 .rv-gold .cr-stamp { animation-delay: .32s; background: linear-gradient(100deg, #fff6c8, #ffd24a 40%, #fff 55%, #e4ae39 70%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 @keyframes crStamp { 0% { transform: scale(1.9); opacity: 0; } 14% { transform: scale(1); opacity: 1; } 70% { transform: scale(1.03); opacity: 1; } 100% { transform: scale(1.08) translateY(-.5em); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .cr-stamp { animation: crStampR 1.7s both; } @keyframes crStampR { 0%, 100% { opacity: 0; } 15%, 70% { opacity: 1; } } }
+/* The stamp sits over the 3D subject (left of the panel on wide screens, above it on tall ones). */
+.cr-overlay.d3 .cr-stamp { top: 12%; right: 38%; font-size: 3.6em; }
+@media (max-aspect-ratio: 23/20) { .cr-overlay.d3 .cr-stamp { right: 0; top: 10%; font-size: 2.6em; } }
