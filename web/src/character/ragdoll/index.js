@@ -160,6 +160,7 @@ export class RagdollController {
 
   /** player.crashStep → true when the ragdoll ran this step (the player then follows it). */
   stepCrash(pl, dt) {
+    if (pl.crashT <= dt + 1e-9) { this.stop(); this.failed = false; }   // a new crash (whatever happened since the last)
     if (this.failed || !this.C.enabled) return false;
     if (!this.active && !this.begin(pl)) { this.failed = true; return false; }
     const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
