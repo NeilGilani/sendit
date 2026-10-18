@@ -9,14 +9,17 @@ fidgets) and `character/ragdoll.js` (a Verlet crash ragdoll; skis and poles ejec
 audio following the body), plus posture tweaks (`restCrouch`, `skiHipsFwd`, `powderBack`, `spotLanding`,
 relaxed air arms, poles planted at rest, chatter in the legs only, cloth flutter).
 
-**It was reverted** (the files are gone). In play it was glitchy: the body twitched ("tweaked out") just
-before some take-offs and landings — the springs reacted to the force spikes of the pop and of the last
-physics steps before touchdown, on top of the trick poses — and crashes did not work properly (the
-ragdoll took over the player's position, so the crash, the camera and the respawn misbehaved). The rider
-is back to the earlier behaviour:
+**It was reverted** (the files are gone). In play it was glitchy: the body "tweaked out" before some
+take-offs and landings, and crashes did not work properly. Measured before the revert (limb positions in
+the pelvis frame, every frame, Valcrest kicker 2 and the Ravenspire First Stack): the head and upper body
+folded ~0.5 m in a single frame about 0.8 s before touchdown and snapped back on the touchdown frame, and
+on the cliff roll-off already at the lip (one-frame velocity changes of 35–50 m/s; after the revert the
+largest is ~6 m/s). The rider is back to the earlier behaviour:
 
 - pre-jump squat and landing **squash & stretch** on `rider.body.scale` (`ANIM.squatMax`, `squatXZ`,
-  `landSquash*`, damped spring `springFreq` / `springDamping`), chatter on the `chatter` group;
+  `landSquash*`, damped spring `springFreq` / `springDamping`), chatter on the `chatter` group. Both ends
+  are instant by design: the squat's compression releases on the pop frame and the landing squash starts
+  at full depth on the touchdown frame (pelvis ~0.17 m / ~0.35 m in one frame), then springs back;
 - the old idle (steady breathing, looking around), sine stumble flail, wide balance arms in the air;
 - the old **crash**: the player slides to a stop (`player.crashStep`), the rider rolls onto its side
   (`p.crashRoll`), drops and throws its arms out (`p.crash`), then the screen fades to the safe respawn
