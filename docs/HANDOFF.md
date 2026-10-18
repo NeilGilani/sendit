@@ -67,6 +67,7 @@ Each map is a mountain with named trails picked in the lobby's Maps tab.
 | Physics (carve/skid, jumps, spins/flips set at take-off, grabs), skis + snowboard | `physics/`, `player.js`, `config.js` | `equipment.md`, `jumps-research.md` |
 | Grinding | `physics/grind.js` | `map4.md` |
 | Rider rig and poses, first person | `rider.js`, `fpview.js`, `camera.js` | `equipment.md` |
+| Body dynamics (force-driven reactions), crash ragdoll | `character/dynamics.js`, `character/ragdoll.js` | `body.md` |
 | Outfit / character items | `character/` | `character.md` |
 | Graphics: HDR look, snow, trees, spray, LOD cross-fades, zero pop-in, per-map lighting | `gfx/` (`perf.js`, `prewarm.js`, `atmosphere.js`), `terrain.js`, `scatter.js`, `fx.js` | `graphics.md`, `graphics-perf.md` |
 | Lobby (tabs registry, Maps / mountains & trails, Equipment, Character) | `lobby/` | `lobby.md`, `maps.md` |
