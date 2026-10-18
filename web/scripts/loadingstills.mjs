@@ -49,8 +49,13 @@ try {
     page.on('pageerror', (e) => errors.push(e.message));
     const q = `loadseed=${s.seed}&loadtrick=${s.trick}&loadcam=${s.cam}&loadtod=${s.tod}&loadmtn=${s.mtn}&loadgear=${s.gear}&loadq=still&loadfreeze=${s.freeze}&loadhold&nostill`;
     await page.goto(`${url}?${q}`);
-    await page.addStyleTag({ content: '#loading .ld-ui, #loading .ld-bars, #loading .ld-static, #loading .ld-still { display: none !important; } #loadcanvas { opacity: 1 !important; transition: none !important; }' });
+    await page.addStyleTag({ content: '#loading .ld-ui, #loading .ld-bars, #loading .ld-static, #loading .ld-still, #loading .ld-snow { display: none !important; } #loadcanvas { opacity: 1 !important; transition: none !important; }' });
     await page.waitForFunction(() => !!window.__loading?.frozen, null, { timeout: 180000 });
+    // Belt and braces: hide the overlay inline too (a still once came out with the UI baked in).
+    await page.evaluate(() => {
+      for (const el of document.querySelectorAll('#loading .ld-ui, #loading .ld-bars, #loading .ld-static, #loading .ld-snow')) el.style.setProperty('display', 'none', 'important');
+    });
+    await page.waitForTimeout(250);
     const png = await page.screenshot({ type: 'png' });
     if (process.env.KEEP_PNG) fs.writeFileSync(`${out}/${s.name}.png`, png);
     // Encode in the browser: PNG → <img> → canvas → WebP.
