@@ -8,16 +8,16 @@ const CSS = /* css */`
 #lvlUp { position: fixed; inset: 0; z-index: 40; pointer-events: none; display: grid; place-items: center; opacity: 0; }
 #lvlUp.show { animation: luIn 3.2s ease-out forwards; }
 #lvlUp.yield .box, #lvlUp.yield .ring { opacity: .18; transition: opacity .15s; }   /* a trick announcement takes the stage */
-#lvlUp .ring { position: absolute; left: 50%; top: 42%; width: 140px; height: 140px; margin: -70px 0 0 -70px; border-radius: 50%; border: 6px solid var(--rc, #ffe14d); opacity: 0; }
+#lvlUp .ring { position: absolute; left: 50%; top: 32%; width: 140px; height: 140px; margin: -70px 0 0 -70px; border-radius: 50%; border: 6px solid var(--rc, #ffe14d); opacity: 0; }
 #lvlUp.show .ring { animation: luRing 1.1s cubic-bezier(.1,.8,.3,1) forwards; }
 #lvlUp.show .ring.r2 { animation-delay: .14s; }
-#lvlUp .box { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); text-align: center; padding: 22px 64px 20px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(12,16,40,.62) 0%, rgba(12,16,40,.38) 55%, transparent 72%); font-family: "Arial Black", Impact, sans-serif; font-style: italic; color: #fffaf0; white-space: nowrap; }
+#lvlUp .box { position: absolute; left: 50%; top: 32%; transform: translate(-50%, -50%); text-align: center; padding: 22px 64px 20px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(12,16,40,.62) 0%, rgba(12,16,40,.38) 55%, transparent 72%); font-family: "Arial Black", Impact, sans-serif; font-style: italic; color: #fffaf0; white-space: nowrap; }
 #lvlUp .k { font-size: 20px; letter-spacing: .5em; color: var(--rc, #ffe14d); -webkit-text-stroke: 1px #1b1446; paint-order: stroke fill; }
 #lvlUp .n { font-size: 120px; line-height: .95; -webkit-text-stroke: 4px #1b1446; paint-order: stroke fill; text-shadow: 0 0 40px var(--rc, #ffe14d), 0 8px 0 rgba(27,20,70,.6); }
 #lvlUp.show .n { animation: luNum .6s cubic-bezier(.2,1.8,.4,1); }
 #lvlUp .rk { font-size: 24px; letter-spacing: .12em; margin-top: 4px; color: var(--rc, #ffe14d); -webkit-text-stroke: 1px #1b1446; paint-order: stroke fill; }
 #lvlUp .sub { font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 900; font-size: 13px; letter-spacing: .2em; color: #fffaf0; margin-top: 8px; text-shadow: 0 1px 3px #1b1446, 0 0 10px rgba(12,16,40,.9); }
-#lvlUp .bg { position: absolute; inset: 0; background: radial-gradient(circle at 50% 42%, rgba(255,225,77,.22), rgba(122,92,255,.12) 35%, transparent 65%); }
+#lvlUp .bg { position: absolute; inset: 0; background: radial-gradient(circle at 50% 32%, rgba(255,225,77,.22), rgba(122,92,255,.12) 35%, transparent 65%); }
 @keyframes luIn { 0% { opacity: 0; } 6% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes luRing { 0% { opacity: 1; transform: scale(.3); } 100% { opacity: 0; transform: scale(5); } }
 @keyframes luNum { 0% { transform: scale(2.4) rotate(-8deg); } 100% { transform: scale(1) rotate(0); } }
@@ -103,6 +103,8 @@ export function mountProgressionUi({ juice }) {
   on('juiceLevelUp', (e) => { queue.push(e); if (!playing) play(); });
   const yieldTo = () => { if (lv.classList.contains('show') && document.body.classList.contains('lvlup')) lv.classList.add('yield'); };
   on('landed', (e) => { if (e.result !== 'crash' && e.air > 0.5) yieldTo(); });
+  // A real next air (still airborne 0.35 s after the take-off, not a bump) needs the landing in view: the card fades back.
+  on('takeoff', () => setTimeout(() => { if (juice?.hud?.busy?.()) yieldTo(); }, 350));
   on('grindScore', yieldTo);
 
   mountRecap();

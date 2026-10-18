@@ -207,11 +207,7 @@ export const TREES = {
   translucency: 0.9,             // backlit glow of needle tips (sun behind the tree)
   snowLoad: 0.85,                // 0 bare … 1 heavily loaded branches (varies per tree)
   firShare: 0.3,                 // share of rounder firs among the spruce
-  nearRadius: 58,                // metres: full frond trees (the most expensive thing in the frame)
-  midRadius: 420,                // metres: simplified fronds; beyond = far cone shells
-  nearMax: 900,
-  midMax: 9000,
-  rebuildStep: 10,               // metres the camera moves before the near pools are refilled
+  // LOD distances (3D fronds -> baked impostors) live in PERF.trees (gfx/perf.js).
   wellRadius: 1.5,               // tree-well radius per unit tree scale
 };
 

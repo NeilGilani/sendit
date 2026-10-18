@@ -21,7 +21,7 @@ import { PHYSICS as P } from '../config.js';
 import { clamp, lerp, smoothstep, angleDiff, lerpAngle, approach, DEG } from './math.js';
 import { emit } from '../state.js';
 
-let lockHinted = false, lateHinted = false;   // the "held key is locked" / "too late to flip" hints show once per page
+let lockHinted = false, lateHinted = false, spinLockHinted = false;   // the "held key is locked" / "too late to flip" hints show once per page
 
 const wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const mod2Pi = (a) => ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
@@ -396,7 +396,7 @@ export class EdgePhysics {
     // down a line and off a cliff mustn't flip you — but the key of a preload is the same throw, so it
     // carries on. A re-press works at any time (the late throw, flipStep).
     this._flipLock = { up: (c.up || 0) > 0.2 && !(front && this._flipCommit), brake: (c.brake || 0) > 0.2 && !(this._flipCommit && !front) };
-    this._lockHintT = 0;
+    this._lockHintT = 0; this._grabLate = false;
     // How long this air should last (sets how long the throw window stays open, flipStep / spinStep).
     this.airPred = this.timeToLand();
     // Rolling off a crest / lip without popping: the turn held from the ground is carving, not a spin
@@ -409,6 +409,7 @@ export class EdgePhysics {
     this._spinPre = popped && Math.abs(this.windup || 0) > 0.3;   // wound up: the throw can finish a full set
     if (this.butter > 0.3) h += -this.yawRate * 0.4;   // spinning out of a butter pre-winds the spin
     this.spinH = clamp(h, -this.spinCap(), this.spinCap());
+    this._spotCheck = false;
     pl.spinRate = this.spinH; pl.spinTuck = 0;
     this.takeoff.end = popped ? this._popEnd : null;
     this.takeoff.set = q;
@@ -423,11 +424,20 @@ export class EdgePhysics {
   /** Largest flip momentum (open-pose rad/s). */
   flipCap() { return this.C.flipSet * Math.sqrt(this.H.spin) * (1 + flowK(this.pl, 'spinBoost')); }
 
-  air(dt, ctrl) {
+  air(dt, ctrl0) {
     const pl = this.pl, C = this.C;
+    // Rotation inputs: the stronger of the plain controls and the square-mapped stick (input.js airStrength):
+    // a gamepad's diagonal or pushed-up stick throws as hard as the keys. Keyboards read the same either way.
+    const ctrl = this._airCtrl || (this._airCtrl = {});
+    Object.assign(ctrl, ctrl0);
+    if (Math.abs(ctrl0.airSteer || 0) > Math.abs(ctrl0.steer)) ctrl.steer = ctrl0.airSteer;
+    ctrl.up = Math.max(ctrl0.up, ctrl0.airUp || 0);
+    ctrl.brake = Math.max(ctrl0.brake, ctrl0.airBrake || 0);
     const tLand = this.timeToLand();
     // Grabs: reached for after the take-off, let go of just before touchdown (the legs land, not the hand).
     const grabbing = ctrl.active && ctrl.tuck > 0.5 && pl.airTime > 0.12 && tLand > C.grabLetGo;
+    // A grab held into the last moments leaves the spot no time (player.js hints once after such a crash).
+    if (grabbing && tLand < C.grabLetGo + 0.2) this._grabLate = true;
     this.spinStep(dt, ctrl, grabbing, tLand);
     if (this.takeoff) this.takeoff.spin += pl.spinRate * dt;
     this.flipStep(dt, ctrl, grabbing, tLand);
@@ -462,6 +472,11 @@ export class EdgePhysics {
     const pl = this.pl, C = this.C;
     const cap = this.spinCap(), t = pl.airTime;
     if (this._spinLock && (Math.abs(ctrl.steer) < 0.2 || Math.sign(ctrl.steer) !== this._spinLock)) this._spinLock = 0;
+    // A carve held off a lip without a pop stays a carve: on a real air, say how to spin (once).
+    if (this._spinLock && ctrl.active && !spinLockHinted && t > 0.5 && tLand > 0.9) {
+      spinLockHinted = true;
+      emit('hint', 'Spin: pop with Space at the lip, or let go of A / D and press again in the air (a turn held off a lip stays a turn)');
+    }
     const steer = ctrl.active && !this._spinLock && Math.abs(ctrl.steer) > 0.2 ? ctrl.steer : 0;
     let h = this.spinH || 0;
     // The throw: early in the air the shoulders can still add to the set (less and less).
@@ -477,13 +492,23 @@ export class EdgePhysics {
     // The late throw: after the window, steering with no spin going (or a slow one the same way) still
     // builds one — slowly, up to spinLateMax (a late 180 / 360 on a big air, never a set), and only with
     // spinLateAir s of air left to start. A carve held off a lip (_spinLock) stays locked until re-pressed.
+    // A slow spin the other way — no more than the late throw itself makes (spinDrift × spinLateMax): a carve's
+    // pre-wind, or a throw reversed too late in its window — turns round the same way. With the stick held against
+    // it the spin used to open up and keep drifting the wrong way for the rest of the air (45°/s for 2.4 s).
+    // Bigger sets still only open up (a stall), and so does everything in the last spinLateAir s.
+    const against = Math.sign(-steer) !== Math.sign(h);
+    const drift = against && Math.abs(h) <= (C.spinDrift ?? 0) * (C.spinLateMax || 0) * this.H.spin && tLand > C.spinLateAir;
     const late = !throwing && steer && C.spinLateMax && Math.abs(h) < C.spinLateMax * this.H.spin
-      && (Math.sign(-steer) === Math.sign(h) || Math.abs(h) < C.spinMinH) && (Math.abs(h) > C.spinMinH || tLand > C.spinLateAir);
+      && (!against || Math.abs(h) < C.spinMinH || drift) && (Math.abs(h) > C.spinMinH || tLand > C.spinLateAir);
     if (late) h = approach(h, Math.sign(-steer) * C.spinLateMax * this.H.spin, C.spinLateRate * Math.abs(steer) * dt);
     // Shape: tucked (stick with the spin), open (against), grabbing = compact, released = spotting.
-    let pose = 0, rate = null;
+    let pose = 0, rate = null, checking = false;
     const dir = Math.sign(h), spinning = Math.abs(h) > C.spinMinH;
-    if (grabbing) pose = 0.6;
+    // A grab is compact (pose 0.6, it can't open up); a late spin (building, or one no bigger than the late
+    // throw makes) with the stick into it tucks fully while grabbing, as it does without the grab — it used to
+    // hold 0.6 there, so a grabbed late 180 took ~20 % longer (1.42–1.5 s). Thrown / wound-up sets are unchanged.
+    const lateSized = Math.abs(h) <= (C.spinLateMax || 0) * this.H.spin + 1e-6;
+    if (grabbing) pose = late || (lateSized && steer && spinning && Math.sign(-steer) === dir) ? 1 : 0.6;
     else if (throwing) pose = 0.5;
     else if (late) pose = 1;
     else if (steer && spinning) pose = Math.sign(-steer) === dir ? 1 : -1;
@@ -507,15 +532,25 @@ export class EdgePhysics {
       // turned a cork into a plain flip half-way. It keeps spinning — open if the next alignment is out of
       // reach, so a check as the flip comes out has less to take back.
       const busy = spinning && this.flipBusy();
-      if (Math.abs(d) < settleA * DEG && (!spinning || (!busy && (!reach || Math.abs(d) < 12 * DEG)))) {
+      // Checks aim to arrive one spin-response time before touchdown: the rate follows its target with that lag,
+      // so aiming at touchdown itself came up 20–40° short on a check-back started late.
+      const tCheck = Math.max(tLand - 1 / C.spinResponse, 0.1);
+      // A check the spot started finishes even once the momentum it sheds drops below spinMinH: the spin rate
+      // lags, so a check passing an alignment overshot the 12° window, a check-back fell under spinMinH half-way,
+      // and either let go there — drifting on, outside settleA, into a sideways landing with nothing left to plan
+      // it. (Only checks already under way: a rider who was never spinning still settles within settleA only.)
+      const drift = !spinning && this._spotCheck && Math.abs(d) <= C.spinCheck * Math.max(tLand, 0.1);   // (as canCheck below)
+      if ((Math.abs(d) < settleA * DEG || drift) && (!spinning || (!busy && (!reach || Math.abs(d) < 12 * DEG)))) {
         // Close to an alignment (or not spinning): check the spin onto it (the upper body counter-rotates).
-        rate = clamp(d / Math.max(tLand, 0.1), -C.spinCheck, C.spinCheck);
+        rate = clamp(d / tCheck, -C.spinCheck, C.spinCheck);
+        checking = spinning || drift;
       } else if (spinning && !reach && busy) {
         pose = -1;
       } else if (spinning && !reach && canCheck) {
         // Too little spin to come round (a carve's pre-wind off a lip, an under-set): check back instead of
         // landing sideways or backwards.
-        rate = clamp(-dir * back / Math.max(tLand, 0.1), -C.spinCheck, C.spinCheck);
+        rate = clamp(-dir * back / tCheck, -C.spinCheck, C.spinCheck);
+        checking = true;
       } else if (spinning) {
         const f = need / Math.abs(h);
         pose = f >= 1 ? Math.min(1, (f - 1) / (C.spinTuckGain - 1)) : -Math.min(1, (1 - f) / (1 - C.spinOpen));
@@ -528,6 +563,7 @@ export class EdgePhysics {
     // Checking a spin (or twisting against it) bleeds the momentum off; it doesn't come back.
     if (rate !== null && spinning) h = Math.sign(pl.spinRate) === dir ? dir * Math.min(Math.abs(h), Math.abs(pl.spinRate)) : 0;
     this.spinH = h;
+    this._spotCheck = checking;
     pl.heading += pl.spinRate * dt;
   }
 

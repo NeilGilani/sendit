@@ -39,6 +39,8 @@ void main() {
   vUp = corner.y;                         // screen-up across the puff (unrotated): lit top, shaded belly
   // Fade in fast, out slow; clumps fade as they break up.
   vA = smoothstep(0.0, 0.06, life) * (1.0 - smoothstep(kind < 0.5 ? 0.35 : 0.6, 1.0, life));
+  // A drone flying through the landing cloud: puffs bigger than their distance would white out the frame.
+  if (kind < 0.5) vA *= smoothstep(0.35 * s, 1.5 * s + 0.6, -mv.z);
   gl_Position = projectionMatrix * mv;
 }`;
 

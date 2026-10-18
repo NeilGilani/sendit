@@ -2,7 +2,11 @@
 // Seconds from the click. CS2's client (popup_capability_decodable) waits ~2 s for the case to open,
 // then scrolls the reel for 6.0 s on cubic-bezier(0.075, 0.82, 0.165, 1) and reveals at the end
 // (docs/rewards-research.md). We hold 0.6 s on the winner before the reveal.
-export const TIMING = { caseIn: 0.0, lid: 1.0, reelIn: 1.6, spin: 2.0, spinDur: 6.0, hold: 0.6, tickGap: 0.055 };
+// The 3D crate (crate3d.js) fills CS2's wait with the physical moment: it lands (land), the two
+// latches snap (latchL, latchR), the lid strains and bursts open (lid), then the reel slides in.
+export const TIMING = { caseIn: 0.0, land: 0.42, latchL: 0.66, latchR: 0.9, lid: 1.38, reelIn: 1.95, spin: 2.25, spinDur: 6.0, hold: 0.6, tickGap: 0.055 };
+/** Quick open (the toggle in the opener, and "Open all"): the same beats, about a third as long. */
+export const TIMING_QUICK = { caseIn: 0.0, land: 0.22, latchL: 0.3, latchR: 0.38, lid: 0.52, reelIn: 0.72, spin: 0.85, spinDur: 2.4, hold: 0.3, tickGap: 0.05 };
 /** CS2 reel easing (popup_capability_decodable.css): cubic-bezier(0.075, 0.82, 0.165, 1). */
 export const REEL_EASE = [0.075, 0.82, 0.165, 1];
 

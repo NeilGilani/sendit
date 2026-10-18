@@ -84,7 +84,7 @@ export class Player {
     this.visFlip = 0; this.flipSettle = 0; this.prevFlip = 0; this.renderFlip = 0;
     this.offAxis = new OffAxis();
     this.renderBase = new THREE.Quaternion(); this.renderTrick = new THREE.Quaternion();
-    this._ctrl = { steer: 0, brake: 0, up: 0, jump: false, tuck: 0, active: false };
+    this._ctrl = { steer: 0, brake: 0, up: 0, jump: false, tuck: 0, active: false, airSteer: 0, airUp: 0, airBrake: 0 };
     this.setEquipment('ski');
   }
 
@@ -176,6 +176,7 @@ export class Player {
     this.prevFlip = this.visFlip;
     if (this.state === State.FROZEN || this.debugFreeze) return;   // debugFreeze: hold a pose for inspection
     if (P.slowmo) dt *= this.slowmoScale(dt);                      // huge airs: a moment of slow motion (opt-in)
+    this.simTime = (this.simTime || 0) + dt;                        // physics clock (character/dynamics.js reads forces per step)
     this.readInput(dt);
     switch (this.state) {
       case State.GROUNDED: this.groundStep(dt); break;
@@ -232,11 +233,13 @@ export class Player {
   readInput(dt) {
     const I = this.input, c = this._ctrl;
     c.active = this.controllable() && this.state !== State.LIFT;
-    c.steer = 0; c.brake = 0; c.up = 0; c.jump = false; c.tuck = 0;
+    c.steer = 0; c.brake = 0; c.up = 0; c.jump = false; c.tuck = 0; c.airSteer = 0; c.airUp = 0; c.airBrake = 0;
     if (c.active) {
       c.steer = I.strength('right') - I.strength('left');
       c.brake = I.strength('brake');
       c.up = I.strength('speedUp');
+      // In-air rotation reads the stick square-mapped (input.js airStrength; edge.js air() takes the stronger).
+      if (I.airStrength) { const a = I.airStrength(); c.airSteer = a.steer; c.airUp = a.up; c.airBrake = a.brake; }
       c.tuck = I.strength('tuck');
       c.jump = I.strength('jump') > 0.5;
       if (I.justPressed('reset')) this.resetToTop();
@@ -486,12 +489,14 @@ export class Player {
     const ys = (P.landYawSpeed ? 1 + (P.landYawSpeed[2] - 1) * clamp((landSpeed - P.landYawSpeed[0]) / (P.landYawSpeed[1] - P.landYawSpeed[0]), 0, 1) : 1)
       * (1 + (this.flowBoost || 0) * (this.flow?.C.landBoost || 0));   // flow state: a little more forgiving
     const ev = slow ? { result: 'clean', switch: this.isSwitch, dev: 0 } : this.dyn.land(devNose, ys);
+    const yawResult = ev.result;
     // Pitch: a flip has to come round to (near) upright; the worse of yaw and pitch decides.
     const fl = this.dyn.landFlip();
     if (fl.result === 'crash') ev.result = 'crash';
     else if (fl.result === 'stumble' && ev.result === 'clean') ev.result = 'stumble';
     ev.flipDev = fl.dev;
     if (impact > P.hardLanding && ev.result === 'clean') ev.result = 'stumble';
+    ev.why = this.landingWhy(ev, yawResult, fl, impact, velYaw);
     const t = this.dyn.takeoff || { switch: false, spin: 0 };
     this.grab = 0;
     // The leftover pitch (within the landing tolerance) settles visually over a few frames.
@@ -500,7 +505,17 @@ export class Player {
     if (impact > P.crashImpact || ev.result === 'crash') {
       // Why it went wrong (for UI / tuning): too hard, or yaw / pitch out of line.
       const reason = impact > P.crashImpact ? 'impact' : fl.result === 'crash' ? 'pitch' : 'yaw';
-      this.lastCrash = { reason, impact, dev: ev.dev, flipDev: fl.dev, air: this.airTime, spins, flips: fl.flips };
+      this.lastCrash = { reason, impact, dev: ev.dev, flipDev: fl.dev, air: this.airTime, spins, flips: fl.flips, why: ev.why };
+      // Landing backwards on directional skis (a 180 / 540) can't work: say so, once (twin tips can).
+      if (reason === 'yaw' && this.equipment.type === 'ski' && !this.equipment.handling.twin && devNose > 140 * Math.PI / 180 && !Player._switchHinted && this.controllable()) {
+        Player._switchHinted = true;
+        setTimeout(() => emit('hint', 'Directional skis can\'t land backwards: spin 360s / 720s, or take the twin-tip park skis for 180s and 540s'), 1200);
+      }
+      // A grab held to the end blocks the spot (the rider only spots once the hand lets go): say so, once.
+      if (reason !== 'impact' && this.dyn._grabLate && !Player._grabHinted && this.controllable()) {
+        Player._grabHinted = true;
+        setTimeout(() => emit('hint', 'Let go of the grab a moment before touchdown: the rider can only spot the landing once the hand is off'), 1200);
+      }
       this.crash('landing');
       return;
     }
@@ -533,7 +548,7 @@ export class Player {
       points = Math.round(points * flow.scoreMul());
     }
     this.lastLanding = { ...ev, impact, air: this.airTime, spins, flips: fl.flips, trick, drop, grade, rawImpact };
-    emit('landed', { impact, air: this.airTime, clean, perfect, switch: ev.switch, result: ev.result, trick, drop, grade, points, rawImpact });
+    emit('landed', { impact, air: this.airTime, clean, perfect, switch: ev.switch, result: ev.result, trick, drop, grade, points, rawImpact, why: ev.why });
     if (scored) {
       let label = trick || `Air ${this.airTime.toFixed(1)}s`;
       if (perfect) label = `Perfect ${label}`;
@@ -557,6 +572,32 @@ export class Player {
     if (flow && this.airTime > 0.35) emit('landingGrade', { grade, drop, impact, rawImpact, air: this.airTime, trick, perfect, feature, roof });
     this.airTime = 0;
     this._maxAbove = 0;
+  }
+
+  /**
+   * Why a landing wasn't clean, in a few words for the HUD (null when it was): the flip short of / past upright,
+   * the gear short of / past its line (or just sideways), or the impact — so a near miss reads as how far off it
+   * was rather than a random wipeout word.
+   */
+  landingWhy(ev, yawResult, fl, impact, velYaw) {
+    if (ev.result === 'clean') return null;
+    if (impact > P.crashImpact) return 'TOO HARD';
+    const r = { clean: 0, stumble: 1, slide: 1, crash: 2 };
+    if (fl.result !== 'clean' && r[fl.result] >= r[yawResult]) {
+      const f = this.flip || 0, o = Math.atan2(Math.sin(f), Math.cos(f)) * Math.sign(f);   // + past upright
+      return Math.abs(f) > 1 ? `FLIP ${o > 0 ? 'OVER' : 'UNDER'}-ROTATED ${Math.round(fl.dev)}°` : `TIPPED ${Math.round(fl.dev)}°`;
+    }
+    if (yawResult !== 'clean' && ev.switch && this.equipment.type === 'ski' && !this.equipment.handling.twin) return 'BACKWARDS ON DIRECTIONAL SKIS';
+    if (yawResult !== 'clean') {
+      // Signed yaw off the nearest rideable end (+ = heading turned past it the way the spin went).
+      let d = angleDiff(velYaw, this.heading);
+      if (ev.switch) d = angleDiff(velYaw + Math.PI, this.heading);
+      const dir = Math.sign(this._spinTotal || 0);
+      const deg = Math.round(ev.dev);
+      if (Math.abs(this._spinTotal || 0) > Math.PI / 2 && dir) return `${d * dir > 0 ? 'OVER' : 'UNDER'}-ROTATED ${deg}°`;
+      return `${deg}° SIDEWAYS`;
+    }
+    return impact > P.hardLanding ? 'HARD LANDING' : null;
   }
 
   crash(kind) {

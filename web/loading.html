@@ -14,6 +14,7 @@
     const html = await (await fetch('/index.html')).text();
     const doc = new DOMParser().parseFromString(html, 'text/html');
     for (const s of doc.head.querySelectorAll('style')) document.head.appendChild(s);
+    for (const s of doc.head.querySelectorAll('script:not([src])')) new Function(s.textContent)();   // the still picker
     document.body.prepend(doc.getElementById('loading'));
     const { loadingScreen } = await import('/src/loading/index.js');
     const q = new URLSearchParams(location.search);
