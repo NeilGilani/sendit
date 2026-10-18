@@ -494,6 +494,23 @@ strong at 144 Hz, half at 30 Hz). Both now use the physics clock (`player.simTim
 | keyboard spin / flip thrown at the lip | 0.90 · 0.83 / 0.92 s | unchanged |
 | physics-tricks (most flips per air), physics-rotation `--check`, jumps-bench max flips / spins | — | unchanged (jumps-bench: 0 crashes; the send bot's line differs a little where its spins now land) |
 
+On the real maps (`jumps-bench.mjs all both --quiet --spin`, new: every big take-off on Valcrest, Blackspruce and
+Ravenspire replayed with the ways a player tries a spin; clean with ≥ 180° / landed, all airs > 1 s, ski + board;
+the Ravenspire set differs by a couple of airs because the riding bot's line changed slightly):
+
+| pattern | before | after |
+|---|---|---|
+| A at the lip, let go at 300° | 93 % / 98 % | 92 % / 98 % |
+| wound up, let go at 540° | 88 % / 93 % | 92 % / 93 % |
+| A 0.4 s in, let go at 120° (a late 180; non-twin skis can't land it backwards) | 51 % / 69 % | 52 % / 68 % |
+| A 0.4 s in **+ grab**, let go at 120° | 45 % / 66 % | 52 % / 71 % (= without the grab) |
+| carving the other way off the lip, A at 0.3 s | 95 % / 99 % | 97 % / 99 % |
+| A at the lip + grab held to the end (no spot) | 39 % / 75 % | 39 % / 76 % (the skill stays) |
+
+Tried and dropped: letting the spot check back whenever neither alignment is in reach and back looks nearer —
+the release sweep improved (crash 30 → 11) but on the maps a late 180 on non-twin skis landed 0/22 instead of
+8/25 (the check-back from a fast spin is slower than the estimate), so it was reverted.
+
 ### Ground and landing windows (measured, left as they are)
 
 - **Steering curve** (steady path turn rate °/s at a pinned speed, flat, steer input 0.1 · 0.3 · 0.5 · 0.7 · 0.9 · 1):
