@@ -114,6 +114,14 @@ export class RagdollController {
     this._impactCool = 0;
     this.stats = { crashes: 0, maxMs: 0, lastMs: 0 };
     this._pre = (W) => this.preSub(W);
+    this.install();
+  }
+
+  /** Hook into the player (crash steps) and the rider (posing); listen for crashes / respawns. */
+  install() {
+    const player = this.player;
+    this.uninstalled = false;
+    player.ragdoll = this; this.rider.ragdoll = this;
     this._off = [
       on('crashed', (kind) => { this.kind = kind; }),
       on('respawned', () => { this.stop(); this.frames.length = 0; }),
@@ -121,8 +129,12 @@ export class RagdollController {
     ];
   }
 
+  /** Unhook completely: the game runs exactly as without the module (ragdoll-identity.mjs compares both). */
   uninstall() {
+    this.stop();
+    this.uninstalled = true;
     this._off.forEach((f) => f?.());
+    this.frames.length = 0;
     if (this.player.ragdoll === this) this.player.ragdoll = null;
     if (this.rider.ragdoll === this) this.rider.ragdoll = null;
   }
@@ -130,7 +142,7 @@ export class RagdollController {
   /** After each rendered (animated) frame: remember where the trunk joints are. Read-only. */
   track() {
     const pl = this.player, r = this.rider;
-    if (pl.state === CRASH || !pl.simulated || !r.bones) return;
+    if (this.uninstalled || pl.state === CRASH || !pl.simulated || !r.bones) return;
     const t = (pl.simTime || 0) + ((pl.renderAlpha ?? 1) - 1) * (pl.stepDt || 1 / 60);
     const F = this.frames, last = F[F.length - 1];
     let f;
@@ -251,8 +263,5 @@ export class RagdollController {
 }
 
 export function installRagdoll(opts) {
-  const ctl = new RagdollController(opts);
-  opts.player.ragdoll = ctl;
-  opts.rider.ragdoll = ctl;
-  return ctl;
+  return new RagdollController(opts);
 }
