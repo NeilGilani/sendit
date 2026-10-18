@@ -570,6 +570,17 @@ featureAt maps it comes from a background scan of `featureAt` over the terrain o
 slices that start 2.5 s after load. The list is cached per map in `localStorage['sendit.spots']`; bump
 `THRILL_SPOT_CATALOG` when map feature names change.
 
+**? markers.** These are STEEP's points of interest. An undiscovered spot up to 160 m ahead of you (or any
+direction within 45 m) gets a floating cyan **?**, 5 m above the snow. At most three show at once, they
+fade in with distance and out as you arrive, and each one disappears when you send its spot.
+
+- **Where they go.** The catalog keeps up to 16 points per spot name, at least 50 m apart: from the scan,
+  `course.named`, or the kickers. So a name used for many features (Roller, Wind Lip) marks the nearest
+  one.
+- **Setting.** "Mark undiscovered spots (?)" (`settings.thrillSpotMarkers`).
+- **Tunables.** `THRILL.markers = { range 160, near 45, max 3, lift 5, size 2.2 }`.
+- **The catalog version** is 2: v1 caches rescan once to add the points.
+
 The lobby's **Progress tab** has a **Spots & gaps** section for the current map. Found spots are lit,
 unfound ones show as `???`, and the gaps found are listed.
 

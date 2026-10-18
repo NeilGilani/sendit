@@ -112,7 +112,7 @@ await page.evaluate(() => { window.__maxExp = 0; window.__expT = setInterval(() 
 await page.evaluate((src) => { window.__done = false; const s = window.__sendit, pl = s.player, snap = () => {}; new Function('s', 'pl', 'snap', src)(s, pl, snap); }, SCENARIOS.cliff.setup);
 let shotDone = false;
 for (let i = 0; i < 200 && !(await page.evaluate(() => window.__done)); i++) {
-  if (!shotDone && (await page.evaluate(() => window.__thrill.adrenaline.level)) > 0.45) { await shot('7-adrenaline-cliff'); shotDone = true; globalThis.__vig = await page.evaluate(() => Number(document.getElementById('thrill-vignette')?.style.opacity || 0)); }
+  if (!shotDone && (await page.evaluate(() => window.__thrill.adrenaline.level)) > 0.75) { await shot('7-adrenaline-cliff'); shotDone = true; globalThis.__vig = await page.evaluate(() => Number(document.getElementById('thrill-vignette')?.style.opacity || 0)); }
   await wait(60);
 }
 const maxExp = await page.evaluate(() => window.__maxExp);
