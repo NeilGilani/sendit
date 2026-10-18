@@ -34,17 +34,23 @@ export const OFFAXIS = {
   corkR: [0.45, 0.75],  // spin : flip rate ratio (rad / rad) from which a flip turns off-axis (cork / rodeo / misty)
   modeTime: 0.12,       // s to blend between the flip and cork forms (only near upright)
   ratioTau: 0.1,        // s low-pass on the rate ratio
-  alphaMin: 50,         // deg: the flattest axis (≈ a flatspin: the body passes horizontal, 2α = 100°)
-  alphaMax: 78,         // deg: the steepest off-axis (≈ a rodeo / misty with little spin)
-  alphaK: 0.85,         // α = alphaMin + (alphaMax − alphaMin) / (1 + alphaK · (r − r0))
+  // Axis tilt from vertical (deg) by spin : flip ratio r — [r, α]: a backflip 360 / rodeo 360 (r ≈ 1)
+  // turns about a steep axis (≈ 72°: the body goes well past horizontal, 2α ≈ 145°), a rodeo / double cork
+  // (r ≈ 1.5) ≈ 64°, a cork 720 (r ≈ 2) ≈ 58° (body ≈ 115° at the deepest), long corks flatten to 50°
+  // (horizontal, 2α = 100°). Research: corks 45–60° from vertical, rodeos / misties 65–80° (§8).
+  alphaTable: [[0.45, 78], [1, 72], [1.5, 64], [2, 58], [3, 52], [6, 50]],
+  alphaFront: 6,        // deg steeper for a frontflip (a misty is flip-led: it inverts early, like a rodeo)
+  alphaMax: 80,
   alphaRateNear: 160,   // deg/s α eases near upright …
   alphaRateFar: 25,     // … and through the rest of the revolution (the body changing its tilt)
 };
 
 /** Axis tilt from vertical (deg) for a spin : flip ratio r (spin radians per flip radian). */
 export function corkAlpha(r, C = OFFAXIS) {
-  const r0 = C.corkR[0];
-  return C.alphaMin + (C.alphaMax - C.alphaMin) / (1 + C.alphaK * Math.max(0, r - r0) * 2);
+  const T = C.alphaTable;
+  if (r <= T[0][0]) return T[0][1];
+  for (let i = 1; i < T.length; i++) if (r <= T[i][0]) return T[i - 1][1] + (T[i][1] - T[i - 1][1]) * (r - T[i - 1][0]) / (T[i][0] - T[i - 1][0]);
+  return T[T.length - 1][1];
 }
 
 const _A = new THREE.Vector3(), _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
@@ -61,15 +67,16 @@ export class OffAxis {
   reset() {
     this.m = 0;              // 0 = flip form, 1 = cork form
     this.s = 1;              // spin side of the cork (+1 = heading increasing)
-    this.alpha = this.C.alphaMax * DEG;   // axis tilt from vertical (cork form)
+    this.alpha = this.C.alphaTable[0][1] * DEG;   // axis tilt from vertical (cork form)
     this.r = 0;              // low-passed spin : flip rate ratio
   }
 
   /**
    * Called every physics step in the air. theta = drawn flip (rad about the gear's +X, signed),
-   * spinRate / flipRate in rad/s, base = the gear's un-flipped attitude (quaternion, carries the heading).
+   * spinRate / flipRate in rad/s, base = the gear's un-flipped attitude (quaternion, carries the heading),
+   * front = a frontflip (misty).
    */
-  update(dt, theta, spinRate, flipRate, base) {
+  update(dt, theta, spinRate, flipRate, base, front = false) {
     const C = this.C, w = Math.abs(wrapPi(theta));
     // Between flips (upright, no flip under way): the flip axis follows the gear; it freezes once a flip
     // starts and stays for every revolution of it (a double cork turns twice about the same axis).
@@ -91,7 +98,7 @@ export class OffAxis {
       }
     } else mT = this.m > 0.5 ? 1 : 0;   // mid-revolution: finish whatever blend was started, never start one
     this.m += Math.sign(mT - this.m) * Math.min(Math.abs(mT - this.m), dt / C.modeTime);
-    const aT = (this.r >= C.corkR[0] ? corkAlpha(this.r, C) : C.alphaMax) * DEG;
+    const aT = Math.min(C.alphaMax, corkAlpha(this.r, C) + (front ? C.alphaFront : 0)) * DEG;
     const rate = (near ? C.alphaRateNear : C.alphaRateFar) * DEG * dt;
     this.alpha += Math.sign(aT - this.alpha) * Math.min(Math.abs(aT - this.alpha), rate);
   }

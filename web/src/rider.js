@@ -201,9 +201,14 @@ export class Rider {
     this.sinkVis = (pl.sink || 0) * ANIM.gearSinkVisual * (this.fp ? 0.45 : 1);
     this.root.position.y -= this.sinkVis;
     this.root.quaternion.copy(pl.renderOrient);
-    // Flips turn about the centre of mass (≈ hip height), not the feet.
+    // Flips turn about the centre of mass (≈ hip height), not the feet. The trick rotation (world frame,
+    // physics/offaxis.js: renderOrient = renderTrick · renderBase) moves the feet round the pivot
+    // base · (0, flipPivot, 0), so the centre of mass stays on the flight path whatever the rotation.
     const fl = pl.renderFlip || 0;   // signed about the gear's +X, already in renderOrient
-    if (fl) {
+    if (pl.renderTrick && pl.renderBase) {
+      const c = _v1.set(0, ANIM.flipPivot, 0).applyQuaternion(pl.renderBase);
+      this.root.position.add(c).sub(c.applyQuaternion(pl.renderTrick));
+    } else if (fl) {   // (players without the off-axis model, e.g. the loading screen's choreography)
       const c = _v1.set(0, ANIM.flipPivot, 0);
       const full = c.clone().applyQuaternion(pl.renderOrient);
       const base = c.applyQuaternion(_q.copy(pl.renderOrient).multiply(_q2.setFromAxisAngle(X, -fl)));

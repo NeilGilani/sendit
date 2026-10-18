@@ -779,7 +779,7 @@ export class Player {
     this.orient.slerp(target, 1 - Math.exp(-k * dt));
     // Off-axis shape (flip axis, cork tilt) from the spin : flip rates, frozen once on the snow (the
     // landing's leftover tilt settles in the same shape).
-    if (this.state === State.AIR) this.offAxis.update(dt, this.visFlip, this.spinRate, this.flipRate, this.orient);
+    if (this.state === State.AIR) this.offAxis.update(dt, this.visFlip, this.spinRate, this.flipRate, this.orient, this.flip < 0);
   }
 }
 
