@@ -196,6 +196,13 @@ rose into it, which pitched the view ~5° per frame just before touchdown. On th
 arm shortens as before. Maps with `airLook` (Ravenspire, Kitsune, Fjordline, Dragonback, Voltage) still look
 down toward the drop in big air. That fades out as the landing approach takes over.
 
+**Respawns, crashes, lifts.** A `respawned` event (crash respawn, drop zone, reset to top) snaps the chase camera to
+the rider (gliding after a 10–35 m teleport flew it through the body as the fade cleared). In a crash the aim eases
+85 % of the way to the tumbling body (`crashK`), so a ragdoll sliding fast down a steep face stays in frame. On a lift
+the follow smoothing is 0.12 s, the arm 6.5 m, 63° off the cable line (`LIFT_SMOOTH`, `LIFT_SIDE`): straight behind,
+the haul rope and the chair back hid the rider. Snow spray in front of the rider's body thins out (gfx/spray.js
+`uFocus`, fx.js `FOCUS_THIN`), so a landing powder cloud no longer hides the rider in the touchdown frames.
+
 **Turns (HANDOFF #4).** A plain exponential yaw chase trails a steady carve by turn rate / `yawRate`, about 14–20°
 in a hard turn. The camera now leads the travel direction by `turnLead` s of the turn rate, low-passed at
 `turnRateSmooth` 1/s so edge changes don't twitch it. It also chases `yawRateTurn` harder while turning. A hard
