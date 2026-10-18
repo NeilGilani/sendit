@@ -35,15 +35,15 @@ async function boot(query) {
   });
   await wait(2500);
 }
-async function scenario(name) {
-  await page.evaluate((src) => { window.__done = false; const s = window.__sendit, pl = s.player, snap = () => {}; new Function('s', 'pl', 'snap', src)(s, pl, snap); }, SCENARIOS[name].setup);
+async function scenario(name, patch = (x) => x) {
+  await page.evaluate((src) => { window.__done = false; const s = window.__sendit, pl = s.player, snap = () => {}; new Function('s', 'pl', 'snap', src)(s, pl, snap); }, patch(SCENARIOS[name].setup));
   await page.waitForFunction(() => window.__done, null, { timeout: 60000 }).catch(() => {});
 }
 const ev = (n) => page.evaluate((n) => window.__ev.filter((e) => e[0] === n), n);
 
 // ---------------------------------------------------------------- Valcrest: spot, replay, retry, restart
 await boot('map=valcrest-gully&kicker=2&ride');
-await scenario('spin360');
+await scenario('spin360', (src) => src.replace('SPIN = 2', 'SPIN = 0').replace('GRAB = false', 'GRAB = true'));   // a straight grab: lands clean
 await wait(300);
 const landed = (await ev('landed')).at(-1)?.[2];
 const spot = (await ev('thrillSpot')).at(-1)?.[2];
@@ -81,6 +81,17 @@ await page.keyboard.press('KeyR');
 await page.waitForFunction(() => window.__ev.some((e) => e[0] === 'resetTop'), null, { timeout: 5000 }).catch(() => {});
 const rt = (await ev('resetTop')).at(-1);
 check('R restarts in well under half a second', !!rt && rt[1] - t0 < 400, rt ? `${(rt[1] - t0).toFixed(0)} ms` : 'no resetTop');
+// A wipeout: the respawn offers its replay.
+await scenario('crash');
+await page.waitForFunction(() => { const e = document.getElementById('thrill-rp'); return e?.classList.contains('on') && /WIPEOUT/.test(e.textContent); }, null, { timeout: 15000 }).catch(() => {});
+const wp = await page.evaluate(() => document.getElementById('thrill-rp')?.textContent || '');
+check('a wipeout offers REPLAY WIPEOUT after the respawn', /WIPEOUT/.test(wp) && (await page.evaluate(() => document.getElementById('thrill-rp').classList.contains('on'))), wp);
+await page.evaluate(() => { window.__sendit.player.script = null; });
+await page.keyboard.press('Tab');
+await wait(1500);
+check('Tab replays the wipeout', await page.evaluate(() => window.__thrill.replay.active));
+await shot('5b-wipeout-replay');
+await page.waitForFunction(() => !window.__thrill.replay.active, null, { timeout: 20000 }).catch(() => {});
 // Progress tab: spots list.
 await page.evaluate(() => { clearInterval(window.__keep); document.exitPointerLock?.(); window.__sendit.ui.h.menu(); });
 await page.waitForFunction(() => window.__sendit.game.mode === 0 && window.__sendit.lobby.visible, null, { timeout: 60000 }).catch(() => {});

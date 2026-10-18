@@ -49,6 +49,12 @@ export const THRILL = {
     dist: 6.2, rise: 2.0,  // drone arm (m)
     prompt: 4,             // s the REPLAY prompt stays after a big landing
     bigAir: 1.4,           // s of air (or a huge trick) for the prompt
+    window: 14,            // s after a moment that Tab still replays it (else the last `fallback` s)
+    fallback: 6,
+    minClip: 1,            // s: shorter stretches are not worth a replay
+    wipeBefore: 2.5, wipeAfter: 3.2,   // a wipeout replay: from before the crash to the respawn
+    wipeSlow: 0.5,         // playback rate around the crash
+    wipeTumble: 4, wipeSpeed: 11,      // m tumbled or m/s at the crash for the "REPLAY WIPEOUT" prompt
   },
 };
 
@@ -219,6 +225,20 @@ export class FrameRing {
     const ta = this.time(lo), tb = this.time(hi);
     return { a: lo, b: hi, k: tb > ta ? (t - ta) / (tb - ta) : 0 };
   }
+}
+
+/**
+ * The stretch of the recording a replay plays: around `moment` ({ t, before, after }) if it is recent, else
+ * the last C.fallback s; never across a cut (a teleport: respawn, retry, drop zone). ring: { t0, t1 }.
+ * → { a, b } or null when too short.
+ */
+export function clipRange(ring, cuts, moment, now, C = THRILL.replay) {
+  let a, b, T;
+  if (moment && now - moment.t < C.window && moment.t >= ring.t0) { T = moment.t; a = T - moment.before; b = T + moment.after; }
+  else { T = ring.t1; b = ring.t1; a = b - C.fallback; }
+  for (const c of cuts) { if (c <= T) a = Math.max(a, c); else b = Math.min(b, c); }
+  a = Math.max(a, ring.t0); b = Math.min(b, ring.t1);
+  return b - a >= C.minClip ? { a, b } : null;
 }
 
 // ------------------------------------------------------------------ versus codes

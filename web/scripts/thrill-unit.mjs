@@ -115,6 +115,16 @@ export async function run(test, assert) {
     assert.equal(new Progression({ storage: st, emit: () => {} }).state.life.spots, 10, 'persisted');
   });
 
+  await test('thrill clipRange: around a recent moment, else the last seconds, never across a teleport', () => {
+    const C = T.THRILL.replay, ring = { t0: 10, t1: 18 };
+    assert.deepEqual(T.clipRange(ring, [], { t: 15, before: 4, after: 1.5 }, 18), { a: 11, b: 16.5 });
+    assert.deepEqual(T.clipRange(ring, [], { t: 15, before: 4, after: 1.5 }, 15 + C.window + 1), { a: 12, b: 18 }, 'stale moment → last 6 s');
+    assert.deepEqual(T.clipRange(ring, [13], { t: 15, before: 4, after: 1.5 }, 18), { a: 13, b: 16.5 }, 'starts after an earlier cut');
+    assert.deepEqual(T.clipRange(ring, [16], { t: 14, before: 2.5, after: 3.2 }, 18), { a: 11.5, b: 16 }, 'a wipeout stops at its respawn');
+    assert.equal(T.clipRange(ring, [17.5], null, 18), null, 'half a second since a teleport');
+    assert.deepEqual(T.clipRange({ t0: 0, t1: 3 }, [], null, 3), { a: 0, b: 3 });
+  });
+
   await test('thrill versus: codes round-trip with a compact ghost; junk decodes to null', () => {
     const ghost = [];
     for (let i = 0; i <= 900; i++) { const t = i / 10; ghost.push(+t.toFixed(2), +(100 + t * 11.3).toFixed(2), +(2000 - t * 6.1).toFixed(2), +(-40 + Math.sin(t) * 9).toFixed(2), +((t * 0.3) % 6).toFixed(3)); }

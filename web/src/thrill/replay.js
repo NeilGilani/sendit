@@ -10,7 +10,7 @@
 // Setting: "Replay prompt after big tricks" (settings.thrillReplayPrompt; Tab works either way).
 import * as THREE from 'three';
 import { on, game, Mode, settings, emit } from '../state.js';
-import { THRILL, FrameRing } from './core.js';
+import { THRILL, FrameRing, clipRange } from './core.js';
 
 const HUGE = /720|900|1080|1260|1440|flip|cork|misty|rodeo|wildcat|tamedog/i;
 const STRIDE_NODE = 11;   // pos 3, quat 4, scale 3, visible 1
@@ -21,7 +21,9 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
   const C = THRILL.replay;
   let nodes = [], ring = null, recClock = 0, countT = 0;
   let active = null;          // { t, t0, t1, ang, fov, rec? }
-  let lastBig = null;         // { t (rec clock at touchdown), shownAt }
+  let moment = null;          // the last replayable moment { t, before, after, kind: 'trick' | 'wipeout' }
+  let cuts = [];              // rec-clock times of teleports (respawn, retry, drop zone): a replay never spans one
+  let crash = null;           // the crash waiting for its respawn (wipeout replays)
   const ui = typeof document !== 'undefined' ? mountUi() : null;
 
   function rebuild() {
@@ -29,11 +31,21 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
     rider.root.traverse((o) => nodes.push(o));
     const stride = nodes.length * STRIDE_NODE + 4;
     ring = new FrameRing(Math.ceil(C.seconds * 75), stride);
-    lastBig = null;
+    moment = null; cuts = [];
   }
   on('equipmentChanged', () => { ring = null; });
-  on('rideStarted', () => { ring?.clear(); lastBig = null; });
-  on('respawned', () => { ring?.clear(); lastBig = null; ui?.prompt(false); });
+  on('rideStarted', () => { ring?.clear(); moment = null; cuts = []; crash = null; });
+  // A teleport: frames after it are elsewhere, so a replay stops at it. Old cuts fall out with the ring.
+  on('respawned', () => { cuts = cuts.filter((c) => ring && c >= ring.t0); cuts.push(recClock + 1e-6); ui?.prompt(false); });
+  on('crashed', () => { if (game.mode === Mode.RIDING && activities?.mode !== 'challenge') crash = { t: recClock, before: C.wipeBefore, after: C.wipeAfter, kind: 'wipeout' }; });
+  // Juice reports the tumble on the respawn: a big one offers its replay ("relive your wipeouts", STEEP).
+  on('juiceWipeout', ({ tumble, speed }) => {
+    if (!crash) return;
+    const c = crash; crash = null;
+    if ((tumble || 0) < C.wipeTumble && (speed || 0) < C.wipeSpeed) return;
+    moment = c;
+    if (settings.thrillReplayPrompt !== false) ui?.prompt(true, 'WIPEOUT');
+  });
 
   function record(dt) {
     if (!rider.root || !rider.model) return;
@@ -86,19 +98,18 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
   }
 
   function canReplay() {
-    return game.mode === Mode.RIDING && !!ring && ring.count > 30 && activities?.mode !== 'challenge' && !player._busy && player.state !== 3;
+    return game.mode === Mode.RIDING && !!ring && ring.count > 10 && activities?.mode !== 'challenge' && !player._busy && player.state !== 3;
   }
 
   function start(rec = false) {
     if (!canReplay() && !(rec && active)) return false;
-    const big = lastBig && recClock - lastBig.t < 14 && lastBig.t - C.before > ring.t0 - 1 ? lastBig : null;
-    const t1 = big ? Math.min(ring.t1, big.t + C.after) : ring.t1;
-    const t0 = Math.max(ring.t0, big ? big.t - C.before : t1 - 6);
-    if (t1 - t0 < 1) return false;
+    const r = clipRange({ t0: ring.t0, t1: ring.t1 }, cuts, moment, recClock, C);
+    if (!r) { emit('hint', 'Nothing to replay yet'); return false; }
+    const t0 = r.a, t1 = r.b, m = moment && moment.t >= t0 && moment.t <= t1 ? moment : null;
     // Drone side: perpendicular to the travel over the clip.
     const pa = posAt(t0, new THREE.Vector3()), pb = posAt(t1, new THREE.Vector3());
     const travel = Math.atan2(pb.z - pa.z, pb.x - pa.x);
-    active = { t: t0, t0, t1, ang: travel + Math.PI / 2, fov: camera.fov, rec: null, center: posAt(t0, new THREE.Vector3()), camPos: null };
+    active = { t: t0, t0, t1, ang: travel + Math.PI / 2, fov: camera.fov, rec: null, center: posAt(t0, new THREE.Vector3()), camPos: null, wipe: m?.kind === 'wipeout' ? m.t : null };
     if (rec) active.rec = startClip();
     ui?.show(true, !!active.rec);
     ui?.prompt(false);
@@ -146,7 +157,7 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
   on('landed', (e) => {
     if (game.mode !== Mode.RIDING || active || !e.clean || e.result === 'crash' || activities?.mode === 'challenge') return;
     if (!(e.air >= C.bigAir || (HUGE.test(e.trick || '') && e.air > 0.8))) return;
-    lastBig = { t: recClock };
+    moment = { t: recClock, before: C.before, after: C.after, kind: 'trick' };
     if (settings.thrillReplayPrompt !== false) ui?.prompt(true);
   });
 
@@ -170,7 +181,7 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
       if (input.codePressed('Enter') && !active.rec) { const keep = active.fov; active = null; start(true); if (active) active.fov = keep; return; }
       if (skipPressed()) { stop(); return; }
       const airborne = apply(active.t);
-      const rate = airborne ? C.slow : 1;
+      const rate = active.wipe !== null ? (active.t > active.wipe - 0.6 && active.t < active.wipe + 1.6 ? C.wipeSlow : 1) : airborne ? C.slow : 1;
       active.rate = (active.rate ?? rate) + (rate - (active.rate ?? rate)) * Math.min(1, dt * 6);
       active.t += dt * active.rate;
       // Drone: orbit the (smoothed) rider, above the snow.
@@ -226,8 +237,9 @@ function mountUi() {
       hint.textContent = rec ? 'SAVING WHEN IT ENDS · ESC STOP' : 'SPACE / ESC SKIP · ENTER SAVE CLIP';
     },
     tick(r, u) { const t = r < 0.97 ? `${r.toFixed(1)}×` : ''; if (rate.textContent !== t) rate.textContent = t; prog.style.width = `${(Math.min(1, u) * 100).toFixed(1)}%`; },
-    prompt(v) {
+    prompt(v, what = '') {
       clearTimeout(prT);
+      if (v) pr.firstChild.textContent = what ? `▶ REPLAY ${what}` : '▶ REPLAY';
       pr.classList.toggle('on', v);
       if (v) prT = setTimeout(() => pr.classList.remove('on'), THRILL.replay.prompt * 1000);
     },
