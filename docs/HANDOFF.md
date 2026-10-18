@@ -93,6 +93,7 @@ GPU=1 node web/scripts/lobbytest.mjs http://localhost:5180/
 node web/scripts/physics-fuzz.mjs
 node web/scripts/physics-tricks.mjs
 node web/scripts/physics-rotation.mjs both --check
+node web/scripts/physics-combo.mjs both --check
 node web/scripts/jumps-valcrest.mjs --check
 node web/scripts/equipment-check.mjs
 node web/scripts/map2-bot.mjs --verify --tuck --check
@@ -104,6 +105,7 @@ node web/scripts/map7-unit.mjs
 node web/scripts/trails-check.mjs --check
 node web/scripts/gfxpopin.mjs http://localhost:5180 <mapId> 1 20
 node web/scripts/map3-perf.mjs http://localhost:5180 1600 900 1 60 <mapId>
+MAC=1 node web/scripts/combo-shots.mjs http://localhost:5180/ <outDir> ski cork720,dc1080   # side-camera frames of combo tricks
 GPU=1 node web/scripts/gfxshots.mjs "http://localhost:5180/?map=<id>&ride" <outDir> '[{"name":"r","wait":5,"keys":"ArrowUp"}]' 1280 720
 ```
 

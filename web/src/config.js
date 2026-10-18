@@ -251,6 +251,18 @@ export const ANIM = {
   restCrouch: 0.12,           // crouch (0..1) standing still: people stand tall at rest, the athletic stance comes with speed
   skiHipsFwd: 0.035,          // m the hips sit forward of the hip joints' rest spot: centred over the boots, shins pressed into the tongues
   powderBack: 0.03,           // m skiers sit back in deep powder (tips up)
+  // Head in the air (rider.airLook): leads the rotation, then spots the landing point.
+  airHeadLead: 0.09,          // rad of head yaw per rad/s of spin (into the spin) …
+  airHeadLeadMax: 0.55,       // … up to this
+  airHeadFlip: 0.35,          // rad: head thrown back into a backflip / chin in for a frontflip
+  airSpot: [0.8, 0.35],       // s before touchdown the eyes start finding the landing … and are on it
+  airSpotYaw: 1.25,           // rad the head (and shoulders) turn to it at most
+  airSpotPitch: 0.75,         // rad down at most
+  airSpotShoulders: 0.35,     // share of the head's turn the shoulders take
+  airHeadResponse: 9,         // 1/s smoothing
+  comboOpen: [0.55, 0.3],     // s before touchdown a cork / rodeo stays compact until … and is open by
+  comboCrouch: 0.45,          // crouch a combo holds through the off-axis part (knees up)
+  comboArmsIn: 0.7,           // how far the arms wrap in through it
   spotLanding: 0.3,           // rad the head pitches down to spot the landing in the last ~0.8 s of a jump
   gearSinkVisual: 0.15,       // share of the physics powder sink shown (the snow reads as packed, so the gear rides on top)
   board: {

@@ -502,9 +502,16 @@ export class EdgePhysics {
       const reach = need <= Math.abs(h) * C.spinTuckGain;
       // The alignment just passed, if the upper body can still check back to it before touchdown.
       const back = spinning ? period - ahead : Infinity, canCheck = back <= C.spinCheck * Math.max(tLand, 0.1);
-      if (Math.abs(d) < settleA * DEG && (!spinning || !reach || Math.abs(d) < 12 * DEG)) {
+      // Deep in a flip (more than flipBusyAngle of it still to come round) the body can't check its spin:
+      // the twist is part of the off-axis rotation (physics/offaxis.js), and parking it while upside down
+      // turned a cork into a plain flip half-way. It keeps spinning — open if the next alignment is out of
+      // reach, so a check as the flip comes out has less to take back.
+      const busy = spinning && this.flipBusy();
+      if (Math.abs(d) < settleA * DEG && (!spinning || (!busy && (!reach || Math.abs(d) < 12 * DEG)))) {
         // Close to an alignment (or not spinning): check the spin onto it (the upper body counter-rotates).
         rate = clamp(d / Math.max(tLand, 0.1), -C.spinCheck, C.spinCheck);
+      } else if (spinning && !reach && busy) {
+        pose = -1;
       } else if (spinning && !reach && canCheck) {
         // Too little spin to come round (a carve's pre-wind off a lip, an under-set): check back instead of
         // landing sideways or backwards.
@@ -622,6 +629,14 @@ export class EdgePhysics {
     if (this.takeoff) this.takeoff.flip = pl.flip;
   }
 
+  /** A flip under way with more than flipBusyAngle still to come round to the next upright. */
+  flipBusy() {
+    const C = this.C, h = this.flipH || 0, f = this.pl.flip || 0;
+    if (Math.abs(h) <= C.flipMinH) return false;
+    const ahead = h > 0 ? Math.PI * 2 - mod2Pi(f) : mod2Pi(f);
+    return ahead > (C.flipBusyAngle ?? 120) * DEG && ahead < Math.PI * 2 - 0.05;
+  }
+
   /** Open-pose rotation (rad) momentum h carries over t s while stretched out and shedding at flipSpotBleed. */
   carryOpen(h, t) {
     const C = this.C, floor = 2 * C.flipMinH, b = C.flipSpotBleed || 0;
@@ -644,7 +659,9 @@ export class EdgePhysics {
   /** Pitch landing check: { dev (deg from upright), flips (whole rotations), back (bool), result }. */
   landFlip() {
     const pl = this.pl, C = this.C;
-    const dev = Math.abs(wrapPi(pl.flip || 0)) / DEG;
+    // How far the body is tipped off upright: the flip's own angle for a plain flip, less in a cork (the
+    // body's up axis rides a cone round the tilted axis, physics/offaxis.js) — the attitude that is drawn.
+    const dev = (pl.offAxis ? pl.offAxis.tilt((pl.flip || 0) * (pl.travelSign || 1)) : Math.abs(wrapPi(pl.flip || 0))) / DEG;
     const flips = Math.round(Math.abs(pl.flip || 0) / (Math.PI * 2));
     const result = dev <= C.flipLandClean ? 'clean' : dev <= C.flipLandStumble ? 'stumble' : 'crash';
     return { dev, flips, back: (pl.flip || 0) > 0, result };
