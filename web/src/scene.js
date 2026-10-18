@@ -162,6 +162,7 @@ export const RING = {
   rings: 64,
   envStart: 0.5,                 // relief share at the ring's inner edge
   envRise: 0.07,                 // share of the depth over which it rises to full relief
+  rimBelow: 800,                 // metres under the spawn height the backdrop's outer rim settles to (under the ranges)
   scale: 7000,                   // metres per ridged-noise unit (peak spacing)
   base: 500,                     // metres above the backdrop rim
   height: 2300,                  // metres of peak relief

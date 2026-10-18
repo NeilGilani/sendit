@@ -556,6 +556,11 @@ export class Terrain {
       const a = this.far[j * fres + i], b = this.far[j * fres + i + 1], c = this.far[(j + 1) * fres + i], d = this.far[(j + 1) * fres + i + 1];
       return (a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz;
     };
+    // The rim goes to just under the distant ranges' base (they rise in front of it). It used to sink
+    // ~900 m under the lowest backdrop point: that left a flat, haze-filled "lake" between the last
+    // backdrop ridges and the ranges on most maps.
+    const edge = m.spawn ? this.baseHeight(m.spawn.position[0], m.spawn.position[2]) : 2500;
+    const rimY = Math.max(m.far_min_height - 900, edge - RING.rimBelow);
     let k = 0;
     for (let j = 0; j <= n; j++) {
       for (let i = 0; i <= n; i++) {
@@ -565,7 +570,7 @@ export class Terrain {
         // Outer rim sinks away so the backdrop never ends in a hard box edge (the sky's ranges take over).
         const rim = smooth(fsize / 2 - 4000, fsize / 2, Math.max(Math.abs(x), Math.abs(z)));
         const y = H(x, z) - inside * (this.mid ? 160 : 90) - 2;
-        pos[k++] = x; pos[k++] = y + (m.far_min_height - 900 - y) * rim; pos[k++] = z;
+        pos[k++] = x; pos[k++] = y + (rimY - y) * rim; pos[k++] = z;
       }
     }
     const idx = new Uint32Array(n * n * 6);

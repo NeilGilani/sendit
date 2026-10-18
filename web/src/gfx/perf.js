@@ -31,8 +31,8 @@ export const PERF = {
   // coarser grid before the swap, how far ahead (s of travel at the current velocity) detailed chunk
   // geometry is built, and how many detailed (LOD 0-2) chunk geometries stay cached.
   terrainMorph: 0.3,
-  // Tile rock on medium / high: buttress facets (ROCK_MACRO in gfx/snow.js rockLayer); medium also gets
-  // the 5 m joint columns within ~0.6 m per pixel. Off = the previous plain-slab rock.
+  // Tile rock on medium / high: buttress facets, crisper block tones (ROCK_MACRO in gfx/snow.js
+  // rockLayer). Off = the previous plain-slab rock.
   rockMacro: true,
   terrainLookahead: 3,
   terrainCache: 48,

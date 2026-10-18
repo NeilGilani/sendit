@@ -163,10 +163,8 @@ void rockLayer(vec2 uv, float fp, out vec3 col, out vec2 g, out vec2 gh, out flo
   g *= 0.7;                       // lighting: big blocks tilt less than the snow test assumes
   #endif
   // Vertical joint columns inside the slabs.
-  #if defined(ROCK_LITE) && !defined(ROCK_MACRO)
-  float wM = 0.0;
-  #elif defined(ROCK_LITE)
-  float wM = 1.0 - smoothstep(0.04, 0.12, fp / uRockScale.y);   // medium: joint columns up close only
+  #ifdef ROCK_LITE
+  float wM = 0.0;                 // (medium: measured +3 % GPU on Ravenspire for the near columns alone)
   #else
   float wM = 1.0 - smoothstep(0.06, 0.2, fp / uRockScale.y);
   #endif
