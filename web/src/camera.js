@@ -88,7 +88,12 @@ export class CameraController {
     this.snapT = Math.max(0, this.snapT - dt);
     if (game.mode === Mode.MENU) { this.flyover(dt); this.wasMenu = true; this.setNear(0.25); this.fpView?.reset(); this.fpWas = false; return; }
     if (this.wasMenu) { this.wasMenu = false; if (this.intro >= 1) this.snap(); }
-    // First person (helmet cam) — crashes cut to the chase camera so the tumble stays readable.
+    // First person (helmet cam). Crashes: the camera is knocked out of the head and follows the ragdoll
+    // from a few metres back (FPView.crash), so the tumble stays readable.
+    if (settings.view === 'fp' && this.rider && this.player.state === State.CRASH && this.intro >= 1 && this.fpWas) {
+      this.fpView.crash(dt);
+      return;
+    }
     if (settings.view === 'fp' && this.rider && this.player.state !== State.CRASH && this.intro >= 1) {
       this.firstPerson(dt);
       this.fpWas = true;

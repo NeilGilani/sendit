@@ -54,11 +54,16 @@ export const FP_BREATH = {
   opacity: 0.32, size: 0.18,  // at its fullest, metres across at birth (grows ×2.4)
   fadeSpeed: 6,               // m/s above which it is gone
 };
+// Crash (ragdoll, character/ragdoll.js): the helmet cam is knocked out of the head and settles a few
+// metres back / up the way you came, watching the body tumble, so the crash stays readable and nobody
+// gets a ragdoll's-eye spin. First person resumes on the respawn.
+export const FP_CRASH = { back: 2.6, up: 1.4, settle: 0.9, follow: 5, lookRate: 7, floor: 0.45 };
 // Terrain chatter: bumps (how fast the ground normal under the rider changes) kick the helmet cam.
 export const FP_BOB = { gain: 0.0035, max: 0.05, spring: 260, damp: 22 };
 
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _e = new THREE.Euler(0, 0, 0, 'YXZ');
+const _cv1 = new THREE.Vector3(), _cv2 = new THREE.Vector3();
 const _m = new THREE.Matrix4(), _s = new THREE.Vector3(), _col = new THREE.Color(), _col2 = new THREE.Color();
 const Y = new THREE.Vector3(0, 1, 0), X = new THREE.Vector3(1, 0, 0), Z = new THREE.Vector3(0, 0, 1);
 const RY_PI = new THREE.Quaternion().setFromAxisAngle(Y, Math.PI);
@@ -189,7 +194,47 @@ export class FPView {
     if (this.puff) this.puff.visible = false;
   }
 
+  /** Crashed in first person: an out-of-body follow of the ragdoll (camera.js calls this in State.CRASH). */
+  crash(dt) {
+    const ctl = this.c, cam = ctl.camera, rider = ctl.rider, F = FP_CRASH;
+    const k = (r) => 1 - Math.exp(-r * dt);
+    const chest = rider.bones.spine_03.getWorldPosition(_cv1);
+    if (!this.crashing) {
+      this.crashing = true; this.crashT = 0; this.active = false;
+      if (rider.fpCam) rider.fpCam.ok = false;
+      if (this.puff) this.puff.visible = false;
+      this.crashPos = cam.position.clone();
+      this.crashQ = cam.quaternion.clone();
+      // Back along where the camera was looking (level), i.e. up the track.
+      this.crashBack = _v.set(0, 0, 1).applyQuaternion(cam.quaternion).setY(0);
+      if (this.crashBack.lengthSq() < 1e-3) this.crashBack.set(0, 0, 1);
+      this.crashBack = this.crashBack.clone().normalize();
+    }
+    this.crashT += dt;
+    const e = THREE.MathUtils.smoothstep(this.crashT, 0, F.settle);
+    const want = _cv2.copy(chest).addScaledVector(this.crashBack, F.back * e).add(_v.set(0, 0.2 + F.up * e, 0));
+    this.crashPos.lerp(want, k(F.follow * (0.4 + e)));
+    const floor = ctl.terrain.getHeight(this.crashPos.x, this.crashPos.z) + F.floor;
+    if (this.crashPos.y < floor) this.crashPos.y = floor;
+    cam.position.copy(this.crashPos);
+    _m.lookAt(this.crashPos, chest, Y);
+    _q.setFromRotationMatrix(_m);
+    this.crashQ.slerp(_q, k(F.lookRate));
+    cam.quaternion.copy(this.crashQ);
+    const tr2 = ctl.trauma * ctl.trauma * (settings.juiceShake ?? (ctl.reducedMotion ? 0.4 : 1));
+    if (tr2 > 1e-4) {
+      const f = ctl.t * C.shakeFreq;
+      cam.rotateX(deg(noise1(f, 11.2) * C.shakeAngle * 0.6 * tr2));
+      cam.rotateZ(deg(noise1(f, 3.7) * C.shakeAngle * 0.6 * tr2));
+    }
+    ctl.fov += (C.fpFov - 6 - ctl.fov) * k(4);
+    cam.fov = ctl.fov;
+    if (cam.near !== FP.near) cam.near = FP.near;
+    cam.updateProjectionMatrix();
+  }
+
   update(dt) {
+    this.crashing = false;
     const ctl = this.c, cam = ctl.camera, s = ctl.player, rider = ctl.rider, rp = rider.p;
     const k = (r) => 1 - Math.exp(-r * dt);
     const st = s.state, air = st === State.AIR, lift = st === State.LIFT;
