@@ -6,7 +6,8 @@
 // posed skeleton (bones, mass-weighted) vs the physics path, and where the head looks vs the landing.
 // Usage: node web/scripts/combo-shots.mjs <url> <outDir> [ski|snowboard] [trick,…]
 //   tricks: backflip cork720 dc1080 rodeo540 misty720 cork720grab bf360
-//   env: GPU=1 (Windows d3d11) | MAC=1 (metal) | default software GL; W/H viewport; DT_SHOT (s, default 0.12)
+//   env: GPU=1 (Windows d3d11) | MAC=1 (metal) | default software GL; W/H viewport; DT_SHOT (s, default 0.12);
+//        MAP (default valcrest-gully); SIDE=-1 puts the camera on the other side
 // Screenshots belong outside the repo.
 import { chromium } from '@playwright/test';
 import fs from 'node:fs';
