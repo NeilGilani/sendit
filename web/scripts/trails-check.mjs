@@ -63,7 +63,15 @@ for (const map of maps) {
       assert.ok(ahead < behind + 0.5, `${t.id}: faces downhill (ahead ${ahead.toFixed(1)} vs behind ${behind.toFixed(1)})`);
       const prog = course.progress(s.x, s.z);
       assert.ok(prog < finish, `${t.id}: starts above the finish (${prog.toFixed(0)} < ${finish.toFixed(0)})`);
-      const mLen = finish - Math.max(0, prog), mVert = yFinish == null ? null : y - yFinish;
+      let mLen = finish - Math.max(0, prog), mVert = yFinish == null ? null : y - yFinish;
+      // A map that gives each trail its own line (course.rideLine → world [x, z] points, spawn → finish) is
+      // measured along it (3D length, start-to-end drop); otherwise along the main course path.
+      const line = course.rideLine?.(t.id);
+      if (line?.length > 1) {
+        mLen = 0;
+        for (let k = 1; k < line.length; k++) { const [ax, az] = line[k - 1], [bx, bz] = line[k]; mLen += Math.hypot(bx - ax, bz - az, H(course, bx, bz) - H(course, ax, az)); }
+        mVert = H(course, line[0][0], line[0][1]) - H(course, line.at(-1)[0], line.at(-1)[1]);
+      }
       if (!MEASURE && t.length != null) assert.ok(Math.abs(t.length - mLen) <= Math.max(40, mLen * 0.1), `${t.id}: declared length ${t.length} vs measured ${mLen.toFixed(0)}`);
       if (!MEASURE && t.vertical != null && mVert != null) assert.ok(Math.abs(t.vertical - mVert) <= Math.max(25, mVert * 0.12), `${t.id}: declared vertical ${t.vertical} vs measured ${mVert.toFixed(0)}`);
       rows.push({ id: t.id, x: s.x.toFixed(0), z: s.z.toFixed(0), heading: s.heading.toFixed(2), progress: fmt(prog), length: fmt(mLen), declared: fmt(t.length), vertical: fmt(mVert), declaredV: fmt(t.vertical) });

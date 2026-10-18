@@ -212,6 +212,30 @@ export async function run(test, assert) {
     assert.ok(JSON.parse(globalThis.localStorage.getItem(core.PROGRESSION_KEY)).xp > 0, 'persisted under its own key');
   });
 
+  await test('progression: Explorer follows the map registry (built-ins, not experimental), never revokes, challengeProgress ticks', async () => {
+    await import('../src/progression/index.js');   // hands the registry's ids to core (setExplorerMaps)
+    const reg = await import('../src/maps/registry.js');
+    await import('../src/maps/builtin.js');
+    const ids = reg.listMaps().filter((m) => !m.experimental).map((m) => m.id);
+    assert.ok(ids.length >= 7 && !ids.includes('lake-tahoe'), ids.join());
+    const { p, of } = make();
+    for (const id of ids.slice(0, -1)) { p.startRide(id); p.endRide(); }
+    assert.ok(!of('achievement').some((a) => a.id === 'all-maps'), 'one map short');
+    p.startRide(ids.at(-1)); p.checkAchievements();
+    assert.equal(of('achievement').filter((a) => a.id === 'all-maps').length, 1, 'every registered map ridden');
+    // A later new map does not take it back.
+    core.setExplorerMaps(() => [...ids, 'brand-new']);
+    p.checkAchievements();
+    assert.ok(p.achievements().find((a) => a.id === 'all-maps').unlocked > 0, 'earned stays earned');
+    core.setExplorerMaps(null);
+    assert.ok(core.ACHIEVEMENTS.find((a) => a.id === 'all-maps').test({ life: { maps: { 'valcrest-gully': 1, blackspruce: 1, ravenspire: 1, 'voltage-park': 1 } } }), 'falls back to the original four');
+    // challengeProgress: fires as a daily's value moves, not on the finishing step.
+    const t = make();
+    t.p.startRide('blackspruce');
+    const c = t.p.challenges().find((x) => x.scope !== 'ride' && x.goal > 1);
+    if (c) { t.p.bump(c.stat, Math.ceil(c.goal / 4)); t.p.bump(c.stat, Math.ceil(c.goal / 4)); assert.ok(t.of('challengeProgress').length >= 1); assert.ok(t.of('challengeProgress').every((e) => e.value < e.challenge.goal)); }
+  });
+
   await test('progression: daily 2x bonus doubles the first ridden XP of the day, then stops; not in the lobby', () => {
     const { p, setNow } = make('2026-10-20T09:00:00');
     const B = core.XP_SOURCES.dailyBonus;

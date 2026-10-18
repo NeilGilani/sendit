@@ -1,5 +1,6 @@
 // Spatial focus navigation for menus: arrow keys and the gamepad d-pad / stick move focus to the
 // nearest control in that direction. Works on any root element (lobby, pause, settings, credits).
+import { emit } from '../state.js';
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -50,6 +51,7 @@ export function moveFocus(root, dir) {
   if (best) {
     best.focus({ preventScroll: true });
     best.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    emit('uiMove', { dir });   // audio.js plays a soft tick
   }
   return best;
 }

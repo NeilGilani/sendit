@@ -257,6 +257,7 @@ export function mountJuiceHud({ player, combo, input, camera }) {
   on('juiceSplitFinal', ({ delta }) => { if (delta != null) split(delta, 'FINISH'); });
   on('juiceComboLost', ({ pts }) => { if (pts >= 60) banner(`COMBO LOST  −${fmt(pts)}`, '#ff6bb0', true); });
   // Line goals on flow maps (their own banner is hidden with the rest of the flow chain HUD).
+  on('parkPump', () => callout('PERFECT PUMP', '#2ff5d6'));   // voltage-park: a timed pump on a pipe / transition wall
   on('lineGoalStep', ({ name, step, of }) => callout(`${name.toUpperCase()}  ${step} / ${of}`));
   on('lineGoal', ({ name, bonus }) => { callout(`LINE COMPLETE · ${name.toUpperCase()}  +${fmt(bonus)}`, '#ffe14d'); edge('rgba(47,245,214,.45)'); });   // the chain is still live: not over its panel
 

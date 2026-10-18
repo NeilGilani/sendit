@@ -21,7 +21,8 @@
 //   progression.onXP(fn)              → unsubscribe; fn({ gained, reason, xp, level, into, need })
 // Bus events (state.js): progressXp, juiceLevelUp, achievement, challengeDone, dailySweep, personalBest.
 import { on, emit, game, Mode } from '../state.js';
-import { Progression, levelFor } from './core.js';
+import { Progression, levelFor, setExplorerMaps } from './core.js';
+import { listMaps } from '../maps/registry.js';
 
 export * from './core.js';
 
@@ -37,6 +38,9 @@ function fire(name, detail) {
   emit(BUS[name] || name, detail);
 }
 const subscribe = (name, fn) => { if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name).add(fn); return () => listeners.get(name).delete(fn); };
+
+// Explorer: every built-in map in the registry except the experimental real-data one (Lake Tahoe).
+setExplorerMaps(() => { const ids = listMaps().filter((m) => !m.experimental).map((m) => m.id); return ids.length ? ids : null; });
 
 let core = null;
 const C = () => (core ||= new Progression({ storage: localStore, emit: fire }));

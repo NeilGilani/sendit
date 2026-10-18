@@ -3,7 +3,7 @@
 // (or import it from anywhere before the lobby is shown — the tab bar updates live).
 import './tabs/equipment.js';
 import './tabs/cases.js';
-import './tabs/locker.js';      // replaces the free colourway picker (tabs/character.js) now that skins are earned
+import './tabs/locker.js';      // replaces the old free colourway picker (a Character tab) now that skins are earned
 import './tabs/maps.js';
 import './tabs/multiplayer.js';
 import './tabs/leaderboards.js';
