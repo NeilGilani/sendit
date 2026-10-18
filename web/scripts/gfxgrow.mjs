@@ -4,7 +4,8 @@
 // (trees' uLodEye, or terrain uMorphEye + scatter fade eye) moved `shift` metres back along the run.
 // Every pixel that differs is content that morphs / fades / grows purely with distance (LOD hand-overs,
 // geomorphs, card growth, snow appearing). Camera motion, parallax and lighting cancel out exactly.
-// Reports, per map: share of pixels changed per metre of travel (mean / p95 / max over the steps) and
+// Reports, per map: share of pixels changed per metre of travel (mean / p95 / max over the steps), the
+// share of 16x16 blocks whose mean brightness changed (structural change, ignores dither speckle) and
 // load time; saves a frame sequence + the worst diff masks when outDir is given.
 // Usage: node scripts/gfxgrow.mjs <baseUrl> [maps] [quality] [steps] [stepMetres] [outDir] [W H]
 //   e.g. node web/scripts/gfxgrow.mjs http://localhost:5186 blackspruce,ravenspire 1 60 2 /tmp/out
@@ -13,7 +14,7 @@ import { chromium } from '@playwright/test';
 import fs from 'node:fs';
 const [base = 'http://localhost:5186', mapsArg = 'blackspruce', q = '1', steps = '60', stepM = '2', outDir = '', W = '1280', H = '720'] = process.argv.slice(2);
 const angle = process.env.ANGLE || (process.platform === 'darwin' ? 'metal' : 'd3d11');
-const START = { 'valcrest-gully': 0.08, blackspruce: 0.12, ravenspire: 0.45, 'kitsune-peak': 0.2, fjordline: 0.2, ...JSON.parse(process.env.START || '{}') };
+const START = { 'valcrest-gully': 0.08, blackspruce: 0.12, ravenspire: 0.78, 'kitsune-peak': 0.78, fjordline: 0.7, ...JSON.parse(process.env.START || '{}') };
 const SHIFT = Number(process.env.SHIFT || 1);
 const THRESH = Number(process.env.THRESH || 10);   // 0..255, any channel
 if (outDir) fs.mkdirSync(outDir, { recursive: true });
@@ -71,6 +72,21 @@ try {
           }
           return n / (w * h);
         };
+        // Structural change: 16x16-pixel blocks whose mean luminance moved by > 5 levels (dither speckle
+        // between two matching pictures averages out; a branch growing or snow appearing does not).
+        const blocks = (a, b) => {
+          const B = 16, bw = Math.floor(w / B), bh = Math.floor(h / B);
+          let n = 0;
+          for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
+            let s = 0;
+            for (let y = by * B; y < by * B + B; y++) for (let x = bx * B; x < bx * B + B; x++) {
+              const k = (y * w + x) * 4;
+              s += (a[k] - b[k]) * 0.2126 + (a[k + 1] - b[k + 1]) * 0.7152 + (a[k + 2] - b[k + 2]) * 0.0722;
+            }
+            if (Math.abs(s) / (B * B) > 5) n++;
+          }
+          return n / (bw * bh);
+        };
         const A = grab();
         // Trees only.
         const e0 = eye.clone();
@@ -85,6 +101,7 @@ try {
         me.copy(m0); fe.copy(f0);
         const mask = wantMask ? new Uint8Array(w * h) : null;
         const tree = diff(A, B, mask) / shift, other = diff(A, C, null) / shift;
+        const treeBlk = blocks(A, B) / shift, otherBlk = blocks(A, C) / shift;
         let png = null;
         if (wantMask) {
           const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
@@ -97,9 +114,9 @@ try {
           g.putImageData(img, 0, 0);
           png = cv.toDataURL('image/png');
         }
-        return { tree, other, png };
+        return { tree, other, treeBlk, otherBlk, png };
       }, { shift: SHIFT, thresh: THRESH, wantMask: !!outDir && i % 10 === 0 });
-      rows.push({ i, tree: r.tree, other: r.other });
+      rows.push({ i, tree: r.tree, other: r.other, treeBlk: r.treeBlk, otherBlk: r.otherBlk });
       if (outDir) {
         await page.screenshot({ path: `${outDir}/${map}_q${q}_${String(i).padStart(3, '0')}.png` });
         if (r.png) fs.writeFileSync(`${outDir}/${map}_q${q}_${String(i).padStart(3, '0')}_diff.png`, Buffer.from(r.png.split(',')[1], 'base64'));
@@ -110,7 +127,7 @@ try {
       const mean = a.reduce((p, c) => p + c, 0) / a.length;
       return { mean: +mean.toFixed(3), p95: +a[Math.floor(a.length * 0.95)].toFixed(3), max: +a[a.length - 1].toFixed(3) };
     };
-    const res = { map, q: Number(q), load: +load.toFixed(1), treePctPerM: st('tree'), terrainScatterPctPerM: st('other'), errors: errs.slice(0, 3) };
+    const res = { map, q: Number(q), load: +load.toFixed(1), treePctPerM: st('tree'), treeBlocksPctPerM: st('treeBlk'), terrainScatterPctPerM: st('other'), terrainScatterBlocksPctPerM: st('otherBlk'), errors: errs.slice(0, 3) };
     summary.push(res);
     console.log(JSON.stringify(res));
     await page.close();

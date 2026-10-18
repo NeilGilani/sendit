@@ -4,7 +4,8 @@
 //  Impostor (everything beyond): one camera-facing card per tree showing pictures of that same frond
 //    tree, baked at load time (gfx/trees.js bakeImpostors) from 12 directions x 3 elevations x 3 snow
 //    loads per species: albedo (snow included) + normal + AO, so the card is lit live like the tree.
-//  Shadow cones: lumpy cone stacks drawn only into the sun shadow map, for trees beyond the fronds.
+//  Shadows beyond the fronds: the impostor card again, turned to face the sun in the shadow pass, so it
+//    casts the frond tree's own silhouette.
 // There is exactly one hand-over, far from the rider (PERF.trees: 36 / 58 / 80 m by quality, never
 // closer than 30 / 45 / 60 m on dense maps): fronds and impostor cross-fade with complementary
 // screen-door dither over a band, each computed in the vertex shader from the live camera. Nothing
@@ -205,39 +206,6 @@ function crownGeometry(kind, seed) {
   return mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)).map(stripTo));
 }
 
-/** Far LOD: a lumpy cone stack, no alpha. aUnder = 4 marks the far shell. */
-function farGeometry(kind, seed) {
-  const rnd = mulberry32(seed);
-  const H = TREES.height;
-  const parts = [trunkGeo(2.0, 0.22, 0.15, 3)];
-  const tiers = 3;
-  for (let i = 0; i < tiers; i++) {
-    const t = i / tiers;
-    const r = (kind === 0 ? 2.4 : 2.8) * Math.pow(1 - t, 0.9) + 0.35;
-    const h = (H / tiers) * 1.7;
-    const y = 1.0 + t * (H - 2.2);
-    const cone = new THREE.ConeGeometry(r, h, 6, 1, true);
-    const p = cone.attributes.position;
-    for (let k = 0; k < p.count; k++) {
-      if (p.getY(k) < 0) {
-        const a = Math.atan2(p.getZ(k), p.getX(k));
-        const j = 1 + 0.16 * Math.sin(a * 5 + i * 2 + rnd());
-        p.setX(k, p.getX(k) * j); p.setZ(k, p.getZ(k) * j); p.setY(k, p.getY(k) - 0.3 * Math.abs(Math.sin(a * 3 + i)));
-      }
-    }
-    cone.computeVertexNormals();
-    cone.translate(0, y + h / 2, 0);
-    const n = p.count;
-    cone.setAttribute('aUnder', new THREE.Float32BufferAttribute(new Float32Array(n).fill(4), 1));
-    const ao = new Float32Array(n);
-    for (let k = 0; k < n; k++) ao[k] = p.getY(k) > y + h * 0.4 ? 0.95 : 0.55;
-    cone.setAttribute('aAO', new THREE.Float32BufferAttribute(ao, 1));
-    parts.push(cone);
-  }
-  return mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)).map(stripTo));
-}
-
-
 function stripTo(g) {
   // Make every part carry the same attribute set.
   const n = g.attributes.position.count;
@@ -263,9 +231,10 @@ function impostorGeometry() {
 // ---------------------------------------------------------------- material
 // LOD hand-over (shared by the colour and shadow-depth shaders). uLodA = (hand-over distance, band,
 // far distance, far band), uLodB = (shadow range, -, -, -), uLodEye = live camera position.
-// TREE_LOD 0 = fronds, 2 = impostor, 3 = shadow-only cone. vDither = (lo, hi): a pixel is drawn when
-// lo <= dither < hi, so fronds and impostor (or, in the shadow pass, fronds and cone) each draw
-// complementary halves of the screen-door pattern across the band: no hole, no double coverage.
+// TREE_LOD 0 = fronds, 2 = impostor. vDither = (lo, hi): a pixel is drawn when
+// lo <= dither < hi, so fronds and impostor (or, in the shadow pass, fronds and the impostor's sun-facing card) each draw
+// complementary halves of the screen-door pattern across the band: no hole, no double coverage
+// (in the shadow pass too: frond casters vs the impostor's sun-facing silhouette card).
 const LOD_PARS = /* glsl */`
 uniform vec4 uLodA; uniform vec4 uLodB; uniform vec3 uLodEye;
 varying vec2 vDither;
@@ -286,9 +255,6 @@ const LOD_VERT = /* glsl */`
       tKeep = tN > 0.0 && tF < 1.0;
       vDither = vec2(0.0, tN);
       transformed *= 1.0 - tF;
-    #elif TREE_LOD == 3
-      tKeep = tN > 0.0;   // shadow-only cone: casts where the fronds hand over
-      vDither = vec2(0.0, tN);
     #endif
     #ifdef TREE_SHADOW
       if (tD > uLodB.x) tKeep = false;      // beyond the shadow box: no caster
@@ -483,9 +449,9 @@ function treeMaterial(opts) {
 
 // Impostor: a camera-facing card per tree (built in tree-local space, so the frame azimuth is simply
 // the camera's direction around the trunk), blending the 2 x 2 nearest baked frames (azimuth x
-// elevation), lit live from the baked normals like the fronds. Shadow lookups are moved out of the
-// tree's own shadow cone toward the sun (by the crown radius at that height), so the card receives
-// the shadows of other trees and the terrain but not of the proxy cone it sits inside.
+// elevation), lit live from the baked normals like the fronds. Shadow lookups are moved toward the sun
+// (by the crown radius at that height), out of the tree's own sun-facing shadow card, so the card
+// receives the shadows of other trees and the terrain but does not shadow itself.
 const IMP_VERT_PARS = IMP_DEFS + LOD_PARS + /* glsl */`
 uniform vec3 uSunDir;
 varying float vSeed; varying vec3 vRotX; varying vec3 vRotZ;
@@ -498,8 +464,14 @@ const IMP_VERT_PRE = INSTANCE + /* glsl */`
     #else
       mat4 iw = modelMatrix;
     #endif
-    vec3 camL = (inverse(iw) * vec4(cameraPosition, 1.0)).xyz;
-    vec3 toC = camL - vec3(0.0, IMP_CY, 0.0);
+    #ifdef IMP_SUN
+      // Shadow pass: the card faces the sun and shows the tree as the sun sees it, so its shadow is
+      // the frond tree's own silhouette (orthographic, like the shadow map).
+      vec3 toC = (inverse(iw) * vec4(uSunDir, 0.0)).xyz;
+    #else
+      vec3 camL = (inverse(iw) * vec4(cameraPosition, 1.0)).xyz;
+      vec3 toC = camL - vec3(0.0, IMP_CY, 0.0);
+    #endif
     vec3 fwd = normalize(toC);
     vec3 rgt = normalize(cross(vec3(0.0, 1.0, 0.0), fwd) + vec3(1e-5, 0.0, 0.0));
     vec3 upv = cross(fwd, rgt);
@@ -595,7 +567,39 @@ void main() {`)
   return m;
 }
 
-/** Shadow-depth material for a frond pool / shadow cones: same sway, alpha cut-out and LOD dither. */
+/** Shadow-depth material for the impostor cells: a sun-facing card with the baked silhouette. */
+function impostorDepthMaterial(kind, lod, alb) {
+  const m = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+  m.name = 'treeImpDepth' + kind;
+  m.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, lod, { uTime: globals.uTime, uWind: globals.uWind, uSunDir: globals.uSunDir, uImpAlb: { value: alb } });
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uTime; uniform vec2 uWind;\n' + IMP_VERT_PARS)
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + IMP_VERT_PRE);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\n' + IMP_DEFS + LOD_PARS + `
+uniform sampler2D uImpAlb;
+varying vec2 vImpUv; varying vec3 vImpA; varying vec3 vImpE; varying float vImpRow;`)
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n' + LOD_FRAG + `
+  {
+    vec2 fsz = vec2(1.0 / IMP_NA, 1.0 / IMP_ROWS);
+    vec2 u = clamp(vImpUv, vec2(0.004), vec2(0.996));
+    vec2 gx = dFdx(vImpUv) * fsz, gy = dFdy(vImpUv) * fsz;
+    float w00 = (1.0 - vImpA.z) * (1.0 - vImpE.z), w10 = vImpA.z * (1.0 - vImpE.z);
+    float w01 = (1.0 - vImpA.z) * vImpE.z, w11 = vImpA.z * vImpE.z;
+    float cov = textureGrad(uImpAlb, (vec2(vImpA.x, vImpRow + vImpE.x) + u) * fsz, gx, gy).a * w00
+              + textureGrad(uImpAlb, (vec2(vImpA.y, vImpRow + vImpE.x) + u) * fsz, gx, gy).a * w10
+              + textureGrad(uImpAlb, (vec2(vImpA.x, vImpRow + vImpE.y) + u) * fsz, gx, gy).a * w01
+              + textureGrad(uImpAlb, (vec2(vImpA.y, vImpRow + vImpE.y) + u) * fsz, gx, gy).a * w11;
+    if (cov < 0.5) discard;
+  }`);
+  };
+  m.defines = { TREE_LOD: 2, TREE_SHADOW: 1, IMP_SUN: 1, IMP_KIND: kind };
+  m.customProgramCacheKey = () => 'treeImpDepth' + kind;
+  return m;
+}
+
+/** Shadow-depth material for the frond pools: same sway, alpha cut-out and LOD dither. */
 function treeDepthMaterial(lodLevel, lod) {
   const m = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
   m.name = 'treeDepth' + lodLevel;
@@ -640,26 +644,27 @@ export class TreeSystem {
     this.cells = [];
     const tex = makeNeedleTexture();
     this.tex = tex;
-    // Impostor atlases (filled by bakeImpostors() at load; RGBA8, mipmapped).
-    const W = IMP.NA * IMP.FW, H = IMP_ROWS * IMP.FH;
-    const rt = () => {
-      const t = new THREE.WebGLRenderTarget(W, H, {
-        type: THREE.UnsignedByteType, format: THREE.RGBAFormat, depthBuffer: true,
-        minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: true,
-      });
-      t.texture.name = 'treeImpostor';
+    // Impostor atlases (filled by bakeImpostors() at load: RGBA8, mipmapped; the bake's render target
+    // and depth buffer are freed afterwards, only these two textures stay on the GPU, ~55 MB).
+    const atlas = () => {
+      const t = new THREE.DataTexture(null, IMP.NA * IMP.FW, IMP_ROWS * IMP.FH, THREE.RGBAFormat, THREE.UnsignedByteType);
+      t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter;
+      t.generateMipmaps = true; t.flipY = false; t.name = 'treeImpostor';
       return t;
     };
-    this.impAlb = rt();
-    this.impNrm = rt();
+    this.impAlb = atlas();
+    this.impNrm = atlas();
     this.baked = false;
     this.mats = {
       lod0: treeMaterial({ name: 'spruceNear', map: tex, lod: this.lod }),
-      imp0: impostorMaterial(0, this.lod, this.impAlb.texture, this.impNrm.texture),
-      imp1: impostorMaterial(1, this.lod, this.impAlb.texture, this.impNrm.texture),
+      imp0: impostorMaterial(0, this.lod, this.impAlb, this.impNrm),
+      imp1: impostorMaterial(1, this.lod, this.impAlb, this.impNrm),
     };
-    this.depthMats = { lod0: treeDepthMaterial(0, this.lod), shell: treeDepthMaterial(3, this.lod) };
-    this.geos = [0, 1].map((k) => ({ lod0: crownGeometry(k, 11 + k), cone: farGeometry(k, 31 + k) }));
+    this.depthMats = {
+      lod0: treeDepthMaterial(0, this.lod),
+      imp: [0, 1].map((k) => impostorDepthMaterial(k, this.lod, this.impAlb)),
+    };
+    this.geos = [0, 1].map((k) => ({ lod0: crownGeometry(k, 11 + k) }));
     this.impGeo = impostorGeometry();
   }
 
@@ -686,12 +691,14 @@ export class TreeSystem {
     const prev = { rt: renderer.getRenderTarget(), color: renderer.getClearColor(new THREE.Color()), alpha: renderer.getClearAlpha(), auto: renderer.autoClear, shadow: renderer.shadowMap.autoUpdate };
     renderer.autoClear = false;
     renderer.shadowMap.autoUpdate = false;
+    const W = IMP.NA * IMP.FW, H = IMP_ROWS * IMP.FH;
+    const rt = new THREE.WebGLRenderTarget(W, H, { type: THREE.UnsignedByteType, format: THREE.RGBAFormat, depthBuffer: true, generateMipmaps: false });
     // Background: a needle-ish colour (albedo, sqrt-encoded) and an "up" normal, so mip levels that
     // mix in the empty border stay plausible; alpha 0 = no coverage.
     const bg = [[0.2, 0.26, 0.2], [0.5, 1, 0.5]];
-    [this.impAlb, this.impNrm].forEach((rt, pass) => {
-      rt.texture.generateMipmaps = false;
+    [this.impAlb, this.impNrm].forEach((tex, pass) => {
       rt.scissorTest = false;
+      rt.viewport.set(0, 0, W, H);
       renderer.setRenderTarget(rt);
       renderer.setClearColor(new THREE.Color().setRGB(...bg[pass], THREE.LinearSRGBColorSpace), 0);
       renderer.clear(true, true, true);
@@ -711,17 +718,20 @@ export class TreeSystem {
               rt.scissor.copy(rt.viewport);
               rt.scissorTest = true;
               renderer.setRenderTarget(rt);   // applies this frame's viewport / scissor
-              // Last frame of the atlas: let three build the mip chain once, after it.
-              if (kind === 1 && lb === IMP.NL - 1 && e === IMP.NE - 1 && a === IMP.NA - 1) rt.texture.generateMipmaps = true;
               renderer.render(scene, cam);
             }
           }
         }
       }
-      rt.scissorTest = false;
-      rt.viewport.set(0, 0, rt.width, rt.height);
-      rt.scissor.set(0, 0, rt.width, rt.height);
+      const data = new Uint8Array(W * H * 4);
+      renderer.readRenderTargetPixels(rt, 0, 0, W, H, data);
+      tex.image = { data, width: W, height: H };
+      tex.needsUpdate = true;
+      // Upload now, then drop the CPU copy (the texture never changes again).
+      renderer.initTexture(tex);
+      tex.image = { data: null, width: W, height: H };
     });
+    rt.dispose();
     renderer.setRenderTarget(prev.rt);
     renderer.setClearColor(prev.color, prev.alpha);
     renderer.autoClear = prev.auto;
@@ -760,7 +770,10 @@ export class TreeSystem {
       const c = new THREE.Vector2(cx / list.length, cz / list.length);
       let r = 0;
       for (const ti of list) r = Math.max(r, Math.hypot(this.trees[ti][0] - c.x, this.trees[ti][2] - c.y));
-      im.castShadow = false; im.receiveShadow = true;
+      // Beyond the fronds, trees cast through their impostor too: a sun-facing card with the tree's
+      // silhouette (the shader drops every instance outside the shadow range).
+      im.castShadow = true; im.receiveShadow = true;
+      im.customDepthMaterial = this.depthMats.imp[kind];
       im.userData = { center: c, radius: r };
       im.name = 'TreesImpostor';
       this.group.add(im);
@@ -793,13 +806,8 @@ export class TreeSystem {
       const p0 = mk('lod0', kind, this.geos[kind].lod0, this.mats.lod0, this.depthMats.lod0, `Trees_lod0_${kind}`);
       p0.im.onBeforeShadow = () => { p0.im.userData.n = p0.im.count; p0.im.count = p0.im.userData.shadowCount; };
       p0.im.onAfterShadow = () => { p0.im.count = p0.im.userData.n; };
-      // Shadow-only cones for every tree beyond the fronds inside the shadow range (cheap and
-      // soft-filtered anyway): the main pass draws none of them.
-      const ps = mk('shell', kind, this.geos[kind].cone, this.mats.lod0, this.depthMats.shell, `Trees_shadow_${kind}`);
-      ps.im.onBeforeRender = () => { ps.im.userData.n = ps.im.count; ps.im.count = 0; };
-      ps.im.onAfterRender = () => { ps.im.count = ps.im.userData.n; };
     }
-    this.member = new Uint8Array(this.trees.length);   // bit 0: frond pool, bit 2: shadow cone
+    this.member = new Uint8Array(this.trees.length);   // bit 0: frond pool
   }
 
   /**
@@ -831,7 +839,7 @@ export class TreeSystem {
       im.visible = Math.hypot(c.x - cam.x, c.y - cam.z) - im.userData.radius < far;
     }
     if (!this.pools) return;
-    const nearStep = PERF.treeRefill.near, farStep = PERF.treeRefill.far;
+    const nearStep = PERF.treeRefill.near;
     // Fronds: refilled every few metres from the spatial grid; each refill holds every tree that can
     // be inside the hand-over before the next one.
     if (Math.hypot(cam.x - this.lastNear.x, cam.z - this.lastNear.z) >= nearStep) {
@@ -842,14 +850,6 @@ export class TreeSystem {
       for (const t of this._nearSet || []) this.member[t] &= ~1;
       for (const t of list) this.member[t] |= 1;
       this._nearSet = list;
-    }
-    // Shadow cones: refilled every `farStep` metres.
-    if (Math.hypot(cam.x - this.lastFar.x, cam.z - this.lastFar.z) >= farStep) {
-      this.lastFar.copy(cam);
-      const shIn = Math.max(0, this.near - this.band - farStep), shOut = this.shadowR + farStep;
-      const list = this.gather(cam, shIn, shOut, true);
-      for (let i = 0; i < this.member.length; i++) this.member[i] &= 1;
-      this.fill(this.pools.filter((p) => p.lod === 'shell'), list, (d) => d <= shOut, 2);
     }
   }
 
@@ -912,9 +912,9 @@ export class TreeSystem {
       if (tN < 1 && !(this.member[i] & 1)) missing = true;
       if (tN > 0 && tF < 1 && !this.cells[this.cellOf[i]].visible) missing = true;
       level[i] = missing ? 3 : tN + tF;
-      // Casts when inside the shadow range: fronds, or the shadow cone once they hand over.
-      const castsNear = tN < 1 && (this.member[i] & 1), castsCone = tN > 0 && (this.member[i] & 4);
-      cast[i] = d < this.shadowR - 1 && (castsNear || castsCone) ? 1 : 0;
+      // Casts when inside the shadow range: fronds, or the impostor's sun-facing card once they hand over.
+      const castsNear = tN < 1 && (this.member[i] & 1), castsImp = tN > 0 && this.cells[this.cellOf[i]].visible;
+      cast[i] = d < this.shadowR - 1 && (castsNear || castsImp) ? 1 : 0;
     }
     return { level, cast };
   }

@@ -5,13 +5,16 @@
 // so shared-GPU noise hits every config alike.
 // Usage: CONFIGS='["", "window.__sendit.scatter.trees.setQuality(1)"]' \
 //   node scripts/gfxab.mjs <baseUrl> <map> [quality] [fractions] [frames] [rounds] [W H]
+// baseUrl may be a comma list (e.g. an old and a new build on two dev servers): each round then
+// boots each build in turn (one page at a time) and measures every pose and config there.
 // ANGLE=metal (macOS default) | d3d11.
 import { chromium } from '@playwright/test';
 const [base = 'http://localhost:5186', map = 'blackspruce', q = '1', fr = '0.12,0.3,0.5,0.7', N = '40', rounds = '3', W = '1600', H = '900'] = process.argv.slice(2);
 const angle = process.env.ANGLE || (process.platform === 'darwin' ? 'metal' : 'd3d11');
 const CONFIGS = JSON.parse(process.env.CONFIGS || '[""]');
 const browser = await chromium.launch({ args: ['--use-gl=angle', `--use-angle=${angle}`, '--ignore-gpu-blocklist', '--enable-gpu'] });
-try {
+const bases = base.split(',');
+const boot = async (base) => {
   const page = await browser.newPage({ viewport: { width: Number(W), height: Number(H) } });
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
@@ -40,11 +43,18 @@ try {
     window.__flyD = 0;
     s.player.script = (c) => { c.tuck = 1; };
   });
-  const res = CONFIGS.map(() => fr.split(',').map(() => Infinity));
-  const tris = CONFIGS.map(() => fr.split(',').map(() => 0));
-  for (let r = 0; r < Number(rounds); r++) {
+  return { page, errs };
+};
+try {
+  const combos = bases.flatMap((b) => CONFIGS.map((c) => ({ b, c })));
+  const res = combos.map(() => fr.split(',').map(() => Infinity));
+  const tris = combos.map(() => fr.split(',').map(() => 0));
+  const errs = [];
+  for (let r = 0; r < Number(rounds); r++) for (const bb of bases) {
+    const { page, errs: e } = await boot(bb);
     for (const [pi, f] of fr.split(',').map(Number).entries()) {
-      for (const [ci, cfg] of CONFIGS.entries()) {
+      for (const [ci0, cfg] of CONFIGS.entries()) {
+        const ci = combos.findIndex((x) => x.b === bb && x.c === cfg);
         const out = await page.evaluate(async ({ f, N, cfg }) => {
           const s = window.__sendit, R = s.renderer, gl = R.getContext(), P = window.__post;
           window.__flyD = f * window.__L;
@@ -78,10 +88,12 @@ try {
         tris[ci][pi] = out.tris;
       }
     }
+    errs.push(...e);
+    await page.close();
   }
-  for (const [ci, cfg] of CONFIGS.entries()) {
+  for (const [ci, { b: cb, c: cfg }] of combos.entries()) {
     const avg = res[ci].reduce((a, b) => a + b, 0) / res[ci].length;
-    console.log(`cfg ${ci} avg ${avg.toFixed(1)} ms  [${res[ci].map((x) => x.toFixed(1)).join(', ')}]  tris ${tris[ci].map((x) => (x / 1e6).toFixed(2)).join('/')}M  :: ${cfg.slice(0, 120)}`);
+    console.log(`cfg ${ci} avg ${avg.toFixed(1)} ms  [${res[ci].map((x) => x.toFixed(1)).join(', ')}]  tris ${tris[ci].map((x) => (x / 1e6).toFixed(2)).join('/')}M  :: ${cb} ${cfg.slice(0, 100)}`);
   }
   for (const e of errs.slice(0, 3)) console.log('  err', e);
 } finally {
