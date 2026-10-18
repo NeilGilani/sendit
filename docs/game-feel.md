@@ -199,7 +199,8 @@ down toward the drop in big air. That fades out as the landing approach takes ov
 
 **Respawns, crashes, lifts.** A `respawned` event (crash respawn, drop zone, reset to top) snaps the chase camera to
 the rider (gliding after a 10–35 m teleport flew it through the body as the fade cleared). In a crash the aim eases
-85 % of the way to the tumbling body (`crashK`), so a body sliding fast down a steep face stays in frame. On a lift
+85 % of the way to the tumbling body (`crashK`; the player follows the crash ragdoll's centre of mass, `docs/body.md`),
+so a body sliding fast down a steep face stays in frame; hard re-impacts of the body add a small knock (`ragdollImpact`). On a lift
 the follow smoothing is 0.12 s, the arm 6.5 m, 63° off the cable line (`LIFT_SMOOTH`, `LIFT_SIDE`): straight behind,
 the haul rope and the chair back hid the rider. Snow spray in front of the rider's body thins out (gfx/spray.js
 `uFocus`, fx.js `FOCUS_THIN`), so a landing powder cloud no longer hides the rider in the touchdown frames.

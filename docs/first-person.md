@@ -83,8 +83,10 @@ effort, only when slow. A stiff spring kicked by how fast the ground normal chan
 top of the speed buzz (`FP_BOB`). Corner wind streaks start a little earlier in the helmet cam
 (`HUD.fpWindEarly`, fainter). Gloves and sleeves are the outfit's own (the real rig is rendered).
 
-**Crashes** (`FP_CRASH`). The body shows again and tumbles (the crash roll, `rider.js`); the helmet cam is knocked
-out of the head and settles a few metres back up the track (`back`, `up`, over `settle` s), watching the body slide to a stop.
+**Crashes** (`FP_CRASH`). The body shows again and tumbles (the crash ragdoll, `docs/body.md`); the helmet cam is
+knocked out of the head and settles a few metres back up the track (`back`, `up`, over `settle` s), watching the body
+come to rest. It keeps `minDist` from the chest (a body rolling back toward it), stays out of tree crowns (`crown` ×
+the trunk radius) and keeps the head (and helmet) it starts inside small until it has left it.
 First person resumes on the respawn, with snow on the lens.
 
 ## Tunables (top of `fpview.js`)
@@ -97,7 +99,7 @@ First person resumes on the respawn, with snow on the lens.
 | `FP_BOARD` | board glove targets (`ride`, `speed`, `crouch`, `toe`, `heel`, `air`, `spinIn`, `flipTuck`, `grind`), `rearReach`, `rearProtract`, `frontDrop`, `twist`, `minEye` |
 | `FP_POLE` | `length`, shaft directions (`glide`, `plant`, `air`, `tuck`), colours |
 | `FP_LENS` | `tint`, `sat`, `fringe`, snow amounts / clearing, fog rise / clear / cap |
-| `FP_BREATH`, `FP_BOB`, `FP_CRASH` | as above |
+| `FP_BREATH`, `FP_BOB`, `FP_CRASH` | as above (`FP_CRASH.minDist`, `crown`: off the tumbling body, out of tree crowns) |
 
 ## Settings
 
