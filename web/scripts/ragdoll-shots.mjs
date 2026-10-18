@@ -61,7 +61,7 @@ const TICK = (every = 6, after = 2.4) => `
 const SC = {
   overflip: { q: 'map=valcrest-gully&kicker=2', setup: TICK() + jump(VAL, 13, 'c.brake = 1;') },
   sideways: { q: 'map=valcrest-gully&kicker=2', setup: TICK() + jump(VAL, 13, 'if (tl < 0.12 && !p._sw) { p._sw = 1; p.heading += 1.4; p.orient.multiply(new p.orient.constructor().setFromAxisAngle({ x: 0, y: 1, z: 0 }, 1.4)); }') },
-  cliff: { q: 'map=ravenspire', setup: TICK(6, 2.8) + jump(RAVEN, 18, 'c.brake = p.airTime < 0.6 ? 1 : 0;', { pop: false, back: 30 }) },
+  cliff: { q: 'map=ravenspire', setup: TICK(6, 2.8) + jump(RAVEN, 18, 'c.brake = 1;', { pop: false, back: 30 }) },
   steep: {
     q: 'map=ravenspire',
     setup: TICK(6, 3.0) + `
