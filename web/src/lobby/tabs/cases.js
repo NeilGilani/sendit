@@ -6,6 +6,7 @@ import { esc, fmtKm } from './common.js';
 import { caseArt } from '../cases/caseArt.js';
 import { openCaseShow, cardHtml, openerActive } from '../cases/opener.js';
 import { crateShow } from '../cases/crate3d.js';
+import { prerasterReel } from '../cases/reelCanvas.js';
 import { lastGains } from '../cases/notify.js';
 import { caseSfx } from '../cases/sfx.js';
 import { RARITIES, rarityOf } from '../../profile/rarity.js';
@@ -45,7 +46,8 @@ registerLobbyTab({
     };
     debugGrant(ctx.profile);
     // Build the 3D crates and compile their shaders while the tab is open, so Open starts at once.
-    (globalThis.requestIdleCallback || ((f) => setTimeout(f, 300)))(() => crateShow.prewarm(), { timeout: 1500 });
+    // The reel's card bitmaps (every card of every case) are drawn in idle time after that.
+    (globalThis.requestIdleCallback || ((f) => setTimeout(f, 300)))(() => crateShow.prewarm().then(() => prerasterReel(SERIES_ORDER)), { timeout: 1500 });
 
     const render = () => {
       const P = ctx.profile;

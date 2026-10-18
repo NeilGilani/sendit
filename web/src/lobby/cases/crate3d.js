@@ -16,12 +16,11 @@
 //   crateShow.end()                      blend back to the lobby, restore the world
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { createEquipmentModel, disposeEquipmentModel } from '../../equipment/models.js';
 import { outfitSlotsFromProfile } from '../../character/profile.js';
 import { gearModel } from '../../profile/catalog.js';
 import { rarityOf } from '../../profile/rarity.js';
-import { grainTexture, woodTextures, parkTextures, logoTexture } from './crateTex.js';
+import { grainTexture, woodTextures, parkTextures, logoTexture, foamTexture } from './crateTex.js';
 import { crateSfx } from '../../audio/crate.js';
 
 const C = { W: 0.95, D: 0.58, Hb: 0.42, Hl: 0.14, r: 0.035 };
@@ -35,6 +34,47 @@ const easeOutBack = (x, s = 1.7) => { const u = clamp01(x) - 1; return 1 + u * u
 const spring = (x, k = 9, w = 22) => (x <= 0 ? 0 : 1 - Math.exp(-k * x) * Math.cos(w * x));
 const hash = (n) => { const s = Math.sin(n * 127.1) * 43758.5453; return s - Math.floor(s); };
 const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+// A fake studio environment for the crate's plastic, wood and metal: an overhead softbox, two strip
+// lights and a floor bounce in the light's colour, in view space so the highlights always read from
+// the camera. Cheap, no PMREM (its shader compile froze the page for seconds on Metal / D3D).
+const STUDIO = { uStudioTint: { value: new THREE.Color(0.3, 0.3, 0.35) } };
+const STUDIO_GLSL = /* glsl */`
+uniform vec3 uStudioTint; uniform float uStudio;
+vec3 studioEnv(vec3 d, float rough) {
+  float w = 0.1 + rough * 0.9;
+  vec3 c = mix(vec3(0.012, 0.014, 0.026), vec3(0.05, 0.055, 0.08), smoothstep(-0.3, 0.6, d.y));
+  c += vec3(1.7) * smoothstep(0.93 - w * 0.7, 1.0, d.y) * (1.0 - rough * 0.55);
+  float az = atan(d.x, d.z);
+  float sw = 0.07 + w * 0.45;
+  float strips = exp(-pow((az - 0.95) / sw, 2.0)) + 0.6 * exp(-pow((az + 1.05) / sw, 2.0));
+  c += vec3(1.25, 1.2, 1.12) * strips * smoothstep(-0.35, 0.1, d.y) * smoothstep(0.9, 0.45, d.y) * (1.0 - rough * 0.6);
+  c += uStudioTint * smoothstep(0.1, -0.5, d.y) * 0.6;
+  return c;
+}`;
+function studio(m, k) {
+  m.userData.studio = { value: k };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, STUDIO, { uStudio: m.userData.studio });
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\n' + STUDIO_GLSL)
+      .replace('vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;', `vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;
+  {
+    vec3 vd = normalize(vViewPosition);
+    float nv = saturate(dot(normal, vd));
+    vec3 rr = reflect(-vd, normal);
+    vec3 F = material.specularColor + (max(vec3(1.0 - material.roughness), material.specularColor) - material.specularColor) * pow(1.0 - nv, 5.0);
+    outgoingLight += studioEnv(rr, material.roughness) * F * uStudio;
+    #ifdef USE_CLEARCOAT
+      vec3 rc = reflect(-vd, geometryClearcoatNormal);
+      float nc = saturate(dot(geometryClearcoatNormal, vd));
+      outgoingLight += studioEnv(rc, material.clearcoatRoughness) * (0.04 + 0.96 * pow(1.0 - nc, 5.0)) * material.clearcoat * uStudio;
+    #endif
+  }`);
+  };
+  m.customProgramCacheKey = () => 'crateStudio';
+  return m;
+}
 
 // Per case: body material style, colours, the light inside.
 const THEMES = {
@@ -237,14 +277,14 @@ class Particles {
 }
 
 // ------------------------------------------------------------------ the crate model
-function buildCrate(series, env, tx) {
+function buildCrate(series, tx) {
   const th = THEMES[series] || THEMES['first-chair'];
   const g = new THREE.Group();
   g.name = `Crate:${series}`;
   const mats = [];
-  const std = (o, physical = false) => {
-    const m = physical ? new THREE.MeshPhysicalMaterial(o) : new THREE.MeshStandardMaterial(o);
-    m.envMap = env; m.envMapIntensity = o.envMapIntensity ?? 0.7;
+  // o.env = strength of the studio reflections (see studio()).
+  const std = ({ env = 0.7, ...o }, physical = false) => {
+    const m = studio(physical ? new THREE.MeshPhysicalMaterial(o) : new THREE.MeshStandardMaterial(o), env);
     mats.push(m);
     return m;
   };
@@ -258,17 +298,17 @@ function buildCrate(series, env, tx) {
   const { W, D, Hb, Hl, r } = C;
   let body, accent, metal, trim;
   if (th.style === 'shell') {
-    body = std({ color: th.body, roughness: 0.4, roughnessMap: tx.grain, bumpMap: tx.grain, bumpScale: 0.6, clearcoat: 0.75, clearcoatRoughness: 0.22, envMapIntensity: 0.65 }, true);
+    body = std({ color: th.body, roughness: 0.4, roughnessMap: tx.grain, bumpMap: tx.grain, bumpScale: 0.6, clearcoat: 0.75, clearcoatRoughness: 0.22, env: 0.65 }, true);
     accent = std({ color: th.accent, roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.2 }, true);
   } else if (th.style === 'neon') {
-    body = std({ color: th.body, map: tx.park.map, roughness: 0.48, bumpMap: tx.park.bump, bumpScale: 0.5, clearcoat: 0.55, clearcoatRoughness: 0.3, envMapIntensity: 0.5 }, true);
+    body = std({ color: th.body, map: tx.park.map, roughness: 0.48, bumpMap: tx.park.bump, bumpScale: 0.5, clearcoat: 0.55, clearcoatRoughness: 0.3, env: 0.5 }, true);
     accent = std({ color: '#ffd400', roughness: 0.5 });
   } else {
-    body = std({ color: th.body, map: tx.wood.map, bumpMap: tx.wood.bump, bumpScale: 1.4, roughness: 0.86, envMapIntensity: 0.35 });
+    body = std({ color: th.body, map: tx.wood.map, bumpMap: tx.wood.bump, bumpScale: 1.4, roughness: 0.86, env: 0.35 });
     accent = std({ color: th.accent, roughness: 0.6 });
   }
-  metal = std({ color: th.metal, metalness: 1, roughness: th.style === 'wood' ? 0.48 : th.style === 'neon' ? 0.3 : 0.16, envMapIntensity: 1.25 });
-  trim = std({ color: th.trim, roughness: 0.75, envMapIntensity: 0.4 });
+  metal = std({ color: th.metal, metalness: 1, roughness: th.style === 'wood' ? 0.48 : th.style === 'neon' ? 0.3 : 0.16, env: 1.25 });
+  trim = std({ color: th.trim, roughness: 0.75, env: 0.4 });
 
   // Body (the lower shell).
   mesh(new RoundedBoxGeometry(W, Hb, D, 4, r), body, 0, Hb / 2, 0);
@@ -278,7 +318,7 @@ function buildCrate(series, env, tx) {
   const neon = [];
   if (th.style === 'shell') {
     // Moulded ribs and the yellow accent band.
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) mesh(new RoundedBoxGeometry(0.07, Hb - 0.05, 0.03, 2, 0.012), body, sx * 0.34, Hb / 2 - 0.005, sz * (D / 2 + 0.004));
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) mesh(new RoundedBoxGeometry(0.07, Hb - 0.05, 0.03, 2, 0.012), body, sx * 0.4, Hb / 2 - 0.005, sz * (D / 2 + 0.004));
     mesh(new RoundedBoxGeometry(W + 0.01, 0.045, D + 0.01, 2, 0.02), accent, 0, Hb * 0.26, 0);
     for (const sx of [-1, 1]) mesh(new RoundedBoxGeometry(0.03, Hb - 0.08, 0.36, 2, 0.012), body, sx * (W / 2 + 0.006), Hb / 2, 0);
   } else if (th.style === 'neon') {
@@ -299,7 +339,7 @@ function buildCrate(series, env, tx) {
       mesh(new THREE.BoxGeometry(0.008, Hb - 0.01, 0.075), metal, sx * (W / 2 + 0.004), Hb / 2, sz * (D / 2 - 0.03));
       for (const yy of [0.06, Hb - 0.06]) mesh(new THREE.SphereGeometry(0.009, 8, 6), metal, sx * (W / 2 - 0.03), yy, sz * (D / 2 + 0.009));
     }
-    const rope = std({ color: '#c8b388', roughness: 1, envMapIntensity: 0.2 });
+    const rope = std({ color: '#c8b388', roughness: 1, env: 0.2 });
     for (const sx of [-1, 1]) {
       const h = mesh(new THREE.TorusGeometry(0.075, 0.014, 8, 20, Math.PI), rope, sx * (W / 2 + 0.03), Hb * 0.62, 0);
       h.rotation.set(0, Math.PI / 2, Math.PI);
@@ -312,26 +352,26 @@ function buildCrate(series, env, tx) {
   // Front logo plate.
   const logoMat = th.style === 'neon'
     ? new THREE.MeshBasicMaterial({ map: tx.logos[series], transparent: true, color: new THREE.Color(3, 3, 3), depthWrite: false })
-    : std({ map: tx.logos[series], transparent: true, roughness: th.style === 'wood' ? 0.9 : 0.3, metalness: 0, depthWrite: false, envMapIntensity: 0.4 });
-  const logo = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.25), logoMat);
+    : std({ map: tx.logos[series], transparent: true, roughness: th.style === 'wood' ? 0.9 : 0.3, metalness: 0, depthWrite: false, env: 0.4 });
+  const logo = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.21), logoMat);
   logo.position.set(0, Hb * 0.56, D / 2 + (th.style === 'shell' ? 0.0025 : 0.002));
   logo.renderOrder = 2;
   g.add(logo);
 
   // Seam glow: light leaking through the gap under the lid before it opens.
   const seamMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-  const seam = new THREE.Mesh(new THREE.BoxGeometry(W - 0.02, 0.014, D - 0.02), seamMat);
+  const seam = new THREE.Mesh(new THREE.BoxGeometry(W - 0.02, 0.01, D - 0.02), seamMat);
   seam.position.y = Hb - 0.004;
   g.add(seam);
   // The light pool inside (seen once the lid is up).
   const poolU = { uCol: { value: new THREE.Color() }, uI: { value: 0 }, uTime: { value: 0 }, uMode: { value: 4 }, uRing: { value: 0 }, uSpin: { value: 0 } };
   const pool = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.05, D - 0.05), new THREE.ShaderMaterial({ uniforms: poolU, vertexShader: GLOW_VERT, fragmentShader: FX_FRAG }));
   pool.rotation.x = -Math.PI / 2;
-  pool.position.y = Hb + 0.003;
+  pool.position.y = Hb + 0.006;
   g.add(pool);
   // Foam rim around the pool.
   for (const [sx, sz, w, d] of [[0, 1, W - 0.02, 0.025], [0, -1, W - 0.02, 0.025], [1, 0, 0.025, D - 0.02], [-1, 0, 0.025, D - 0.02]]) {
-    mesh(new THREE.BoxGeometry(w, 0.01, d), trim, sx * (W / 2 - 0.022), Hb + 0.004, sz * (D / 2 - 0.022));
+    mesh(new THREE.BoxGeometry(w, 0.012, d), trim, sx * (W / 2 - 0.022), Hb + 0.006, sz * (D / 2 - 0.022));
   }
 
   // Lid on a hinge along the back top edge.
@@ -340,13 +380,13 @@ function buildCrate(series, env, tx) {
   g.add(lid);
   const lidMesh = mesh(new RoundedBoxGeometry(W + 0.016, Hl, D + 0.016, 4, r), body, 0, Hl / 2, D / 2 + 0.008, lid);
   lidMesh.name = 'Lid';
-  const lidInnerMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const lidInnerMat = new THREE.MeshBasicMaterial({ color: 0x000000, map: tx.foam });
   const lidInner = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.03, D - 0.03), lidInnerMat);
   lidInner.rotation.x = Math.PI / 2;
   lidInner.position.set(0, -0.002, D / 2 + 0.008);
   lid.add(lidInner);
   if (th.style === 'shell') {
-    for (const sx of [-1, 1]) mesh(new RoundedBoxGeometry(0.07, 0.02, D - 0.06, 2, 0.008), body, sx * 0.34, Hl + 0.006, D / 2 + 0.008, lid);
+    for (const sx of [-1, 1]) mesh(new RoundedBoxGeometry(0.07, 0.02, D - 0.06, 2, 0.008), body, sx * 0.4, Hl + 0.006, D / 2 + 0.008, lid);
     mesh(new RoundedBoxGeometry(W + 0.022, 0.03, D + 0.022, 2, 0.012), accent, 0, 0.02, D / 2 + 0.008, lid);
   } else if (th.style === 'neon') {
     const nm = neon[0], nm2 = neon[1];
@@ -374,7 +414,7 @@ function buildCrate(series, env, tx) {
   // Two latches: a plate on the body, a lever hinged low that hooks over a catch on the lid.
   const latches = [];
   for (const sx of [-1, 1]) {
-    const x = sx * (th.style === 'shell' ? 0.21 : 0.3);
+    const x = sx * 0.3;
     mesh(new RoundedBoxGeometry(0.1, 0.08, 0.016, 2, 0.006), metal, x, Hb - 0.07, D / 2 + 0.006);
     const piv = new THREE.Group();
     piv.position.set(x, Hb - 0.1, D / 2 + 0.02);
@@ -417,11 +457,8 @@ class CrateShow {
       const t0 = performance.now();
       this.stage = stage; this.renderer = renderer;
       const mark = (n) => { (this.warmLog ||= []).push(`${n} ${Math.round(performance.now() - t0)}`); };
-      const pm = new THREE.PMREMGenerator(renderer);
-      this.env = pm.fromScene(new RoomEnvironment(), 0.04).texture;
-      pm.dispose();
-      mark('pmrem');
-      const tx = { grain: grainTexture(), wood: woodTextures(), park: parkTextures(), logos: {} };
+      const tx = { grain: grainTexture(), wood: woodTextures(), park: parkTextures(), foam: foamTexture(), logos: {} };
+      tx.foam.repeat.set(3, 2);
       tx.park.bump.repeat.set(5, 3);
       for (const s of Object.keys(THEMES)) tx.logos[s] = logoTexture(s);
       this.root = new THREE.Group();
@@ -429,7 +466,7 @@ class CrateShow {
       this.root.visible = false;
       this.crates = {};
       for (const s of Object.keys(THEMES)) {
-        const c = buildCrate(s, this.env, tx);
+        const c = buildCrate(s, tx);
         c.group.visible = false;
         this.root.add(c.group);
         this.crates[s] = c;
@@ -441,19 +478,67 @@ class CrateShow {
       this.root.visible = true;
       for (const c of Object.values(this.crates)) c.group.visible = true;
       for (const m of this.fxMeshes) m.visible = true;
-      const cam = stage.camera;
-      const p = renderer.compileAsync ? renderer.compileAsync(this.root, cam, stage.scene) : (renderer.compile(this.root, cam, stage.scene), Promise.resolve());
+      const p = this.compile(this.root);
       this.root.visible = false;
       for (const c of Object.values(this.crates)) c.group.visible = false;
       mark('compile-call');
       await p.catch(() => {});
       mark('compiled');
-      for (const t of [tx.grain, tx.wood.map, tx.wood.bump, tx.park.map, tx.park.bump, ...Object.values(tx.logos)]) renderer.initTexture?.(t);
+      await this.warmFrames();
+      mark('warm frames');
+      for (const t of [tx.grain, tx.foam, tx.wood.map, tx.wood.bump, tx.park.map, tx.park.bump, ...Object.values(tx.logos)]) renderer.initTexture?.(t);
       this.ready = true;
       this.warmMs = performance.now() - t0;
       return true;
     })().catch((e) => { console.warn('[cases] 3D case prewarm failed; using the 2D case', e); this._warm = null; return false; });
     return this._warm;
+  }
+
+  /**
+   * Compile an object's programs in the background against the world's lights and fog, as the post
+   * stack's render target sees them (renderer.compile() alone builds the canvas variant: another
+   * output colour space, so the first real frame would compile again).
+   */
+  compile(obj) {
+    const r = this.renderer, st = this.stage;
+    const prev = r.getRenderTarget();
+    this.warmRT ||= new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType });
+    r.setRenderTarget(this.warmRT);
+    let p;
+    try { p = r.compileAsync ? r.compileAsync(obj, st.camera, st.scene) : (r.compile(obj, st.camera, st.scene), Promise.resolve()); }
+    finally { r.setRenderTarget(prev); }
+    return p;
+  }
+
+  /**
+   * Two real frames with every crate and effect drawn (under the snow, out of sight, culling off),
+   * so shadow-depth programs, buffers and textures are all on the GPU before the first opening.
+   */
+  warmFrames() {
+    const st = this.stage;
+    if (!st.active) return Promise.resolve();
+    return new Promise((resolve) => {
+      const undo = [];
+      this.root.traverse((o) => { if (o.isMesh || o.isPoints) { undo.push([o, o.frustumCulled, o.visible]); o.frustumCulled = false; o.visible = true; } });
+      for (const c of Object.values(this.crates)) c.group.visible = true;
+      this.root.visible = true;
+      this.root.position.y = -6;
+      let n = 3;
+      const prev = st.cameraOverride;
+      const hook = () => { if (--n <= 0) done(); return false; };
+      const done = () => {
+        if (n === -99) return;
+        n = -99;
+        for (const [o, fc, v] of undo) { o.frustumCulled = fc; o.visible = v; }
+        this.root.visible = false;
+        this.root.position.y = 0;
+        for (const c of Object.values(this.crates)) c.group.visible = false;
+        if (st.cameraOverride === hook) st.cameraOverride = prev;
+        resolve();
+      };
+      st.cameraOverride = hook;
+      setTimeout(done, 3000);   // the lobby was hidden meanwhile: skip the warm frames
+    });
   }
 
   buildFx() {
@@ -527,6 +612,7 @@ class CrateShow {
   begin(o) {
     const stage = globalThis.__sendit?.stage;
     if (!this.ready || !this.available(stage)) return false;
+    const tb = performance.now();
     // Chained straight from the last reveal ("Open another"): the studio is already dark.
     this.cont = this.active && !this.ending;
     if (this.active) this.finish();
@@ -585,8 +671,7 @@ class CrateShow {
         this.itemLen = box.max.y - box.min.y;
         this.item.position.y = -(box.min.y + box.max.y) / 2;
         this.item.visible = true;
-        const r = this.renderer;
-        (r.compileAsync ? r.compileAsync(this.itemPivot, cam, stage.scene) : Promise.resolve(r.compile(this.itemPivot, cam, stage.scene))).catch(() => {});
+        this.compile(this.itemPivot).catch(() => {});
         this.itemPivot.visible = false;
       } else if (this.rider?.setOutfit) {
         const slots = outfitSlotsFromProfile();
@@ -596,6 +681,7 @@ class CrateShow {
       }
     } catch (e) { console.warn('[cases] could not build the pull preview', e); this.item = null; }
     this.hidden = null;
+    this.beginMs = Math.round(performance.now() - tb);
     return true;
   }
 
@@ -765,7 +851,7 @@ class CrateShow {
     c.poolU.uCol.value.copy(this.lightCol);
     c.poolU.uI.value = t >= T.lid ? I * 0.9 : 0;
     c.poolU.uTime.value = t;
-    c.lidInnerMat.color.copy(this.lightCol).multiplyScalar(t >= T.lid ? Math.min(2.2, I * 0.18) : 0);
+    c.lidInnerMat.color.copy(this.lightCol).multiplyScalar(t >= T.lid ? Math.min(1.6, 0.25 + I * 0.06) : 0);
     for (const m of c.neon) m.color.set(m === c.neon[0] ? th.accent : th.accent2).multiplyScalar(3.5 + 1.5 * Math.sin(t * 5) + (t > T.lid ? 3 * Math.exp(-lx * 2) : 0));
     // Beam: grows out of the crate at the burst, breathes with the light.
     const beamOn = t >= T.lid ? easeOut3(lx / 0.35) : 0;
@@ -775,6 +861,7 @@ class CrateShow {
     bu.uCol.value.copy(this.lightCol);
     bu.uI.value = beamOn * (0.25 + I * 0.05) * (reveal >= 0 ? Math.max(0.35, 1 - reveal) : 1);
     bu.uTime.value = t;
+    STUDIO.uStudioTint.value.copy(this.lightCol).multiplyScalar(0.25 + Math.min(1, I * 0.05));
     // Plinth neon follows the light.
     if (st.neonBase) st.neonBase.copy(this.lightCol).multiplyScalar(0.6);
     // ---------------------------------------------------------- reveal
@@ -843,17 +930,17 @@ class CrateShow {
       u(m).uTime.value = t;
     }
     const pop = Math.exp(-x * 2.2);
-    u(this.glow).uI.value = (0.5 + rank * 0.18) * (0.6 + 1.6 * pop);
-    this.glow.scale.setScalar(1 + rank * 0.25);
-    u(this.rays).uI.value = rank >= 2 ? (0.18 + (rank - 2) * 0.16) * smooth(0, 0.25, x) * (1 + pop) * (reduced() ? 0.5 : 1) : rank === 1 ? 0.08 * smooth(0, 0.3, x) : 0;
+    u(this.glow).uI.value = (0.22 + rank * 0.06) * (0.5 + 1.3 * pop);
+    this.glow.scale.setScalar(0.9 + rank * 0.12);
+    u(this.rays).uI.value = rank >= 2 ? (0.07 + (rank - 2) * 0.045) * smooth(0, 0.25, x) * (1 + 1.5 * pop) * (reduced() ? 0.5 : 1) : rank === 1 ? 0.04 * smooth(0, 0.3, x) : 0;
     u(this.rays).uSpin.value = reduced() ? 0 : 0.35 + rank * 0.06;
-    this.rays.scale.setScalar(0.8 + 0.25 * easeOutBack(x / 0.5) + rank * 0.08);
-    u(this.flare).uI.value = rank >= 4 ? (gold ? 3.5 : 2) * Math.exp(-x * 2.5) + (gold ? 0.25 : 0) : rank >= 3 ? 1.1 * Math.exp(-x * 4) : 0;
+    this.rays.scale.setScalar(0.6 + 0.25 * easeOutBack(x / 0.5) + rank * 0.06);
+    u(this.flare).uI.value = rank >= 4 ? (gold ? 2.4 : 1.4) * Math.exp(-x * 2.5) + (gold ? 0.12 : 0) : rank >= 3 ? 0.8 * Math.exp(-x * 4) : 0;
     this.flare.scale.setScalar(gold ? 1.6 : 1.1);
     const ringK = clamp01(x / 0.9);
     u(this.ring).uRing.value = ringK;
     u(this.ring).uCol.value.copy(this.rcol);
-    u(this.ring).uI.value = (1.5 + rank * 0.8) * (1 - ringK) + 0.25 + rank * 0.05;
+    u(this.ring).uI.value = (1.0 + rank * 0.5) * (1 - ringK) + 0.15 + rank * 0.04;
     u(this.ring).uTime.value = t;
     this.ring.scale.setScalar(1.5 + rank * 0.25);
     // Gold keeps raining sparkles while the reveal is up.
@@ -874,7 +961,7 @@ class CrateShow {
 
   // ---------------------------------------------------------------- particle bursts
   puff(t0, n, spread) {
-    const col = new THREE.Color(0.95, 0.97, 1.0);
+    const col = new THREE.Color(1.8, 1.85, 1.95);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + Math.random() * 0.3;
       const sp = 0.8 + Math.random() * 1.2 * spread;
@@ -904,7 +991,7 @@ class CrateShow {
       this.add.emit(this._v.set((Math.random() - 0.5) * 0.6, top + Math.random() * 0.2, (Math.random() - 0.5) * 0.4), this._v2.set((Math.random() - 0.5) * 0.4, 0.4 + Math.random() * 1.1, (Math.random() - 0.5) * 0.3), t0 + Math.random() * 0.6, 1.4 + Math.random() * 1.2, L.clone().multiplyScalar(1.2), 0.025 + Math.random() * 0.03, 0, 0.6, -0.05);
     }
     // Snow spilling over the rim.
-    const snow = new THREE.Color(0.93, 0.96, 1.0);
+    const snow = new THREE.Color(1.9, 1.95, 2.1);
     for (let i = 0; i < 160; i++) {
       const side = Math.random() < 0.5 ? 1 : -1;
       const alongX = Math.random() < 0.6;
@@ -937,7 +1024,7 @@ class CrateShow {
       this.alpha.emit(this._v.set((Math.random() - 0.5) * 0.4, y + 0.3, z), this._v2.set(Math.cos(a) * s, 2 + Math.random() * 2.5, Math.sin(a) * s * 0.5), t0, 2 + Math.random() * 1.6, new THREE.Color(confCols[i % confCols.length]), 0.03 + Math.random() * 0.02, 3, 1.4, 1.3);
     }
     // Snow poof where the crate was (clothing) or out of the crate (gear).
-    const snow = new THREE.Color(0.95, 0.97, 1.0);
+    const snow = new THREE.Color(1.9, 1.95, 2.1);
     const nSnow = this.gear ? 60 : 140;
     for (let i = 0; i < nSnow; i++) {
       const a = Math.random() * Math.PI * 2, s = 0.5 + Math.random() * 1.8;

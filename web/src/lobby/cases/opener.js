@@ -23,6 +23,7 @@ import { caseArt } from './caseArt.js';
 import { caseSfx } from './sfx.js';
 import { crateSfx } from '../../audio/crate.js';
 import { crateShow } from './crate3d.js';
+import { CanvasReel, reelMetrics } from './reelCanvas.js';
 import './cases.css';
 
 import { TIMING, TIMING_QUICK, REEL_EASE, cubicBezier } from './timing.js';
@@ -30,6 +31,7 @@ import { TIMING, TIMING_QUICK, REEL_EASE, cubicBezier } from './timing.js';
 export { TIMING, TIMING_QUICK, REEL_EASE, cubicBezier };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const DBG = { nodraw: typeof location !== 'undefined' && location.search.includes('reelnodraw') };   // perf isolation (temporary)
 const HOLD_SKIP = 0.4;   // seconds of Space / Enter / A to skip
 const QUICK_KEY = 'sendit.cases.quick';
 export const quickOpen = {
@@ -93,10 +95,16 @@ export function openCaseShow(caseId, { onClose, rng, quick, chain } = {}) {
   const promise = new Promise((r) => { resolve = r; });
   active = { promise };
   if (chain) chain.pulls.push(result);
-  const ov = new Opener(result, { quick: quick ?? (!!chain || quickOpen.get()), chain }, () => { active = null; onClose?.(); resolve({ result, equipped: ov.equipped }); });
-  ov.userClose = onClose;
-  active.opener = ov;
-  globalThis.__senditCases = { opener: ov, result };
+  const go = () => {
+    const ov = new Opener(result, { quick: quick ?? (!!chain || quickOpen.get()), chain }, () => { active = null; onClose?.(); resolve({ result, equipped: ov.equipped }); });
+    ov.userClose = onClose;
+    active.opener = ov;
+    globalThis.__senditCases = { opener: ov, result };
+  };
+  // The 3D crate is normally warm (the Cases tab prewarms it); if not yet, wait for it briefly
+  // rather than falling back to the 2D case.
+  if (!crateShow.ready && crateShow.available()) Promise.race([crateShow.prewarm(), new Promise((r) => setTimeout(r, 5000))]).then(go);
+  else go();
   return promise;
 }
 
@@ -111,10 +119,12 @@ class Opener {
     this.trace = [];          // per-frame { t, x, v, card } for frame-by-frame checks (scripts/casesshot.mjs)
     this.ticks = [];
     this.series = SERIES[result.case.series];
-    this.t0 = performance.now();
-    // The 3D crate on the lobby stage; the 2D case box if the stage is not up.
+    // The 3D crate on the lobby stage; the 2D case box if the stage is not up. The clock starts after
+    // begin() (it may dress the rider in the pull, a few hundred ms the first time), so t = 0 is drawn.
     this.cs = { result, timing: this.T, quick, clock: () => this.time(), under: null, tickPulse: 0, landed: false, revealAt: null, onCue: (n) => this.cue(n) };
+    this.t0 = performance.now();
     this.d3 = crateShow.begin(this.cs);
+    this.t0 = performance.now();
     this.build();
     this.phase = 'case';
     this.raf = requestAnimationFrame((n) => this.frame(n));
@@ -138,7 +148,7 @@ class Opener {
   build() {
     const { reel } = this.result;
     const el = document.createElement('div');
-    el.className = `cr-overlay${this.d3 ? ' d3' : ''}${this.quick ? ' quick' : ''}`;
+    el.className = `cr-overlay cv${this.d3 ? ' d3' : ''}${this.quick ? ' quick' : ''}`;
     el.setAttribute('role', 'dialog');
     el.setAttribute('aria-label', `Opening ${this.series.name}`);
     el.style.setProperty('--sc', this.series.color);
@@ -159,9 +169,11 @@ class Opener {
     document.body.appendChild(el);
     if (this.d3) document.body.classList.add('cr-open');
     this.el = el;
-    this.strip = el.querySelector('.cr-strip');
+    this.strip = el.querySelector('.cr-strip');   // kept for tests / old captures; hidden (the canvas draws the reel)
     this.win = el.querySelector('.cr-window');
     this.cards = [...this.strip.children];
+    this.reel = new CanvasReel(reel.cards);
+    this.win.appendChild(this.reel.cv);
     this.marker = el.querySelector('.cr-marker');
     this.streaks = el.querySelector('.cr-streaks');
     this.fx = el.querySelector('.cr-fx');
@@ -173,11 +185,14 @@ class Opener {
   }
 
   measure() {
-    const card = this.cards[0].getBoundingClientRect();
-    const second = this.cards[1].getBoundingClientRect();
-    this.cw = card.width;
-    this.pitch = second.left - card.left || card.width + 8;
-    this.cx = this.win.getBoundingClientRect().width / 2;
+    const em = reelMetrics().em;   // = the overlay's font-size clamp (cases.css)
+    const box = this.win.getBoundingClientRect();
+    // (The reel band may still be scaled by its entry transition: use the layout size.)
+    const w = this.win.offsetWidth || box.width, h = this.win.offsetHeight || box.height;
+    this.reel.layout(w, h, em);
+    this.cw = this.reel.cw;
+    this.pitch = this.reel.pitch;
+    this.cx = w / 2;
     const { winAt, stop } = this.result.reel;
     this.x0 = 1.5 * this.pitch - this.cx;                  // the marker starts over card ~1
     this.x1 = winAt * this.pitch + stop * this.cw - this.cx;
@@ -221,6 +236,7 @@ class Opener {
       if (h >= 1) { this.holdSince = null; this.holdPad = false; this.padHeld = a; this.skip(); }
     }
     this.cs.tickPulse *= Math.exp(-dt * 12);
+    if ((this.phase === 'case' || this.phase === 'lid') && t > 0.05 && !this.warmed) this.warmed = !this.reel.warmStep(6);
     if (this.phase === 'case' && t >= T.lid) { this.el.classList.add('lid'); this.phase = 'lid'; }
     if (this.phase === 'lid' && t >= T.reelIn) { this.el.classList.add('reel'); this.phase = 'reelIn'; }
     if (this.phase === 'reelIn' && t >= T.spin) this.phase = 'spin';
@@ -230,7 +246,8 @@ class Opener {
       const x = this.x0 + (this.x1 - this.x0) * e;
       const prev = this.trace.at(-1);
       const v = prev ? (x - prev.x) / Math.max(1e-3, t - prev.t) : 0;
-      this.strip.style.transform = `translate3d(${-x.toFixed(2)}px,0,0)`;
+      if (!DBG.nodraw) this.reel.draw(x);
+      this.x = x;
       // Speed streaks while fast (they fade as the reel slows and the cards sharpen into view).
       const spd = Math.min(1, Math.abs(v) / 5000);
       // (Opacity on a sibling layer: a CSS variable on the window would restyle all 60 cards every frame.)
@@ -262,6 +279,8 @@ class Opener {
       this.trace.push({ t: +t.toFixed(4), x: +x.toFixed(2), v: +v.toFixed(1), card: cell });
       if (k >= 1 && this.phase === 'spin') { this.phase = 'hold'; this.land(); }
     }
+    // The winner's pop on the canvas (until it settles).
+    if (this.landT != null && t - this.landT < 0.8) this.reel.draw(this.x1, { win: this.result.reel.winAt, landK: Math.max(0.001, t - this.landT), color: rarityOf(this.result.rarity).color });
     if (this.phase === 'hold' && t >= T.spin + T.spinDur + T.hold) { this.phase = 'reveal'; this.reveal(t); }
     if (this.phase === 'reveal' && this.autoAt != null && t >= this.autoAt && !this.frozen) { this.autoAt = null; this.act('next'); }
     if (this.particles) this.drawFx(now);
@@ -277,6 +296,7 @@ class Opener {
   }
 
   land() {
+    this.landT = this.time();
     this.stopRiser?.();
     caseSfx.land();
     this.rumble(0.25, 0.4, 120);

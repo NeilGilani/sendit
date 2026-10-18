@@ -33,6 +33,7 @@ try {
   await page.waitForFunction(() => window.__sendit?.stage?.ready && window.__sendit.lobby.visible, null, { timeout: 300000 });
   await page.evaluate(() => window.__sendit.lobby.select('cases'));
   await page.waitForFunction(() => window.__senditCrate?.ready, null, { timeout: 60000 });
+  await page.waitForFunction(() => window.__senditReelPending?.() === 0, null, { timeout: 60000 }).catch(() => console.log('reel cards still rasterising'));
   console.log("prewarm ms", await page.evaluate(() => Math.round(window.__senditCrate.warmMs) + " " + (window.__senditCrate.warmLog || []).join(", ")));
   const n = (process.env.PERF ? 2 : 1) + (process.env.CHAIN ? 2 : 0);
   const seedFor = () => page.evaluate(async ({ series, want }) => {
@@ -49,7 +50,7 @@ try {
     await page.evaluate(({ seed, quick }) => {
       window.__ft = [];
       let last = performance.now();
-      const f = (now) => { window.__ft.push(now - last); last = now; if (window.__ft.length < 2000 && document.querySelector('.cr-overlay')) requestAnimationFrame(f); };
+      const f = (now) => { window.__ft.push(now - last); if (now - last > 50) (window.__long ||= []).push([+(now - last).toFixed(0), +(window.__senditCases?.opener?.time(now) ?? -1).toFixed(2)]); last = now; if (window.__ft.length < 2000 && document.querySelector('.cr-overlay')) requestAnimationFrame(f); };
       requestAnimationFrame(f);
       window.__senditCasesApi.open(null, seed, { quick });
     }, { seed, quick });
@@ -58,7 +59,7 @@ try {
     const s = await page.evaluate(() => {
       const ft = window.__ft.slice(1);
       const sorted = [...ft].sort((a, b) => b - a);
-      return { frames: ft.length, avgFps: +(1000 / (ft.reduce((a, b) => a + b, 0) / ft.length)).toFixed(1), worst: sorted.slice(0, 5).map((v) => +v.toFixed(1)), over33: ft.filter((v) => v > 33.4).length, first: ft.slice(0, 6).map((v) => +v.toFixed(1)) };
+      return { frames: ft.length, avgFps: +(1000 / (ft.reduce((a, b) => a + b, 0) / ft.length)).toFixed(1), worst: sorted.slice(0, 5).map((v) => +v.toFixed(1)), over33: ft.filter((v) => v > 33.4).length, first: ft.slice(0, 6).map((v) => +v.toFixed(1)), long: window.__long, begin: window.__senditCrate.beginMs };
     });
     console.log('perf', JSON.stringify(s));
     await page.click('.cr-btn[data-act="close"]');
@@ -76,6 +77,12 @@ try {
     await page.screenshot({ path: f });
   }
   const res = await page.evaluate(() => { const r = window.__senditCases.result; return { key: r.key, rarity: r.rarity, near: r.reel.nearMiss, gear: !!r.item.equipment }; });
+  // Contact sheet of the sequence (one image to look at).
+  const files = times.map((t) => `${outDir}/${series}-${want || 'any'}-${t.toFixed(2)}.png`);
+  const sheet = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  await sheet.setContent(`<body style="margin:0;background:#111;display:grid;grid-template-columns:repeat(4,1fr);gap:2px;font:12px sans-serif;color:#fff">${files.map((f, i) => `<div style="position:relative"><img style="width:100%;display:block" src="data:image/png;base64,${fs.readFileSync(f).toString('base64')}"><b style="position:absolute;left:4px;top:2px;text-shadow:0 0 3px #000">${times[i]} s</b></div>`).join('')}</body>`);
+  await sheet.screenshot({ path: `${outDir}/${series}-${want || 'any'}-sheet.png`, fullPage: true });
+  await sheet.close();
   console.log('result', JSON.stringify(res));
   await page.evaluate(() => window.__senditCases.opener.seek(null));
   if (process.env.EQUIP) {

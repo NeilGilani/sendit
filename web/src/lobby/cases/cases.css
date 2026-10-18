@@ -285,3 +285,8 @@ body.cr-open #lobby, body.cr-open .cn-stack { opacity: 0 !important; pointer-eve
 #lobby .cs-all { display: block; width: 100%; margin-top: .45em; padding: .45em 1em; border-radius: .7em; font-weight: 900; font-style: italic; font-size: .9em; color: #ffe36a; background: rgba(255, 227, 106, .1); border: 1px solid rgba(255, 227, 106, .45); }
 #lobby .cs-all small { font-style: normal; font-weight: 700; opacity: .7; }
 #lobby .cs-all:hover { background: rgba(255, 227, 106, .18); }
+.cr-overlay.d3 .cr-rtext { align-self: center; }
+@media (max-aspect-ratio: 23/20) { .cr-overlay.d3 .cr-rtext { align-self: flex-end; } }
+/* The canvas reel (reelCanvas.js) replaces the DOM strip. */
+.cr-overlay.cv .cr-strip { display: none; }
+.cr-reelcv { position: absolute; left: 0; top: 0; display: block; }

@@ -137,7 +137,20 @@ export function parkTextures(seed = 11) {
   return { map: tex(c), bump: tex(cb, { srgb: false, repeat: true }) };
 }
 
-const FONT = '"Helvetica Neue", "Arial Black", Arial, system-ui, sans-serif';
+/** Egg-crate foam lining (the inside of the lid). */
+export function foamTexture() {
+  const [c, g] = canvas(256, 256);
+  g.fillStyle = '#2a2b31'; g.fillRect(0, 0, 256, 256);
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+    const cx = x * 32 + 16 + (y % 2) * 16, cy = y * 32 + 16;
+    const grd = g.createRadialGradient(cx - 4, cy - 5, 2, cx, cy, 17);
+    grd.addColorStop(0, '#8a8c96'); grd.addColorStop(0.6, '#45464e'); grd.addColorStop(1, 'rgba(30,31,36,0)');
+    g.fillStyle = grd; g.beginPath(); g.arc(cx, cy, 17, 0, Math.PI * 2); g.fill();
+  }
+  return tex(c, { repeat: true });
+}
+
+const FONT ='"Helvetica Neue", "Arial Black", Arial, system-ui, sans-serif';
 
 /** The printed / stencilled / neon logo plate on the case's front (transparent PNG-like). */
 export function logoTexture(series) {
