@@ -21,7 +21,7 @@ import { PHYSICS as P } from '../config.js';
 import { clamp, lerp, smoothstep, angleDiff, lerpAngle, approach, DEG } from './math.js';
 import { emit } from '../state.js';
 
-let lockHinted = false, lateHinted = false;   // the "held key is locked" / "too late to flip" hints show once per page
+let lockHinted = false, lateHinted = false, spinLockHinted = false;   // the "held key is locked" / "too late to flip" hints show once per page
 
 const wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const mod2Pi = (a) => ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
@@ -472,6 +472,11 @@ export class EdgePhysics {
     const pl = this.pl, C = this.C;
     const cap = this.spinCap(), t = pl.airTime;
     if (this._spinLock && (Math.abs(ctrl.steer) < 0.2 || Math.sign(ctrl.steer) !== this._spinLock)) this._spinLock = 0;
+    // A carve held off a lip without a pop stays a carve: on a real air, say how to spin (once).
+    if (this._spinLock && ctrl.active && !spinLockHinted && t > 0.5 && tLand > 0.9) {
+      spinLockHinted = true;
+      emit('hint', 'Spin: pop with Space at the lip, or let go of A / D and press again in the air (a turn held off a lip stays a turn)');
+    }
     const steer = ctrl.active && !this._spinLock && Math.abs(ctrl.steer) > 0.2 ? ctrl.steer : 0;
     let h = this.spinH || 0;
     // The throw: early in the air the shoulders can still add to the set (less and less).
