@@ -193,7 +193,7 @@ body.fp #juiceHud .an { top: 42%; }   /* helmet cam: no rider in the middle, kee
   #juiceHud .an .t { font-size: 28px; -webkit-text-stroke: 2px #1b1446; }
   #juiceHud .an .s { font-size: 17px; }
   #juiceHud .an .s small { font-size: 11px; }
-  #juiceHud .co { top: 60%; font-size: 18px; }
+  #juiceHud .co { font-size: 18px; }
   #juiceHud .bn { top: 120px; font-size: 26px; }
   #juiceHud .ts { top: 92px; transform: scale(.8); transform-origin: top left; }
   body.fp #juiceHud .an { top: 34%; }
