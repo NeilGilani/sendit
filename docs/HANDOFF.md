@@ -66,8 +66,7 @@ Each map is a mountain with named trails picked in the lobby's Maps tab.
 |---|---|---|
 | Physics (carve/skid, jumps, spins/flips set at take-off, grabs), skis + snowboard | `physics/`, `player.js`, `config.js` | `equipment.md`, `jumps-research.md` |
 | Grinding | `physics/grind.js` | `map4.md` |
-| Rider rig and poses, first person | `rider.js`, `fpview.js`, `camera.js` | `equipment.md` |
-| Body dynamics (force-driven reactions), crash ragdoll | `character/dynamics.js`, `character/ragdoll.js` | `body.md` |
+| Rider rig and poses, first person | `rider.js`, `fpview.js`, `camera.js` | `equipment.md`, `body.md` (the force-driven body dynamics and crash ragdoll were reverted; a new ragdoll is a separate task) |
 | Outfit / character items | `character/` | `character.md` |
 | Graphics: HDR look, snow, trees, spray, LOD cross-fades, zero pop-in, per-map lighting | `gfx/` (`perf.js`, `prewarm.js`, `atmosphere.js`), `terrain.js`, `scatter.js`, `fx.js` | `graphics.md`, `graphics-perf.md` |
 | Lobby (tabs registry, Maps / mountains & trails, Equipment, Character) | `lobby/` | `lobby.md`, `maps.md` |
@@ -116,7 +115,7 @@ Performance target: quality 1 around 14–16 ms GPU at 1600×900. Screenshots go
 ## Known issues / good next steps
 
 1. **First person** — finished (see `docs/first-person.md`): gloves framed on skis and snowboard in every
-   scenario, detailed poles with plants, goggle lens tint / fog / snow, breath, crash cam on the ragdoll.
+   scenario, detailed poles with plants, goggle lens tint / fog / snow, breath, crash cam (out-of-body follow of the crash tumble).
 2. ~~`trails-check` length mismatches~~ fixed: Kitsune and Fjordline courses expose `rideLine(trailId)` and the check measures
    along each trail's own line (docs/maps.md § Measuring trails). `--check` passes for all built-in maps.
 3. Voltage Park: no wallrides; the superpipe is hard to ride with keys.
