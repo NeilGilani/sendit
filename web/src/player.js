@@ -506,6 +506,11 @@ export class Player {
       // Why it went wrong (for UI / tuning): too hard, or yaw / pitch out of line.
       const reason = impact > P.crashImpact ? 'impact' : fl.result === 'crash' ? 'pitch' : 'yaw';
       this.lastCrash = { reason, impact, dev: ev.dev, flipDev: fl.dev, air: this.airTime, spins, flips: fl.flips, why: ev.why };
+      // Landing backwards on directional skis (a 180 / 540) can't work: say so, once (twin tips can).
+      if (reason === 'yaw' && this.equipment.type === 'ski' && !this.equipment.handling.twin && devNose > 140 * Math.PI / 180 && !Player._switchHinted && this.controllable()) {
+        Player._switchHinted = true;
+        setTimeout(() => emit('hint', 'Directional skis can\'t land backwards: spin 360s / 720s, or take the twin-tip park skis for 180s and 540s'), 1200);
+      }
       // A grab held to the end blocks the spot (the rider only spots once the hand lets go): say so, once.
       if (reason !== 'impact' && this.dyn._grabLate && !Player._grabHinted && this.controllable()) {
         Player._grabHinted = true;
