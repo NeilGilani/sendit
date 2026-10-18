@@ -26,7 +26,7 @@ import { getEquipmentSpec, normalizeType } from './equipment/registry.js';
 import { dressRider, HEAD_SCALE, OUTFIT_SLOTS } from './character/index.js';
 import { outfitSlotsFromProfile } from './character/profile.js';
 import { proportionRig } from './character/body.js';
-import { FP_BOARD, fpSkiArm, fpBoardArm, fpPoleDir, fpProtract, fpHand, fpShadow } from './fpview.js';
+import { FP, FP_BOARD, fpSkiArm, fpBoardArm, fpPoleDir, fpProtract, fpHand, fpShadow } from './fpview.js';
 import { BodyDynamics } from './character/dynamics.js';
 import { Ragdoll } from './character/ragdoll.js';
 
@@ -603,8 +603,10 @@ export class Rider {
     this.rotateGlobal(B.neck_01, new THREE.Quaternion().setFromAxisAngle(Y, headYaw * 0.45).multiply(_q.setFromAxisAngle(X, headPitch * 0.5)).multiply(_q2.setFromAxisAngle(Z, headRoll * 0.4)));
     this.inherit(B.Head);
     this.rotateGlobal(B.Head, new THREE.Quaternion().setFromAxisAngle(Y, headYaw * 0.55).multiply(_q.setFromAxisAngle(X, headPitch * 0.5)).multiply(_q2.setFromAxisAngle(Z, headRoll * 0.6)));
-    // First person (helmet cam): collapse the head (and helmet) so the camera never sees inside it.
-    if (this.fp) B.Head.scale.setScalar(0.001);
+    // First person (helmet cam): shrink the head (and helmet) so the eye, which sits ≥ 0.15 m out from
+    // the head bone, is always outside it. A full collapse (scale ≈ 0) dragged the neck / collar
+    // vertices skinned partly to the head into long dark strands across the view when looking down.
+    if (this.fp) B.Head.scale.setScalar(HEAD_SCALE * FP.headScale);
   }
 
   poseSki(pl) {

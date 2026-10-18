@@ -262,7 +262,7 @@ export function fabricMaterial() {
     vertPars: 'attribute vec4 aG; attribute float aLin; attribute float aCrease; varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj; uniform float uHide; uniform float uFlutter;',
     vertPre: FLUTTER + 'vG = aG; vLin = aLin; vCrease = aCrease; vObj = position;\n  if (uHide > 0.5 && ((aG.x > 2.5 && aG.x < 5.5) || aG.x > 7.5)) transformed *= 0.0;\n  if (uHide > 0.5 && (abs(aG.x - 1.0) < 0.5 || abs(aG.x - 7.0) < 0.5)) transformed.yz = mix(transformed.yz, vec2(1.45, -0.075), 0.25 * smoothstep(0.4, 0.6, abs(position.x)));',
     fragPars: `${COMMON}
-varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj;
+varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj; uniform float uHide;
 uniform vec3 uJacket, uPanel, uAccent, uGaiter, uPants, uCuff, uMitt, uGauntlet; uniform float uStyle; uniform vec3 uHemY;
 uniform vec4 uJPat, uPPat, uGPat, uMPat; uniform vec3 uJPatA, uJPatB, uPPatA, uPPatB, uGPatA, uGPatB, uMPatA;
 float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fabAO = 1.0, fabH = 0.0;
@@ -271,6 +271,8 @@ ${PRINTS}`,
     frag: /* glsl */`
       {
         float id = floor(vG.x + 0.5);
+        // First person: the collapsed face pieces (vertex shader) still skin into thin strands; drop them.
+        if (uHide > 0.5 && ((id > 2.5 && id < 5.5) || id > 7.5)) discard;
         float u = vG.y, v = vG.z, side = vG.w;
         float uc = u - floor(u + 0.5);             // −0.5 … 0.5, 0 = front (jacket, pants) / top (sleeves)
         vec3 c = uJacket;

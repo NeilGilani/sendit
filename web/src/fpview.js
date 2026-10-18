@@ -18,6 +18,8 @@ export const FP = {
   eyeUp: 0.1, eyeFwd: 0.11,
   eyeFwdBoard: 0.17,          // snowboard: the view runs past the front shoulder, so the eye sits further out
   near: 0.05,
+  shoulderClear: 0.27,        // m the eye keeps from each shoulder joint (it rises over them)
+  headScale: 0.45,            // the head + helmet shrink to this share in first person (rider.js trunk)
   // Lens: CAMERA.fpFov / fpFovBonus / fpSpinFov in config.js.
   // Ground look: pitch (deg, − = down), extra per degree of slope, per unit speed ratio, in a tuck.
   pitch: -19, slopePitch: 0.55, speedPitch: 4, tuckPitch: 5, lookIntoTurn: 0.2,
@@ -32,7 +34,7 @@ export const FP = {
 };
 
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
-const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _e = new THREE.Euler(0, 0, 0, 'YXZ');
+const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _e = new THREE.Euler(0, 0, 0, 'YXZ');
 const _m = new THREE.Matrix4(), _s = new THREE.Vector3();
 const Y = new THREE.Vector3(0, 1, 0), X = new THREE.Vector3(1, 0, 0), Z = new THREE.Vector3(0, 0, 1);
 const RY_PI = new THREE.Quaternion().setFromAxisAngle(Y, Math.PI);
@@ -176,6 +178,15 @@ export class FPView {
     // so looking down puts the eyes out over the chest, looking aside never puts them in a shoulder)
     rider.bones.Head.getWorldPosition(this.eye);
     this.eye.add(_v.set(0, FP.eyeUp, -(rider.isBoard ? FP.eyeFwdBoard : FP.eyeFwd)).applyQuaternion(this.q));
+    // …but never inside a shoulder: looking steeply down past the nose-side shoulder (a board's landing
+    // spot at the end of a spin, looking down at the board) the eye would end up in the jacket, so it
+    // rises along the body's up axis until it clears both shoulder joints by FP.shoulderClear.
+    _v2.set(0, 1, 0).applyQuaternion(s.renderOrient);
+    for (const n of ['upperarm_l', 'upperarm_r']) {
+      const S = rider.bones[n].getWorldPosition(_v3), d = _v.subVectors(this.eye, S);
+      const h = d.dot(_v2), r2 = d.lengthSq() - h * h, R = FP.shoulderClear;
+      if (r2 < R * R) { const need = Math.sqrt(R * R - r2); if (h < need) this.eye.addScaledVector(_v2, need - h); }
+    }
     // Snow chatter: a fine vertical buzz that grows with speed on the ground.
     const chat = ground ? (0.003 + r * r * 0.012) : 0.0008;
     this.eye.y += (noise1(t * 26, 2.1) * 0.7 + noise1(t * 53, 4.4) * 0.3) * chat;
@@ -389,7 +400,9 @@ export function fpBoardArm(rider, side, front, pl, u, l) {
   const tp = handFrom(rider, side, u, l);
   // Which side of the view this arm's shoulder is on (handles goofy, switch and the head turning).
   const B = rider.bones, sh = posOf(rider.g(B['upperarm' + (side > 0 ? '_l' : '_r')]), new THREE.Vector3()).sub(eye);
-  const sx = sh.dot(right) >= 0 ? 1 : -1;
+  // Compared with the other shoulder, so the front shoulder sitting right on the view axis can't flip it.
+  const other = posOf(rider.g(B['upperarm' + (side > 0 ? '_r' : '_l')]), new THREE.Vector3()).sub(eye);
+  const sx = sh.dot(right) >= other.dot(right) ? 1 : -1;
   const behind = THREE.MathUtils.smoothstep(-sh.dot(fwd), -0.05, 0.12);   // shoulder behind the eye
   (rider.fpProt ||= [FP_ARMS.protract, FP_ARMS.protract])[side > 0 ? 0 : 1] = FP_ARMS.protract + behind * A.rearProtract;
   (rider.fpDrop ||= [0, 0])[side > 0 ? 0 : 1] = (1 - behind) * A.frontDrop;   // the shoulder ahead of the eye drops out of the view
