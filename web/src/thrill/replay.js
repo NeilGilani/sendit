@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { on, game, Mode, settings, emit } from '../state.js';
 import { THRILL, FrameRing, clipRange } from './core.js';
+import { HEAD_SCALE } from '../character/index.js';
 
 const HUGE = /720|900|1080|1260|1440|flip|cork|misty|rodeo|wildcat|tamedog/i;
 const STRIDE_NODE = 11;   // pos 3, quat 4, scale 3, visible 1
@@ -212,6 +213,10 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
       active.age = (active.age || 0) + 1;
       if (active.age > 1 && skipPressed()) { stop(); return; }   // not the key press that started it
       const airborne = apply(active.t);
+      // Recorded in the helmet cam: show the rider whole (first person shrinks the head, hides the garments).
+      rider.fp = false;
+      const H = rider.bones?.Head;
+      if (H && H.scale.x < HEAD_SCALE * 0.95) H.scale.setScalar(HEAD_SCALE);
       const rate = active.wipe !== null ? (active.t > active.wipe - 0.6 && active.t < active.wipe + 1.6 ? C.wipeSlow : 1) : airborne ? C.slow : 1;
       active.rate = (active.rate ?? rate) + (rate - (active.rate ?? rate)) * Math.min(1, dt * 6);
       active.t += dt * active.rate;
