@@ -26,6 +26,7 @@ The research behind the numbers is in [equipment-research.md](equipment-research
 | `web/scripts/equipment-check.mjs` | Headless catalogue check: every spec validates, partial overrides merge, handling stays finite and clamped. |
 | `web/scripts/physics-fuzz.mjs` | Headless fuzz on the real course: random inputs, gear and stance swaps; fails on NaN, falling through the snow, or a stuck air state. Prints crash causes. |
 | `web/scripts/physics-tricks.mjs` | Headless flip and cork bench: launches, stick timing, landings and trick names for both types. |
+| `web/scripts/physics-rotation.mjs` | Headless rotation-feel bench: carry-over after letting go of a flip, the counter key, and how fast flips / spins start when pressed at different moments. `--check` asserts the targets (docs/jumps-research.md §7). |
 | `web/scripts/physics-kicker.mjs` | Headless kicker bench: a features.js-shaped kicker on a slope, straight, popped, spun, flipped and preloaded. Takes `[ski\|snowboard\|both] [slopeDeg]`. |
 | `web/scripts/physics-course.mjs` | Headless bot on the real hand-built gully (course.js on the game's 1.25 m grid), start to finish. Styles: `carve`, `straight`, `park` (pop + 360 off the drops), `flip` (preloaded backflips). Logs landings, stumbles, crashes and speeds. |
 | `web/scripts/physics-steer.mjs` | Headless steering-feel bench at pinned speeds with each map's physics: turn-in time, full-lock gear and path rates, skid, key-tap size, 30 % / 60 % stick response, edge-to-edge time, release. |
