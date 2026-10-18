@@ -2,6 +2,7 @@
 // bests) through the tab registry, and a level badge + XP bar on the profile chip (a small widget
 // added next to the chip's text; the lobby's own markup is not edited).
 import { registerLobbyTab } from '../lobby/tabs.js';
+import { spotsHtml } from '../thrill/spots.js';
 import { on, game, Mode } from '../state.js';
 import { progression, PB_STATS, XP_SOURCES, nextRank, rankEmblem } from './index.js';
 import { fmtVal } from './ui.js';
@@ -49,6 +50,10 @@ const CSS = /* css */`
 .pg-book { display: flex; flex-wrap: wrap; gap: 0.35em; font-size: 0.78em; }
 .pg-book span { padding: 0.25em 0.6em; border-radius: 999px; background: rgba(255,255,255,0.08); font-weight: 700; }
 .pg-book small { color: var(--lb-dim); }
+.pg-book .pg-unk { background: rgba(255,255,255,0.03); color: var(--lb-dim); font-weight: 400; letter-spacing: 0.1em; }
+.pg-spots span:not(.pg-unk) { background: rgba(47,245,214,0.16); }
+.pg-gaps { margin-top: 0.4em; }
+.pg-gaps span { background: rgba(126,249,255,0.12); }
 .pg-maps { display: grid; gap: 0.25em; font-size: 0.85em; }
 .pg-map { display: flex; justify-content: space-between; align-items: center; padding: 0.3em 0.6em; border-radius: 0.6em; background: rgba(255,255,255,0.05); }
 .pg-map b i { font-style: normal; color: rgba(255,255,255,0.18); margin-left: 0.1em; }
@@ -138,6 +143,7 @@ registerLobbyTab({
         <div class="pg-book">${book.length ? book.sort((a, b) => b.n - a.n).slice(0, 14).map((t) => `<span title="landed ${t.n}×">${esc(t.name)}</span>`).join('') : '<small>Land tricks to fill the book: every new one pays XP.</small>'}</div>
         <div class="pg-h">Map mastery <small>★ ridden · ★ clean run · ★ ×4 combo</small></div>
         <div class="pg-maps">${maps.map((m) => { const st = progression.getMapStars(m.id); return `<div class="pg-map"><span>${esc(m.name)}</span><b>${st.stars.map((x) => `<i class="${x ? 'on' : ''}">★</i>`).join('')}</b></div>`; }).join('')}</div>
+        ${spotsHtml(mapId, ctx.maps?.current?.()?.map?.name)}
         <div class="pg-h">Personal bests <small>${esc(ctx.maps?.current?.()?.map?.name || 'this map')}</small></div>
         <div class="pg-pb">${Object.entries(PB_STATS).map(([k, S]) => `<span>${S.label}</span><b>${pb[k] ? S.fmt(pb[k]) : '—'}</b>`).join('')}</div>`;
       const det = el.querySelector('.pg-adet');
@@ -152,7 +158,7 @@ registerLobbyTab({
       }));
     };
     render();
-    for (const ev of ['progressXp', 'challengeDone', 'weeklyDone', 'achievement', 'rideRecorded']) ctx.on(ev, render);
+    for (const ev of ['progressXp', 'challengeDone', 'weeklyDone', 'achievement', 'rideRecorded', 'thrillSpot', 'thrillGap']) ctx.on(ev, render);
   },
 });
 

@@ -36,6 +36,7 @@ import { services } from './services/index.js';
 import { Lobby, LobbyStage, applyEquipment } from './lobby/index.js';
 import { normalizeType } from './equipment/registry.js';
 import { installJuice } from './juice/index.js';
+import { installThrill } from './thrill/index.js';
 import { trackProgression } from './progression/index.js';
 import { mountProgressionUi } from './progression/ui.js';
 import './progression/lobby.js';
@@ -190,6 +191,12 @@ async function boot() {
   juice = installJuice({ player, cam, sound, input, post, camera, fx, activities, scene });
   progressUpdate = trackProgression({ player, getMapId: () => currentMap?.map.id ?? 'unknown' });
   mountProgressionUi({ juice });
+  // Thrill (thrill/index.js): instant restart / retry, spots & gaps, adrenaline cues, instant replay, versus links.
+  thrill = installThrill({
+    player, rider, cam, camera, sound, input, activities, ui, juice, scene, course, features, terrain, canvas, params,
+    getMap: () => ({ mapId: currentMap?.map.id ?? 'unknown', trailId: currentMap?.trail ?? null }),
+    getName: () => profileStore.profile?.displayName || 'Rider',
+  });
   applyQuality();
   on('settings', ({ key }) => { if (key === 'quality') applyQuality(); });
   addEventListener('resize', onResize);
@@ -434,7 +441,7 @@ on('hardBrake', () => input.rumble(0.3, 0.6, 200));
 let rumbleT = 0;
 
 // Game feel (juice/index.js: hit-stop, announcer, punches…) and progression (progression/index.js), set up in boot().
-let juice = null, progressUpdate = null;
+let juice = null, progressUpdate = null, thrill = null;
 function rumbleCarve(dt) {
   rumbleT -= dt;
   if (rumbleT > 0 || game.mode !== Mode.RIDING || player.state !== State.GROUNDED) return;
@@ -472,14 +479,15 @@ function frame(now) {
   last = now;
   if (!composer) return;
   input.poll(dt);
-  if (game.mode === Mode.RIDING && input.pressed.has('KeyE') && rider) profileStore.setEquipment(profileStore.equipment === 'snowboard' ? 'skis' : 'snowboard');   // debug: swap gear while riding (via the profile, so the lobby stays in sync)
-  if (input.justPressed('view') && (game.mode === Mode.RIDING || game.mode === Mode.LIFT)) {
+  const replaying = !!thrill?.input();   // instant replay (thrill/replay.js): the ride is frozen while it plays
+  if (!replaying && game.mode === Mode.RIDING && input.pressed.has('KeyE') && rider) profileStore.setEquipment(profileStore.equipment === 'snowboard' ? 'skis' : 'snowboard');   // debug: swap gear while riding (via the profile, so the lobby stays in sync)
+  if (!replaying && input.justPressed('view') && (game.mode === Mode.RIDING || game.mode === Mode.LIFT)) {
     setSetting('view', settings.view === 'fp' ? 'tp' : 'fp');
     ui.pop(settings.view === 'fp' ? 'FIRST PERSON' : 'CHASE CAM', 'cyan', true);
   }
   rider.fp = settings.view === 'fp' && game.mode !== Mode.MENU && player.state !== State.CRASH;
   document.body.classList.toggle('fp', rider.fp && (game.mode === Mode.RIDING || game.mode === Mode.LIFT));
-  if (input.justPressed('pause')) {
+  if (!replaying && input.justPressed('pause')) {
     if (ui.back()) { /* closed an overlay (settings / credits) */ }
     else if (game.mode === Mode.PAUSED) resume();
     else if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) pause();
@@ -491,7 +499,7 @@ function frame(now) {
   rider.root.visible = !inLobby;
   if (inLobby) { lobby.update(dt); stage.update(dt); }
   const paused = game.mode === Mode.PAUSED;
-  if (!paused) {
+  if (!paused && !replaying) {
     time += dt;
     acc += dt * (juice ? juice.timeScale(dt) : 1);   // hit-stop / micro slow-mo on big moments (juice/impact.js)
     let n = 0;
@@ -500,19 +508,24 @@ function frame(now) {
     player.interpolate(acc / STEP);
   }
   globals.uTime.value = time;
-  rider.update(paused ? 0 : dt, camera);
-  if (!inLobby) cam.update(paused ? 0 : dt);
+  if (replaying) thrill.replay.update(dt);   // poses the rig from the recording and flies the drone camera
+  else {
+    rider.update(paused ? 0 : dt, camera);
+    if (!inLobby) cam.update(paused ? 0 : dt);
+  }
   sky.update(camera, inLobby ? stage.focusPoint : game.mode === Mode.MENU ? camera.position.clone().add(new THREE.Vector3(0, -200, 0)) : player.renderPos, time);
   terrain.update(camera.position);
   scatter.update(camera.position);
   lifts.update(time, camera.position);
   life.update(paused ? 0 : dt, time, player, camera.position);
   snowfall.update(camera, time, innerHeight);
-  if (!paused) { fx.update(dt, camera); activities.update(dt * (juice?.warp.k ?? 1)); }
+  if (!paused && !replaying) { fx.update(dt, camera); activities.update(dt * (juice?.warp.k ?? 1)); }
   ui.updateActivity(activities.hud());
-  sound.update(dt, camera);
-  ui.update(dt, player);
-  checkFinish();
+  if (!replaying) {
+    sound.update(dt, camera);
+    ui.update(dt, player);
+    checkFinish();
+  }
   rumbleCarve(dt);
   // Wind streaks fade in near top speed.
   const riding = game.mode === Mode.RIDING;
@@ -520,9 +533,10 @@ function frame(now) {
   const fpWind = rider.fp ? HUD.fpWindEarly : 0;
   const wantWind = riding ? THREE.MathUtils.smoothstep(player.speedRatio, HUD.windStreakFrom - fpWind, HUD.windStreakFull) * (rider.fp ? 0.8 : 1) : 0;
   post.update(dt, time, wantWind);
-  post.setLens(rider.fp && cam.fpView?.active && (game.mode === Mode.RIDING || game.mode === Mode.LIFT || game.mode === Mode.PAUSED) ? cam.fpView.lens : null);   // goggle lens (fpview.js)
-  juice?.update(paused ? 0 : dt, time);
-  progressUpdate?.(dt);
+  post.setLens(!replaying && rider.fp && cam.fpView?.active && (game.mode === Mode.RIDING || game.mode === Mode.LIFT || game.mode === Mode.PAUSED) ? cam.fpView.lens : null);   // goggle lens (fpview.js)
+  juice?.update(paused || replaying ? 0 : dt, time);
+  if (!replaying) progressUpdate?.(dt);
+  if (!paused && !replaying) thrill?.update(dt);
   input.endFrame();
   composer.render(dt);
 }
