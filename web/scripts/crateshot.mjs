@@ -67,6 +67,26 @@ try {
     await page.waitForTimeout(800);
   };
   if (process.env.PERF) await fpsRun();
+  if (process.env.FLOW) {
+    // The debug flags as a player would use them: <url>?casegrant=3&caseforce=gold, click Open, hold Space.
+    console.log('cases ready', await page.evaluate(() => window.__sendit.profile.unopened.length));
+    const got = [];
+    for (let i = 0; i < Number(process.env.FLOW); i++) {
+      await page.click('.cs-open');
+      await page.waitForSelector('.cr-overlay', { timeout: 15000 });
+      await page.waitForTimeout(1200);
+      await page.keyboard.down('Space'); await page.waitForTimeout(700); await page.keyboard.up('Space');
+      await page.waitForSelector('.cr-reveal:not([hidden]) h2', { timeout: 15000 });
+      got.push(await page.evaluate(() => `${window.__senditCases.result.rarity} ${window.__senditCases.result.key} (3D: ${!!window.__senditCrate.active})`));
+      await page.waitForTimeout(1500);
+      await page.screenshot({ path: `${outDir}/flow-${i}.png` });
+      await page.click('.cr-btn[data-act="close"]');
+      await page.waitForFunction(() => !document.querySelector('.cr-overlay') && !window.__senditCrate.active, null, { timeout: 15000 });
+      await page.waitForTimeout(500);
+    }
+    console.log('pulls', got.join(' | '));
+    console.log(`errors: ${errors.length}`, errors.slice(0, 6).join('\n')); await browser.close(); process.exit(errors.length ? 1 : 0);
+  }
   if (process.env.CHAIN) {
     // "Open all" in real time: screenshots every 1.5 s through the chain (auto-advance, summary).
     await page.evaluate(() => { const P = window.__sendit.profile; while (P.unopened.length) P.unopened.splice(0, 1); for (let i = 0; i < 3; i++) P.grantCase('test', ['first-chair', 'night-park', 'backcountry'][i]); window.__sendit.lobby.select('locker'); });

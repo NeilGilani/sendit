@@ -16,9 +16,10 @@ node web/scripts/unittest.mjs                      item data, odds simulation, p
 node web/scripts/cases-timing.mjs                  the opening at 60 fps: reel position, speed, ticks
 node web/scripts/rewards-table.mjs                 the case contents as markdown (the Items section below)
 node web/scripts/crateshot.mjs <url> <dir>         frame sequence of the 3D opening per case / grade + a contact sheet
-                                                   (SERIES=night-park RARITY=gold ITEM=board- PERF=1 QUICK=1, see the file)
+                                                   (SERIES=night-park RARITY=gold ITEM=board- PERF=1 QUICK=1, see the file;
+                                                   MATRIX=1 every case x grade, CHAIN=1 "Open all", FLOW=2 with ?caseforce)
 GPU=1 node web/scripts/casesshot.mjs <url> <dir>   capture the opening (SEEK=1 RARITY=epic NEAR=1 EQUIP=1, see the file)
-GPU=1 node web/scripts/lobbytest.mjs <url>         end-to-end; sections 6b and 6c cover cases
+GPU=1 node web/scripts/lobbytest.mjs <url>         end-to-end; sections 6b and 6c cover cases (macOS: ANGLE=metal)
 GPU=1 node web/scripts/rewards-looks.mjs <url> <dir>  screenshots of the lobby rider in reward looks
 ```
 
@@ -210,9 +211,11 @@ reflection (`studio()` in crate3d.js) instead of a PMREM environment.
   compiled in the background for the post stack's render target, three hidden warm frames, then every
   card bitmap in idle time). The reel is one canvas (the old 60-card DOM strip made the compositor raster
   tiles mid-spin: 0.2–0.5 s stalls). While the studio is fully dark the world is hidden. Measured headless
-  on the shared MacBook Air (Metal, other sessions running): ~56 fps average over a whole opening, no
-  frame over 100 ms after the first; the first frame can take ~0.4 s when the pull is a garment cut the
-  rider has never worn (building its geometry; the show's clock starts after it, so nothing is skipped).
+  on the shared MacBook Air (Metal, other sessions running, `crateshot.mjs PERF=1`): 57–60 fps average
+  over a whole opening (680 frames), worst frame 83 ms, prewarm 0.3–0.8 s in the background; before the
+  canvas reel and the render-target compile the same run had 1.5–3 s stalls. The click can take ~0.4 s
+  before the first frame when the pull is a garment cut the rider has never worn (building its geometry;
+  the show's clock starts after it, so nothing is skipped).
 - **Fallback**: if the lobby stage is not up (no WebGL stage), the old 2D case box plays with the same reel.
 - `prefers-reduced-motion`: no camera drift or shake, no spinning rays, no streaks.
 
