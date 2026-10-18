@@ -109,7 +109,7 @@ async function boot() {
   features = new Features(terrain);
   features.plan(course);
   ui.loading(0.5, 'Painting the snow…');
-  terrain.bakeSunMask(renderer);
+  await terrain.bakeSunMaskSliced(renderer);   // in strips: the loading worker shares the GPU
   const noise = makeNoiseTexture(512, 11);
   terrain.buildMaterials({ noise });
   terrain.build();
