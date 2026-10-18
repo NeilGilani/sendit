@@ -5,7 +5,7 @@
 // SkiPhysics or SnowboardPhysics instance (physics/), chosen with setEquipment(type, variant).
 // Tunables: PHYSICS (+ PHYSICS.ski / PHYSICS.snowboard) in config.js.
 import * as THREE from 'three';
-import { PHYSICS as P, FX, applyMapTuning } from './config.js';
+import { PHYSICS as P, FX, ANIM, applyMapTuning } from './config.js';
 import { game, Mode, setMode, emit, addScore, on } from './state.js';
 import { angleDiff, lerpAngle, clamp } from './physics/math.js';
 import { SkiPhysics } from './physics/ski.js';
@@ -13,6 +13,7 @@ import { SnowboardPhysics } from './physics/snowboard.js';
 import { Flow } from './physics/flow.js';
 import { Grind } from './physics/grind.js';
 import { pathYaw } from './physics/edge.js';
+import { OffAxis } from './physics/offaxis.js';
 import { getEquipmentSpec, deriveHandling, normalizeType } from './equipment/registry.js';
 
 export const State = { FROZEN: 0, GROUNDED: 1, AIR: 2, CRASH: 3, LIFT: 4, GRIND: 5 };
@@ -77,8 +78,12 @@ export class Player {
     this.press = 0; this.butter = 0; this.grab = 0; this.windup = 0; this.grabName = null;
     this.flip = 0; this.flipRate = 0;   // rad about the gear's lateral axis in the air (+ = backflip), rad/s
     // Drawn flip (signed about the gear's +X, i.e. flip · travelSign, plus a residual that settles after
-    // touchdown). `orient` stays the un-flipped base; renderOrient = base · Rx(renderFlip).
+    // touchdown). `orient` stays the un-flipped base (it carries the heading); the off-axis model
+    // (physics/offaxis.js) turns the drawn flip into a world-frame trick rotation about a world-fixed axis:
+    // renderOrient = renderTrick · renderBase, the body pivoting about its centre of mass (renderCom()).
     this.visFlip = 0; this.flipSettle = 0; this.prevFlip = 0; this.renderFlip = 0;
+    this.offAxis = new OffAxis();
+    this.renderBase = new THREE.Quaternion(); this.renderTrick = new THREE.Quaternion();
     this._ctrl = { steer: 0, brake: 0, up: 0, jump: false, tuck: 0, active: false };
     this.setEquipment('ski');
   }
@@ -104,8 +109,9 @@ export class Player {
         this.heading += Math.PI;
         this.flip = -this.flip; this.flipRate = -this.flipRate;   // keep the drawn flip (flip · travel) continuous
         groundQuat(this.groundNormal, this.heading, this.orient);
-        this.prevOrient.copy(this.orient); this.renderOrient.copy(this.orient);
-        this.travelSign = 1;   // edge angles are relative to travel, so they carry over unchanged
+        this.travelSign = 1;
+        this.visFlip = this.flip + this.flipSettle;
+        this.snapRender();   // edge angles are relative to travel, so they carry over unchanged
       }
     }
     this.equipment = { type: t, variant: spec.id, spec, handling };
@@ -139,15 +145,22 @@ export class Player {
     this.dyn.charge = 0; this.dyn.charging = false; this.dyn.travel = 1; this.dyn.edge = 0; this.dyn.stop = 0;
     this.travelSign = 1; this.edgeAngle = 0; this.skidAngle = 0; this.latAccel = 0;
     this.flip = 0; this.flipRate = 0; this.visFlip = 0; this.flipSettle = 0; this.prevFlip = 0; this.renderFlip = 0;
+    this.offAxis.reset();
     this._safe = [[this.position.clone(), yaw]];
     this.snapRender();
   }
 
   snapRender() {
     this.prevPos.copy(this.position); this.renderPos.copy(this.position);
-    this.prevOrient.copy(this.orient); this.renderOrient.copy(this.orient);
+    this.prevOrient.copy(this.orient); this.renderBase.copy(this.orient);
     this.prevFlip = this.renderFlip = this.visFlip;
-    if (this.visFlip) this.renderOrient.multiply(_qf.setFromAxisAngle(_X, this.visFlip));
+    this.offAxis.quat(this.visFlip, this.renderTrick);
+    this.renderOrient.multiplyQuaternions(this.renderTrick, this.renderBase);
+  }
+
+  /** The drawn body's centre of mass (the point rider.js turns the body about): renderPos + base · (0, flipPivot, 0). */
+  renderCom(out = new THREE.Vector3()) {
+    return out.set(0, ANIM.flipPivot, 0).applyQuaternion(this.renderBase).add(this.renderPos);
   }
 
   startRiding() {
@@ -210,9 +223,10 @@ export class Player {
 
   interpolate(alpha) {
     this.renderPos.lerpVectors(this.prevPos, this.position, alpha);
-    this.renderOrient.slerpQuaternions(this.prevOrient, this.orient, alpha);
+    this.renderBase.slerpQuaternions(this.prevOrient, this.orient, alpha);
     this.renderFlip = this.prevFlip + (this.visFlip - this.prevFlip) * alpha;
-    if (this.renderFlip) this.renderOrient.multiply(_qf.setFromAxisAngle(_X, this.renderFlip));
+    this.offAxis.quat(this.renderFlip, this.renderTrick);
+    this.renderOrient.multiplyQuaternions(this.renderTrick, this.renderBase);
   }
 
   readInput(dt) {
@@ -386,13 +400,16 @@ export class Player {
     this.state = State.AIR; this.airTime = 0; this._spinTotal = 0; this.spinRate = 0; this.turnVelocity = 0;
     this.grab = 0; this.stop = 0; this.butter = 0; this.press = 0;
     this.dyn.takeoffInfo(popped);
+    this.offAxis.reset();
     emit('takeoff', { popped, switch: this.isSwitch, type: this.equipment.type });
   }
 
   airStep(dt) {
     this.velocity.y -= P.gravity * P.airGravity * dt;
-    // Aerodynamic drag a = k·v², k = ρ·CdA / 2m (PHYSICS.airDrag); a tuck or a grab is more compact.
-    const compact = Math.max(this.grab, this.flipTuck || 0);
+    // Aerodynamic drag a = k·v², k = ρ·CdA / 2m (PHYSICS.airDrag); a grab is more compact. The tuck of a
+    // flip doesn't count: rotating never changes the flight (air time, apex, landing point — a spin and
+    // flip fly the same arc as a straight air; physics-combo.mjs), and a balled-up flip opens again anyway.
+    const compact = this.grab;
     const kd = P.airDrag * (1 - (1 - P.airDragCompact) * compact);
     this.velocity.multiplyScalar(1 / (1 + kd * this.velocity.length() * dt));
     this.dyn.air(dt, this._ctrl);
@@ -760,6 +777,9 @@ export class Player {
     // Fast follow on the ground (stops / butters / spins rotate quickly), smoothing only the terrain.
     const k = this.state === State.GROUNDED ? 22 : 30;
     this.orient.slerp(target, 1 - Math.exp(-k * dt));
+    // Off-axis shape (flip axis, cork tilt) from the spin : flip rates, frozen once on the snow (the
+    // landing's leftover tilt settles in the same shape).
+    if (this.state === State.AIR) this.offAxis.update(dt, this.visFlip, this.spinRate, this.flipRate, this.orient);
   }
 }
 

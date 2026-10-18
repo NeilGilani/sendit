@@ -644,7 +644,9 @@ export class EdgePhysics {
   /** Pitch landing check: { dev (deg from upright), flips (whole rotations), back (bool), result }. */
   landFlip() {
     const pl = this.pl, C = this.C;
-    const dev = Math.abs(wrapPi(pl.flip || 0)) / DEG;
+    // How far the body is tipped off upright: the flip's own angle for a plain flip, less in a cork (the
+    // body's up axis rides a cone round the tilted axis, physics/offaxis.js) — the attitude that is drawn.
+    const dev = (pl.offAxis ? pl.offAxis.tilt((pl.flip || 0) * (pl.travelSign || 1)) : Math.abs(wrapPi(pl.flip || 0))) / DEG;
     const flips = Math.round(Math.abs(pl.flip || 0) / (Math.PI * 2));
     const result = dev <= C.flipLandClean ? 'clean' : dev <= C.flipLandStumble ? 'stumble' : 'crash';
     return { dev, flips, back: (pl.flip || 0) > 0, result };
