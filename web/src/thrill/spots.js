@@ -7,11 +7,64 @@
 // Fjordline), else the kickers (Valcrest, Blackspruce: "Kicker 2 (L)"). The full list (for found / total)
 // is course.named (Voltage) or a background scan of featureAt over the terrain, cached per map in
 // localStorage 'sendit.spots' (THRILL_SPOT_CATALOG bumps it). The Progress tab lists them (spotsHtml).
-import { on, emit, addScore, game, Mode } from '../state.js';
+import * as THREE from 'three';
+import { on, emit, addScore, game, Mode, settings } from '../state.js';
 import { THRILL, SpotBook, judgeLanding } from './core.js';
 import { progression } from '../progression/index.js';
 
-export const THRILL_SPOT_CATALOG = 1;   // bump when map feature names change, to rescan
+/** Up to THRILL.markers.max floating "?" sprites over undiscovered spots, fading in with distance. */
+class SpotMarkers {
+  constructor(scene, terrain) {
+    this.terrain = terrain;
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(64, 64, 8, 64, 64, 62);
+    grad.addColorStop(0, 'rgba(47,245,214,0.55)'); grad.addColorStop(0.55, 'rgba(47,245,214,0.18)'); grad.addColorStop(1, 'rgba(47,245,214,0)');
+    g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
+    g.font = 'bold 76px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = 8; g.strokeStyle = 'rgba(4,20,28,0.85)'; g.strokeText('?', 64, 68);
+    g.fillStyle = '#eafffb'; g.fillText('?', 64, 68);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    this.items = [];
+    for (let i = 0; i < THRILL.markers.max; i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false, opacity: 0 }));
+      sp.visible = false; sp.renderOrder = 5;
+      scene.add(sp);
+      this.items.push({ sp, target: null, a: 0 });
+    }
+    this.t = 0;
+  }
+  set(list) {
+    // Keep a sprite on the same spot when it is still in the list (no jumping between spots).
+    const free = this.items.filter((it) => !it.target || !list.some((l) => l.name === it.target.name));
+    for (const it of free) it.target = null;
+    for (const l of list) {
+      const have = this.items.find((it) => it.target?.name === l.name);
+      if (have) { have.target = l; continue; }
+      const it = this.items.find((x) => !x.target);
+      if (it) { it.target = l; it.sp.position.set(l.x, this.terrain.getHeight(l.x, l.z) + THRILL.markers.lift, l.z); }
+    }
+  }
+  update(dt, show, pos) {
+    this.t += dt;
+    const M = THRILL.markers;
+    for (const [i, it] of this.items.entries()) {
+      const d = it.target ? Math.hypot(it.sp.position.x - pos.x, it.sp.position.z - pos.z) : Infinity;
+      // Fade in from range to range·0.7, out again inside `near`/2 (you are on it).
+      const want = show && it.target ? Math.min(1, (M.range - d) / (M.range * 0.3)) * Math.min(1, d / (M.near * 0.5)) : 0;
+      it.a += (Math.max(0, want) - it.a) * Math.min(1, dt * 4);
+      it.sp.visible = it.a > 0.02;
+      if (!it.sp.visible) continue;
+      it.sp.material.opacity = it.a * 0.9;
+      const s = M.size * (0.8 + Math.min(1.6, d / 60));   // stays readable far away
+      it.sp.scale.set(s, s, 1);
+      if (it.target) it.sp.position.y = this.terrain.getHeight(it.target.x, it.target.z) + M.lift + Math.sin(this.t * 2 + i) * 0.4;
+    }
+  }
+}
+
+export const THRILL_SPOT_CATALOG = 2;   // bump when map feature names change, to rescan (2: points per spot for the markers)
 
 const localStore = {
   get(k) { try { const s = globalThis.localStorage?.getItem(k); return s ? JSON.parse(s) : null; } catch { return null; } },
@@ -35,14 +88,22 @@ export function makeNamer(course, features) {
   };
 }
 
-/** All spot names, now if cheap (course.named, kickers), else via a chunked background scan (cb). */
+/**
+ * All spot names and a few points on each ({ name: [[x, z], …] }, ≥ 50 m apart, ≤ 16), now if cheap
+ * (course.named, kickers), else via a chunked background scan. done(names, pts).
+ */
 function buildCatalog(course, features, terrain, namer, done) {
-  const names = new Set();
+  const names = new Set(), pts = {};
+  const add = (n, x, z) => {
+    names.add(n);
+    const l = (pts[n] ||= []);
+    if (l.length < 16 && l.every((q) => Math.hypot(q[0] - x, q[1] - z) >= 50)) l.push([x, z]);
+  };
   for (const r of course?.rails || []) if (r?.name) names.add(r.name);
-  if (Array.isArray(course?.named)) { for (const n of course.named) if (n?.name) names.add(n.name); done([...names]); return () => {}; }
+  if (Array.isArray(course?.named)) { for (const n of course.named) if (n?.name) add(n.name, n.x, n.z); done([...names], pts); return () => {}; }
   if (typeof course?.featureAt !== 'function') {
-    (features?.kickers || []).forEach((k) => { const n = namer(k.o.x + k.f.x * k.L * 0.5, k.o.y + k.f.y * k.L * 0.5); if (n) names.add(n); });
-    done([...names]); return () => {};
+    (features?.kickers || []).forEach((k) => { const x = k.o.x + k.f.x * k.L * 0.5, z = k.o.y + k.f.y * k.L * 0.5, n = namer(x, z); if (n) add(n, x, z); });
+    done([...names], pts); return () => {};
   }
   const half = terrain?.half || 2000, step = 8;
   let i = -half, stop = false;
@@ -50,21 +111,22 @@ function buildCatalog(course, features, terrain, namer, done) {
     if (stop) return;
     const t0 = performance.now();
     while (i <= half && performance.now() - t0 < 6) {
-      for (let z = -half; z <= half; z += step) { const n = namer(i, z); if (n) names.add(n); }
+      for (let z = -half; z <= half; z += step) { const n = namer(i, z); if (n) add(n, i, z); }
       i += step;
     }
-    if (i > half) done([...names]); else setTimeout(slice, 30);
+    if (i > half) done([...names], pts); else setTimeout(slice, 30);
   };
   setTimeout(slice, 2500);   // after the loading screen and first frames
   return () => { stop = true; };
 }
 
-export function installSpots({ player, course, features, terrain, getMapId, hud }) {
+export function installSpots({ player, course, features, terrain, getMapId, hud, scene }) {
   const C = THRILL.spots;
   const namer = makeNamer(course, features);
   const B = spotBook();
   const mapId = () => getMapId();
-  if (!B.hasCatalog(mapId(), THRILL_SPOT_CATALOG)) buildCatalog(course, features, terrain, namer, (names) => { if (names.length) B.setCatalog(mapId(), names, THRILL_SPOT_CATALOG); });
+  if (!B.hasCatalog(mapId(), THRILL_SPOT_CATALOG)) buildCatalog(course, features, terrain, namer, (names, pts) => { if (names.length) B.setCatalog(mapId(), names, THRILL_SPOT_CATALOG, pts); });
+  const markers = scene ? new SpotMarkers(scene, terrain) : null;
 
   let from = null;
   const riding = () => game.mode === Mode.RIDING;
@@ -108,7 +170,23 @@ export function installSpots({ player, course, features, terrain, getMapId, hud 
     }
   });
   on('grindEnd', ({ reason, name, dist }) => { if (riding() && name && reason !== 'bail' && (dist || 0) >= C.railMin) discovered(name, 'rail'); });
-  return { namer, book: B };
+  // Undiscovered spots ahead get a floating "?" (Steep's points of interest), refreshed twice a second.
+  let pickT = 0;
+  on('thrillSpot', () => { pickT = 0; });
+  return {
+    namer, book: B, markers,
+    update(dt) {
+      if (!markers) return;
+      const show = riding() && settings.thrillSpotMarkers !== false;
+      if (show && (pickT -= dt) <= 0) {
+        pickT = 0.5;
+        const v = player.velocity, hs = Math.hypot(v.x, v.z);
+        const dx = hs > 1 ? v.x / hs : -Math.sin(player.heading), dz = hs > 1 ? v.z / hs : -Math.cos(player.heading);
+        markers.set(B.undiscoveredNear(mapId(), player.position.x, player.position.z, dx, dz, THRILL.markers));
+      }
+      markers.update(dt, show, player.position);
+    },
+  };
 }
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));

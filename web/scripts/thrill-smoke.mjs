@@ -43,6 +43,9 @@ const ev = (n) => page.evaluate((n) => window.__ev.filter((e) => e[0] === n), n)
 
 // ---------------------------------------------------------------- Valcrest: spot, replay, retry, restart
 await boot('map=valcrest-gully&kicker=2&ride');
+const mk = await page.evaluate(() => window.__thrill.spots.markers.items.filter((it) => it.sp.visible).map((it) => it.target?.name));
+check('undiscovered spots ahead get a ? marker', mk.length > 0, mk.join(', '));
+await shot('0-spot-marker');
 await scenario('spin360', (src) => src.replace('SPIN = 2', 'SPIN = 0').replace('multiplyScalar(13)', 'multiplyScalar(11)').replaceAll('*= 13 / sp', '*= 11 / sp'));   // a straight air at 11 m/s: ~1.9 s, lands clean
 await wait(300);
 const landed = (await ev('landed')).at(-1)?.[2];

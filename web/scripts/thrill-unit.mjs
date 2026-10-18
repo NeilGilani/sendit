@@ -34,6 +34,20 @@ export async function run(test, assert) {
     assert.equal(b.hasCatalog('m', 2), false, 'new catalog version');
   });
 
+  await test('thrill spots: undiscovered markers are near, ahead, nearest first, and vanish once found', () => {
+    const b = new T.SpotBook(memStore());
+    b.setCatalog('m', ['Ahead', 'Behind', 'Close behind', 'Far', 'Found'], 2, {
+      Ahead: [[0, -100], [0, -400]], Behind: [[0, 100]], 'Close behind': [[0, 30]], Far: [[0, -300]], Found: [[0, -50]], Junk: [['x', 1]],
+    });
+    b.record('m', 'Found');
+    const near = b.undiscoveredNear('m', 0, 0, 0, -1);   // heading north (−z)
+    assert.deepEqual(near.map((n) => n.name), ['Close behind', 'Ahead']);
+    assert.equal(near[1].z, -100, 'the nearest point of a spot');
+    assert.equal(b.undiscoveredNear('m', 0, 0, 0, -1, { max: 1 }).length, 1);
+    assert.deepEqual(Object.keys(b.map('m').catalog.pts).sort(), ['Ahead', 'Behind', 'Close behind', 'Far', 'Found'], 'junk points dropped');
+    assert.equal(b.setCatalog('m', ['Ahead', 'Behind', 'Close behind', 'Far', 'Found'], 2), false, 'same names, no new points: unchanged');
+  });
+
   await test('thrill spots: garbage storage is repaired', () => {
     for (const junk of [null, 5, 'x', { maps: 3 }, { maps: { a: null, b: { spots: { q: { n: -1 }, ok: { n: 2 } }, gaps: { g: 'x' }, catalog: { names: [1, 'a'] } } } }]) {
       const st = memStore(); st.set('sendit.spots', junk);

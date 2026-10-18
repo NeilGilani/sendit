@@ -34,6 +34,13 @@ export const THRILL = {
     gapRepeat: 100,        // points for a gap already found (THPS gaps always score)
     railMin: 3,            // m of grind for a rail to count as a spot
   },
+  markers: {
+    range: 160,            // m: undiscovered spots closer than this get a floating "?" …
+    near: 45,              // … ahead of you, or any direction within this
+    max: 3,                // markers at once
+    lift: 5,               // m above the snow
+    size: 2.2,             // sprite size (m) up close; grows with distance to stay readable
+  },
   exposure: {
     look: [6, 10, 15, 22, 30],   // m ahead sampled along the travel direction
     dropFrom: 6, dropFull: 24,   // m of drop ahead beyond the slope's own fall: 0 → 1
@@ -78,8 +85,20 @@ function sanitizeSpots(s) {
     const spots = {}, gaps = {};
     for (const [k, v] of Object.entries(m.spots || {})) if (k && v && Number.isFinite(v.n) && v.n > 0) spots[k] = { n: Math.floor(v.n), first: Number(v.first) || 0 };
     for (const [k, v] of Object.entries(m.gaps || {})) if (k && Number.isFinite(v) && v > 0) gaps[k] = Math.floor(v);
-    const catalog = Array.isArray(m.catalog?.names) ? { names: m.catalog.names.filter((x) => typeof x === 'string' && x).slice(0, 400), ver: Number(m.catalog.ver) || 0 } : null;
+    const catalog = Array.isArray(m.catalog?.names) ? { names: m.catalog.names.filter((x) => typeof x === 'string' && x).slice(0, 400), ver: Number(m.catalog.ver) || 0, pts: cleanPts(m.catalog.pts) } : null;
     out.maps[id] = { spots, gaps, catalog };
+  }
+  return out;
+}
+
+/** { name: [[x, z], …] } with finite numbers only, at most 16 points a name. */
+function cleanPts(p) {
+  const out = {};
+  if (!p || typeof p !== 'object' || Array.isArray(p)) return out;
+  for (const [k, v] of Object.entries(p)) {
+    if (!Array.isArray(v)) continue;
+    const ok = v.filter((q) => Array.isArray(q) && Number.isFinite(q[0]) && Number.isFinite(q[1])).slice(0, 16).map((q) => [Math.round(q[0]), Math.round(q[1])]);
+    if (ok.length) out[k] = ok;
   }
   return out;
 }
@@ -117,13 +136,31 @@ export class SpotBook {
     return { isNew: n === 1, n, name };
   }
   /** The map's full list of named spots (found or not). Kept unless it changes. */
-  setCatalog(mapId, names, ver = 1) {
+  setCatalog(mapId, names, ver = 1, pts = null) {
     const m = this.map(mapId);
     const clean = [...new Set(names.filter((x) => typeof x === 'string' && x))].sort();
-    if (m.catalog && m.catalog.ver === ver && m.catalog.names.length === clean.length && m.catalog.names.every((x, i) => x === clean[i])) return false;
-    m.catalog = { names: clean, ver };
+    if (m.catalog && m.catalog.ver === ver && m.catalog.names.length === clean.length && m.catalog.names.every((x, i) => x === clean[i]) && !pts) return false;
+    m.catalog = { names: clean, ver, pts: cleanPts(pts) };
     this.save();
     return true;
+  }
+  /**
+   * Undiscovered spots near (x, z): [{ name, x, z, d }] nearest first, at most `max`, within `range` m, and
+   * ahead of the travel direction (dx, dz) unless closer than `near` m.
+   */
+  undiscoveredNear(mapId, x, z, dx, dz, { range = 160, near = 45, max = 3 } = {}) {
+    const m = this.map(mapId), pts = m.catalog?.pts || {}, out = [];
+    for (const [name, list] of Object.entries(pts)) {
+      if (m.spots[name]) continue;
+      let best = null;
+      for (const [px, pz] of list) {
+        const ex = px - x, ez = pz - z, d = Math.hypot(ex, ez);
+        if (d > range || (d > near && (ex * dx + ez * dz) / Math.max(d, 1e-6) < 0.35)) continue;
+        if (!best || d < best.d) best = { name, x: px, z: pz, d };
+      }
+      if (best) out.push(best);
+    }
+    return out.sort((a, b) => a.d - b.d).slice(0, max);
   }
   hasCatalog(mapId, ver = 1) { const c = this.map(mapId).catalog; return !!c && c.ver === ver && c.names.length > 0; }
   /** → { found, total, spots: [{ name, n }] (found first, then unfound as n 0), gaps: [{ name, n }] } */

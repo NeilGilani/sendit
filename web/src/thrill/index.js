@@ -20,7 +20,7 @@ export function installThrill(o) {
   const { player, rider, cam, camera, sound, input, activities, ui, juice, scene, course, features, terrain, canvas, getMap, getName, params } = o;
   const hud = juice?.hud;
   const retry = installRetry({ player, input, activities, ui, cam });
-  const spots = installSpots({ player, course, features, terrain, getMapId: () => getMap().mapId, hud });
+  const spots = installSpots({ player, course, features, terrain, getMapId: () => getMap().mapId, hud, scene });
   const adrenaline = installAdrenaline({ player, terrain, sound });
   const replay = installReplay({ player, rider, camera, terrain, input, activities, cam, canvas });
   const versus = installVersus({ scene, course, player, activities, hud, getMap, getName, params });
@@ -33,6 +33,7 @@ export function installThrill(o) {
     input: () => replay.input(),
     update(dt) {
       retry.update(dt);
+      spots.update(dt);
       adrenaline.update(dt);
       versus.update(dt);
       replay.record(dt);
@@ -42,17 +43,18 @@ export function installThrill(o) {
   return thrill;
 }
 
-/** Two rows in the shared settings grid (lobby Settings tab and pause menu). */
+/** Three rows in the shared settings grid (lobby Settings tab and pause menu). */
 function mountThrillSettings() {
   const grid = typeof document !== 'undefined' && document.querySelector('#settings .grid');
   if (!grid || grid.querySelector('[data-key=thrillAdrenaline]')) return;
   const rows = document.createElement('template');
   rows.innerHTML = `
     <label for="set-thrillAdrenaline">Adrenaline cues (heartbeat near drops)</label><input id="set-thrillAdrenaline" type="checkbox" data-key="thrillAdrenaline" />
-    <label for="set-thrillReplayPrompt">Replay prompt after big tricks</label><input id="set-thrillReplayPrompt" type="checkbox" data-key="thrillReplayPrompt" />`;
+    <label for="set-thrillReplayPrompt">Replay prompt after big tricks</label><input id="set-thrillReplayPrompt" type="checkbox" data-key="thrillReplayPrompt" />
+    <label for="set-thrillSpotMarkers">Mark undiscovered spots (?)</label><input id="set-thrillSpotMarkers" type="checkbox" data-key="thrillSpotMarkers" />`;
   const fs = grid.querySelector('label[for=set-fullscreen]');
   grid.insertBefore(rows.content, fs || null);
-  for (const k of ['thrillAdrenaline', 'thrillReplayPrompt']) {
+  for (const k of ['thrillAdrenaline', 'thrillReplayPrompt', 'thrillSpotMarkers']) {
     const el = grid.querySelector(`#set-${k}`);
     el.checked = settings[k] !== false;
     el.addEventListener('change', () => setSetting(k, el.checked));
