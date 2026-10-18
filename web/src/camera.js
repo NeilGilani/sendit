@@ -84,7 +84,7 @@ export class CameraController {
     this.vel = [0, 0, 0];
     this.yaw = this.player.heading + ((this.player.travelSign ?? 1) < 0 ? Math.PI : 0);
     this.lookYaw = 0; this.lookPitch = 0; this.side = 0;
-    this.airK = 0; this.preK = 0; this.airTotal = 0; this.turnRate = 0; this.prevVelYaw = null; this.armLift = 0; this.sv = {}; this.landPt.set(0, 0, 0);
+    this.airK = 0; this.preK = 0; this.airTotal = 0; this.turnRate = 0; this.prevVelYaw = null; this.armLift = 0; this.crashK = 0; this.sv = {}; this.landPt.set(0, 0, 0);
   }
 
   startIntro() {
@@ -302,6 +302,10 @@ export class CameraController {
       const maxA = THREE.MathUtils.degToRad(this.camera.fov * 0.5 * C.landKeep), ang = toR.angleTo(toA);
       if (ang > maxA) aim.copy(cp).addScaledVector(toR.lerp(toA, maxA / ang).normalize(), dA);
     }
+    // Crash: aim at the tumbling body. It slides fast down steep faces and the anchor's vertical smoothing left the
+    // camera 3-4 m above it, aimed past it: on Blackspruce the ragdoll sat below the bottom edge for most of the crash.
+    this.crashK = this.spring('crashK', crash ? 1 : 0, crash ? 4 : 3, dt);
+    if (this.crashK > 0.001) aim.lerp(_v.copy(s.renderPos).setY(s.renderPos.y + 0.3), clamp(this.crashK, 0, 1) * 0.85);
     this.camera.lookAt(aim);
     // Carve tilt
     const wantRoll = -s.turnInput * r * THREE.MathUtils.degToRad(7) * (1 - this.side) * (s.state === State.GROUNDED ? 1 : 0);
