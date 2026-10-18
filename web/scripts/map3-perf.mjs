@@ -8,7 +8,7 @@
 //   map defaults to ravenspire; pass valcrest-gully to compare (spots are then along its path).
 import { chromium } from '@playwright/test';
 const [base = 'http://localhost:5183', W = '1600', H = '900', qs = '0,1,2', N = '90', map = 'ravenspire'] = process.argv.slice(2);
-const browser = await chromium.launch({ args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ args: [...(process.platform === 'darwin' ? ['--use-gl=angle', '--use-angle=metal'] : ['--use-angle=d3d11']), '--enable-gpu', '--ignore-gpu-blocklist'] });
 // Spots as fractions along the course path (start → finish), riding down it.
 const SPOTS = [0.02, 0.2, 0.38, 0.55, 0.62, 0.8];
 for (const q of qs.split(',').map(Number)) {
