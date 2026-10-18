@@ -346,12 +346,15 @@ export class FPView {
     const chat = ground ? (0.003 + r * r * 0.012) : 0.0008;
     this.eye.y += (noise1(t * 26, 2.1) * 0.7 + noise1(t * 53, 4.4) * 0.3) * chat;
     this.eye.y -= this.dip * 0.5;
-    // Terrain chatter: a stiff spring kicked by how fast the ground normal changes (bumps, ruts, crud).
-    if (ground && dt > 1e-4) {
-      const dn = _v.copy(s.groundNormal).sub(this.prevN).length() / dt;
-      this.bobV += Math.min(FP_BOB.max, dn * FP_BOB.gain * (0.4 + r)) * (noise1(t * 40, 6.6) > 0 ? 1 : -1);
+    // Terrain chatter: a stiff spring kicked by how fast the ground normal changes (bumps, ruts, crud). The normal
+    // only changes on physics steps (60 Hz), so the rate and the kick are taken over physics time (s.simTime):
+    // per frame it kicked 2.4× as hard at 144 Hz and half as hard at 30 Hz. (60 Hz unchanged.)
+    const simDt = s.simTime !== undefined && this.prevSim !== undefined ? s.simTime - this.prevSim : dt;
+    if (ground && simDt > 1e-4) {
+      const dn = _v.copy(s.groundNormal).sub(this.prevN).length() / simDt;
+      this.bobV += Math.min(FP_BOB.max, dn * FP_BOB.gain * (0.4 + r)) * (noise1(t * 40, 6.6) > 0 ? 1 : -1) * Math.min(4, simDt * 60);
     }
-    this.prevN.copy(s.groundNormal);
+    if (simDt > 1e-4 || !ground) { this.prevN.copy(s.groundNormal); this.prevSim = s.simTime; }
     this.bobV -= (this.bob * FP_BOB.spring + this.bobV * FP_BOB.damp) * dt;
     this.bob += this.bobV * dt;
     this.eye.y += this.bob;
