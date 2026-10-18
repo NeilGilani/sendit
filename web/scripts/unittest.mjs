@@ -24,6 +24,8 @@ async function test(name, fn) {
 
 // Progression + juice (game-feel): scripts/progression-unit.mjs (own storage key, runs first).
 await (await import('./progression-unit.mjs')).run(test, assert);
+// Thrill (instant restart / retry, spots & gaps, adrenaline, replay, versus codes): scripts/thrill-unit.mjs.
+await (await import('./thrill-unit.mjs')).run(test, assert);
 
 // ---------------------------------------------------------------- schema
 await test('default profile is valid with a full loadout', () => {
