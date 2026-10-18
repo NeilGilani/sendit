@@ -58,7 +58,7 @@ export const FP_BREATH = {
 // Crash: the helmet cam is knocked out of the head and settles a few
 // metres back / up the way you came, watching the body tumble, so the crash stays readable and nobody
 // gets a tumbling-eye spin. First person resumes on the respawn.
-export const FP_CRASH = { back: 2.6, up: 1.4, settle: 0.9, follow: 5, lookRate: 7, floor: 0.45, minDist: 1.7 };
+export const FP_CRASH = { back: 2.6, up: 1.4, settle: 0.9, follow: 5, lookRate: 7, floor: 0.45, minDist: 1.7, crown: 3.5 };
 // Terrain chatter: bumps (how fast the ground normal under the rider changes) kick the helmet cam.
 export const FP_BOB = { gain: 0.0035, max: 0.05, spring: 260, damp: 22 };
 
@@ -208,9 +208,18 @@ export class FPView {
     const e = THREE.MathUtils.smoothstep(this.crashT, 0, F.settle);
     const want = _cv2.copy(chest).addScaledVector(this.crashBack, F.back * e).add(_v.set(0, 0.2 + F.up * e, 0));
     this.crashPos.lerp(want, k(F.follow * (0.4 + e)));
-    // Never inside the tumbling body (the ragdoll can roll back toward the camera).
+    // Never inside the tumbling body (the ragdoll can roll back toward the camera) …
     const dc = this.crashPos.distanceTo(chest);
     if (dc < F.minDist * e) this.crashPos.sub(chest).multiplyScalar(F.minDist * e / Math.max(dc, 1e-3)).add(chest);
+    // … or a tree's crown / a rock (out of the trunk's foliage radius, sideways).
+    const near = ctl.player.scatter?.obstaclesNear?.(this.crashPos, 3);
+    if (near) for (const o of near) {
+      const R = o[3] === 'tree' ? o[2] * F.crown + 0.3 : o[2] + 0.5;
+      const dx = this.crashPos.x - o[0], dz = this.crashPos.z - o[1], d = Math.hypot(dx, dz);
+      if (d < R && d > 1e-3) { this.crashPos.x = o[0] + dx / d * R; this.crashPos.z = o[1] + dz / d * R; }
+    }
+    // The helmet cam starts inside the head: keep the head (and helmet) small until it has left it.
+    if (rider.bones?.Head) rider._crashHideHead = this.crashPos.distanceTo(rider.bones.Head.getWorldPosition(_v)) < 0.55;
     const floor = ctl.terrain.getHeight(this.crashPos.x, this.crashPos.z) + F.floor;
     if (this.crashPos.y < floor) this.crashPos.y = floor;
     cam.position.copy(this.crashPos);
@@ -232,6 +241,7 @@ export class FPView {
 
   update(dt) {
     this.crashing = false;
+    if (this.c.rider) this.c.rider._crashHideHead = false;
     const ctl = this.c, cam = ctl.camera, s = ctl.player, rider = ctl.rider, rp = rider.p;
     const k = (r) => 1 - Math.exp(-r * dt);
     const st = s.state, air = st === State.AIR, lift = st === State.LIFT;

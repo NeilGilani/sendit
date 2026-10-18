@@ -228,6 +228,7 @@ export class RagdollController {
 
   stop() {
     this.active = false;
+    this.rider._crashHideHead = false;
     this.H = null; this.seed = null;
     this.failed = false;
   }

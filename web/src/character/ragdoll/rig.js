@@ -137,6 +137,8 @@ export function applyPose(rider, H, seed, alpha, blend, renderPos) {
     m.visible = true;
   }
   if (rider.poles) for (let i = 0; i < rider.poles.length; i++) if (!seed.gear.poles.some((p) => p.mesh === i)) rider.poles[i].visible = false;
+  // The helmet cam knocked out of the head starts inside it: the head stays small until it has left (fpview.js).
+  if (rider._crashHideHead) B.Head.scale.multiplyScalar(0.15);
   rider.root.updateMatrixWorld(true);
   for (const c of rider.contacts || []) { c.grounded = false; c.load = 0; }
 }
