@@ -4,7 +4,9 @@
 // Messages out: frame (first frame shown), shot {info}, stats, log, error.
 let errors = 0;
 let scene = null, running = false, last = 0, due = 0, visible = true, sentFrame = false;
-const post = (type, payload = {}) => self.postMessage({ type, ...payload });
+// Every message carries the worker's clock as epoch ms (wt): the page's main thread may receive it seconds
+// late (long tasks), so timing stats use wt, not the arrival time.
+const post = (type, payload = {}) => self.postMessage({ type, wt: performance.timeOrigin + performance.now(), ...payload });
 
 self.addEventListener('error', (e) => post('error', { message: e.message || 'error' }));
 self.addEventListener('unhandledrejection', (e) => post('error', { message: e.reason?.message || String(e.reason) }));
@@ -41,6 +43,7 @@ self.onmessage = async (e) => {
     try {
       const ti = performance.now();
       const { LoadingScene } = await import('./scene.js');
+      post('modules');   // the page starts the game's own download now (loading/index.js whenStarted)
       scene = new LoadingScene(m.canvas, { ...m, opts: { ...m.opts, modulesMs: Math.round(performance.now() - ti) } }, post);
       await scene.init();
       running = true;

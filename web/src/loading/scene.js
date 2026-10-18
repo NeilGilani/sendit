@@ -23,6 +23,7 @@ import { PowderFX } from './powderfx.js';
 import { Shot } from './choreo.js';
 import { planMove, CameraRig } from './shots.js';
 import { TreeSystem } from '../gfx/trees.js';
+import { StillOverlay } from './still.js';
 
 // Max rendered pixels (CSS px × ratio²). A 1440×900 @2× laptop would ask for 5.2 MP; ~3.2 MP + SMAA is
 // crisp on a 13'' panel and still holds 30–60 fps next to the booting game (the scaler trims it if not).
@@ -53,6 +54,9 @@ export class LoadingScene {
 
   async init() {
     const t0 = performance.now();
+    // The page's painted still, redrawn here until the first rider shot (loading/still.js).
+    this.stillOv = this.opts.still?.url ? new StillOverlay(this.opts.still) : null;
+    const stillLoad = this.stillOv?.load();
     const v = this.v = pickVariant(this.opts);
     const r = this.r = v.r;
     const renderer = this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, powerPreference: 'high-performance', alpha: false, stencil: false, depth: true });
@@ -134,11 +138,15 @@ export class LoadingScene {
     // first frame, so this thread never stalls on a link; the painted backdrop covers the wait.
     this.frame(0, true);
     const tc = performance.now();
-    const compiling = this.renderer.compileAsync(this.scene, this.camera);
+    const compiling = this.compileHDR(this.scene);
+    // Every frame this worker commits must show the still while the page shows it (a black or empty
+    // frame would flash over the page's still): wait for it before the first draw of any kind.
+    if (stillLoad && !(await Promise.race([stillLoad, new Promise((res) => setTimeout(() => res(false), 2500))]))) this.stillOv = null;
     // Meanwhile build the post passes' programs (sync, small) by running the chain over an empty scene.
     this.renderPass.scene = new THREE.Scene();
     this.composer.render(0);
     this.renderPass.scene = this.scene;
+    this.stillOv?.render(this.renderer, this.size.width, this.size.height);
     await compiling;
     this.stats = { build: Math.round(tc - t0), compile: Math.round(performance.now() - tc) };
     this.checkPrograms();
@@ -178,6 +186,20 @@ export class LoadingScene {
     this.scene.add(ts.group);
     this.timing.trees = Math.round(performance.now() - t0);
     this.timing.treeCount = n;
+  }
+
+  /**
+   * compileAsync for the programs the frames really use: the scene renders into the composer's HDR
+   * target (linear output), a different program variant from the canvas one — compiling for the canvas
+   * left the first live frame linking everything synchronously (a 1.8 s stall measured). compile() runs
+   * synchronously at the call, so the target only needs binding around it.
+   */
+  compileHDR(obj, target = null) {
+    const r = this.renderer, prev = r.getRenderTarget();
+    r.setRenderTarget(this.composer.inputBuffer);
+    let p;
+    try { p = r.compileAsync(obj, this.camera, target); } finally { r.setRenderTarget(prev); }
+    return p;
   }
 
   /**
@@ -310,7 +332,7 @@ export class LoadingScene {
     rider.root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     // Compile off-thread (behind the establishing shot) rather than as a hitch on the first trick frame.
     rider.update(0, this.camera);
-    await this.renderer.compileAsync(rider.root, this.camera, this.scene);
+    await this.compileHDR(rider.root, this.scene);
     this.checkPrograms();
     rider.root.visible = false;
     this.scene.add(rider.root);
@@ -354,11 +376,12 @@ export class LoadingScene {
     this.shotLen = shot.screenLength();
     this.powder.clear();
     this.rider.root.visible = true;
+    if (this.stillOv && !this.stillFadeT) this.stillFadeT = 1e-4;   // dissolve the still into the first shot
     const com = shot.pose(this.pl, this.simT, 0, this.fx, this.simT).com;
     this.rider.update(0, this.camera);
     this.rig.start(this.move, com);
     this.mode = 'shot';
-    this.dip = 0.6;                         // fade up from the cut
+    this.dip = this.stillFadeT && this.stillFadeT < 0.1 ? 0 : 0.6;   // fade up from the cut (not under the still)
     const T = TRICKS[trick];
     this.lastInfo = { trick: T.name, trickId: trick, cam, camera: CAMERAS[cam].name, place: v.place, time: TIMES[v.tod].name, tod: v.tod, mtn: v.mtn, gear: v.gear, seed: v.seed, own: !!v.own };
     this.post('shot', { info: this.lastInfo });
@@ -460,7 +483,13 @@ export class LoadingScene {
     this.trees?.update(cam.position);
     globals.uResolution.value.set(this.size.width, this.size.height);
     if (setupOnly || this.opts.q === 'idle') return;   // ?loadq=idle: measure the scene's startup cost alone
-    this.composer.render(dt);
+    // Under a fully opaque still the live scene only renders now and then (keeps its targets and
+    // programs warm without taking GPU time from the booting game).
+    const ov = this.stillOv;
+    if (ov && this.stillFadeT) { this.stillFadeT += dt; const x = Math.min(1, this.stillFadeT / 1.6); ov.alpha = 1 - x * x * (3 - 2 * x); }
+    const hidden = ov && ov.ready && ov.alpha >= 1;
+    if (!hidden || this.frames % 8 === 0) this.composer.render(dt);
+    if (ov) { ov.render(this.renderer, this.size.width, this.size.height); if (ov.alpha <= 0) this.stillOv = null; }
     this.frames++;
   }
 

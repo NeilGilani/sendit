@@ -197,11 +197,12 @@ async function boot() {
   addEventListener('resize', onResize);
   onResize();
   terrain.update(terrain.getSpawn().position, Infinity);   // full detail around the start before the first frame
-  renderer.compile(scene, camera);
+  await compileForPost();
   // Warm-up behind the loading screen (gfx/prewarm.js): textures, every shader variant, LOD around start + lobby.
   await rockTextureReady();
   const ls = lobbySpot(currentMap.map, course, terrain);
   console.log('[gfx] prewarm', (await prewarm({ renderer, scene, camera, post, scatter, terrain, fx, spots: [terrain.getSpawn().position, new THREE.Vector3(ls.x, 0, ls.z)] })).toFixed(0), 'ms');
+  warming = false;
   setTimeout(() => warmQualityVariants({ renderer, camera, scene, current: settings.quality, makeVariants: (q) => terrain.qualityMaterials(q) }), 1500);
   ui.loading(1, '');
   ui.doneLoading();
@@ -288,6 +289,28 @@ function saveLoadHint(mapId = currentMap?.map.id, trail = null, transition = fal
 }
 
 /**
+ * Shader programs without blocking the GPU process: KHR_parallel_shader_compile via compileAsync, so the
+ * loading screen's worker (which shares Chrome's GPU thread) keeps drawing while the game's ~100
+ * programs link. Falls back to the synchronous compile.
+ */
+async function compileAsync() {
+  try { await renderer.compileAsync(scene, camera); } catch (e) { console.warn('[gfx] compileAsync failed, compiling synchronously', e); renderer.compile(scene, camera); }
+}
+
+/**
+ * Compile the programs the game will actually draw with: it renders into the post stack's HDR target
+ * (linear output, another program variant than the canvas), so compile with that target bound. The
+ * frame loop holds off meanwhile (`warming`): a frame would link the same programs synchronously.
+ */
+async function compileForPost() {
+  warming = true;
+  const prev = renderer.getRenderTarget();
+  const rt = composer?.inputBuffer;
+  if (rt) renderer.setRenderTarget(rt);
+  try { await compileAsync(); } finally { renderer.setRenderTarget(prev); }
+}
+
+/**
  * Build the lobby stage once (plinth, preview rider, shaders). Never rejects: if the stage fails,
  * the lobby UI still works over the world's menu flyover (the camera controller drives the view).
  */
@@ -296,7 +319,7 @@ function ensureStage() {
     stageReady = stage.init(new GLTFLoader()).then(async () => {
       await stage.setEquipment(profileStore.equipment, { animate: false, variant: profileStore.gearModel() });
       stage.resize(innerWidth, innerHeight);
-      renderer.compile(scene, camera);
+      await compileAsync();
     }).catch((e) => {
       console.error('[lobby] stage failed to build; showing the lobby over the world instead', e);
       stage.ready = false;
@@ -488,11 +511,12 @@ function checkFinish() {
 // ---------------------------------------------------------------- loop (fixed 60 Hz physics, interpolated render)
 const STEP = 1 / 60;
 let acc = 0, last = performance.now(), time = 0;
+let warming = false;   // compileForPost(): no frames while the programs compile in parallel
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  if (!composer) return;
+  if (!composer || warming) return;
   input.poll(dt);
   if (game.mode === Mode.RIDING && input.pressed.has('KeyE') && rider) profileStore.setEquipment(profileStore.equipment === 'snowboard' ? 'skis' : 'snowboard');   // debug: swap gear while riding (via the profile, so the lobby stays in sync)
   if (input.justPressed('view') && (game.mode === Mode.RIDING || game.mode === Mode.LIFT)) {

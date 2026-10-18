@@ -103,6 +103,7 @@ export const CAMERAS = {
   reveal: { name: 'Drone reveal', w: 2 },       // starts tight, pulls back and up over the range
   follow: { name: 'Chase', w: 1 },              // behind and above the rider off the lip, over the void
   close: { name: 'Close orbit', w: 3.5 },         // a drone swinging round the rider ~5 m away through the trick
+  hero: { name: 'Hero three-quarter', w: 3 },    // 3/4 front, below the apex, backlit: the poster frame
 };
 
 export function rng(seed) {

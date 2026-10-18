@@ -2,29 +2,33 @@
 // spec is a seeded variant frozen mid-trick (?loadq=still → full size, real depth of field, no
 // adaptive scaling, ?loadfreeze=<fraction of the air time>), captured from loading.html with the
 // overlay hidden, then encoded to WebP in the browser (canvas.toBlob) — no native image tools needed.
-// Usage: node scripts/loadingstills.mjs <loading.html url> <outDir> [WxH@dpr=1600x900@1.6] [only=<name,…>]
+// Usage: node scripts/loadingstills.mjs <loading.html url> <outDir> [WxH@dpr=1600x900@1.8 → 2880×1620] [only=<name,…>]
 // Writes <outDir>/<name>.webp (+ .png with KEEP_PNG=1) and prints the manifest JSON for index.html.
 import { chromium } from '@playwright/test';
 import fs from 'fs';
 
 const url = process.argv[2] || 'http://localhost:5184/loading.html';
 const out = process.argv[3] || '../assets/loading';
-const [W, H, DPR] = (process.argv[4] || '1600x900@1.6').split(/[x@]/).map(Number);
+const [W, H, DPR] = (process.argv[4] || '1600x900@1.8').split(/[x@]/).map(Number);
 const only = (process.argv[5] || '').replace(/^only=/, '').split(',').filter(Boolean);
 const Q = Number(process.env.Q || 0.8);
 
 // name, seed (place, light, rider), trick, camera move, freeze point (fraction of the air), tod, mtn.
+// Chosen from contact sheets (docs/loading-screen.md): the 'hero' 3/4 move from below the apex reads
+// best as a poster (rider big, grab and face visible, sky / range behind, backlit).
 export const STILLS = [
-  { name: 'golden-cork', seed: 7101, trick: 'cork900', cam: 'close', freeze: 0.42, tod: 'golden', mtn: 'spires', gear: 'snowboard' },
-  { name: 'golden-japan', seed: 7244, trick: 'japan', cam: 'low', freeze: 0.5, tod: 'golden', mtn: 'ranges', gear: 'ski' },
-  { name: 'alpenglow-method', seed: 7377, trick: 'method', cam: 'dolly', freeze: 0.48, tod: 'alpenglow', mtn: 'spires', gear: 'snowboard' },
-  { name: 'bluebird-backflip', seed: 7412, trick: 'backflip', cam: 'close', freeze: 0.55, tod: 'bluebird', mtn: 'ranges', gear: 'ski' },
-  { name: 'bluebird-indy', seed: 7533, trick: 'indy', cam: 'tele', freeze: 0.5, tod: 'bluebird', mtn: 'spires', gear: 'snowboard' },
-  { name: 'dawn-rodeo', seed: 7690, trick: 'rodeo', cam: 'orbit', freeze: 0.45, tod: 'dawn', mtn: 'inversion', gear: 'ski' },
-  { name: 'storm-720', seed: 7801, trick: '720', cam: 'close', freeze: 0.4, tod: 'storm', mtn: 'ranges', gear: 'snowboard' },
-  { name: 'aurora-japan', seed: 7955, trick: 'japan', cam: 'low', freeze: 0.5, tod: 'aurora', mtn: 'spires', gear: 'ski' },
+  { name: 'golden-method', seed: 7101, trick: 'method', cam: 'hero', freeze: 0.45, tod: 'golden', mtn: 'spires', gear: 'snowboard' },
+  { name: 'golden-backflip', seed: 7101, trick: 'backflip', cam: 'hero', freeze: 0.5, tod: 'golden', mtn: 'spires', gear: 'ski' },
+  { name: 'bluebird-japan', seed: 7412, trick: 'japan', cam: 'hero', freeze: 0.45, tod: 'bluebird', mtn: 'ranges', gear: 'ski' },
+  { name: 'bluebird-cork', seed: 7533, trick: 'cork900', cam: 'hero', freeze: 0.4, tod: 'bluebird', mtn: 'spires', gear: 'snowboard' },
+  { name: 'alpenglow-method', seed: 7377, trick: 'method', cam: 'hero', freeze: 0.45, tod: 'alpenglow', mtn: 'spires', gear: 'snowboard' },
+  { name: 'dawn-japan', seed: 7690, trick: 'japan', cam: 'hero', freeze: 0.45, tod: 'dawn', mtn: 'inversion', gear: 'ski' },
+  { name: 'storm-japan', seed: 7801, trick: 'japan', cam: 'close', freeze: 0.45, tod: 'storm', mtn: 'ranges', gear: 'ski' },
+  { name: 'aurora-backflip', seed: 7955, trick: 'backflip', cam: 'hero', freeze: 0.5, tod: 'aurora', mtn: 'spires', gear: 'ski' },
 ];
 
+// SPECS='[{...}]' replaces the list (contact sheets while choosing shots).
+const LIST = process.env.SPECS ? JSON.parse(process.env.SPECS.startsWith('[') ? process.env.SPECS : fs.readFileSync(process.env.SPECS, 'utf8')) : STILLS;   // JSON or a file
 fs.mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({
   args: [...(process.platform === 'darwin' ? ['--use-gl=angle', '--use-angle=metal'] : ['--use-angle=d3d11']), '--enable-gpu', '--ignore-gpu-blocklist'],
@@ -32,7 +36,7 @@ const browser = await chromium.launch({
 const manifest = [];
 let bad = 0;
 try {
-  for (const s of STILLS) {
+  for (const s of LIST) {
     if (only.length && !only.includes(s.name)) continue;
     const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: DPR });
     const page = await ctx.newPage();

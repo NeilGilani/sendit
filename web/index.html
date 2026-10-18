@@ -13,7 +13,7 @@
     // A lobby → mountain load (localStorage sendit.loadhint, src/loading/hint.js) prefers a still in that
     // mountain's light. ?loadstill=<name> pins one, ?nostill skips it (the painted CSS screen only).
     (function () {
-      var S = /*STILLS*/[]/*END*/;
+      var S = /*STILLS*/[{"f":"golden-method.webp","seed":7101,"tod":"golden","mtn":"spires","gear":"snowboard"},{"f":"golden-backflip.webp","seed":7101,"tod":"golden","mtn":"spires","gear":"ski"},{"f":"bluebird-japan.webp","seed":7412,"tod":"bluebird","mtn":"ranges","gear":"ski"},{"f":"bluebird-cork.webp","seed":7533,"tod":"bluebird","mtn":"spires","gear":"snowboard"},{"f":"alpenglow-method.webp","seed":7377,"tod":"alpenglow","mtn":"spires","gear":"snowboard"},{"f":"dawn-japan.webp","seed":7690,"tod":"dawn","mtn":"inversion","gear":"ski"},{"f":"storm-japan.webp","seed":7801,"tod":"storm","mtn":"ranges","gear":"ski"},{"f":"aurora-backflip.webp","seed":7955,"tod":"aurora","mtn":"spires","gear":"ski"}]/*END*/;
       var LOOK = { 'valcrest-gully': 'golden bluebird', 'lake-tahoe': 'bluebird golden', blackspruce: 'bluebird storm golden', ravenspire: 'golden alpenglow storm',
         'voltage-park': 'aurora bluebird', dragonback: 'bluebird golden dawn', 'kitsune-peak': 'alpenglow dawn', fjordline: 'golden dawn' };
       var q = location.search, pool = S, s = null, h = null, last = null;
@@ -64,8 +64,11 @@
       background-size: 173px 211px, 97px 131px; background-position: 0 0, 41px 67px; animation: ld-fall 16s linear infinite; }
     #loading .ld-flakes.b { background-size: 331px 367px, 229px 263px; background-position: 30px 90px, 160px 10px; filter: blur(1.2px); opacity: .55; animation-duration: 9s; }
     @keyframes ld-fall { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-60px, 28.57%, 0); } }
-    #loadcanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 1.8s ease; }
-    #loading.live #loadcanvas { opacity: 1; }
+    /* Shown from the start: it stays transparent until the worker's first frame, which redraws the painted
+       still exactly (src/loading/still.js) and dissolves into the live shot itself. */
+    #loadcanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    #loading .ld-snow { position: absolute; inset: 0; overflow: hidden; pointer-events: none; transition: opacity 2.5s ease; }
+    #loading.live .ld-snow { opacity: 0; }
     #loading.live .ld-static { opacity: 0; }
     #loading.static #loadcanvas { display: none; }
     /* Cinematic 2.2:1 bars: the overlay lives in them; they retract on the hand-off. */
@@ -100,7 +103,7 @@
     #loading.out, #loading.out-quick { pointer-events: none; background: transparent; }
     #loading.out .ld-ui, #loading.out-quick .ld-ui { opacity: 0; }
     #loading.out .ld-bars i { transform: scaleY(0); }
-    #loading.out #loadcanvas, #loading.out .ld-static { opacity: 0; transform: scale(1.07); transition: opacity var(--out) cubic-bezier(.4,0,.2,1), transform var(--out) cubic-bezier(.3,0,.1,1); }
+    #loading.out #loadcanvas, #loading.out .ld-static, #loading.out .ld-snow { opacity: 0; transform: scale(1.07); transition: opacity var(--out) cubic-bezier(.4,0,.2,1), transform var(--out) cubic-bezier(.3,0,.1,1); }
     #loading.out-quick { opacity: 0; transition: opacity var(--out) ease; }
     /* Lobby -> mountain load: the mountain being loaded, named like a game's map card (bottom-left). */
     #loading .ld-dest { position: absolute; left: clamp(20px, 4vw, 64px); bottom: calc(clamp(0px, calc((100vh - 100vw / 2.2) / 2), 16vh) + clamp(22px, 4vh, 44px));
@@ -140,9 +143,9 @@
         <path fill="#232a45" d="M-20 900 L-20 820 L180 790 L380 820 L600 780 L820 830 L1040 790 L1260 830 L1460 800 L1620 820 L1620 900 Z"/>
       </svg>
       <div class="ld-still"></div>
-      <div class="ld-flakes a"></div><div class="ld-flakes b"></div><div class="ld-flakes c"></div>
     </div>
     <canvas id="loadcanvas"></canvas>
+    <div class="ld-snow" aria-hidden="true"><div class="ld-flakes a"></div><div class="ld-flakes b"></div><div class="ld-flakes c"></div></div>
     <div class="ld-bars" aria-hidden="true"><i></i><i></i></div>
     <div class="ld-ui">
       <div class="ld-brand"><div class="title">SENDIT</div></div>
@@ -233,7 +236,11 @@
   </div>
 
   <div id="fade"></div>
-  <script type="module" src="/src/loading/index.js"></script>
-  <script type="module" src="/src/main.js"></script>
+  <!-- The loading screen first; the game's own code is fetched once the loading worker has its modules
+       (or after 2.5 s at most), so the hero shot isn't stuck behind the game's downloads. -->
+  <script type="module">
+    import('/src/loading/index.js').then(({ loadingScreen }) => loadingScreen.whenStarted(2500))
+      .catch((e) => console.error('[loading]', e)).then(() => import('/src/main.js'));
+  </script>
 </body>
 </html>

@@ -43,7 +43,10 @@ class LoadingScreen {
     this.sceneInfo = null;
     this.sceneStats = null;
     this.worker = null;
-    if (!this.root) return;
+    // Resolves once the worker has its code (or can't run): index.html only then starts fetching the game
+    // (main.js), so the loading scene's modules aren't queued behind the game's hundreds of requests.
+    this._started = new Promise((res) => { this._start = res; });
+    if (!this.root) { this._start(); return; }
     this.bar = $('loadbar');
     this.msg = $('loadmsg');
     this.caption = $('loadcap');
@@ -54,7 +57,12 @@ class LoadingScreen {
     // stops too). ?loadscene=1 forces the live scene anyway.
     const reduce = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (params.get('loadscene') === '1' || (params.get('loadscene') !== '0' && !reduce)) this.startScene();
-    else this.root.classList.add('static');
+    else { this.root.classList.add('static'); this._start(); }
+  }
+
+  /** See _started. Never waits longer than `maxMs`. */
+  whenStarted(maxMs = 2500) {
+    return Promise.race([this._started, new Promise((res) => setTimeout(res, maxMs))]);
   }
 
   /** Tips: shuffled into the CSS rotation (each tip owns a slot of the keyframe cycle). */
@@ -87,8 +95,10 @@ class LoadingScreen {
       if (this.hint?.transition) {
         opts.hint = this.hint;
         if (still) { opts.tod = still.tod; opts.mtn = still.mtn; }
-      } else if (still) opts.seed = still.seed;
+      } else if (still) Object.assign(opts, { seed: still.seed, tod: still.tod, mtn: still.mtn, gear: still.gear });
       opts.cover = this.hasStill();
+      // The worker redraws the still (loading/still.js) in step with the CSS drift, then dissolves it.
+      if (opts.cover) opts.still = this.stillInfo(still);
       for (const k of ['loadseed', 'loadtrick', 'loadcam', 'loadtod', 'loadgear', 'loadmtn', 'loaddebug', 'loadq', 'loadfreeze']) if (params.has(k)) opts[k.slice(4)] = params.get(k);
       this.worker.postMessage({ type: 'init', canvas: off, ...this.size(), opts }, [off]);
       addEventListener('resize', () => this.worker?.postMessage({ type: 'resize', ...this.size() }));
@@ -96,6 +106,15 @@ class LoadingScreen {
     } catch (e) {
       this.fail(e.message);
     }
+  }
+
+  /** URL + Ken Burns parameters + the CSS animation's start (epoch ms) of the painted still. */
+  stillInfo(still) {
+    const css = getComputedStyle(document.documentElement);
+    const el = this.root.querySelector('.ld-still');
+    const anim = el?.getAnimations?.()[0];
+    const t = anim?.startTime ?? document.timeline?.currentTime ?? performance.now();
+    return { url: new URL(`/loading/${still.f}`, location.href).href, kbx: parseFloat(css.getPropertyValue('--kbx')) || 0, kby: parseFloat(css.getPropertyValue('--kby')) || 0, start: performance.timeOrigin + Number(t) };
   }
 
   /** index.html's painted still is up (or about to be): the live scene waits for the rider before showing. */
@@ -116,13 +135,18 @@ class LoadingScreen {
   size() { return { width: innerWidth, height: innerHeight, dpr: devicePixelRatio || 1 }; }
 
   onMessage(m) {
-    if (m.type === 'frame') {
+    const at = m.wt ? m.wt - performance.timeOrigin - T0 : performance.now() - T0;   // when the worker sent it
+    if (m.type === 'modules') {
+      this.modulesAt = performance.now() - T0;
+      this._start();
+    } else if (m.type === 'frame') {
       // First real frame of the live scene: dissolve from the painted backdrop, unless a painted still
       // of the rider is up; then the live scene shows from its first rider shot (never an empty slope).
-      if (!this.firstFrameAt) this.firstFrameAt = performance.now() - T0;
+      if (!this.firstFrameAt) { this.firstFrameAt = at; this.frameMsgLag = performance.now() - T0 - at; }
       if (!this.hasStill()) this.goLive();
     } else if (m.type === 'shot') {
       this.sceneInfo = m.info;
+      if (!this.firstShotAt) this.firstShotAt = at;
       this.goLive();
       this.setCaption(m.info);
     } else if (m.type === 'frozen') {
@@ -159,6 +183,7 @@ class LoadingScreen {
     console.warn('[loading] live scene unavailable, showing the static screen:', reason);
     this.root?.classList.remove('live');
     this.root?.classList.add('static');
+    this._start?.();
     try { this.worker?.terminate(); } catch { /* already gone */ }
     this.worker = null;
   }
@@ -222,7 +247,7 @@ class LoadingScreen {
   }
 
   stats() {
-    return { firstFrameMs: Math.round(this.firstFrameAt), liveMs: Math.round(this.liveAt || 0), stillMs: Math.round(window.__ldStillAt || 0), readyMs: Math.round(this.readyAt || 0), stages: this.stages, scene: this.sceneStats, shot: this.sceneInfo };
+    return { firstFrameMs: Math.round(this.firstFrameAt), liveMs: Math.round(this.liveAt || 0), firstShotMs: Math.round(this.firstShotAt || 0), msgLagMs: Math.round(this.frameMsgLag || 0), modulesMs: Math.round(this.modulesAt || 0), stillMs: Math.round(window.__ldStillAt || 0), readyMs: Math.round(this.readyAt || 0), stages: this.stages, scene: this.sceneStats, shot: this.sceneInfo };
   }
 }
 
