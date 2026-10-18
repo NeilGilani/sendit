@@ -16,7 +16,8 @@ import { lerpAngle, clamp } from './world.js';
 export const FP = {
   // Eye: from the head bone (base of the skull), in the view frame: up / forward, metres.
   eyeUp: 0.1, eyeFwd: 0.11,
-  near: 0.04,
+  eyeFwdBoard: 0.17,          // snowboard: the view runs past the front shoulder, so the eye sits further out
+  near: 0.05,
   // Lens: CAMERA.fpFov / fpFovBonus / fpSpinFov in config.js.
   // Ground look: pitch (deg, − = down), extra per degree of slope, per unit speed ratio, in a tuck.
   pitch: -19, slopePitch: 0.55, speedPitch: 4, tuckPitch: 5, lookIntoTurn: 0.2,
@@ -75,7 +76,7 @@ export class FPView {
   kick(impact) { this.dipV += Math.min(FP.dipMax, impact * FP.dipKick); }
 
   /** Next update starts fresh (after the chase camera, a respawn or a menu). */
-  reset() { this.active = false; }
+  reset() { this.active = false; if (this.c.rider?.fpCam) this.c.rider.fpCam.ok = false; }
 
   update(dt) {
     const ctl = this.c, cam = ctl.camera, s = ctl.player, rider = ctl.rider, rp = rider.p;
@@ -174,7 +175,7 @@ export class FPView {
     // --- eye: in front of the head bone along the view (the head turns about the neck with the look,
     // so looking down puts the eyes out over the chest, looking aside never puts them in a shoulder)
     rider.bones.Head.getWorldPosition(this.eye);
-    this.eye.add(_v.set(0, FP.eyeUp, -FP.eyeFwd).applyQuaternion(this.q));
+    this.eye.add(_v.set(0, FP.eyeUp, -(rider.isBoard ? FP.eyeFwdBoard : FP.eyeFwd)).applyQuaternion(this.q));
     // Snow chatter: a fine vertical buzz that grows with speed on the ground.
     const chat = ground ? (0.003 + r * r * 0.012) : 0.0008;
     this.eye.y += (noise1(t * 26, 2.1) * 0.7 + noise1(t * 53, 4.4) * 0.3) * chat;
@@ -204,6 +205,9 @@ export class FPView {
       if (Math.abs(g - (this._g ?? -1)) > 0.01) { this._g = g; document.body.style.setProperty('--fp-rush', g.toFixed(2)); }
     }
     rider.fpLookPitch = THREE.MathUtils.radToDeg(_e.setFromQuaternion(this.q, 'YXZ').x);
+    // The arms (rider.js → fpBoardArm) frame the gloves in this view next frame.
+    const fc = rider.fpCam ||= { q: new THREE.Quaternion(), eye: new THREE.Vector3(), ok: false };
+    fc.q.copy(this.q); fc.eye.copy(this.eye); fc.ok = true;
     this.active = true;
   }
 }
@@ -236,7 +240,10 @@ export function eyeArmature(rider, out = new THREE.Vector3()) {
 /** First person: shoulder blades drawn forward (protraction) so the gloves reach into view. */
 export function fpProtract(rider, side) {
   const c = rider.bones['clavicle' + (side > 0 ? '_l' : '_r')];
-  rider.rotateGlobal(c, _hq.setFromAxisAngle(Y, -side * FP_ARMS.protract).multiply(_hq2.setFromAxisAngle(X, -FP_ARMS.shrug)));
+  const amt = rider.fpProt?.[side > 0 ? 0 : 1] ?? FP_ARMS.protract;   // per-arm override (fpBoardArm)
+  const drop = rider.fpDrop?.[side > 0 ? 0 : 1] ?? 0;                  // shoulder lowered (rad, fpBoardArm)
+  if (drop) rider.rotateGlobal(c, _hq.setFromAxisAngle(Z, -side * drop));
+  rider.rotateGlobal(c, _hq.setFromAxisAngle(Y, -side * amt).multiply(_hq2.setFromAxisAngle(X, -FP_ARMS.shrug)));
 }
 
 /** First person: smaller gloves (viewmodel scale) turned into a pole grip / board-balance hand. */
@@ -292,6 +299,7 @@ function keepOffEye(hand, eye, min) {
  */
 export function fpSkiArm(rider, side, pl, u, l) {
   const p = rider.p, A = FP_ARMS;
+  rider.fpProt = null; rider.fpDrop = null;
   const eye = eyeArmature(rider, new THREE.Vector3());
   const tp = handFrom(rider, side, u, l);
   const r = pl.speedRatio || 0;
@@ -323,6 +331,97 @@ export function fpSkiArm(rider, side, pl, u, l) {
   const hand = tp.lerp(fp, w);
   if ((p.sit || 0) < 0.5 && (p.crash || 0) < 0.5) keepOffEye(hand, eye, A.minEye);
   return armIK(rider, side, hand, _c.set(side * A.elbow[0], A.elbow[1], A.elbow[2]).normalize().clone());
+}
+
+// Snowboard: the camera looks down the nose (sideways to the chest), so view-frame targets are turned
+// into armature space through the helmet cam's orientation relative to the armature (last frame's
+// camera and armature; their relative turn changes slowly, even mid-flip, so the lag doesn't show).
+// Glove targets: x = toward the arm's own shoulder side of the view (the nose-side shoulder sits ahead
+// on the heel side once the shoulders open, the rear one behind on the toe side, so the arms never
+// cross the lens), y = up, z = forward along the view, metres from the eye.
+export const FP_BOARD = {
+  ride: { x: 0.33, y: -0.26, z: 0.46 },    // balance hands just inside the lower frame edges
+  rearReach: 0.1,                           // the rear (behind-the-eye) glove sits a little closer
+  rearProtract: 0.45,                       // extra shoulder-blade reach (rad) for the rear arm
+  frontDrop: 0.35,                          // nose-side shoulder lowered (rad) so it never fills the lower view
+  twist: 0.28,                              // extra shoulder opening toward the nose (rad, rider.js poseBoard)
+  speed: { x: 0.02, y: 0.02, z: 0.05 },     // at top speed: a touch wider and further forward
+  crouch: -0.07,                            // lower with the crouch / tuck
+  toe: { x: 0.05, y: -0.08 },               // toe-side carve: the toe-side hand drops toward the snow
+  heel: { y: 0.04, z: 0.06 },               // heel-side carve: both hands reach forward against the sit
+  air: { x: 0.07, y: 0.07 },                // in the air: a little wider and higher (balance)
+  spinIn: { x: -0.09, y: -0.06 },           // spin wrap (arms in across the chest) / flung wide (−)
+  flipTuck: { x: -0.08, y: -0.16, z: 0.04 },// flip tuck: hands down toward the shins
+  grind: { x: 0.08, y: 0.05 },
+  minEye: 0.44,
+};
+
+const _bq = new THREE.Quaternion(), _bq2 = new THREE.Quaternion(), _bm = new THREE.Matrix4();
+const _bx = new THREE.Vector3(), _by = new THREE.Vector3(), _bz = new THREE.Vector3(), _be = new THREE.Vector3();
+
+/**
+ * Helmet-cam frame in armature space (from last frame's camera, FPView sets rider.fpCam): fills
+ * right / up / forward unit vectors and the eye position. Returns false before the first FP frame.
+ */
+function viewArmature(rider, right, up, fwd, eye) {
+  const fc = rider.fpCam, arm = rider.armature;
+  if (!fc?.ok || !arm) return false;
+  arm.matrixWorld.decompose(_be, _bq, _bx);
+  _bq2.copy(_bq).invert().multiply(fc.q);
+  right.set(1, 0, 0).applyQuaternion(_bq2);
+  up.set(0, 1, 0).applyQuaternion(_bq2);
+  fwd.set(0, 0, -1).applyQuaternion(_bq2);
+  eye.copy(fc.eye).applyMatrix4(_bm.copy(arm.matrixWorld).invert());
+  return true;
+}
+
+/**
+ * First-person snowboard arm: gloves balance at the lower frame edges (the nose-side glove on its side
+ * of the view, the rear one on the other), dropping on toe-side carves, reaching forward on heel side,
+ * wider in the air, in toward the shins in a flip tuck; grabs and hand drags reach for real (the
+ * third-person arm), held off the lens. `front` = the nose-side arm. Returns new [u, l] for armAim.
+ */
+export function fpBoardArm(rider, side, front, pl, u, l) {
+  const p = rider.p, A = FP_BOARD;
+  const right = _bx, up = _by, fwd = _bz;
+  const eye = new THREE.Vector3();
+  if (!viewArmature(rider, right, up, fwd, eye)) return [u, l];
+  const tp = handFrom(rider, side, u, l);
+  // Which side of the view this arm's shoulder is on (handles goofy, switch and the head turning).
+  const B = rider.bones, sh = posOf(rider.g(B['upperarm' + (side > 0 ? '_l' : '_r')]), new THREE.Vector3()).sub(eye);
+  const sx = sh.dot(right) >= 0 ? 1 : -1;
+  const behind = THREE.MathUtils.smoothstep(-sh.dot(fwd), -0.05, 0.12);   // shoulder behind the eye
+  (rider.fpProt ||= [FP_ARMS.protract, FP_ARMS.protract])[side > 0 ? 0 : 1] = FP_ARMS.protract + behind * A.rearProtract;
+  (rider.fpDrop ||= [0, 0])[side > 0 ? 0 : 1] = (1 - behind) * A.frontDrop;   // the shoulder ahead of the eye drops out of the view
+  const r = pl.speedRatio || 0, crouch = clamp(((p.crouch || 0) - 0.45) / 0.5, 0, 1);
+  // Toe side of the view: + when the chest (+Z armature) faces view-right.
+  const toeSide = Math.sign(_a.set(0, 0, 1).dot(right)) || 1;
+  const sway = Math.sin(p.t * 1.1 + side * 1.7) * 0.01;
+  let x = A.ride.x + A.speed.x * r - behind * A.rearReach * 0.5;
+  let y = A.ride.y + A.speed.y * r + A.crouch * crouch + sway;
+  let z = A.ride.z + A.speed.z * r - behind * A.rearReach;
+  const ground = 1 - (p.air || 0);
+  const toe = (p.toe || 0) * ground, heel = (p.heel || 0) * ground;
+  if (sx === toeSide) { x += A.toe.x * toe; y += A.toe.y * toe; }
+  y += A.heel.y * heel; z += A.heel.z * heel;
+  x += A.air.x * (p.air || 0); y += A.air.y * (p.air || 0) + Math.sin(p.t * 3.1 + side) * 0.025 * (p.air || 0);
+  const si = clamp(p.spinTuck || 0, -1, 1);
+  x += A.spinIn.x * si; y += A.spinIn.y * Math.max(0, si);
+  const ft = clamp(p.flipTuck || 0, 0, 1);
+  x += A.flipTuck.x * ft; y += A.flipTuck.y * ft; z += A.flipTuck.z * ft;
+  x += A.grind.x * (p.grind || 0); y += A.grind.y * (p.grind || 0);
+  x += 0.05 * (p.stop || 0);
+  const fp = eye.clone().addScaledVector(right, sx * x).addScaledVector(up, y).addScaledVector(fwd, z);
+  // The grab hand and a dragging hand reach for real; stumbling flails half of it; the lift chair sits.
+  const name = pl.grabName || 'Indy';
+  const grabbing = front === (name === 'Melon' || name === 'Nose grab') ? (p.grab || 0) : 0;
+  const dragging = front === ((p.toe || 0) >= (p.heel || 0)) ? (p.drag || 0) : 0;
+  const w = (1 - grabbing) * (1 - dragging) * (1 - 0.6 * (p.stumble || 0)) * (1 - (p.sit || 0)) * (1 - (p.crash || 0));
+  const hand = tp.lerp(fp, w);
+  if ((p.sit || 0) < 0.5 && (p.crash || 0) < 0.5) keepOffEye(hand, eye, A.minEye);
+  // Elbow out to the arm's side of the view and down.
+  const pole = _c.copy(right).multiplyScalar(sx * 0.8).addScaledVector(up, -0.6).addScaledVector(fwd, -0.2).normalize().clone();
+  return armIK(rider, side, hand, pole);
 }
 
 /**

@@ -22,7 +22,7 @@ import { getEquipmentSpec, normalizeType } from './equipment/registry.js';
 import { dressRider, HEAD_SCALE, OUTFIT_SLOTS } from './character/index.js';
 import { outfitSlotsFromProfile } from './character/profile.js';
 import { proportionRig } from './character/body.js';
-import { fpSkiArm, fpPoleDir, fpProtract, fpHand, fpShadow } from './fpview.js';
+import { FP_BOARD, fpSkiArm, fpBoardArm, fpPoleDir, fpProtract, fpHand, fpShadow } from './fpview.js';
 
 const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4(), _v1 = new THREE.Vector3();
@@ -618,7 +618,8 @@ export class Rider {
     const lead = p.lead * BA.turnLead;
     const sk = p.skate || 0;
     off.x += nx * 0.08 * sk;                                  // weight over the front foot while skating
-    const spineTwist = (nx * (BA.shoulderOpen - BA.hipOpen) + lead + nx * 0.45 * sk) * ns;
+    let spineTwist = (nx * (BA.shoulderOpen - BA.hipOpen) + lead + nx * 0.45 * sk) * ns;
+    if (this.fp) spineTwist += nx * FP_BOARD.twist * ns;   // first person: shoulders open further so both gloves frame the view
     // A preloaded backflip arches the chest up and back (the shoulders throw first).
     const bend = (0.1 + p.crouch * BA.crouchHinge * 0.8 - p.toe * BA.toeTall * 0.7 + p.heel * 0.12 + p.grab * 0.26) * ns - p.flipLoad * ANIM.flipLoadArch - (p.tweak || 0) * 0.3;
     // Head: look down the direction of travel (nose, or over the back shoulder when switch).
@@ -634,7 +635,7 @@ export class Rider {
     const toeSide = nx * (p.look >= 0 ? 1 : -1);
     // (+ BA.headTilt: the head turned down the nose sat a few degrees toward the heels riding straight.)
     const level = (-(p.worldRoll ?? p.lean) * toeSide * ANIM.headLevel * (1 - p.air) + BA.headTilt) * ns;
-    this.trunk(off, hipYaw + nx * 0.3 * sk, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist + gT * 0.2 + skidLook * 0.3, wob - p.lean * 0.15, headYaw + skidLook * 0.7, -(hipPitch + bend) * 0.6 + level);
+    this.trunk(off, hipYaw + nx * 0.3 * sk, hipPitch + p.hip * 0.5, bend + p.hip * 0.4, spineTwist + gT * 0.2 + skidLook * 0.3, wob - p.lean * 0.15, headYaw + skidLook * 0.7 - (this.fp ? nx * FP_BOARD.twist * ns : 0), -(hipPitch + bend) * 0.6 + level);
     // Legs: feet in the bindings across the board, knees toward the toe edge and a little duck.
     const w = st.width / 2;
     const feet = [[nx, st.front], [-nx, st.back]];   // [armature x sign, binding angle]
@@ -816,7 +817,9 @@ export class Rider {
     }
     this.armGrind(side, u, l, 1 - p.grab);
     [u, l] = this.armOverlays(side, u, l);
+    if (this.fp) [u, l] = fpBoardArm(this, side, front, pl, u, l);   // first person: gloves at the frame edges (fpview.js)
     this.armAim(side, u, l);
+    if (this.fp) fpHand(this, side, false);
   }
 
   /**
