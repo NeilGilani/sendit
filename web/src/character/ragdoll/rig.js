@@ -110,6 +110,15 @@ export function applyPose(rider, H, seed, alpha, blend, renderPos) {
   _m.copy(rider.armature.matrixWorld).invert();
   _v.applyMatrix4(_m).applyMatrix4(H._rootInv);
   B.pelvis.position.copy(_v);
+  // The chest body is one rigid piece while the drawn spine bends over three bones: put spine_03 where the
+  // chest body has it (a stretch of a centimetre or two inside the jacket), so the shoulders, arms and neck
+  // hang exactly from the bodies' joints.
+  if (blend >= 1) {
+    const ce = D.get(P.chest);
+    _v.copy(S.spine_03.p).sub(P.chest.xs).applyQuaternion(ce.d).add(ce.x);
+    B.spine_02.updateWorldMatrix(true, false);
+    B.spine_03.position.copy(_v.applyMatrix4(_m.copy(B.spine_02.matrixWorld).invert()));
+  }
 
   // Gear: loose pieces and the ones still on (attached skis, the board).
   const mesh = (L) => (L.kind === 'ski' ? rider.skis?.[L.index] : L.kind === 'pole' ? rider.poles?.[seed.gear.poles[L.index]?.mesh ?? L.index] : rider.board);

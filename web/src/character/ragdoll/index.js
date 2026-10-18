@@ -186,7 +186,9 @@ export class RagdollController {
       W.comVel(0, _a).setY(0);
       brace = _b.copy(_a.lengthSq() > 1 ? _a.normalize() : this.fallDir).multiplyScalar(0.75).add(_c.set(0, -1, 0)).normalize();
     }
-    updateTone(H, W.t, W.h, brace, C);
+    // Lying still: the muscles let go (a resting limb pushed by its tone against snow or bark would jitter).
+    this.rest = W.settling ? this.rest * Math.exp(-6 * W.h) : Math.min(1, this.rest + W.h);
+    updateTone(H, W.t, W.h, brace, C, this.rest);
   }
 
   begin(pl) {
@@ -216,7 +218,7 @@ export class RagdollController {
     if (this.fallDir.lengthSq() < 1e-4) this.fallDir.set(-Math.sin(pl.heading), 0, -Math.cos(pl.heading));
     this.fallDir.normalize();
     this.H = H; this.seed = seed; this.shift = shift;
-    this.t = 0; this.restT = 0; this.active = true;
+    this.t = 0; this.restT = 0; this.rest = 1; this.active = true;
     this.E0 = H.world.energy(0);
     H.world.budget = this.E0;
     this.stats.crashes++;

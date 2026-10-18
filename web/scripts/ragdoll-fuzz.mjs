@@ -134,6 +134,7 @@ function runCrash(sc, seconds = 4) {
     }
     const t = (k + 1) * s.dt;
     if (out.sleep === null && W.asleep(0)) out.sleep = t;
+    if (out.slow === undefined && t > 0.3 && W.comVel(0, _w).length() < 0.3) out.slow = t;
     if ((k % 5 === 0 || k === steps - 1) && t > RAGDOLL.blendTime + 0.02) {
       ctl.pose(r);
       // The drawn rig on the bodies: elbows, knees, head, pelvis.
@@ -243,6 +244,7 @@ for (let i = (process.env.ONLY ? Number(process.env.ONLY) : 0); i < (process.env
   if (VERBOSE || (r.fail.length && !CHECK)) console.log(`#${i} ${r.type} ${r.cause} ${r.deg.toFixed(0)}° ${r.speed.toFixed(1)} m/s dt 1/${Math.round(1 / r.dt)}: ${r.fail.join(', ') || 'ok'} (stretch ${(r.stretch * 100).toFixed(2)} cm, below ${(r.below * 100).toFixed(2)} cm, dE ${r.dE.toFixed(1)} J, limit ${(r.limit * 57.3).toFixed(1)}°, rig ${(r.attach * 100).toFixed(1)} cm, sleep ${r.sleep?.toFixed(2) ?? '-'} s; end v ${r.mv?.toFixed(2)} ${r.mvb} w ${r.mw?.toFixed(2)} ${r.mwb} com ${r.comv?.toFixed(2)})`);
 }
 const fails = results.filter((r) => r.fail.length);
+if (process.env.SLOW) for (const r of results.filter((x) => x.gentle)) console.log('slow', r.i, r.cause, r.deg.toFixed(0), r.speed.toFixed(1), 'com<0.3 at', r.slow?.toFixed(2), 'asleep', r.sleep?.toFixed(2));
 const q = (arr, p) => { const a = [...arr].sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(p * a.length))]; };
 const sleepers = results.filter((r) => r.sleep !== null);
 const gentle = results.filter((r) => r.gentle);

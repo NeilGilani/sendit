@@ -432,7 +432,7 @@ export const HUD = {
 // Exists only while the real player is in State.CRASH. XPBD rigid bodies (capsules) on the rig's bones.
 export const RAGDOLL = {
   enabled: true,
-  substep: 1 / 720,            // s, fixed internal step (frame-rate independent)
+  substep: 1 / 960,            // s, fixed internal step (frame-rate independent)
   maxSubsteps: 64,             // per call (a long hitch just drops time)
   gravity: 9.81,
   // Masses (kg): an ~80 kg rider in kit
@@ -450,8 +450,8 @@ export const RAGDOLL = {
     ankle: { cone: 22, twist: 12 },   // snowboard: boots in the bindings
   },
   // Snow and obstacles
-  muSnow: 0.6, muStaticSnow: 0.8,     // body on snow (dynamic / static)
-  plough: 1.6,                 // 1/s tangential drag while touching the snow (digging in)
+  muSnow: 0.8, muStaticSnow: 1.0,     // body on snow (dynamic / static: a body digs in)
+  plough: 2.5,                 // 1/s tangential drag while touching the snow (ploughing through it)
   ploughSpin: 5,               // 1/s angular drag while touching (a body sinks in: it doesn't roll like a log)
   restitution: 0.08,
   muGear: 0.3, ploughGear: 2, // released skis (brakes out) / poles
@@ -471,8 +471,8 @@ export const RAGDOLL = {
   ejectSpeed: 5,               // m/s: skis release above this (poles always drop)
   blendTime: 0.1,              // s from the animated pose to the ragdoll
   // Rest / respawn
-  sleepSpeed: 0.15, sleepSpin: 0.8, sleepTime: 0.3,
-  settleSpeed: 1.0, settleRate: 4,   // centre of mass slower than this (touching): motion dies at this rate (1/s)
+  sleepSpeed: 0.2, sleepSpin: 1.5, sleepTime: 0.25,
+  settleSpeed: 0.5, settleRate: 10,  // centre of mass slower than this (touching): what's left dies at this rate (1/s)
   restHold: 0.45,              // s asleep before the respawn fade (never before PHYSICS.tumbleTime)
   maxTumble: 3.0,              // s: respawn fade starts at the latest here
   maxSpeed: 50, maxSpin: 30,   // safety clamps

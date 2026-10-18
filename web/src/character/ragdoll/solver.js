@@ -152,6 +152,7 @@ export class World {
     this.contacts = [];      // pool; this sub-step's are [0, nc): { b, r (world offset), n, lam, vn, mu, e }
     this.nc = 0;
     this.pc = []; this.np = 0;   // self-contacts this sub-step
+    this.rec = true;             // record contacts (the second snow pass doesn't)
     this.groups = new Map(); // group → { asleep, still }
     this.t = 0;
     this.ticks = 0;
@@ -202,6 +203,10 @@ export class World {
     // A second joint pass (anchors + limits, no drives): contacts are solved last and stiff, and a hard impact
     // would otherwise leave the joints stretched / past their limits for that sub-step.
     for (const j of this.joints) if (!this.groups.get(j.b1.group).asleep) this.solveJoint(j, h, true);
+    // … and the snow once more for whatever was touching it (positions only; the contacts are already recorded).
+    this.rec = false;
+    for (const b of this.bodies) if (b.touch && !this.groups.get(b.group).asleep) this.collide(b, h);
+    this.rec = true;
     // --- velocities from the positions
     const ih = 1 / h;
     for (const b of this.bodies) {
@@ -225,12 +230,14 @@ export class World {
     for (const j of this.joints) if (j.damp > 0 && !this.groups.get(j.b1.group).asleep) this.dampJoint(j, h);
     // Settling: once a group is crawling (its centre of mass slower than settleSpeed, touching something), it
     // loses what's left quickly instead of creeping for seconds (people come to rest, gear stops wobbling).
+    this.settling = false;
     for (const [gid, G] of this.groups) {
       if (G.asleep) continue;
       let touch = false, m = 0;
       _a.set(0, 0, 0);
       for (const b of this.bodies) if (b.group === gid) { _a.addScaledVector(b.v, b.m); m += b.m; if (b.touch) touch = true; }
       if (!touch || _a.length() / m > C.settleSpeed) continue;
+      if (gid === 0) this.settling = true;
       const k = Math.max(0, 1 - C.settleRate * h);
       for (const b of this.bodies) if (b.group === gid) { b.v.multiplyScalar(k); b.w.multiplyScalar(k); }
     }
@@ -464,6 +471,7 @@ export class World {
     slip.addScaledVector(nn, -slip.dot(nn));
     const sl = slip.length();
     if (sl > 1e-9 && sl < muS * pen) this.pos(null, b, null, _r0.copy(loc).applyQuaternion(b.q), slip.divideScalar(-sl), sl, 0, h);
+    if (!this.rec) return;
     b.touch++; b.touchN.add(nn);
     if (this.nc < 256) {
       const c = this.contacts[this.nc] ||= { r: new THREE.Vector3(), n: new THREE.Vector3() };
@@ -482,7 +490,12 @@ export class World {
     const vt = _b.copy(v).addScaledVector(c.n, -vn);
     const vtl = vt.length();
     const dv = _c.set(0, 0, 0);
-    if (vtl > 1e-9) dv.addScaledVector(vt, -Math.min(c.mu * Math.abs(c.lam) / h, vtl) / vtl);
+    // Coulomb: the friction impulse is at most μ · the normal impulse (λ / h); as a speed change at this point
+    // that is μ · λ / h · w_t (the generalised inverse mass along the slip).
+    if (vtl > 1e-9) {
+      const wt = b.wPos(c.r, _d.copy(vt).divideScalar(vtl));
+      dv.addScaledVector(vt, -Math.min(c.mu * Math.abs(c.lam) * wt / h, vtl) / vtl);
+    }
     const target = c.vn < -2 * this.g * h ? Math.max(-c.e * c.vn, 0) : 0;
     dv.addScaledVector(c.n, target - vn);
     const m = dv.length();

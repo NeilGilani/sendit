@@ -343,11 +343,11 @@ export function depenetrate(H, env, maxLift = 0.45, maxPush = 1.2) {
 }
 
 /**
- * Muscle tone for this moment: strong at first, relaxing to C.toneEnd; while bracing the arms reach toward
- * `braceDir` (world) with extra tone.
+ * Muscle tone for this moment: strong at first, relaxing to C.toneEnd (× rest: 0 once the body lies still, so no
+ * muscle keeps nudging a limb against the snow or a trunk); while bracing the arms reach toward `braceDir` (world).
  */
-export function updateTone(H, t, dt, braceDir, C) {
-  const relax = C.toneEnd + (1 - C.toneEnd) * Math.exp(-t / C.toneTau);
+export function updateTone(H, t, dt, braceDir, C, rest = 1) {
+  const relax = (C.toneEnd + (1 - C.toneEnd) * Math.exp(-t / C.toneTau)) * rest;
   const bracing = !!braceDir;
   for (const j of Object.values(H.joints)) {
     const arm = j.kind === 'shoulder' || j.kind === 'elbow';
