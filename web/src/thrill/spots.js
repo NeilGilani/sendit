@@ -70,6 +70,15 @@ export function installSpots({ player, course, features, terrain, getMapId, hud 
   const riding = () => game.mode === Mode.RIDING;
   on('takeoff', () => { from = riding() ? namer(player.position.x, player.position.z) : null; });
   on('respawned', () => { from = null; });
+  // The near miss: a new spot launched but not landed clean says so, and how to try again (Zen).
+  function missed() {
+    if (!from || !riding() || (player.airTime || 0) < C.minAir * 0.8) return;
+    if (B.map(mapId()).spots[from]) return;
+    const zen = !globalThis.__sendit?.activities || globalThis.__sendit.activities.mode !== 'challenge';
+    hud?.callout?.(`SO CLOSE · ${from.toUpperCase()} NOT SENT${zen ? ' · BACKSPACE / ▼ RETRY' : ''}`, '#ffb3ea');
+    emit('thrillSpotMissed', { mapId: mapId(), name: from });
+  }
+  on('crashed', () => { missed(); from = null; });
 
   function discovered(name, kind) {
     const r = B.record(mapId(), name);
@@ -84,6 +93,7 @@ export function installSpots({ player, course, features, terrain, getMapId, hud 
 
   on('landed', (e) => {
     if (!riding() || e.result === 'crash') { from = null; return; }
+    if (!e.clean) { missed(); from = null; return; }
     const to = namer(player.position.x, player.position.z);
     const j = judgeLanding({ clean: e.clean, air: e.air, drop: e.drop, from, to }, C);
     from = null;
