@@ -91,6 +91,7 @@ node web/scripts/unittest.mjs
 GPU=1 node web/scripts/lobbytest.mjs http://localhost:5180/
 node web/scripts/physics-fuzz.mjs
 node web/scripts/physics-tricks.mjs
+node web/scripts/physics-rotation.mjs both --check
 node web/scripts/jumps-valcrest.mjs --check
 node web/scripts/equipment-check.mjs
 node web/scripts/map2-bot.mjs --verify --tuck --check

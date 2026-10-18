@@ -471,13 +471,21 @@ export class EdgePhysics {
       const eff = (1 - (t / win) ** 2) * (0.5 + 0.5 * this.popQ);
       // A throw alone sets less than a wound-up pop; a full set needs the pop right at the lip too.
       const lim = (this._spinPre ? cap * (0.6 + 0.4 * this.popQ) : C.spinThrowMax * this.H.spin) * Math.sign(-steer);
-      h = approach(h, clamp(lim, -cap, cap), C.spinThrowRate * Math.abs(steer) * eff * dt);
+      // (Never slower than the late throw below, so a press near the end of the window isn't the slowest.)
+      h = approach(h, clamp(lim, -cap, cap), Math.max(C.spinThrowRate * eff, C.spinLateRate || 0) * Math.abs(steer) * dt);
     }
+    // The late throw: after the window, steering with no spin going (or a slow one the same way) still
+    // builds one — slowly, up to spinLateMax (a late 180 / 360 on a big air, never a set), and only with
+    // spinLateAir s of air left to start. A carve held off a lip (_spinLock) stays locked until re-pressed.
+    const late = !throwing && steer && C.spinLateMax && Math.abs(h) < C.spinLateMax * this.H.spin
+      && (Math.sign(-steer) === Math.sign(h) || Math.abs(h) < C.spinMinH) && (Math.abs(h) > C.spinMinH || tLand > C.spinLateAir);
+    if (late) h = approach(h, Math.sign(-steer) * C.spinLateMax * this.H.spin, C.spinLateRate * Math.abs(steer) * dt);
     // Shape: tucked (stick with the spin), open (against), grabbing = compact, released = spotting.
     let pose = 0, rate = null;
     const dir = Math.sign(h), spinning = Math.abs(h) > C.spinMinH;
     if (grabbing) pose = 0.6;
     else if (throwing) pose = 0.5;
+    else if (late) pose = 1;
     else if (steer && spinning) pose = Math.sign(-steer) === dir ? 1 : -1;
     else if (steer) rate = -steer * C.airTwist;   // no momentum: twist the hips a little (no momentum is made)
     else if (pl.airTime > 0.1) {
@@ -550,7 +558,8 @@ export class EdgePhysics {
       const eff = (1 - (t / win) ** 2) * (0.5 + 0.5 * this.popQ);
       // A throw alone sets less than a preload; a full set needs the pop right at the lip too.
       const lim = (this._flipCommit ? cap * (0.6 + 0.4 * this.popQ) : C.flipThrowMax * Math.sqrt(this.H.spin)) * Math.sign(input);
-      h = approach(h, clamp(lim, -cap, cap), C.flipThrowRate * Math.abs(input) * eff * dt);
+      // (Never slower than the late throw below, so a press near the end of the window isn't the slowest.)
+      h = approach(h, clamp(lim, -cap, cap), Math.max(C.flipThrowRate * eff, C.flipLateRate) * Math.abs(input) * dt);
     }
     // The late throw: after the window W / S still start (or build) a flip — slowly, and only up to
     // flipLateMax, so a big air allows a late single but never a set; it needs flipLateAir s of air left.
@@ -564,10 +573,19 @@ export class EdgePhysics {
     }
     const dir = Math.sign(h), flipping = Math.abs(h) > C.flipMinH;
     // Shape: −1 stretched layout (× flipOpen), 0 open, 1 tight tuck (× flipTuckGain).
-    let tuck = 0, rate = null;
+    let tuck = 0, rate = null, bleed = 0, floor = 0;
     if (throwing || late) tuck = 1;
-    else if (flipping && Math.abs(input) > 0.2) tuck = Math.sign(input) === dir ? 1 : -1;   // against the flip: stretch out
-    else if (flipping) {
+    else if (flipping && Math.abs(input) > 0.2 && Math.sign(input) === dir) tuck = 1;
+    else if (flipping && Math.abs(input) > 0.2) {
+      // Against the flip: stretch out. Near upright — coming up on it (half of flipCounterAngle) or a
+      // little past it (flipCounterAngle) — the legs kick out of the rotation too: the counter sheds
+      // momentum at flipCounter rad/s², enough to even out a near miss, not to stop a flip in the middle.
+      // Further past, it sheds like a spotting layout (below), never less than letting go would.
+      tuck = -1;
+      const o = wrapPi(pl.flip) * dir;                     // + past upright (over-rotating), − still short
+      if (o < C.flipCounterAngle * DEG && o > -0.5 * C.flipCounterAngle * DEG) { bleed = C.flipCounter; floor = 1.2 * C.flipMinH; }
+      else if (o > 0) { bleed = C.flipSpotBleed; floor = 2 * C.flipMinH; }
+    } else if (flipping) {
       // Spot the landing: the next upright ahead in the flip's direction, arriving at touchdown.
       // Plan to come round early and open up (layout, legs stretched) for the last flipSpot s: the tuck
       // needed until then is whatever the rest of the rotation asks for beyond the open rate.
@@ -578,11 +596,19 @@ export class EdgePhysics {
       tuck = f >= 1 ? clamp((f - 1) / (C.flipTuckGain - 1), 0, 1) : -clamp((1 - f) / (1 - C.flipOpen), 0, 1);
       // Just past upright with the next one out of reach: stretch out and ride out the small over-rotation
       // (whichever lands closer to upright) instead of chasing a whole extra turn.
-      const past = Math.PI * 2 - ahead, over = past + Math.abs(h) * C.flipOpen * tLand;
-      const short = Math.max(0, ahead - Math.abs(h) * C.flipTuckGain * tLand);
+      // (What stretching out still carries, with the momentum it sheds; what a tuck still reaches, with the
+      // legs tiring — a tuck already held most of its flipTuckHold can't chase a whole extra turn.)
+      const past = Math.PI * 2 - ahead, over = past + C.flipOpen * this.carryOpen(Math.abs(h), tLand);
+      const short = Math.max(0, ahead - Math.abs(h) * this.tuckReach(tLand));
       if (over < short) tuck = -1;
+      // More momentum than the landing needs: stretching out of it sheds some (flipSpotBleed rad/s², down
+      // to what the spot asks for), so letting go on a big air carries the flip on — not a whole extra half.
+      // A rate, so the short time left on a small air hardly feels it.
+      if (tuck < 0 && !grabbing) { bleed = C.flipSpotBleed; floor = over < short ? 2 * C.flipMinH : Math.max(need, 2 * C.flipMinH); }
       if (grabbing) tuck = Math.max(tuck, 0.1);             // a grab keeps the body compact (no stretched layout)
     } else rate = clamp(-rem / Math.max(tLand, 0.15), -C.flipCheck, C.flipCheck);   // no flip: just level out
+    // (Never below the floor: a flip always carries on a little — the shed momentum isn't a brake.)
+    if (bleed && Math.abs(h) > floor) h = dir * Math.max(floor, Math.abs(h) - bleed * dt);
     // A tight tuck at speed takes real strength (the legs hold against a load ∝ ω²): it holds at full gain
     // for flipTuckHold s, then fades over flipTuckFade s to flipTuckFloor of the tuck; opening up recovers.
     this.tuckLoad = Math.max(0, (this.tuckLoad || 0) + (pl.flipTuck > 0.3 ? pl.flipTuck : -0.5) * dt);
@@ -594,6 +620,25 @@ export class EdgePhysics {
     this.flipH = h;
     pl.flip += pl.flipRate * dt;
     if (this.takeoff) this.takeoff.flip = pl.flip;
+  }
+
+  /** Open-pose rotation (rad) momentum h carries over t s while stretched out and shedding at flipSpotBleed. */
+  carryOpen(h, t) {
+    const C = this.C, floor = 2 * C.flipMinH, b = C.flipSpotBleed || 0;
+    if (!b || h <= floor) return h * t;
+    const tb = Math.min(t, (h - floor) / b);
+    return h * tb - 0.5 * b * tb * tb + Math.min(h, floor) * (t - tb);
+  }
+
+  /** Average flip-tuck gain over the next t s with the key held (the tuck fades after flipTuckHold), × t. */
+  tuckReach(t) {
+    const C = this.C;
+    let sum = 0;
+    for (let i = 0; i < 6; i++) {
+      const load = (this.tuckLoad || 0) + t * (i + 0.5) / 6;
+      sum += 1 + (C.flipTuckGain - 1) * (1 - (1 - C.flipTuckFloor) * clamp((load - C.flipTuckHold) / C.flipTuckFade, 0, 1));
+    }
+    return (sum / 6) * t;
   }
 
   /** Pitch landing check: { dev (deg from upright), flips (whole rotations), back (bool), result }. */
