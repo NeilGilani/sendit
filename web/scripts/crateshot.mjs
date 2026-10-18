@@ -67,6 +67,42 @@ try {
     await page.waitForTimeout(800);
   };
   if (process.env.PERF) await fpsRun();
+  if (process.env.MATRIX) {
+    // Every case × every grade in one session: a few key frames each, one contact sheet per case.
+    const R = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'gold'];
+    const mt = timesArg ? times : [1.0, 1.5, 5.0, 8.5, 9.9];
+    for (const s of ['first-chair', 'night-park', 'backcountry']) {
+      const files = [];
+      for (const r of R) {
+        const seed = await page.evaluate(async ({ s, r }) => {
+          const Rw = await import('/src/profile/rewards.js');
+          const P = window.__sendit.profile;
+          P.grantCase('test', s);
+          const pity = P.rewards.sinceRed >= Rw.PITY - 1;
+          for (let k = 1; k < 200000; k++) if (Rw.rollCase(s, Rw.seeded(k), pity).rarity === r) return k;
+          return 1;
+        }, { s, r });
+        await page.evaluate((seed) => { window.__senditCasesApi.open(null, seed); window.__senditCases.opener.seek(0); }, seed);
+        for (const t of mt) {
+          await page.evaluate((t) => window.__senditCases.opener.seek(t), t);
+          await page.waitForTimeout(t > 8 ? 600 : 250);
+          const f = `${outDir}/m-${s}-${r}-${t.toFixed(2)}.png`;
+          await page.screenshot({ path: f });
+          files.push([f, `${r} ${t}s`]);
+        }
+        const key = await page.evaluate(() => window.__senditCases.result.key);
+        console.log(s, r, key);
+        await page.evaluate(() => window.__senditCases.opener.seek(null));
+        await page.click('.cr-btn[data-act="close"]');
+        await page.waitForFunction(() => !document.querySelector('.cr-overlay') && !window.__senditCrate.active, null, { timeout: 15000 });
+      }
+      const sheet = await browser.newPage({ viewport: { width: 2000, height: 1200 } });
+      await sheet.setContent(`<body style="margin:0;background:#111;display:grid;grid-template-columns:repeat(${mt.length},1fr);gap:2px;font:14px sans-serif;color:#fff">${files.map(([f, l]) => `<div style="position:relative"><img style="width:100%;display:block" src="data:image/png;base64,${fs.readFileSync(f).toString('base64')}"><b style="position:absolute;left:4px;top:2px;text-shadow:0 0 3px #000">${l}</b></div>`).join('')}</body>`);
+      await sheet.screenshot({ path: `${outDir}/matrix-${s}.png`, fullPage: true });
+      await sheet.close();
+    }
+    console.log(`errors: ${errors.length}`, errors.slice(0, 6).join('\n')); await browser.close(); process.exit(errors.length ? 1 : 0);
+  }
   const seed = await seedFor();
   console.log('seed', seed);
   await page.evaluate(({ seed, quick }) => { window.__senditCasesApi.open(null, seed, { quick }); window.__senditCases.opener.seek(0); }, { seed, quick });
