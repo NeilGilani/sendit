@@ -102,6 +102,19 @@ export async function run(test, assert) {
     assert.deepEqual(r.at(9), { a: 3, b: 3, k: 0 });
   });
 
+  await test('thrill achievements: spots, gaps and versus wins unlock Scout, Mind the Gap, Gap Master, Bragging Rights', async () => {
+    const { Progression } = await import('../src/progression/core.js');
+    const st = memStore(), got = [];
+    const p = new Progression({ storage: st, emit: (n, d) => { if (n === 'achievement') got.push(d.id); } });
+    for (let i = 0; i < 9; i++) p.recordThrill('spot');
+    assert.ok(!got.includes('spots-10'));
+    p.recordThrill('spot'); p.recordThrill('gap'); p.recordThrill('versusWin'); p.recordThrill('nonsense');
+    assert.deepEqual(['spots-10', 'gap-1', 'versus-win'].filter((x) => got.includes(x)).length, 3);
+    for (let i = 0; i < 9; i++) p.recordThrill('gap');
+    assert.ok(got.includes('gap-10'));
+    assert.equal(new Progression({ storage: st, emit: () => {} }).state.life.spots, 10, 'persisted');
+  });
+
   await test('thrill versus: codes round-trip with a compact ghost; junk decodes to null', () => {
     const ghost = [];
     for (let i = 0; i <= 900; i++) { const t = i / 10; ghost.push(+t.toFixed(2), +(100 + t * 11.3).toFixed(2), +(2000 - t * 6.1).toFixed(2), +(-40 + Math.sin(t) * 9).toFixed(2), +((t * 0.3) % 6).toFixed(3)); }

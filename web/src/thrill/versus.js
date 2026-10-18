@@ -10,6 +10,7 @@ import { on, emit, game, Mode } from '../state.js';
 import { encodeVersus, decodeVersus, marginText } from './core.js';
 import { skierGeometry } from '../life.js';
 import { fmtTime } from '../activities.js';
+import { progression } from '../progression/index.js';
 
 export function installVersus({ scene, course, player, activities, hud, getMap, getName, params }) {
   let target = null;
@@ -65,6 +66,7 @@ export function installVersus({ scene, course, player, activities, hud, getMap, 
       const txt = win ? `YOU BEAT ${target.name.toUpperCase()} BY ${marginText(res.time, target.time)}` : `${target.name.toUpperCase()} WINS BY ${marginText(res.time, target.time)}`;
       hud?.banner?.(txt, win ? '#ffe14d' : '#ff5cc8', !win);
       emit('thrillVersus', { win, time: res.time, target: target.time, name: target.name });
+      if (win) progression.core?.recordThrill?.('versusWin');
     }
     setTimeout(() => decorateResults(), 950);
   });

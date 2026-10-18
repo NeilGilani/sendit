@@ -76,6 +76,7 @@ export function installSpots({ player, course, features, terrain, getMapId, hud 
     if (!r.isNew) return r;
     addScore(`New spot · ${name}`, C.newScore);
     progression.addXP?.(C.newXp, 'spot');
+    progression.core?.recordThrill?.('spot');
     hud?.toast?.({ kind: 'New spot', title: name, sub: `${r.found} / ${r.total} on this mountain · +${C.newXp} XP`, icon: kind === 'rail' ? '⟋' : '⛰', c1: '#7ef9ff', c2: '#2ff5d6', progress: r.total ? r.found / r.total : null });
     emit('thrillSpot', { mapId: mapId(), name, found: r.found, total: r.total });
     return r;
@@ -91,7 +92,7 @@ export function installSpots({ player, course, features, terrain, getMapId, hud 
       const g = B.recordGap(mapId(), j.gap[0], j.gap[1]);
       const pts = g.isNew ? C.gapScore : C.gapRepeat;
       addScore(`Gap · ${g.name}`, pts);
-      if (g.isNew) progression.addXP?.(C.gapXp, 'gap');
+      if (g.isNew) { progression.addXP?.(C.gapXp, 'gap'); progression.core?.recordThrill?.('gap'); }
       hud?.banner?.(`${g.isNew ? 'NEW GAP! ' : 'GAP! '}${g.name.toUpperCase()}  +${pts}`, g.isNew ? '#7ef9ff' : '#2ff5d6');
       emit('thrillGap', { mapId: mapId(), name: g.name, isNew: g.isNew, n: g.n });
     }
