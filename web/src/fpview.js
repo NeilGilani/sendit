@@ -210,7 +210,8 @@ export class FPView {
     this.crashPos.lerp(want, k(F.follow * (0.4 + e)));
     // Never inside the tumbling body (the ragdoll can roll back toward the camera) …
     const dc = this.crashPos.distanceTo(chest);
-    if (dc < F.minDist * e) this.crashPos.sub(chest).multiplyScalar(F.minDist * e / Math.max(dc, 1e-3)).add(chest);
+    const md = F.minDist * Math.min(1, this.crashT / 0.3);   // (out of the head within 0.3 s)
+    if (dc < md) this.crashPos.sub(chest).multiplyScalar(md / Math.max(dc, 1e-3)).add(chest);
     // … or a tree's crown / a rock (out of the trunk's foliage radius, sideways).
     const near = ctl.player.scatter?.obstaclesNear?.(this.crashPos, 3);
     if (near) for (const o of near) {
