@@ -27,6 +27,15 @@ await page.evaluate(() => {
   for (const m of [fx?.mesh, fx?.spray?.mesh]) if (m) { m.visible = false; Object.defineProperty(m, 'visible', { get: () => false, set: () => {} }); }
 });
 await page.waitForTimeout(1000);
+// The physics centre of mass as drawn (player.renderCom; older builds: flipPivot above the feet along the un-flipped gear).
+await page.evaluate(() => {
+  window.__com = (pl) => {
+    if (pl.renderCom) return pl.renderCom(new pl.position.constructor());
+    const Q = pl.renderOrient.constructor, V = pl.position.constructor;
+    const base = pl.renderOrient.clone().multiply(new Q().setFromAxisAngle(new V(1, 0, 0), -(pl.renderFlip || 0)));
+    return new V(0, 0.85, 0).applyQuaternion(base).add(pl.renderPos);
+  };
+});
 if (process.env.SIDE) await page.evaluate((s) => { window.__camSide = s; }, process.env.SIDE);
 
 // [vy, set, inputs (page-side source: (p) => keys)]
@@ -63,7 +72,7 @@ for (const name of list) {
     pl.snapRender();
     const right = { x: -f.z, z: f.x };
     // Ideal point-mass flight (no drag) from the take-off, for the path errors.
-    const p0 = pl.renderCom(new pl.position.constructor()), v0 = pl.velocity.clone();
+    const p0 = window.__com(pl), v0 = pl.velocity.clone();
     window.__ideal = { p0, v0 };
     window.__shotT = 0; window.__cap = null; window.__done = false; window.__landT = null;
     let next = 0.06;
@@ -71,7 +80,7 @@ for (const name of list) {
     // a frozen player keeps interpolating to its latest step, up to a step ahead of the drawn pose)
     const orig = R.update;
     if (!R.__origUpdate) R.__origUpdate = orig;
-    const upd = function (dt, cam) { R.__origUpdate.call(R, dt, cam); window.__rc = pl.renderCom(new pl.position.constructor()); window.__rq = pl.renderOrient.clone(); };
+    const upd = function (dt, cam) { R.__origUpdate.call(R, dt, cam); window.__rc = window.__com(pl); window.__rq = pl.renderOrient.clone(); };
     R.update = upd;
     window.__resume = () => { R.update = upd; pl.debugFreeze = false; window.__cap = null; };
     pl.script = (c, p) => {
@@ -83,7 +92,7 @@ for (const name of list) {
       if (t >= next - 1e-6) { next += DT_SHOT; window.__cap = t; pl.debugFreeze = true; R.update = () => {}; }
     };
     window.__gfxCam = () => {
-      const c = pl.renderCom(new pl.position.constructor());
+      const c = window.__com(pl);
       const sd = Number(window.__camSide ?? 1), d = 4.6;
       return [c.x + right.x * d * sd, c.y + 0.35, c.z + right.z * d * sd, c.x, c.y, c.z, 42];
     };
@@ -105,13 +114,13 @@ for (const name of list) {
       const com = new V3(); let wsum = 0;
       for (const [a, b, w] of seg) { if (!B[a]) continue; const pa = wp(B[a]); const pb = b && B[b] ? wp(B[b]) : pa; com.addScaledVector(pa.add(pb).multiplyScalar(0.5), w); wsum += w; }
       com.multiplyScalar(1 / wsum);
-      const rc = window.__rc || pl.renderCom(new V3());
+      const rc = window.__rc || window.__com(pl);
       const { p0, v0 } = window.__ideal, t = pl.airTime;
       const ideal = new V3(p0.x + v0.x * t, p0.y + v0.y * t - 4.905 * t * t, p0.z + v0.z * t);
       const up = new V3(0, 1, 0).applyQuaternion(window.__rq || pl.renderOrient);
       const tl = pl.state === 2 ? pl.dyn.timeToLand() : 0;
       return { t, st: pl.state, flip: pl.flip * 57.3, spin: pl._spinTotal * 57.3, tilt: Math.acos(Math.max(-1, Math.min(1, up.y))) * 57.3,
-        look: [R.p.alYaw || 0, R.p.alPitch || 0, R.p.alW || 0], dev: [com.x - rc.x, com.y - rc.y, com.z - rc.z], air: pl.state === 2, m: pl.offAxis.m, alpha: pl.offAxis.alpha * 57.3, comVsPhys: rc.distanceTo(com), drawnVsIdeal: rc.distanceTo(ideal), boneVsIdeal: com.distanceTo(ideal), tl,
+        look: [R.p.alYaw || 0, R.p.alPitch || 0, R.p.alW || 0], dev: [com.x - rc.x, com.y - rc.y, com.z - rc.z], air: pl.state === 2, m: pl.offAxis?.m ?? 0, alpha: (pl.offAxis?.alpha ?? 0) * 57.3, comVsPhys: rc.distanceTo(com), drawnVsIdeal: rc.distanceTo(ideal), boneVsIdeal: com.distanceTo(ideal), tl,
         res: pl.lastLanding ? `${pl.lastLanding.result} ${pl.lastLanding.trick}` : '' };
     }));
     await page.evaluate(() => window.__resume());
