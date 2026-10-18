@@ -17,6 +17,7 @@ In-ride juice runs on every map, and session-to-session progression sits on top 
 | `web/src/progression/index.js` | Public API and the ride tracker. Storage key: `sendit.progression`. |
 | `web/src/progression/ui.js` | Level-up celebration, toasts, the in-ride XP bar and the ride recap card. |
 | `web/src/progression/lobby.js` | The lobby's **Progress** tab, the TODAY strip, and the level badge on the profile chip. |
+| `web/src/thrill/` | Instant restart and retry, spots and gaps, adrenaline cues, instant replay and versus links (§ 7–8). |
 
 Shared files have small, additive edits only:
 
@@ -431,6 +432,223 @@ The progression state never touches the profile files (web/src/profile/). It has
   - This map's personal bests.
 - **TODAY strip.** It sits above the Ride button and shows the three dailies, each with a mini progress ring and its XP; finished ones are struck through. Clicking it opens the Progress tab. It hides on very short windows.
 - **Profile chip.** An `LV n` badge in the rank colour, and a thin XP bar under the name. It is a small widget appended to the chip; Lobby.js is not edited.
+
+## 7. Why games hook — and what Sendit adds
+
+The earlier research ([game-feel-research.md](game-feel-research.md)) covered moment-to-moment juice and the
+"one more run" loop. This pass looked at STEEP and the other games the user named, asked what each one does to
+keep players riding, and checked every idea against what Sendit already had.
+
+### What the big games do
+
+| Game | What hooks people | Already in Sendit? |
+|---|---|---|
+| **STEEP** | Discovering the mountain: drop zones and challenges unlock as you explore the Mountain View. "Mountain stories" give each peak a voice. You can replay any moment (the GoPro view) and share it. Friends' scores and lines sit on every challenge. | Drop zones (keys 1–9) on the big maps. **Added:** spots to discover per mountain, instant replay with a drone cam and clip saving, and links to challenge a friend. |
+| **Riders Republic** | Replay editor with drone, follow and helmet cams. Constant small events, and a career that branches by discipline. | Helmet cam (first person). **Added:** the drone replay. |
+| **SSX Tricky / SSX 3** | The boost / Uber meter fills from tricks (spelling TRICKY). Races and trick events reward different styles, and a hot streak is shown as the rider "on fire". | SEND IT on the flow maps, FEVER, the hot trail, Challenge vs Zen. |
+| **Tony Hawk's Pro Skater** | Combo chains where repeats wear out. **Gaps**: hidden named spots and transfers, shown in the combo list and in a per-level list (which drives exploration). Five-plus goals per level. | Combos with repeat decay, line goals on the flow maps. **Added:** spots and transfer gaps with a per-mountain list. |
+| **Trackmania** | One button restarts the run in under a second, so a failed attempt costs nothing. A ghost of your best, medals, and split times at checkpoints, to the millisecond. Short runs. | Ghost, medals and gate splits in Challenge. Restarting took a 1.3 s fade plus a 3.6 s countdown. **Added:** a 0.3 s restart with a 2.4 s countdown, and retry from the last take-off. |
+| **Forza Horizon** | Skill chains (near misses, drifts, air) that bank when you stop, and rewards every few seconds. Skill songs. | The combo chain, close shaves, FEVER, XP. |
+| **Rocket League / Fortnite** | A short session loop, cosmetics, and the near miss on a reward reveal. Replays and clips you can share. | Reward cases with near-miss reels, and the Locker. **Added:** clips. |
+| **Descenders** | Risk against reward: a run's reputation grows with style and is lost by bailing. | Losing the combo on a crash, stomp and clean streaks. |
+| **Skate** | Hall of Meat (crashes pay a little). A marker to drop and return to while practising a line. | Wipeout XP. **Added:** retry from the take-off (the marker, set for you). |
+
+### The psychology, briefly
+
+- **Variable rewards.** Points, cases and new tricks arrive at unpredictable times, which keeps people
+  playing; slot machines exploit the same pull. Sendit uses it only for things earned by riding: case
+  reels, FEVER windows, and new spots or gaps you stumble on.
+- **Flow channel.** The challenge has to rise with skill. Sendit keeps the riding difficulty fixed, so the
+  rising goals are the self-set ones: bigger spins, new spots, beating a ghost.
+- **Clear short-term goals.** Players need something to do in the next 30 seconds: dailies, line goals, the
+  next spot, the replay prompt, the gap to a friend's ghost.
+- **Visible mastery.** Trick book, map stars, and now a spots list per mountain ("7 / 31").
+- **Near misses.** A near miss reads as "almost" rather than a loss: close shaves, the case reel stopping
+  beside a rare item, a friend beating you by 0.4 s.
+- **Adrenaline.** Speed, sound and the frame create the rush: a wider lens and streaks at speed, wind, and a
+  pulse that rises at exposure. A heartbeat near a cliff is a cheap, strong cue.
+- **Instant retry.** The cost of failing decides how much risk players will take. When a retry costs a
+  second, players try the big trick again; when it costs a long fade and a walk back, they play safe.
+- **Social comparison.** Beating a named friend means more than beating a number.
+
+### What we added and why (all of it skill-neutral)
+
+The user's rule was that nothing may make riding easier, and that riding must stay controllable and
+natural. None of these features changes physics, landing tolerance, speed or scoring rules. They change
+how fast you get back to try again, what you have to aim for, and how the moment feels.
+
+| Feature | Hook | Section |
+|---|---|---|
+| Instant restart and retry from take-off | Instant retry and Trackmania pacing, which encourage riskier attempts | 8a |
+| Spots and transfer gaps | Discovery, variable reward and visible mastery (STEEP and THPS) | 8b |
+| Adrenaline cues | Arousal: a heartbeat and closing edges when exposed | 8c |
+| Instant replay and clips | Savouring the moment, plus sharing (STEEP GoPro view, Riders Republic drone) | 8d |
+| Versus links | Social comparison and a named ghost (Trackmania, STEEP friends) | 8e |
+
+Considered and left out:
+
+- **A run-wide SEND IT multiplier on every map.** It would overlap the combo, FEVER and SEND IT systems that
+  already exist.
+- **Personal-best splits in Zen.** Challenge already has gate splits and ghosts.
+- **Mountain stories with voice-over.** No voice assets.
+
+Sources: [Steep store page](https://steep.ubisoft.com), [TheSixthAxis on Steep](https://www.thesixthaxis.com/2016/11/09/exploring-steeps-snow-covered-mountaintops-and-extreme-vertical-drops/),
+[THPS2 gaps (StrategyWiki)](https://strategywiki.org/wiki/Tony_Hawk%27s_Pro_Skater_2/Gaps), [Trackmania preview (TheSixthAxis)](https://www.thesixthaxis.com/2020/05/28/trackmania-preview-new-pc-release/),
+[Uber Trick System (Giant Bomb)](https://giantbomb.com/wiki/Concepts/Uber_Trick_System), [Descenders review (GameCritics)](https://gamecritics.com/daniel-weissenberger/descenders-review/),
+[Riders Republic replay editor guide](https://www.ludo.guide/guide/riders-republic/advanced-gameplay-techniques/photo-mode-replay-editor), [Variable rewards](https://concepts.dsebastien.net/concept/variable-rewards/).
+
+## 8. Thrill features (thrill/)
+
+| Module | What it does |
+|---|---|
+| `web/src/thrill/core.js` | Pure logic and every tunable (`THRILL`): spot book, landing judge, retry trail, exposure, replay ring, versus codes. |
+| `web/src/thrill/retry.js` | Quick restart (R) and retry from the last take-off (Backspace). |
+| `web/src/thrill/spots.js` | Spots and gaps, the background catalog scan, and the Progress tab section (`spotsHtml`). |
+| `web/src/thrill/adrenaline.js` | Heartbeat and edge vignette when exposed. |
+| `web/src/thrill/replay.js` | Recorder, drone replay, letterbox UI, clip saving. |
+| `web/src/thrill/versus.js` | Challenge links: the friend's ghost, the live gap, the verdict, the share button. |
+| `web/src/thrill/index.js` | `installThrill()`, and two settings rows. |
+
+Edits to shared files are small and additive:
+
+- `main.js`: install the module, call `thrill.input()` before the world updates (while a replay plays it
+  skips the physics, the rig, the chase camera, effects, activities, sound and the finish check), and call
+  `thrill.update(dt)` after juice.
+- `progression/lobby.js`: one line for the Spots & gaps section, plus four CSS rules.
+- `scripts/unittest.mjs`: one line that runs `thrill-unit.mjs`.
+
+`player.js` is not edited. The quick restart replaces `player.resetToTop` on the instance.
+
+### 8a. Instant restart and retry (thrill/retry.js)
+
+- **R / Y: restart.** This is the same reset to the top as before, but it is a 0.08 s flash to black, 40 ms
+  held, then 0.22 s back in. It used to take 0.45 + 0.12 + 0.7 s. A Challenge restarts with a **2, 1, GO**
+  countdown (2.4 s; a fresh start keeps 3, 2, 1). Event: `thrillRestart {mode}`.
+- **Backspace / d-pad ▼: retry from the last take-off** (Zen). It puts you back on the approach, 2.6 s of
+  riding before your last take-off, **with the speed you had there**, so the same jump can be tried again
+  at once. It also works while tumbling after a crash, which skips the respawn fade. It can be used again
+  and again on the same jump. A retried run no longer counts as a clean run, as with drop zones. Before any
+  jump, a hint explains the key. In a Challenge it restarts the run, since a retry would break the clock.
+  Event: `thrillRetry {x, z, speed}`.
+- Voltage Park keeps its own **T** (back to the last feature).
+
+Tunables: `THRILL.restart = { fadeIn 0.08, hold 40 ms, fadeOut 0.22, countdown 2.4 }` and
+`THRILL.retry = { lead 2.6 s, sampleHz 8, keep 30 s }`.
+
+### 8b. Spots and gaps (thrill/spots.js)
+
+Every named feature on a mountain is a **spot** to discover.
+
+- **Sending a spot.** A clean landing after taking off from a named feature, with at least 0.6 s of air or
+  3 m of drop, sends it. The first time pays +250 style points and +60 XP, and shows a "NEW SPOT" toast with
+  "7 / 31 on this mountain" and a progress bar.
+- **Transfer gaps.** Taking off from one named spot and landing on another, with 0.8 s of air or more, is a
+  **gap** ("NEW GAP! THE THRONE → PILLOW STACKS"). It pays +400 and +100 XP the first time and +100 every
+  time after, as THPS gaps always score.
+- **Rails** count as spots when ground for 3 m or more.
+- **Combos.** All of these are score lines, so they also feed the combo chain.
+
+Where names come from:
+
+- `course.featureAt(x, z)` on Ravenspire, Voltage Park, Dragonback, Kitsune and Fjordline.
+- Otherwise the kickers: on Valcrest and Blackspruce they are named like "Kicker 3 (L)".
+
+The full list, used for found / total, comes from `course.named` and the rails on Voltage. On the other
+featureAt maps it comes from a background scan of `featureAt` over the terrain on an 8 m grid, in 6 ms
+slices that start 2.5 s after load. The list is cached per map in `localStorage['sendit.spots']`; bump
+`THRILL_SPOT_CATALOG` when map feature names change.
+
+The lobby's **Progress tab** has a **Spots & gaps** section for the current map. Found spots are lit,
+unfound ones show as `???`, and the gaps found are listed.
+
+Events: `thrillSpot {mapId, name, found, total}` and `thrillGap {mapId, name, isNew, n}`. Tunables:
+`THRILL.spots`.
+
+### 8c. Adrenaline cues (thrill/adrenaline.js)
+
+An exposure level from 0 to 1 is the largest of three measures:
+
+- **Drop ahead.** While grounded and above 6 m/s, the snow is sampled 6, 10, 15, 22 and 30 m ahead along the
+  travel direction. The drop beyond the slope's own fall line is measured, so an even steep slope reads
+  calm and a cliff band reads high. It runs from 6 m (level 0) to 24 m (level 1).
+- **Height above the snow in the air.** From 6 m (level 0) to 24 m (level 1).
+- **Speed ratio.** From 0.93 to 1.05, worth at most 0.35.
+
+The level eases up at 2.5/s and down at 0.9/s. From 0.15, a synthesized heartbeat plays on the sfx bus: a
+"lub-dub" of two low sine thumps, from 76 to 148 bpm, louder as the level rises. The screen edges also
+darken, up to 0.55, and pulse on each beat. With reduced motion there is no pulse and the edges are softer.
+The vignette sits under the HUD.
+
+The cue tells the player nothing the camera doesn't already show. Setting: **Adrenaline cues (heartbeat
+near drops)** (`settings.thrillAdrenaline`). Event: `thrillExposure {level}` at 4 Hz. Tunables:
+`THRILL.exposure`.
+
+### 8d. Instant replay (thrill/replay.js)
+
+**Recording.** Every frame of riding, the last 8 s are kept in a ring of 600 frames: each node under the
+rider rig, plus the rider's position and whether they were in the air. Each node stores its local
+position, rotation, scale and visibility, which covers bones, gear, garments and poles. That is about
+3 MB, and copying it costs nothing measurable. The node list is rebuilt when the rig changes (gear swap).
+
+**Playing.**
+
+- **The prompt.** In Zen, a clean landing with 1.4 s or more of air, or a 720, flip or cork with more than
+  0.8 s of air, shows a "▶ REPLAY · TAB" pill for 4 s. **Tab (d-pad ▲)** plays it. Pressed later, up to
+  14 s after the landing, Tab still replays that trick; with no recent big trick it replays the last 6 s.
+- **The clip.** It runs from 4 s before the touchdown to 1.5 s after. It plays at 0.4× while airborne,
+  eased, and at 1× on the snow.
+- **The camera.** A drone orbits the rider: 6.2 m out, 2 m up, 120° over the clip, starting side-on to the
+  travel and kept 1.2 m above the snow. The lens is 50°.
+- **The screen.** Letterbox bars, a blinking REPLAY tag, the rate (0.4×) and a progress line. The HUD and
+  the adrenaline vignette are hidden.
+- **Frozen world.** The ride is frozen while it plays: no physics, no timers. Afterwards the rig is put
+  back exactly as it was and the chase camera snaps behind.
+- **Skipping.** Space, Esc, Tab, or pad A / B / Start / ▲ skips.
+- **Enter saves a clip.** It restarts the replay and records the canvas with `MediaRecorder` (VP9 or VP8
+  webm, 30 fps, 6 Mbit/s), then downloads `sendit-replay-<time>.webm` when the replay ends.
+
+Not in Challenge runs, where the clock never stops. Setting: **Replay prompt after big tricks**
+(`settings.thrillReplayPrompt`); Tab works either way. Event: `thrillReplay {on, length, clip}`.
+Tunables: `THRILL.replay`.
+
+### 8e. Versus links (thrill/versus.js)
+
+- **Sharing.** The Challenge results card gains **Copy challenge link**. The link is
+  `?map=…&trail=…&challenge&vs=CODE`. The code holds the map, trail, your display name, time, style score and
+  medal, plus the run's ghost: down-sampled to 0.3 s and delta-packed into zigzag varints (decimetres and
+  centiradians), then base64url. A 90 s run is about 2 KB. With no clipboard permission, the link shows in
+  a prompt instead.
+- **Racing it.** Opening the link boots that map straight into the Challenge.
+  - The friend's ghost rides in pink with their name over it.
+  - Under the timer: **VS MIA · 1:01.50  ▲ 12 m** (cyan when you are ahead along the course, pink when
+    behind).
+  - At the finish, a banner: **YOU BEAT MIA BY 1.24 s** (gold) or **MIA WINS BY 0.80 s**.
+  - The results card adds a "VS Mia" row, and the button becomes **Copy link · challenge back**.
+- The target stays for every retry until the page is opened without `?vs`. A code for another map shows a
+  hint and is ignored, and a broken code is ignored.
+
+Event: `thrillVersus {win, time, target, name}`. Codec: `encodeVersus` / `decodeVersus` (`VERSUS`) in
+core.js.
+
+### Tests
+
+- `node web/scripts/thrill-unit.mjs`, which `unittest.mjs` also runs. It checks:
+  - The spot book: discovery, repeats, the catalog, garbage storage.
+  - The landing judge.
+  - The retry pick.
+  - Exposure against an even slope and a cliff, and the heartbeat tempo.
+  - The replay ring: wrapping and lookup by time.
+  - Versus codes: the round trip within quantisation, size, URL safety, and junk input.
+- `MAC=1 node web/scripts/thrill-smoke.mjs <url> <outDir>` (or `GPU=1` on Windows). It runs in the real game
+  and saves a screenshot of each step:
+  - A real Valcrest kicker 360: the spot toast and the replay prompt.
+  - Tab: the replay plays, the ride is frozen, and it ends.
+  - Backspace: back on the approach with speed.
+  - R: the restart takes under 400 ms.
+  - The Progress tab's spots list.
+  - The Ravenspire First Stack cliff: the adrenaline level and a spot.
+  - A versus link: the ghost, the live gap, the verdict row and the share button.
+  - No console errors.
 
 ## Tests and tools
 
