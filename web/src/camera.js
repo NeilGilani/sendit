@@ -24,7 +24,7 @@ export class CameraController {
     this.side = 0; this.sideSign = 1; this.roll = 0;
     this.trauma = 0;
     // Air framing (follow): eased amounts, springs, the predicted touchdown, the smoothed turn rate.
-    this.airK = 0; this.preK = 0; this.airTotal = 0; this.turnRate = 0; this.prevVelYaw = null; this.lift = 0;
+    this.airK = 0; this.preK = 0; this.airTotal = 0; this.turnRate = 0; this.prevVelYaw = null; this.armLift = 0;
     this.sv = {}; this.landPt = new THREE.Vector3(); this._land = { t: 0, p: new THREE.Vector3() };
     this.reducedMotion = !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;   // gentler default shake
     this.snapT = 0;            // > 0 while the FoV snaps back (crash / hard brake)
@@ -79,7 +79,7 @@ export class CameraController {
     this.vel = [0, 0, 0];
     this.yaw = this.player.heading + ((this.player.travelSign ?? 1) < 0 ? Math.PI : 0);
     this.lookYaw = 0; this.lookPitch = 0; this.side = 0;
-    this.airK = 0; this.preK = 0; this.airTotal = 0; this.turnRate = 0; this.prevVelYaw = null; this.lift = 0; this.sv = {}; this.landPt.set(0, 0, 0);
+    this.airK = 0; this.preK = 0; this.airTotal = 0; this.turnRate = 0; this.prevVelYaw = null; this.armLift = 0; this.sv = {}; this.landPt.set(0, 0, 0);
   }
 
   startIntro() {
@@ -255,27 +255,27 @@ export class CameraController {
     const pr = THREE.MathUtils.degToRad(-this.pitch);
     const dir = new THREE.Vector3(back.x * Math.cos(pr), Math.sin(pr), back.z * Math.cos(pr));
     // Terrain in the way of the arm. In the air (a landing slope or knuckle rising behind the rider) the arm tilts
-    // up over it (lift, m at the camera end: quick to rise, slow to settle) instead of collapsing toward the rider
+    // up over it (armLift, m at the camera end: quick to rise, slow to settle) instead of collapsing toward the rider
     // in one frame; on the snow, and for anything lift can't clear, the arm shortens as before.
     const up = this.airK * C.airRise;
     let need = 0;
-    if (this.airK > 0.01 || this.lift > 0.01) {
+    if (this.airK > 0.01 || this.armLift > 0.01) {
       for (let i = 2; i <= 8; i++) {
         const f = i / 8, q = this.pos.clone().addScaledVector(dir, f * this.dist);
         need = Math.max(need, (this.terrain.getHeight(q.x, q.z) + C.armClear - q.y - up * f) / f);
       }
       need = Math.min(C.liftMax, need) * clamp(this.airK * 3, 0, 1);
     }
-    this.lift += (need - this.lift) * k(need > this.lift ? 10 : 1.5);
+    this.armLift += (need - this.armLift) * k(need > this.armLift ? 10 : 1.5);
     let len = this.dist;
     for (let i = 1; i <= 8; i++) {
       const f = i / 8, t = f * this.dist;
       const q = this.pos.clone().addScaledVector(dir, t);
-      if (q.y + (this.lift + up) * f < this.terrain.getHeight(q.x, q.z) + 0.6) { len = Math.max(0.8, t - this.dist / 8); break; }
+      if (q.y + (this.armLift + up) * f < this.terrain.getHeight(q.x, q.z) + 0.6) { len = Math.max(0.8, t - this.dist / 8); break; }
     }
     this.arm = len < this.arm ? len : this.arm + (len - this.arm) * k(3);
     const cp = this.pos.clone().addScaledVector(dir, this.arm);
-    cp.y += (up + this.lift) * (this.arm / Math.max(this.dist, 1e-3));
+    cp.y += (up + this.armLift) * (this.arm / Math.max(this.dist, 1e-3));
     cp.y = Math.max(cp.y, this.terrain.getHeight(cp.x, cp.z) + 0.7);
     this.camera.position.copy(cp);
     // Aim: just past the rider, a little low so the snow ahead shows; in big air on maps with airLook further down

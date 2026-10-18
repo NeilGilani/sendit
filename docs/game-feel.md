@@ -189,7 +189,7 @@ so in the air the yaw follows the flight direction (held when there is almost no
 | Landing approach (`preK`, 0 until `landLead` 0.9 s before touchdown, 1 at `landSettle` 0.25 s) | The swing comes most of the way back behind (`airSideLand` of it is left). The arm rises to `landPitch`, steeper by the landing's own slope (as on the snow), and the aim moves `landLook` of the way from the rider toward the landing point. The rider is held within `landKeep` of the half-frame. The player sees the landing slope beside or above the rider, and their angle to it, in time to adjust. |
 | Touchdown and after | The springs ease back over ~0.5 s (`airOut`, `sideReturn`). The ground yaw rate blends back in through `airK`. The juice landing punch (dip and lens) still plays on top. |
 
-In the air the arm tilts up over terrain behind the rider: `lift`, up to `liftMax` m, keeping `armClear` m clear.
+In the air the arm tilts up over terrain behind the rider (`armLift`), up to `liftMax` m, keeping `armClear` m clear.
 It rises fast and settles slowly. Before, the arm collapsed toward the rider in one frame when a steep landing
 rose into it, which pitched the view ~5° per frame just before touchdown. On the snow, and beyond `liftMax`, the
 arm shortens as before. Maps with `airLook` (Ravenspire, Kitsune, Fjordline, Dragonback, Voltage) still look
