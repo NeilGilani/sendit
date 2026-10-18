@@ -224,6 +224,16 @@ export const crateSfx = {
     for (let i = 0; i < 26; i++) tone(NOTE(96 + ((i * 7) % 14)), t + 0.5 + i * 0.09 + Math.random() * 0.03, { a: 0.002, d: 0.3, gain: 0.025, rev: 0.7 });
   },
 
+  /** The hold before a Classified+ reveal: a rising swell and a heartbeat thump (dur seconds). */
+  charge(rank = 3, dur = 0.6) {
+    if (!ac()) return;
+    const t = ctx.currentTime;
+    hiss(t, { f: 300, q: 1.4, a: dur * 0.95, d: 0.04, gain: 0.12 + (rank - 3) * 0.05, sweep: 10, rev: 0.3 });
+    tone(NOTE(43 + rank), t, { type: 'sawtooth', a: dur * 0.95, d: 0.05, gain: 0.05, glide: 2, lp: 900 });
+    tone(55, t + 0.02, { a: 0.004, d: 0.22, gain: 0.25, glide: 0.6 });
+    if (dur > 0.4) tone(55, t + dur * 0.55, { a: 0.004, d: 0.2, gain: 0.3, glide: 0.6 });
+  },
+
   /** A rare card sliding past the marker in the crawl: a short shimmer. */
   tease(rank = 4) {
     if (!ac()) return;

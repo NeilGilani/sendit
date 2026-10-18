@@ -439,6 +439,7 @@ class CrateShow {
     this._v = new THREE.Vector3();
     this._v2 = new THREE.Vector3();
     this._c = new THREE.Color();
+    this._c2 = new THREE.Color();
   }
 
   /** Can the 3D show run here (lobby stage up and rendering)? */
@@ -843,7 +844,14 @@ class CrateShow {
       // During the reel: the colour of the card under the marker; ticks flicker it.
       if (t >= T.spin && o.under) want.set(rarityOf(o.under).color).lerp(this.baseLight, 0.25);
       I += (o.tickPulse || 0) * 3;
-      if (o.landed) { want.copy(this.rcol); I = 7 + 6 * Math.exp(-(t - T.spin - T.spinDur) * 4); }
+      // A red or gold card sliding past the marker: the light flares in its colour.
+      if (o.tease && t - o.tease.t < 0.9 && !o.landed) { const f = Math.exp(-(t - o.tease.t) * 4); want.lerp(this._c2.set(o.tease.col), f); I += 7 * f; }
+      if (o.landed) {
+        const lt = t - T.spin - T.spinDur;
+        want.copy(this.rcol);
+        // The hold: the light swells toward the reveal, more for higher grades.
+        I = 7 + 6 * Math.exp(-lt * 4) + Math.max(0, this.rarity.rank - 1) * 2.5 * smooth(0, T.hold, lt);
+      }
     }
     this.lightCol.lerp(want, 1 - Math.exp(-dt * 14));
     if (o.landed) this.lightCol.copy(this.rcol);
@@ -1004,7 +1012,7 @@ class CrateShow {
       const alongX = Math.random() < 0.6;
       const p = alongX ? this._v.set((Math.random() - 0.5) * C.W, top, side * C.D * 0.45) : this._v.set(side * C.W * 0.45, top, (Math.random() - 0.5) * C.D);
       const out = alongX ? this._v2.set((Math.random() - 0.5) * 0.4, 1.2 + Math.random() * 1.6, side * (0.3 + Math.random() * 0.9)) : this._v2.set(side * (0.3 + Math.random() * 0.9), 1.2 + Math.random() * 1.6, (Math.random() - 0.5) * 0.4);
-      this.alpha.emit(p, out, t0 + Math.random() * 0.15, 0.9 + Math.random() * 0.8, snow, 0.012 + Math.random() * 0.022, 4, 1.2, 5.5);
+      this.alpha.emit(p, out, t0 + Math.random() * 0.15, 0.9 + Math.random() * 0.8, snow, 0.008 + Math.random() * 0.016, 4, 1.2, 5.5);
     }
   }
 

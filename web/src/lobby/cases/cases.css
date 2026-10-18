@@ -290,3 +290,9 @@ body.cr-open #lobby, body.cr-open .cn-stack { opacity: 0 !important; pointer-eve
 /* The canvas reel (reelCanvas.js) replaces the DOM strip. */
 .cr-overlay.cv .cr-strip { display: none; }
 .cr-reelcv { position: absolute; left: 0; top: 0; display: block; }
+.cr-stamp { position: absolute; left: 0; right: 0; top: 40%; text-align: center; pointer-events: none; z-index: 3;
+  font-size: 4.4em; font-weight: 900; font-style: italic; letter-spacing: .06em; text-transform: uppercase; color: #fff;
+  text-shadow: 0 0 .25em var(--rc), 0 0 .7em var(--rc), 0 .06em 0 rgba(0, 0, 0, .4); animation: crStamp 1.7s cubic-bezier(.2, 1.2, .3, 1) both; }
+.rv-gold .cr-stamp { animation-delay: .32s; background: linear-gradient(100deg, #fff6c8, #ffd24a 40%, #fff 55%, #e4ae39 70%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+@keyframes crStamp { 0% { transform: scale(1.9); opacity: 0; } 14% { transform: scale(1); opacity: 1; } 70% { transform: scale(1.03); opacity: 1; } 100% { transform: scale(1.08) translateY(-.5em); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .cr-stamp { animation: crStampR 1.7s both; } @keyframes crStampR { 0%, 100% { opacity: 0; } 15%, 70% { opacity: 1; } } }

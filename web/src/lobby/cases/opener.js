@@ -129,7 +129,12 @@ class Opener {
     this.phase = 'case';
     this.raf = requestAnimationFrame((n) => this.frame(n));
     this.onKey = (e) => this.key(e);
-    this.onKeyUp = (e) => { if (e.code === 'Space' || e.code === 'Enter') this.holdSince = null; };
+    this.onKeyUp = (e) => {
+      if (e.code !== 'Space' && e.code !== 'Enter') return;
+      // Held long enough but no frame saw it (a very slow machine): still a skip.
+      if (this.holdSince != null && performance.now() - this.holdSince >= HOLD_SKIP * 1000) this.skip();
+      this.holdSince = null;
+    };
     addEventListener('keydown', this.onKey, true);
     addEventListener('keyup', this.onKeyUp, true);
     // A resize mid-spin re-measures the strip (cards are em-sized), so it still stops on the winner.
@@ -269,6 +274,7 @@ class Opener {
         if (under && k > 0.25 && cell !== this.result.reel.winAt && (under.rarity === 'legendary' || under.rarity === 'gold')) {
           if (!this.frozen) { if (this.d3) crateSfx.tease(rarityOf(under.rarity).rank); else caseSfx.tease(); }
           const c = rarityOf(under.rarity).color;
+          this.cs.tease = { t, col: c };   // the crate's light flares in that colour too
           this.marker.animate?.([{ filter: `drop-shadow(0 0 10px ${c}) drop-shadow(0 0 22px ${c}) brightness(1.6)` }, { filter: 'none' }], { duration: 600, easing: 'ease-out' });
         }
         this.lastCell = cell;
@@ -299,6 +305,8 @@ class Opener {
     this.landT = this.time();
     this.stopRiser?.();
     caseSfx.land();
+    // Classified and up: a short swell under the hold, into the reveal.
+    if (this.d3 && rarityOf(this.result.rarity).rank >= 3 && !this.frozen) crateSfx.charge(rarityOf(this.result.rarity).rank, this.T.hold);
     this.rumble(0.25, 0.4, 120);
     this.vibrate(25);
     this.cs.landed = true;
@@ -350,6 +358,13 @@ class Opener {
     this.el.classList.add('revealed', `rv-${r.id}`);
     rv.hidden = false;
     const chainDone = this.chain && !more && this.chain.pulls.length > 1;
+    // Classified and up get a big stamp across the screen first (gold after its blackout).
+    if (r.rank >= 3) {
+      const st = document.createElement('div');
+      st.className = 'cr-stamp';
+      st.textContent = r.id === 'gold' ? '★ Exceedingly rare ★' : r.name;
+      this.el.appendChild(st);
+    }
     rv.innerHTML = `
       ${this.d3 ? '' : `<div class="cr-rays"></div>
       <div class="cr-rcard">${cardHtml(res.key, res.rarity, { big: true, label: false })}</div>`}
