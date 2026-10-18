@@ -215,9 +215,9 @@ export const ANIM = {
   rollRelease: 15,            // 1/s the lean eases back up once the steer is let go (rollResponse tipping in)
   landLeanTime: 0.35, landLeanResponse: 30,   // s after a landing the lean catches up at this rate (1/s): plumb at once on a steep face
   leadRelease: 10,            // 1/s the upper-body turn lead eases back to neutral once the steer is let go (6 leading in)
-  squatMax: 0.25,             // legacy (the whole-body squash is gone: squats and landings bend the knees, character/dynamics.js)
-  squatXZ: 0.12,              // legacy
-  landSquashPerMs: 0.035,     // landing spring per m/s of vertical speed (lobby previews only; riders use DYN.absorb)
+  squatMax: 0.25,             // pre-jump Y compression (25%)
+  squatXZ: 0.12,              // X/Z expansion while squatting (volume preservation)
+  landSquashPerMs: 0.035,     // squash per m/s of vertical landing speed
   landSquashMax: 0.45,
   springFreq: 13,             // rad/s of the damped squash & stretch oscillation
   springDamping: 4.5,         // 1/s decay — settles in ~2-3 bounces
@@ -250,9 +250,6 @@ export const ANIM = {
   flipLoadArch: 0.45,         // rad the upper body arches back while preloading a backflip (S while charging)
   flipPivot: 0.85,
   flipTuckLift: 0.14,         // m the feet pull up toward the hips while flipping            // m above the feet the rider flips about (centre of mass)
-  restCrouch: 0.12,           // crouch (0..1) standing still: people stand tall at rest, the athletic stance comes with speed
-  skiHipsFwd: 0.035,          // m the hips sit forward of the hip joints' rest spot: centred over the boots, shins pressed into the tongues
-  powderBack: 0.03,           // m skiers sit back in deep powder (tips up)
   // Head in the air (rider.airLook): leads the rotation, then spots the landing point.
   airHeadLead: 0.09,          // rad of head yaw per rad/s of spin (into the spin) …
   airHeadLeadMax: 0.55,       // … up to this
@@ -265,7 +262,6 @@ export const ANIM = {
   comboOpen: [0.55, 0.3],     // s before touchdown a cork / rodeo stays compact until … and is open by
   comboCrouch: 0.45,          // crouch a combo holds through the off-axis part (knees up)
   comboArmsIn: 0.7,           // how far the arms wrap in through it
-  spotLanding: 0.3,           // rad the head pitches down to spot the landing in the last ~0.8 s of a jump
   gearSinkVisual: 0.15,       // share of the physics powder sink shown (the snow reads as packed, so the gear rides on top)
   board: {
     crouch: 0.17,             // m pelvis drop at rest (riders stand lower than skiers)

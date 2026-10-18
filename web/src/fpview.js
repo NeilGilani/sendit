@@ -55,9 +55,9 @@ export const FP_BREATH = {
   opacity: 0.32, size: 0.18,  // at its fullest, metres across at birth (grows ×2.4)
   fadeSpeed: 6,               // m/s above which it is gone
 };
-// Crash (ragdoll, character/ragdoll.js): the helmet cam is knocked out of the head and settles a few
+// Crash: the helmet cam is knocked out of the head and settles a few
 // metres back / up the way you came, watching the body tumble, so the crash stays readable and nobody
-// gets a ragdoll's-eye spin. First person resumes on the respawn.
+// gets a tumbling-eye spin. First person resumes on the respawn.
 export const FP_CRASH = { back: 2.6, up: 1.4, settle: 0.9, follow: 5, lookRate: 7, floor: 0.45 };
 // Terrain chatter: bumps (how fast the ground normal under the rider changes) kick the helmet cam.
 export const FP_BOB = { gain: 0.0035, max: 0.05, spring: 260, damp: 22 };
@@ -188,7 +188,7 @@ export class FPView {
     if (this.puff) this.puff.visible = false;
   }
 
-  /** Crashed in first person: an out-of-body follow of the ragdoll (camera.js calls this in State.CRASH). */
+  /** Crashed in first person: an out-of-body follow of the tumbling body (camera.js calls this in State.CRASH). */
   crash(dt) {
     const ctl = this.c, cam = ctl.camera, rider = ctl.rider, F = FP_CRASH;
     const k = (r) => 1 - Math.exp(-r * dt);

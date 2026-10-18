@@ -57,7 +57,6 @@ board are doing under you (hockey stops, counter-rotation, switch, spins).
   Toe-side carves drop the toe-side glove toward the snow, heel side reaches both forward; airs go wider,
   flip tucks pull in; grabs and deep-carve hand drags reach for real. The board nose shows looking down and
   on take-offs.
-- Body dynamics (`character/dynamics.js`) still add their hand-lag springs at 35 % in first person.
 
 **Poles** (`FP_POLE`, `fpPoleGeometry`, `fpPoleDir`). In the helmet cam the poles swap to a detailed model
 (moulded grip with knob and finger ridges, wrist strap, tapered shaft, spoked basket, steel tip) at a real
@@ -84,8 +83,8 @@ effort, only when slow. A stiff spring kicked by how fast the ground normal chan
 top of the speed buzz (`FP_BOB`). Corner wind streaks start a little earlier in the helmet cam
 (`HUD.fpWindEarly`, fainter). Gloves and sleeves are the outfit's own (the real rig is rendered).
 
-**Crashes** (`FP_CRASH`). The ragdoll takes the body; the helmet cam is knocked out of the head and settles
-a few metres back up the track (`back`, `up`, over `settle` s), watching the body tumble and the yard sale.
+**Crashes** (`FP_CRASH`). The body shows again and tumbles (the crash roll, `rider.js`); the helmet cam is knocked
+out of the head and settles a few metres back up the track (`back`, `up`, over `settle` s), watching the body slide to a stop.
 First person resumes on the respawn, with snow on the lens.
 
 ## Tunables (top of `fpview.js`)

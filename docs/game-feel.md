@@ -199,7 +199,7 @@ down toward the drop in big air. That fades out as the landing approach takes ov
 
 **Respawns, crashes, lifts.** A `respawned` event (crash respawn, drop zone, reset to top) snaps the chase camera to
 the rider (gliding after a 10–35 m teleport flew it through the body as the fade cleared). In a crash the aim eases
-85 % of the way to the tumbling body (`crashK`), so a ragdoll sliding fast down a steep face stays in frame. On a lift
+85 % of the way to the tumbling body (`crashK`), so a body sliding fast down a steep face stays in frame. On a lift
 the follow smoothing is 0.12 s, the arm 6.5 m, 63° off the cable line (`LIFT_SMOOTH`, `LIFT_SIDE`): straight behind,
 the haul rope and the chair back hid the rider. Snow spray in front of the rider's body thins out (gfx/spray.js
 `uFocus`, fx.js `FOCUS_THIN`), so a landing powder cloud no longer hides the rider in the touchdown frames.
@@ -635,7 +635,7 @@ position, rotation, scale and visibility, which covers bones, gear, garments and
   14 s after the landing, Tab still replays that trick; with no recent big trick it replays the last 6 s.
 - **Wipeouts.** After a big crash (a tumble of 4 m or more, or 11 m/s or more at the crash), the respawn
   shows "▶ REPLAY WIPEOUT · TAB" (STEEP's "relive your wipeouts"). The clip runs from 2.5 s before the crash
-  to the respawn, at 0.5× around the crash, ragdoll included.
+  to the respawn, at 0.5× around the crash, the tumble included.
 - **Teleports.** A replay never spans a respawn, retry or drop zone (`clipRange`).
 - **The clip.** It runs from 4 s before the touchdown to 1.5 s after. It plays at 0.4× while airborne,
   eased, and at 1× on the snow.

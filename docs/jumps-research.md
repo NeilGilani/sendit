@@ -449,7 +449,7 @@ allows is unchanged), and every change is backed by a bot. Benches (headless, th
 | Ravenspire slow-mo (huge airs) | rotation in real seconds × 1/0.7 around the apex | kept (visible, intended) |
 
 Two frame-rate dependences outside the physics turned up and were fixed: the rider's force-driven body reactions
-(character/dynamics.js) differentiated the physics velocity by the render frame time — at 144 / 165 Hz frames
+(character/dynamics.js, since removed — see body.md) differentiated the physics velocity by the render frame time — at 144 / 165 Hz frames
 alternate between zero and one physics step, a 14 % frame-to-frame ripple in a steady carve (0 % at 30 / 60 Hz) —
 and the first-person terrain chatter (fpview.js) kicked per frame from the ground normal's change rate (2.4× as
 strong at 144 Hz, half at 30 Hz). Both now use the physics clock (`player.simTime`).
