@@ -309,6 +309,8 @@ At runtime, `registerVariant(type, spec)` adds a model (for DLC or user presets)
 
 ## Rider animation (rider.js)
 
+Force-driven reactions (knee absorption, inertia, flinches, dabs, windmilling, breathing, fidgets) and the crash ragdoll are documented in [`body.md`](body.md); the whole-body squash & stretch described in older notes is gone.
+
 - **Proportions** (`web/src/character/body.js`, `PROPORTIONS`, applied once to the rest pose at load). The Quaternius model has a superhero cut. Measured on its bind pose (1.81 m), the head was about 20% too wide for the body, and the arm span was 1.65 m (real arm span ≈ height), mostly from a short upper arm. Now the head is ×0.94 (helmet included), the upper arm +4.5 cm, the forearm +1.5 cm and the hands ×0.92. Bones move, not vertices, so the body, outfit and helmet follow.
 - **Head stabilisation (both):** the head takes `headLevel` (45%) of the body's roll from vertical back out, so the eyes stay nearer level. On a board it does this through head pitch, because the board leans about an axis that runs through the hips. On a traverse the lean only cancels the slope, so the head stays as it is. Measured: ski carve head roll 20–25° → 18–22° at a deeper lean; board heel-side carve 42–45° → 22–25°.
 
