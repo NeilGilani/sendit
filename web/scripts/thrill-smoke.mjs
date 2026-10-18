@@ -43,6 +43,8 @@ const ev = (n) => page.evaluate((n) => window.__ev.filter((e) => e[0] === n), n)
 
 // ---------------------------------------------------------------- Valcrest: spot, replay, retry, restart
 await boot('map=valcrest-gully&kicker=2&ride');
+const rowsN = await page.evaluate(() => document.querySelectorAll('#settings input[data-key^=thrill]').length);
+check('settings grid has the three thrill rows', rowsN === 3, String(rowsN));
 const mk = await page.evaluate(() => window.__thrill.spots.markers.items.filter((it) => it.sp.visible).map((it) => it.target?.name));
 check('undiscovered spots ahead get a ? marker', mk.length > 0, mk.join(', '));
 await shot('0-spot-marker');
@@ -149,7 +151,7 @@ await wait(1400);
 const card = await page.evaluate(() => ({ rows: document.getElementById('resRows')?.textContent || '', btn: document.querySelector('#results [data-act=thrill-share]')?.textContent || '' }));
 check('results card has the verdict row and the share button', /VS Mia/.test(card.rows) && /link/i.test(card.btn), JSON.stringify(card));
 await page.evaluate(() => document.querySelector('#results [data-act=thrill-share]')?.click());
-await wait(500);
+await wait(1600);   // the late rows cascade in after ~1 s
 await shot('9-versus-results');
 
 check('no console errors', errors.length === 0, errors.slice(0, 4).join(' | '));
