@@ -320,7 +320,10 @@ function ensureStage() {
     stageReady = stage.init(new GLTFLoader()).then(async () => {
       await stage.setEquipment(profileStore.equipment, { animate: false, variant: profileStore.gearModel() });
       stage.resize(innerWidth, innerHeight);
-      await compileAsync();
+      // During the boot the post stack doesn't exist yet and compileForPost() covers the stage with the
+      // rest of the scene (a canvas-variant compile here was wasted work: 0.9 s of GPU-thread time).
+      // A later first lobby visit (after ?ride) compiles the stage's real variants here.
+      if (composer) { const was = warming; await compileForPost(); warming = was; }
     }).catch((e) => {
       console.error('[lobby] stage failed to build; showing the lobby over the world instead', e);
       stage.ready = false;

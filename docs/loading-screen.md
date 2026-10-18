@@ -19,7 +19,7 @@ code (commit `f7dcf86`, served side by side on another port), with 2–3 other s
 | | old |
 |---|---|
 | first paint | the CSS backdrop (gradient + SVG ridges + CSS dots): the "basic 2D mountain" |
-| first live frame, boot | 5.5–8.5 s after open (2.8–6.5 s on quieter runs); the 2D screen until then |
+| first live frame, boot | 2.5–3.3 s after open on a quiet machine, 5.5–8.5 s with other sessions busy; the 2D screen until then |
 | live scene resolution | the scaler collapsed to 0.5–0.64 → **919×574 to 1183×739 px on a 2880×1800 screen** (blurry) |
 | live scene fps during the boot | 9–14 fps, freezes of **5–8.5 s** |
 | lobby → mountain | a full page reload (`location.search`), so the same boot again: 2D screen for 1–6 s, then a random rider on a random made-up place (captions like "Dragonback · Spine 3" while loading Ravenspire), ~1050 px wide |
@@ -79,10 +79,31 @@ the main thread receives worker messages late (multi-second long tasks).
 
 ### Numbers (after)
 
-MacBook Air M1 8 GB, headless Chrome (ANGLE Metal), 1440×900 @2×, dev server, other sessions running
-(load average 8–50 during every run, so wall times swing by 2×; compare within a row only).
+MacBook Air M1 8 GB, headless Chrome (ANGLE Metal), 1440×900 @2× (a 2880×1800 screen), dev server, warm
+HTTP cache. Old = commit `f7dcf86` served on another port, runs interleaved old/new, 4 pairs at 01:25 when
+the machine was quiet (load average 2–4); boot → lobby, then lobby → Ravenspire (`selectTrail`, ride).
 
-NUMBERS_TABLE
+| | old | new |
+|---|---|---|
+| first picture | CSS 2D mountain at ~0.1 s | **engine still at 0.13–0.2 s** (decoded) |
+| live rider on screen, boot | 2.5–3.3 s (2D screen until then) | 2.3–3.4 s (the still until then, dissolving in-worker) |
+| boot → lobby ready | 11.1 / 11.4 / 12.9 / 12.0 s (median ≈ 11.7) | 9.5 / 12.9 / 13.9 / 11.4 s (median ≈ 12.1) |
+| live render size, boot | 960×600 – 1183×739 (scale 0.52–0.64) | **2277×1423** (scale 1.0) |
+| live fps during boot | 18–20 | 32–33 (locked 30 by design) |
+| worst live frame, boot | 1.5–3.4 s | 0.7–1.4 s (one, in "Setting up the lobby"; then fixed, see below) |
+| lobby → mountain ready | 8.1 / 8.6 / 9.0 / 9.0 s (median ≈ 8.8) | 8.2 / 9.4 / 9.5 / 10.4 s (median ≈ 9.5) |
+| live on the map load | 0.9–1.1 s, random rider / made-up place | 1.4–1.9 s (still before), **the player's rider, the real mountain + card** |
+| live render size, map load | 1563×977 | **2277×1423** |
+| worst live frame, map load | 0.2–0.43 s | **67–83 ms (no stalls at all)** |
+
+So boot is within noise of before (+0.4 s median), a map load ~0.7 s longer (the heavier hero scene and the
+sliced warm-up), and the screen is a real, sharp picture from the first ~150 ms and smooth throughout.
+The remaining boot hitch (0.7–1.4 s while the lobby stage was set up) was a wasted canvas-variant compile
+in `ensureStage()`; it is now skipped during the boot (compileForPost covers the stage).
+
+Earlier runs the same night with the machine at load average 15–90 (other sessions' browsers) showed the
+same picture in proportion: old map loads froze the hero shot for 2–4 s at the end (prewarm), boot for
+5–17 s; after the fixes the worst frame stayed under ~0.5 s even at load 50.
 
 ### AAA loading screens: what they do and what we took
 
