@@ -524,16 +524,25 @@ Edits to shared files are small and additive:
 - **R / Y: restart.** This is the same reset to the top as before, but it is a 0.08 s flash to black, 40 ms
   held, then 0.22 s back in. It used to take 0.45 + 0.12 + 0.7 s. A Challenge restarts with a **2, 1, GO**
   countdown (2.4 s; a fresh start keeps 3, 2, 1). Event: `thrillRestart {mode}`.
-- **Backspace / d-pad ▼: retry from the last take-off** (Zen). It puts you back on the approach, 2.6 s of
-  riding before your last take-off, **with the speed you had there**, so the same jump can be tried again
-  at once. It also works while tumbling after a crash, which skips the respawn fade. It can be used again
-  and again on the same jump. A retried run no longer counts as a clean run, as with drop zones. Before any
-  jump, a hint explains the key. In a Challenge it restarts the run, since a retry would break the clock.
+- **Backspace / d-pad ▼: retry from the last take-off** (Zen). It puts you back on the approach, **with
+  the speed you had there**, so the same jump can be tried again at once. The point is 2.6 s before the
+  take-off at the take-off speed, measured as distance ridden (12–45 m).
+  - **What counts as the take-off.** Only an air of 0.4 s or more, or one that ends in a crash. A smaller
+    air (under 60 %) within 40 m after a bigger one is treated as a bounce off the landing, so it doesn't
+    move the target.
+  - **During a crash.** It works while tumbling, and skips the respawn fade.
+  - **Repeats.** It works again and again on the same jump.
+  - **Clean runs.** A retried run no longer counts as a clean run, as with drop zones.
+  - **Before any jump**, a hint explains the key.
+  - **In a Challenge** it restarts the run, since a retry would break the clock.
+
   Event: `thrillRetry {x, z, speed}`.
 - Voltage Park keeps its own **T** (back to the last feature).
 
 Tunables: `THRILL.restart = { fadeIn 0.08, hold 40 ms, fadeOut 0.22, countdown 2.4 }` and
-`THRILL.retry = { lead 2.6 s, sampleHz 8, keep 30 s }`.
+`THRILL.retry = { lead 2.6 s, leadMin 12 m, leadMax 45 m, minAir 0.4 s, bounceM 40 m, sampleM 1.5 m, keep 600 m }`.
+The trail's clock is the distance ridden, not time, so frame rate and hit-stop don't change where you land.
+Teleports (respawns, drop zones, restarts) don't count as distance.
 
 ### 8b. Spots and gaps (thrill/spots.js)
 
@@ -580,7 +589,7 @@ An exposure level from 0 to 1 is the largest of three measures:
 
 The level eases up at 2.5/s and down at 0.9/s. From 0.15, a synthesized heartbeat plays on the sfx bus: a
 "lub-dub" of two low sine thumps, from 76 to 148 bpm, louder as the level rises. The screen edges also
-darken, up to 0.55, and pulse on each beat. With reduced motion there is no pulse and the edges are softer.
+darken (vignette opacity up to 0.7) and pulse on each beat. With reduced motion there is no pulse and the edges are softer.
 The vignette sits under the HUD.
 
 The cue tells the player nothing the camera doesn't already show. Setting: **Adrenaline cues (heartbeat
@@ -589,8 +598,8 @@ near drops)** (`settings.thrillAdrenaline`). Event: `thrillExposure {level}` at 
 
 ### 8d. Instant replay (thrill/replay.js)
 
-**Recording.** Every frame of riding, the last 8 s are kept in a ring of 600 frames: each node under the
-rider rig, plus the rider's position and whether they were in the air. Each node stores its local
+**Recording.** The last 8 s of riding are kept, at up to 60 Hz, in a ring of 496 frames: each node under
+the rider rig, plus the rider's position and whether they were in the air. Each node stores its local
 position, rotation, scale and visibility, which covers bones, gear, garments and poles. That is about
 3 MB, and copying it costs nothing measurable. The node list is rebuilt when the rig changes (gear swap).
 
@@ -599,15 +608,20 @@ position, rotation, scale and visibility, which covers bones, gear, garments and
 - **The prompt.** In Zen, a clean landing with 1.4 s or more of air, or a 720, flip or cork with more than
   0.8 s of air, shows a "▶ REPLAY · TAB" pill for 4 s. **Tab (d-pad ▲)** plays it. Pressed later, up to
   14 s after the landing, Tab still replays that trick; with no recent big trick it replays the last 6 s.
+- **Wipeouts.** After a big crash (a tumble of 4 m or more, or 11 m/s or more at the crash), the respawn
+  shows "▶ REPLAY WIPEOUT · TAB" (STEEP's "relive your wipeouts"). The clip runs from 2.5 s before the crash
+  to the respawn, at 0.5× around the crash, ragdoll included.
+- **Teleports.** A replay never spans a respawn, retry or drop zone (`clipRange`).
 - **The clip.** It runs from 4 s before the touchdown to 1.5 s after. It plays at 0.4× while airborne,
   eased, and at 1× on the snow.
-- **The camera.** A drone orbits the rider: 6.2 m out, 2 m up, 120° over the clip, starting side-on to the
-  travel and kept 1.2 m above the snow. The lens is 50°.
-- **The screen.** Letterbox bars, a blinking REPLAY tag, the rate (0.4×) and a progress line. The HUD and
-  the adrenaline vignette are hidden.
+- **The camera.** A drone orbits the rider: 6.2 m out, 2.4 m up, 120° over the clip, starting side-on to
+  the travel and kept 1.2 m above the snow. It flies on whichever side of the line has fewer trees between
+  it and the rider (sampled against the scatter's obstacle hash). The lens is 50°.
+- **The screen.** Letterbox bars, a blinking REPLAY tag, the rate (0.4×) and a progress line. The HUD, the
+  adrenaline vignette, the level-up overlay and the case cards are hidden.
 - **Frozen world.** The ride is frozen while it plays: no physics, no timers. Afterwards the rig is put
   back exactly as it was and the chase camera snaps behind.
-- **Skipping.** Space, Esc, Tab, or pad A / B / Start / ▲ skips.
+- **Skipping.** Space, Esc, Tab, or pad A / B / Start / ▲ skips (not on the frame that started it).
 - **Enter saves a clip.** It restarts the replay and records the canvas with `MediaRecorder` (VP9 or VP8
   webm, 30 fps, 6 Mbit/s), then downloads `sendit-replay-<time>.webm` when the replay ends.
 
@@ -634,6 +648,17 @@ Tunables: `THRILL.replay`.
 Event: `thrillVersus {win, time, target, name}`. Codec: `encodeVersus` / `decodeVersus` (`VERSUS`) in
 core.js.
 
+### 8f. SO CLOSE: the next medal (thrill/medals.js)
+
+This is the Trackmania near miss. A Challenge results card that isn't gold gets one more row for the next
+medal up:
+
+- **Close.** Within 1.5 s, or 4 % of the target time, it pulses gold: **SO CLOSE · 0.42 s off SILVER**.
+- **Otherwise** it states the goal plainly: **Next medal · SILVER · 12.3 s faster**.
+
+Judged runs (Voltage slopestyle) skip it. Logic: `nextMedalGap(time, targets)`. Tunables: `THRILL.medal`.
+Event: `thrillNextMedal {medal, gap, close}`.
+
 ### Tests
 
 - `node web/scripts/thrill-unit.mjs`, which `unittest.mjs` also runs. It checks:
@@ -642,15 +667,19 @@ core.js.
   - The retry pick.
   - Exposure against an even slope and a cliff, and the heartbeat tempo.
   - The replay ring: wrapping and lookup by time.
+  - Clip ranges: around a moment, the fallback, and never across a cut.
+  - The thrill achievements.
+  - `nextMedalGap`.
   - Versus codes: the round trip within quantisation, size, URL safety, and junk input.
 - `MAC=1 node web/scripts/thrill-smoke.mjs <url> <outDir>` (or `GPU=1` on Windows). It runs in the real game
   and saves a screenshot of each step:
-  - A real Valcrest kicker 360: the spot toast and the replay prompt.
+  - A real straight air off Valcrest kicker 3 (11 m/s, about 1.9 s): the spot toast and the replay prompt.
   - Tab: the replay plays, the ride is frozen, and it ends.
-  - Backspace: back on the approach with speed.
+  - Backspace: back on the approach with speed, past the bounce after the landing.
   - R: the restart takes under 400 ms.
+  - A crash: the REPLAY WIPEOUT prompt, and the wipeout replays.
   - The Progress tab's spots list.
-  - The Ravenspire First Stack cliff: the adrenaline level and a spot.
+  - The Ravenspire First Stack cliff: the adrenaline level, the vignette and a spot.
   - A versus link: the ghost, the live gap, the verdict row and the share button.
   - No console errors.
 
