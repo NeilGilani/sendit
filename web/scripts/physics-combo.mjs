@@ -220,6 +220,40 @@ function bench(type) {
   return out;
 }
 
+// Off-axis model fuzz (physics/offaxis.js alone): random spin / flip rate histories. The drawn attitude
+// (trick · heading) must never jump more than its rates allow in a step (no pops when the shape changes), and
+// whole flips must be exactly the plain heading.
+{
+  const { OffAxis } = await import('../src/physics/offaxis.js');
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  let worst = 0, worstMsg = '', idErr = 0;
+  const qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), qy = new THREE.Quaternion(), base = new THREE.Quaternion();
+  for (let run = 0; run < 300; run++) {
+    const oa = new OffAxis();
+    let th = 0, psi = rnd() * TAU, sr = (rnd() - 0.5) * 16, fr = (rnd() - 0.5) * 12, prev = null;
+    for (let i = 0; i < 200; i++) {
+      if (rnd() < 0.04) sr = (rnd() - 0.5) * 16;
+      if (rnd() < 0.04) fr = (rnd() - 0.5) * 12;
+      if (rnd() < 0.01) fr = 0;
+      th += fr * DT; psi += sr * DT;
+      base.setFromAxisAngle(_Y, psi);
+      oa.update(DT, th, sr, fr, base, fr < 0);
+      oa.quat(th, qa); qb.multiplyQuaternions(qa, qy.setFromAxisAngle(_Y, psi));
+      if (prev) {
+        const d = 2 * Math.acos(Math.min(1, Math.abs(prev.dot(qb))));
+        const allow = 2.2 * (Math.abs(sr) + Math.abs(fr)) * DT + 0.03;
+        if (d - allow > worst) { worst = d - allow; worstMsg = `run ${run} step ${i}: ${(d * DEG).toFixed(1)}° in a step (rates ${sr.toFixed(1)} / ${fr.toFixed(1)}, m ${oa.m.toFixed(2)})`; }
+      }
+      prev = (prev || new THREE.Quaternion()).copy(qb);
+      for (const k of [1, 2, -1]) idErr = Math.max(idErr, 2 * Math.acos(Math.min(1, Math.abs(oa.quat(k * TAU, qa).w))));
+    }
+  }
+  console.log(`off-axis fuzz: worst step beyond its rates ${(worst * DEG).toFixed(2)}° ${worstMsg} · whole flips off the plain heading ≤ ${(idErr * DEG).toFixed(4)}°`);
+  expect(worst <= 0.02, `off-axis model pops: ${worstMsg}`);
+  expect(idErr < 1e-3, `off-axis model: a whole flip is ${(idErr * DEG).toFixed(3)}° off the plain heading`);
+}
+
 const res = {};
 if (which !== 'snowboard') res.ski = bench('ski');
 if (which !== 'ski') res.snowboard = bench('snowboard');

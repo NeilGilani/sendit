@@ -19,7 +19,7 @@ const browser = await chromium.launch({ args });
 const W = Number(process.env.W || 420), H = Number(process.env.H || 420), DT_SHOT = Number(process.env.DT_SHOT || 0.12);
 const page = await browser.newPage({ viewport: { width: W, height: H } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
-await page.goto(`${base.replace(/\/?$/, '/')}?map=valcrest-gully&ride&equip=${equip}&quality=${process.env.Q ?? 0}`);
+await page.goto(`${base.replace(/\/?$/, '/')}?map=${process.env.MAP || "valcrest-gully"}&ride&equip=${equip}&quality=${process.env.Q ?? 0}`);
 await page.waitForFunction(() => window.__sendit?.player?.state === 1, null, { timeout: 400000 });
 await page.evaluate(() => {
   const st = document.createElement('style'); st.textContent = 'body > *:not(canvas) { display: none !important; }'; document.head.appendChild(st);
