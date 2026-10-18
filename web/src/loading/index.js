@@ -13,6 +13,7 @@
 // Debug URL flags: ?loadscene=0 (static screen only) · ?loadhold (never hand off; frame capture)
 //                  ?loadseed=<n> (pick the variant) · ?loadtrick=<id> · ?loadcam=<id> · ?loadtod=<id>
 import { TIPS } from './tips.js';
+import { readLoadHint, consumeTransition } from './hint.js';
 
 const $ = (id) => (typeof document !== 'undefined' ? document.getElementById(id) : null);
 const params = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
@@ -46,6 +47,8 @@ class LoadingScreen {
     this.bar = $('loadbar');
     this.msg = $('loadmsg');
     this.caption = $('loadcap');
+    this.hint = readLoadHint();
+    if (this.hint?.transition) { consumeTransition(); this.showDestination(this.hint); }
     this.buildTips();
     // Reduced motion: no flips and swooping cameras, just the painted screen (its snow is CSS and
     // stops too). ?loadscene=1 forces the live scene anyway.
@@ -77,7 +80,16 @@ class LoadingScreen {
       this.workerAt = performance.now();
       this.worker.onerror = (e) => { e.preventDefault?.(); this.fail(e.message || 'worker error'); };
       const opts = {};
-      for (const k of ['loadseed', 'loadtrick', 'loadcam', 'loadtod', 'loadgear', 'loadmtn', 'loaddebug', 'loadq']) if (params.has(k)) opts[k.slice(4)] = params.get(k);
+      // The painted still (index.html picks one) and the live scene share a variant: same seed (place,
+      // light, rider), so the cross-fade lands on the same mountain. A lobby -> mountain load keeps the
+      // still's light but rides the player's own kit on the picked mountain (loading/hint.js).
+      const still = typeof window !== 'undefined' ? window.__ldStill : null;
+      if (this.hint?.transition) {
+        opts.hint = this.hint;
+        if (still) { opts.tod = still.tod; opts.mtn = still.mtn; }
+      } else if (still) opts.seed = still.seed;
+      opts.cover = this.hasStill();
+      for (const k of ['loadseed', 'loadtrick', 'loadcam', 'loadtod', 'loadgear', 'loadmtn', 'loaddebug', 'loadq', 'loadfreeze']) if (params.has(k)) opts[k.slice(4)] = params.get(k);
       this.worker.postMessage({ type: 'init', canvas: off, ...this.size(), opts }, [off]);
       addEventListener('resize', () => this.worker?.postMessage({ type: 'resize', ...this.size() }));
       document.addEventListener('visibilitychange', () => this.worker?.postMessage({ type: 'visible', visible: !document.hidden }));
@@ -86,15 +98,35 @@ class LoadingScreen {
     }
   }
 
+  /** index.html's painted still is up (or about to be): the live scene waits for the rider before showing. */
+  hasStill() { return typeof window !== 'undefined' && !!window.__ldStill && !window.__ldStillFailed; }
+
+  /** Lobby -> mountain load: name the mountain being loaded (big, bottom-left, like a game's map card). */
+  showDestination(h) {
+    const box = $('loaddest');
+    if (!box || !h.mountain) return;
+    const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const diff = h.difficulty ? `<i class="dot ${esc(h.difficulty)}"></i>` : '';
+    box.innerHTML = `<small>Dropping in</small><b>${esc(h.mountain)}</b><span>${diff}${esc(h.trail || '')}${h.region ? `<em>${esc(h.region)}</em>` : ''}</span>`;
+    if (h.accent) box.style.setProperty('--accent', h.accent);
+    box.classList.add('on');
+    this.root.classList.add('dest');
+  }
+
   size() { return { width: innerWidth, height: innerHeight, dpr: devicePixelRatio || 1 }; }
 
   onMessage(m) {
     if (m.type === 'frame') {
-      // First real frame of the live scene: dissolve from the painted backdrop.
-      if (!this.firstFrameAt) { this.firstFrameAt = performance.now() - T0; this.root.classList.add('live'); }
+      // First real frame of the live scene: dissolve from the painted backdrop, unless a painted still
+      // of the rider is up; then the live scene shows from its first rider shot (never an empty slope).
+      if (!this.firstFrameAt) this.firstFrameAt = performance.now() - T0;
+      if (!this.hasStill()) this.goLive();
     } else if (m.type === 'shot') {
       this.sceneInfo = m.info;
+      this.goLive();
       this.setCaption(m.info);
+    } else if (m.type === 'frozen') {
+      this.frozen = m.info || true;
     } else if (m.type === 'stats') {
       this.sceneStats = m.stats;
     } else if (m.type === 'error') {
@@ -104,6 +136,12 @@ class LoadingScreen {
     } else if (m.type === 'log') {
       console.log('[loading]', m.message);
     }
+  }
+
+  goLive() {
+    if (this.liveAt) return;
+    this.liveAt = performance.now() - T0;
+    this.root.classList.add('live');
   }
 
   setCaption(info) {
@@ -161,7 +199,7 @@ class LoadingScreen {
     this.readyAt = performance.now() - T0;
     clearTimeout(this._creep);
     if (this.bar) { this.bar.style.transition = 'transform .5s ease-out'; this.bar.style.transform = 'scaleX(1)'; }
-    const quick = !this.firstFrameAt || this.readyAt < 1200;
+    const quick = (!this.liveAt && !this.hasStill()) || this.readyAt < 1200;
     const dur = quick ? 450 : 1300;
     // The game's fade curtain would add a black dip: the lobby is revealed straight through the dissolve.
     const curtain = $('fade');
@@ -184,7 +222,7 @@ class LoadingScreen {
   }
 
   stats() {
-    return { firstFrameMs: Math.round(this.firstFrameAt), readyMs: Math.round(this.readyAt || 0), stages: this.stages, scene: this.sceneStats, shot: this.sceneInfo };
+    return { firstFrameMs: Math.round(this.firstFrameAt), liveMs: Math.round(this.liveAt || 0), stillMs: Math.round(window.__ldStillAt || 0), readyMs: Math.round(this.readyAt || 0), stages: this.stages, scene: this.sceneStats, shot: this.sceneInfo };
   }
 }
 

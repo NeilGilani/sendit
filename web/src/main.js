@@ -28,7 +28,9 @@ import { UI } from './ui.js';
 import { Input } from './input.js';
 import { game, Mode, setMode, on, settings, setSetting, resetScore, emit, scoreSnapshot } from './state.js';
 import './maps/builtin.js';
-import { resolveMapSelection, loadMap, describeSelection, lobbySpot, getTrail, defaultTrail, needsReload, selectionQuery, trailSpawnFor, trailFinishFor, trailBoardId } from './maps/registry.js';
+import { resolveMapSelection, loadMap, describeSelection, lobbySpot, getTrail, defaultTrail, needsReload, selectionQuery, trailSpawnFor, trailFinishFor, trailBoardId, getMap } from './maps/registry.js';
+import { writeLoadHint } from './loading/hint.js';
+import { outfitSlotsFromProfile } from './character/profile.js';
 import { showTrailToast, hideTrailToast } from './maps/trailhud.js';
 import { profileStore } from './profile/store.js';
 import { installRideTracker } from './profile/tracker.js';
@@ -203,6 +205,7 @@ async function boot() {
   setTimeout(() => warmQualityVariants({ renderer, camera, scene, current: settings.quality, makeVariants: (q) => terrain.qualityMaterials(q) }), 1500);
   ui.loading(1, '');
   ui.doneLoading();
+  saveLoadHint();
   ui.fade(false, 2.0);
   if (params.has('ride') || params.has('challenge')) startRide(true, params.has('challenge') ? 'challenge' : 'zen');
   else { setMode(Mode.MENU); ui.refresh(); }
@@ -249,6 +252,7 @@ async function selectTrail(mapId, trailId, { ride = false, mode } = {}) {
   if (!t) return false;
   if (needsReload(currentMap, mapId, trailId)) {
     profileStore.setMap(mapId, t.variant ?? null, t.id);
+    saveLoadHint(mapId, t, true);   // the next load's loading screen: the player's rider on this mountain
     const q = selectionQuery(mapId, t.id, location.search);
     if (ride) q.set('ride', '');
     location.search = q.toString();
@@ -264,6 +268,23 @@ async function selectTrail(mapId, trailId, { ride = false, mode } = {}) {
   emit('trailSelected', { mapId, trailId: t.id });
   if (ride) startRide(false, mode ?? lobby?.mode ?? 'zen');
   return true;
+}
+
+/**
+ * Tell the next page load's loading screen (loading/hint.js) who rides and where: the player's outfit
+ * and gear, and (on a lobby → mountain reload) the mountain and trail being loaded.
+ */
+function saveLoadHint(mapId = currentMap?.map.id, trail = null, transition = false) {
+  try {
+    const map = getMap(mapId);
+    const m = map?.mountain || {};
+    trail = trail || (currentMap ? getTrail(currentMap.map, currentMap.trail) : null);
+    writeLoadHint({
+      transition, mapId, mountain: m.name || map?.name, region: m.region, accent: m.accent,
+      trail: trail?.name, difficulty: trail?.difficulty,
+      gear: profileStore.equipment, gearModel: profileStore.gearModel(), outfit: outfitSlotsFromProfile(),
+    });
+  } catch (e) { console.warn('[loading] hint not saved', e); }
 }
 
 /**
@@ -294,6 +315,7 @@ function applyGameEquipment(type) {
 
 // Loadout changes (lobby toggle, other tabs, profile sync) reach the preview and the game rider.
 on('loadout', ({ equipment }) => {
+  if (currentMap) saveLoadHint();
   if (stage?.ready) {
     stage.setEquipment(equipment, { variant: profileStore.gearModel(equipment) });
     sfx('jump_pop', 0.3, 1.15);
