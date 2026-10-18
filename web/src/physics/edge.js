@@ -409,6 +409,7 @@ export class EdgePhysics {
     this._spinPre = popped && Math.abs(this.windup || 0) > 0.3;   // wound up: the throw can finish a full set
     if (this.butter > 0.3) h += -this.yawRate * 0.4;   // spinning out of a butter pre-winds the spin
     this.spinH = clamp(h, -this.spinCap(), this.spinCap());
+    this._spotCheck = false;
     pl.spinRate = this.spinH; pl.spinTuck = 0;
     this.takeoff.end = popped ? this._popEnd : null;
     this.takeoff.set = q;
@@ -492,7 +493,7 @@ export class EdgePhysics {
       && (!against || Math.abs(h) < C.spinMinH || drift) && (Math.abs(h) > C.spinMinH || tLand > C.spinLateAir);
     if (late) h = approach(h, Math.sign(-steer) * C.spinLateMax * this.H.spin, C.spinLateRate * Math.abs(steer) * dt);
     // Shape: tucked (stick with the spin), open (against), grabbing = compact, released = spotting.
-    let pose = 0, rate = null;
+    let pose = 0, rate = null, checking = false;
     const dir = Math.sign(h), spinning = Math.abs(h) > C.spinMinH;
     // A grab is compact (pose 0.6, it can't open up); a late spin (building, or one no bigger than the late
     // throw makes) with the stick into it tucks fully while grabbing, as it does without the grab — it used to
@@ -522,15 +523,25 @@ export class EdgePhysics {
       // turned a cork into a plain flip half-way. It keeps spinning — open if the next alignment is out of
       // reach, so a check as the flip comes out has less to take back.
       const busy = spinning && this.flipBusy();
-      if (Math.abs(d) < settleA * DEG && (!spinning || (!busy && (!reach || Math.abs(d) < 12 * DEG)))) {
+      // Checks aim to arrive one spin-response time before touchdown: the rate follows its target with that lag,
+      // so aiming at touchdown itself came up 20–40° short on a check-back started late.
+      const tCheck = Math.max(tLand - 1 / C.spinResponse, 0.1);
+      // A check the spot started finishes even once the momentum it sheds drops below spinMinH: the spin rate
+      // lags, so a check passing an alignment overshot the 12° window, a check-back fell under spinMinH half-way,
+      // and either let go there — drifting on, outside settleA, into a sideways landing with nothing left to plan
+      // it. (Only checks already under way: a rider who was never spinning still settles within settleA only.)
+      const drift = !spinning && this._spotCheck && Math.abs(d) <= C.spinCheck * Math.max(tLand, 0.1);   // (as canCheck below)
+      if ((Math.abs(d) < settleA * DEG || drift) && (!spinning || (!busy && (!reach || Math.abs(d) < 12 * DEG)))) {
         // Close to an alignment (or not spinning): check the spin onto it (the upper body counter-rotates).
-        rate = clamp(d / Math.max(tLand, 0.1), -C.spinCheck, C.spinCheck);
+        rate = clamp(d / tCheck, -C.spinCheck, C.spinCheck);
+        checking = spinning || drift;
       } else if (spinning && !reach && busy) {
         pose = -1;
       } else if (spinning && !reach && canCheck) {
         // Too little spin to come round (a carve's pre-wind off a lip, an under-set): check back instead of
         // landing sideways or backwards.
-        rate = clamp(-dir * back / Math.max(tLand, 0.1), -C.spinCheck, C.spinCheck);
+        rate = clamp(-dir * back / tCheck, -C.spinCheck, C.spinCheck);
+        checking = true;
       } else if (spinning) {
         const f = need / Math.abs(h);
         pose = f >= 1 ? Math.min(1, (f - 1) / (C.spinTuckGain - 1)) : -Math.min(1, (1 - f) / (1 - C.spinOpen));
@@ -543,6 +554,7 @@ export class EdgePhysics {
     // Checking a spin (or twisting against it) bleeds the momentum off; it doesn't come back.
     if (rate !== null && spinning) h = Math.sign(pl.spinRate) === dir ? dir * Math.min(Math.abs(h), Math.abs(pl.spinRate)) : 0;
     this.spinH = h;
+    this._spotCheck = checking;
     pl.heading += pl.spinRate * dt;
   }
 
