@@ -122,12 +122,12 @@ function runCrash(sc, seconds = 4) {
     const W = ctl.H.world;
     if (E0 === null) E0 = ctl.E0;
     if (W.failed) { out.fail.push('solver failed (NaN)'); break; }
-    out.stretch = Math.max(out.stretch, W.stretch());
+    { const st = W.stretch(); if (st > out.stretch) { out.stretch = st; out.stretchAt = `${W.stretchName} @${((k + 1) * s.dt).toFixed(2)}s`; } }
     out.limit = Math.max(out.limit, W.limitViolation());
     const E = W.energy(0);
     if (!Number.isFinite(E)) { out.fail.push('NaN energy'); break; }
     out.dE = Math.max(out.dE, E - E0);
-    if (process.env.DBG && k % Math.max(1, Math.round(0.1 / s.dt)) === 0) { const c = W.com(0, new THREE.Vector3()), v = W.comVel(0, new THREE.Vector3()); console.log('  t', ((k + 1) * s.dt).toFixed(2), 'com', c.x.toFixed(2), (c.y - T.getHeight(c.x, c.z)).toFixed(2), c.z.toFixed(2), 'v', v.length().toFixed(2), 'dE', (E - E0).toFixed(1), 'obs', ctl.env.obstacles.map((o) => `${o.x.toFixed(2)},${o.z.toFixed(2)} r${o.r.toFixed(2)} y${(o.y1 - o.y0).toFixed(2)}`).join(' ')); }
+    if (process.env.DBG && k % Math.max(1, Math.round(0.1 / s.dt)) === 0) { const c = W.com(0, new THREE.Vector3()), v = W.comVel(0, new THREE.Vector3()); console.log('  t', ((k + 1) * s.dt).toFixed(2), 'w', W.bodies.filter((b) => b.group === 0).map((b) => b.w.length().toFixed(1) + (b.touch ? '*' : '')).join(' '), 'com', c.x.toFixed(2), (c.y - T.getHeight(c.x, c.z)).toFixed(2), c.z.toFixed(2), 'v', v.length().toFixed(2), 'dE', (E - E0).toFixed(1), 'obs', ctl.env.obstacles.map((o) => `${o.x.toFixed(2)},${o.z.toFixed(2)} r${o.r.toFixed(2)} y${(o.y1 - o.y0).toFixed(2)}`).join(' ')); }
     for (const b of W.bodies) for (const sp of b.samples) {
       b.point(sp.p, _v);
       out.below = Math.max(out.below, T.getHeight(_v.x, _v.z) - (_v.y - sp.r));
@@ -152,7 +152,7 @@ function runCrash(sc, seconds = 4) {
   out.E0 = E0;
   if (ctl.H) { let mv = 0, mw = 0; for (const b of ctl.H.world.bodies) if (b.group === 0) { if (b.v.length() > mv) { mv = b.v.length(); out.mvb = b.name; } if (b.w.length() > mw) { mw = b.w.length(); out.mwb = b.name; } } out.mv = mv; out.mw = mw; out.comv = ctl.H.world.comVel(0, new THREE.Vector3()).length(); }
   ctl.uninstall();
-  if (out.stretch > LIM.stretch) out.fail.push(`stretch ${(out.stretch * 100).toFixed(1)} cm`);
+  if (out.stretch > LIM.stretch) out.fail.push(`stretch ${(out.stretch * 100).toFixed(1)} cm (${out.stretchAt})`);
   if (out.below > LIM.below) out.fail.push(`under the snow ${(out.below * 100).toFixed(1)} cm`);
   if (out.dE > LIM.energy) out.fail.push(`energy +${out.dE.toFixed(1)} J`);
   if (out.limit * 180 / Math.PI > LIM.limitDeg) out.fail.push(`joint limit +${(out.limit * 180 / Math.PI).toFixed(1)}°`);

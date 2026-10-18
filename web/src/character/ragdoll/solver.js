@@ -224,6 +224,13 @@ export class World {
     this.rec = false;
     for (const b of this.bodies) if (b.touch && !b.G.asleep) this.collide(b, h);
     this.rec = true;
+    // Joints and snow once more, the anchors last (a hard landing's contact push would otherwise leave a joint
+    // pulled apart or past its limit for a frame).
+    for (const j of this.joints) if (!j.b1.G.asleep) this.solveJoint(j, h, true);
+    this.rec = false;
+    for (const b of this.bodies) if (b.touch && !b.G.asleep) this.collide(b, h);
+    this.rec = true;
+    for (const j of this.joints) if (!j.b1.G.asleep) this.anchor(j, h);
     // --- velocities from the positions
     const ih = 1 / h;
     for (const b of this.bodies) {
@@ -319,6 +326,15 @@ export class World {
     b1.pushRot(n, dl);
     b0.pushRot(n, -dl);
     return dl;
+  }
+
+  anchor(j, h) {
+    const b0 = j.b0, b1 = j.b1;
+    b0.offset(j.r0, _r0); b1.offset(j.r1, _r1);
+    _p0.addVectors(b0.x, _r0); _p1.addVectors(b1.x, _r1);
+    _d.subVectors(_p0, _p1);
+    const c = _d.length();
+    if (c > 1e-7) this.pos(b0, b1, _r0, _r1, _d.divideScalar(c), c, 0, h);
   }
 
   solveJoint(j, h, noDrive = false) {
@@ -449,7 +465,7 @@ export class World {
           b.x.y += lift; b.xp.y += lift;
           continue;
         }
-        this.contact(b, _p0, _n.set(s.nx, s.ny, s.nz), r, pen, b.mu, b.muS, b.e, h);
+        this.contact(b, _p0, _n.set(s.nx, s.ny, s.nz), r, pen, b.mu, b.muS, b.e, h, s);
       }
       // Obstacles: vertical cylinders from the snow to their top (trees, rocks, posts).
       for (const o of env.obstacles) {
@@ -477,7 +493,7 @@ export class World {
   }
 
   /** One contact against the static world at sample centre p (sphere radius r), normal n, depth pen. */
-  contact(b, p, n, r, pen, mu, muS, e, h) {
+  contact(b, p, n, r, pen, mu, muS, e, h, smp = null) {
     const nn = _b.copy(n);
 
     const rr = _r0.copy(p).addScaledVector(nn, -r).sub(b.x);
@@ -490,12 +506,17 @@ export class World {
     slip.addScaledVector(nn, -slip.dot(nn));
     const sl = slip.length();
     if (sl > 1e-9 && sl < muS * pen) this.pos(null, b, null, _r0.copy(loc).applyQuaternion(b.q), slip.divideScalar(-sl), sl, 0, h);
-    if (!this.rec) return;
+    if (!this.rec) {
+      // A later snow pass of the same sub-step: its push is part of this contact's normal impulse (friction).
+      if (smp && smp.cTick === this.ticks) smp.cRec.lam += lam;
+      return;
+    }
     b.touch++; b.touchN.add(nn);
     if (this.nc < 256) {
       const c = this.contacts[this.nc] ||= { r: new THREE.Vector3(), n: new THREE.Vector3() };
       this.nc++;
       c.b = b; c.r.copy(loc).applyQuaternion(b.q); c.n.copy(nn); c.lam = lam; c.vn = vn; c.mu = mu; c.e = e;
+      if (smp) { smp.cTick = this.ticks; smp.cRec = c; }
     }
     if (b.group === 0 && -vn > this.impact) { this.impact = -vn; this.impactAt.copy(p); }
     if (b.isHand) this.handTouch = true;
@@ -548,7 +569,8 @@ export class World {
     let s = 0;
     for (const j of this.joints) {
       j.b0.point(j.r0, _p0); j.b1.point(j.r1, _p1);
-      s = Math.max(s, _p0.distanceTo(_p1));
+      const d = _p0.distanceTo(_p1);
+      if (d > s) { s = d; this.stretchName = j.name; }
     }
     return s;
   }
