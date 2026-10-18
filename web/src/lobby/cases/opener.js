@@ -31,7 +31,6 @@ import { TIMING, TIMING_QUICK, REEL_EASE, cubicBezier } from './timing.js';
 export { TIMING, TIMING_QUICK, REEL_EASE, cubicBezier };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-const DBG = { nodraw: typeof location !== 'undefined' && location.search.includes('reelnodraw') };   // perf isolation (temporary)
 const HOLD_SKIP = 0.4;   // seconds of Space / Enter / A to skip
 const QUICK_KEY = 'sendit.cases.quick';
 export const quickOpen = {
@@ -251,7 +250,7 @@ class Opener {
       const x = this.x0 + (this.x1 - this.x0) * e;
       const prev = this.trace.at(-1);
       const v = prev ? (x - prev.x) / Math.max(1e-3, t - prev.t) : 0;
-      if (!DBG.nodraw) this.reel.draw(x);
+      this.reel.draw(x);
       this.x = x;
       // Speed streaks while fast (they fade as the reel slows and the cards sharpen into view).
       const spd = Math.min(1, Math.abs(v) / 5000);
