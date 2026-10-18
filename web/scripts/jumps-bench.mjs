@@ -7,7 +7,7 @@
 //   Blackspruce  its explicit kickers, entered at 12 / 15 m/s
 //   Ravenspire   The Stacks, Station Cliff, the Hammer and the Ravine: 'send' (tucked, pop every lip)
 //                and 'roll' (no pop), each with the flow layer idle and in the SEND IT state
-// Usage: node web/scripts/jumps-bench.mjs [valcrest|blackspruce|ravenspire|all] [ski|snowboard|both] [--quiet]
+// Usage: node web/scripts/jumps-bench.mjs [valcrest|blackspruce|ravenspire|all] [ski|snowboard|both] [--quiet] [--ease (flip patterns) | --spin (spin patterns)]
 import { gridTerrain, airRecorder, fmtAir } from './jumps-lib.mjs';
 const THREE = await import('three');
 const { Player, State } = await import('../src/player.js');
@@ -96,14 +96,26 @@ const PATTERNS = {
   'W held, re-pressed at 0.6 s': (c, pl) => { if (!air(pl) || pl.airTime < 0.3 || (pl.airTime > 0.6 && skilled(pl))) c.up = 1; },
   'grab held + S at 0.3 s': (c, pl) => { c.tuck = 1; if (air(pl) && pl.airTime > 0.3 && skilled(pl)) c.brake = 1; },
 };
+// --spin: the ways a player tries a spin off this take-off (let go = the spot picks the landing). Reported per
+// pattern: clean landings with at least a 180 / landed at all / mean spin (docs/jumps-research.md §9).
+const SPIN = args.includes('--spin');
+const spun = (pl) => Math.abs(pl._spinTotal) * 180 / Math.PI;
+const SPIN_PATTERNS = {
+  'A at the lip, let go at 300°': (c, pl) => { if (air(pl) && pl.airTime > 0.03 && spun(pl) < 300) c.steer = -1; },
+  'wind-up, let go at 540°': (c, pl, late) => { if ((!air(pl) && late) || (air(pl) && spun(pl) < 540)) c.steer = -1; },
+  'A 0.4 s in, let go at 120°': (c, pl) => { if (air(pl) && pl.airTime > 0.4 && spun(pl) < 120) c.steer = -1; },
+  'A 0.4 s in + grab, let go at 120°': (c, pl) => { if (air(pl)) { c.tuck = pl.dyn.timeToLand() > 0.6 ? 1 : 0; if (pl.airTime > 0.4 && spun(pl) < 120) c.steer = -1; } },
+  'carve the other way, A at 0.3 s, let go at 120°': (c, pl, late) => { if (!air(pl) && late) c.steer = 1; else if (air(pl) && pl.airTime > 0.3 && spun(pl) < 120) c.steer = -1; else if (air(pl) && pl.airTime < 0.3) c.steer = 1; },
+  'A at the lip + grab held to the end': (c, pl) => { if (air(pl)) { c.tuck = 1; if (pl.airTime > 0.03 && spun(pl) < 300) c.steer = -1; } },
+};
 const easeRows = [];
 function report(map, label, type, a, T, flow) {
   const mx = a.snap && a.air > 0.5 ? { f: replay(T, type, a.snap, a.frames, 'flip', flow), s: replay(T, type, a.snap, a.frames, 'spin', flow) } : null;
   rows.push({ map, label, type, flow, a, mx });
   if (!QUIET) console.log(`  ${label.padEnd(26)} ${type.padEnd(9)} ${fmtAir(a)}${mx ? `  | max ${mx.f.flips.toFixed(2)} flips (${mx.f.air.toFixed(2)} s), ${mx.s.spin.toFixed(0)}° spin` : ''}`);
-  if (EASE && a.snap && a.air > 1.0) {
+  if ((EASE || SPIN) && a.snap && a.air > 1.0) {
     const out = {};
-    for (const [k, pat] of Object.entries(PATTERNS)) out[k] = replay(T, type, a.snap, a.frames, null, flow, pat);
+    for (const [k, pat] of Object.entries(SPIN ? SPIN_PATTERNS : PATTERNS)) out[k] = replay(T, type, a.snap, a.frames, null, flow, pat);
     easeRows.push({ map, label, type, flow, air: a.air, out });
     if (!QUIET) console.log('     ' + Object.entries(out).map(([k, r]) => `${k}: ${r.result}${r.result !== 'crash' ? ` ${r.landedFlips}f` : ''} (${r.flips.toFixed(2)})`).join(' · '));
   }
@@ -190,6 +202,20 @@ for (const r of rows) {
 for (const [g, rs] of groups) {
   const m = (f) => Math.max(...rs.map(f));
   console.log(`  ${g.padEnd(38)} airs ${String(rs.length).padStart(2)}  v0 ≤ ${m((r) => r.a.v0).toFixed(1)} m/s  air ≤ ${m((r) => r.a.air).toFixed(2)} s (${m((r) => r.a.real).toFixed(2)} real)  h ≤ ${m((r) => r.a.h).toFixed(1)} m  apex ≤ ${m((r) => r.a.apex).toFixed(1)} m  dist ≤ ${m((r) => r.a.dist).toFixed(0)} m  max flips ${m((r) => r.mx?.f.flips ?? 0).toFixed(2)}  max spin ${m((r) => r.mx?.s.spin ?? 0).toFixed(0)}°  crashes ${rs.filter((r) => /CRASH/.test(r.a.result)).length}`);
+}
+if (SPIN) {
+  console.log('\n=== spin ease (airs > 1 s): per pattern, clean with ≥ 180° landed / tried · landed at all · mean spin ===');
+  const groups = new Map();
+  const bucket = (t) => (t < 1.6 ? 'air < 1.6 s' : t < 2.2 ? 'air 1.6–2.2 s' : 'air ≥ 2.2 s');
+  for (const r of easeRows) { const g = `${r.map === 'ravenspire' ? 'ravenspire' : 'kickers (valcrest + blackspruce)'} ${r.type}, ${bucket(r.air)}`; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(r); }
+  for (const [g, rs] of groups) {
+    console.log(`  ${g} (${rs.length} airs)`);
+    for (const k of Object.keys(SPIN_PATTERNS)) {
+      const xs = rs.map((r) => r.out[k]);
+      const clean = xs.filter((x) => x.result === 'clean' && x.spin >= 170).length, landed = xs.filter((x) => x.result !== 'crash').length;
+      console.log(`     ${k.padEnd(46)} clean ≥ 180 ${clean}/${xs.length}  landed ${landed}/${xs.length}  mean ${(xs.reduce((a, x) => a + x.spin, 0) / xs.length).toFixed(0)}°`);
+    }
+  }
 }
 if (EASE) {
   console.log('\n=== flip ease (airs > 1 s): per pattern, clean single flips landed / tried · any flip landed · mean flips reached ===');

@@ -587,6 +587,7 @@ export class Player {
       const f = this.flip || 0, o = Math.atan2(Math.sin(f), Math.cos(f)) * Math.sign(f);   // + past upright
       return Math.abs(f) > 1 ? `FLIP ${o > 0 ? 'OVER' : 'UNDER'}-ROTATED ${Math.round(fl.dev)}°` : `TIPPED ${Math.round(fl.dev)}°`;
     }
+    if (yawResult !== 'clean' && ev.switch && this.equipment.type === 'ski' && !this.equipment.handling.twin) return 'BACKWARDS ON DIRECTIONAL SKIS';
     if (yawResult !== 'clean') {
       // Signed yaw off the nearest rideable end (+ = heading turned past it the way the spin went).
       let d = angleDiff(velYaw, this.heading);
