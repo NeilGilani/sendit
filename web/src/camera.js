@@ -47,6 +47,9 @@ export class CameraController {
     on('bump', (v) => this.addTrauma(Math.min(1, v * 0.06) * C.obstacleTrauma));
     on('stumble', () => this.addTrauma(0.25));
     on('landed', ({ impact }) => this.fpView?.kick(impact));
+    // Respawns / drop zones / reset to top teleport the rider (often 10-35 m back up the track): jump the chase
+    // camera there instead of gliding after it, which flew it through the rider just as the fade cleared.
+    on('respawned', () => { if (this.intro >= 1 && game.mode !== Mode.MENU) this.snap(); });
   }
 
   addTrauma(a) { this.trauma = clamp(this.trauma + a, 0, 1); }
