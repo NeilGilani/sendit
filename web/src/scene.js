@@ -149,7 +149,7 @@ export const MIDTERRAIN = {
   lodDist: [1400, 3200],         // metres: 10 m grid → 20 m → 40 m (scaled by quality)
   maskRes: 2048,                 // baked sun mask texels per side (≈ 6 m)
   // Mid ring / backdrop seen from close (faces above a spawn near the tile edge):
-  rockDetailDist: 3000,          // metres: low / medium draw fracture blocks + ledge snow out to here (high: everywhere)
+  rockDetailDist: 1500,          // metres: low / medium draw fracture blocks + ledge snow out to here (high: everywhere)
   nearRelief: 1.0,               // strength of the 35–110 m ribs / gullies added to steep mid-ring faces
 };
 
