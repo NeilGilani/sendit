@@ -124,7 +124,7 @@ for (const name of list) {
   for (const d of data) console.log(`  t ${d.t.toFixed(2)} st ${d.st} flip ${d.flip.toFixed(0)} spin ${d.spin.toFixed(0)} tilt ${d.tilt.toFixed(0)} m ${d.m.toFixed(2)} α ${d.alpha.toFixed(0)}  drawnCOM-ideal ${d.drawnVsIdeal.toFixed(2)} m  boneCOM-drawn ${d.comVsPhys.toFixed(2)} m  boneCOM-ideal ${d.boneVsIdeal.toFixed(2)} m  head yaw ${(d.look[0] * 57.3).toFixed(0)}° pitch ${(d.look[1] * 57.3).toFixed(0)}° spot ${d.look[2].toFixed(2)} (t-land ${d.tl.toFixed(2)})`);
   // Body wobble: how far the posed skeleton's centre of mass strays from its average offset to the physics
   // point (a body that orbits its pivot while turning shows here; 0 = it rides the flight path exactly).
-  const airD = data.filter((d) => d.air), mean = [0, 1, 2].map((i) => airD.reduce((a, d) => a + d.dev[i], 0) / Math.max(1, airD.length));
+  const airD = data.filter((d) => d.air && d.t > 0.1), mean = [0, 1, 2].map((i) => airD.reduce((a, d) => a + d.dev[i], 0) / Math.max(1, airD.length));
   const wob = Math.max(0, ...airD.map((d) => Math.hypot(d.dev[0] - mean[0], d.dev[1] - mean[1], d.dev[2] - mean[2])));
   console.log(`  body COM wobble about the flight path: ${wob.toFixed(2)} m`);
   report[name] = { res, data, wobble: wob };
