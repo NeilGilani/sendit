@@ -123,7 +123,9 @@ async function boot() {
   scatter = new Scatter(terrain);
   await scatter.load(loader, { trees: [], rocks: [] });
   // Far trees are baked pictures of the near trees (gfx/trees.js): bake them now, before any frame.
-  console.log('[gfx] tree impostors', scatter.trees.bakeImpostors(renderer).toFixed(0), 'ms');
+  // (yields every ~12 ms and reports progress, so the live loading scene stays smooth).
+  const impMs = await scatter.trees.bakeImpostorsAsync(renderer, (p) => ui.loading(0.62 + 0.1 * p, 'Planting pines…'));
+  console.log('[gfx] tree impostors', impMs.toFixed(0), 'ms');
   scene.add(scatter.group);
   ui.loading(0.75, 'Building the park…');
   features.build();

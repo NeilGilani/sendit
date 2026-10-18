@@ -182,6 +182,7 @@ export class LoadingScene {
       n++;
     }
     ts.build();
+    ts.bakeImpostors(this.renderer);   // trees beyond the fronds are baked pictures (gfx/trees.js)
     ts.setQuality(this.opts.q === 'low' ? 0 : 2);
     this.scene.add(ts.group);
     this.timing.trees = Math.round(performance.now() - t0);

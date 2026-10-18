@@ -684,6 +684,30 @@ export class TreeSystem {
    */
   bakeImpostors(renderer) {
     const t0 = performance.now();
+    for (const _ of this.bakeSteps(renderer)) { /* run to the end */ }
+    return performance.now() - t0;
+  }
+
+  /**
+   * Same bake, yielding to the event loop every ~12 ms so a live loading animation stays smooth.
+   * onProgress(0..1) is called at each yield (main.js forwards it to ui.loading). Resolves to ms.
+   */
+  async bakeImpostorsAsync(renderer, onProgress) {
+    const t0 = performance.now();
+    let last = t0;
+    for (const p of this.bakeSteps(renderer)) {
+      if (performance.now() - last < 12) continue;
+      onProgress?.(p);
+      await new Promise((res) => setTimeout(res, 0));
+      last = performance.now();
+    }
+    onProgress?.(1);
+    return performance.now() - t0;
+  }
+
+  /** The bake as a generator: one atlas row (12 pictures) per step, yields its progress 0..1.
+   * Renderer state is restored around every step, so other code may render between steps. */
+  *bakeSteps(renderer) {
     const scene = new THREE.Scene();
     const mats = [1, 2].map((b) => treeMaterial({ name: 'spruceBake', map: this.tex, lod: this.lod, bake: b }));
     const mesh = new THREE.Mesh(this.geos[0].lod0, mats[0]);
@@ -691,9 +715,18 @@ export class TreeSystem {
     scene.add(mesh);
     const cam = new THREE.OrthographicCamera(-IMP.W / 2, IMP.W / 2, IMP.H / 2, -IMP.H / 2, 1, 80);
     const C = new THREE.Vector3(0, IMP.CY, 0);
-    const prev = { rt: renderer.getRenderTarget(), color: renderer.getClearColor(new THREE.Color()), alpha: renderer.getClearAlpha(), auto: renderer.autoClear, shadow: renderer.shadowMap.autoUpdate };
-    renderer.autoClear = false;
-    renderer.shadowMap.autoUpdate = false;
+    let prev = null;
+    const begin = () => {
+      prev = { rt: renderer.getRenderTarget(), color: renderer.getClearColor(new THREE.Color()), alpha: renderer.getClearAlpha(), auto: renderer.autoClear, shadow: renderer.shadowMap.autoUpdate };
+      renderer.autoClear = false;
+      renderer.shadowMap.autoUpdate = false;
+    };
+    const end = () => {
+      renderer.setRenderTarget(prev.rt);
+      renderer.setClearColor(prev.color, prev.alpha);
+      renderer.autoClear = prev.auto;
+      renderer.shadowMap.autoUpdate = prev.shadow;
+    };
     const W = IMP.NA * IMP.FW, H = IMP_ROWS * IMP.FH;
     const rt = new THREE.WebGLRenderTarget(W, H, { type: THREE.UnsignedByteType, format: THREE.RGBAFormat, depthBuffer: true, generateMipmaps: false });
     // Background: a needle-ish colour (albedo, sqrt-encoded) and an "up" normal, so mip levels that
@@ -705,18 +738,23 @@ export class TreeSystem {
       { tex: this.impNrm, mat: 1, rows: IMP_ROWS, els: IMP.NE },
       { tex: this.impSun, mat: 0, rows: 2 * IMP.NL, els: 1, sun: true },
     ];
-    passes.forEach(({ tex, mat, rows, els, sun }) => {
+    const total = passes.reduce((n, p) => n + 2 * IMP.NL * p.els, 0);
+    let done = 0;
+    for (const { tex, mat, rows, els, sun } of passes) {
+      begin();
       rt.scissorTest = false;
       rt.viewport.set(0, 0, W, H);
       renderer.setRenderTarget(rt);
       renderer.setClearColor(new THREE.Color().setRGB(...bg[mat], THREE.LinearSRGBColorSpace), 0);
       renderer.clear(true, true, true);
       mesh.material = mats[mat];
+      end();
       for (let kind = 0; kind < 2; kind++) {
         mesh.geometry = this.geos[kind].lod0;
         for (let lb = 0; lb < IMP.NL; lb++) {
           mats[mat].userData.uniforms.uBakeBin.value = lb;
           for (let e = 0; e < els; e++) {
+            begin();
             const row = (kind * IMP.NL + lb) * els + e, el = sun ? sunEl : e * IMP.EL;
             for (let a = 0; a < IMP.NA; a++) {
               const az = (a / IMP.NA) * Math.PI * 2;
@@ -729,9 +767,12 @@ export class TreeSystem {
               renderer.setRenderTarget(rt);   // applies this frame's viewport / scissor
               renderer.render(scene, cam);
             }
+            end();
+            yield ++done / total;
           }
         }
       }
+      begin();
       const h = rows * IMP.FH;
       let data = new Uint8Array(W * h * 4);
       renderer.readRenderTargetPixels(rt, 0, 0, W, h, data);
@@ -741,15 +782,11 @@ export class TreeSystem {
       // Upload now, then drop the CPU copy (the texture never changes again).
       renderer.initTexture(tex);
       tex.image = { data: null, width: W, height: h };
-    });
+      end();
+    }
     rt.dispose();
-    renderer.setRenderTarget(prev.rt);
-    renderer.setClearColor(prev.color, prev.alpha);
-    renderer.autoClear = prev.auto;
-    renderer.shadowMap.autoUpdate = prev.shadow;
     for (const m of mats) m.dispose();
     this.baked = true;
-    return performance.now() - t0;
   }
 
   build() {

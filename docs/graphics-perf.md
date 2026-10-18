@@ -316,9 +316,11 @@ compiles and 0 texture uploads mid-ride, no errors.
 Navigation to the first riding frame, q1, both builds back to back on a quiet moment of the machine
 (`gfxgrow` boots): Blackspruce 11.6 → 12.1 s, Ravenspire 9.4 → 10.1 s, Valcrest 5.5 → 6.2 s,
 Fjordline 16.7 → 16.9 s (Kitsune 16.8 → 21.3 s, a noisy run). The impostor bake costs 0.2–0.7 s (1.1–1.6 s while the machine was busy;12 × 3 × 3 ×
-2 + 72 small renders and three read-backs, logged as `[gfx] tree impostors … ms`). It runs synchronously
-in `main.js` right after the trees are placed, before the warm-up, so the loading screen needs no new
-hook.
+2 + 72 small renders and three read-backs, logged as `[gfx] tree impostors … ms`). In the game it runs
+as `bakeImpostorsAsync()` in `main.js` right after the trees are placed, before the warm-up: it yields every
+~12 ms and reports progress through `ui.loading(0.62–0.72, 'Planting pines…')`, so the live loading scene
+stays smooth. The loading scene (`src/loading/scene.js`) plants the same trees and bakes its own atlas
+synchronously in its worker (`bakeImpostors()`, part of its ~650 ms "trees" time).
 
 ### Knobs
 
