@@ -17,10 +17,11 @@ export const THRILL = {
     countdown: 2.4,        // s: a Challenge restart counts 2, 1, GO (a fresh start keeps 3, 2, 1)
   },
   retry: {
-    lead: 2.6,             // s before the last take-off to put you back (on the approach, with its speed)
+    lead: 2.6,             // s before the last take-off to put you back (on the approach, with its speed) …
+    leadMin: 12, leadMax: 45,   // … measured as distance at the take-off speed, m
     minAir: 0.4,           // s: shorter airs (bumps, rollers) don't move the retry point
-    sampleHz: 8,           // ground samples per second
-    keep: 30,              // s of samples kept
+    sampleM: 1.5,          // m between ground samples
+    keep: 600,             // m of trail kept
   },
   spots: {
     minAir: 0.6,           // s of air for a take-off to count as sending a spot
@@ -143,6 +144,7 @@ export function judgeLanding(e, C = THRILL.spots) {
 }
 
 // ------------------------------------------------------------------ retry from the last take-off
+// `t` is any increasing clock: retry.js feeds the distance ridden (m), so the lead is frame-rate proof.
 export class RetryTrail {
   constructor(keep = THRILL.retry.keep) { this.keep = keep; this.s = []; this.takeoffT = null; }
   clear() { this.s.length = 0; this.takeoffT = null; }

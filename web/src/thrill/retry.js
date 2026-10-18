@@ -13,8 +13,10 @@ import { progression } from '../progression/index.js';
 
 export function installRetry({ player, input, activities, ui, cam }) {
   const C = THRILL.retry, R = THRILL.restart;
+  // The trail's clock is the distance ridden (m), so the lead doesn't depend on the frame rate or hit-stop.
   const trail = new RetryTrail(C.keep);
-  let clock = 0, sampleT = 0;
+  let clock = 0, sampleAt = 0, lead = 30, pendingLead = 30;
+  const last = { x: 0, z: 0, ok: false };
 
   /** Black flash, action, back in. Keeps the player's own fade-lock (_busy) so nothing double-fires. */
   async function quick(action) {
@@ -50,8 +52,8 @@ export function installRetry({ player, input, activities, ui, cam }) {
       return;
     }
     if (player.state === State.FROZEN || player.state === State.LIFT) return;
-    if (pending !== null && player.state === State.AIR && player.airTime >= C.minAir) trail.markTakeoff(pending);   // mid-air: this jump
-    const p = trail.pick(C.lead);
+    if (pending !== null && player.state === State.AIR && player.airTime >= C.minAir) mark();   // mid-air: this jump
+    const p = trail.pick(lead);
     if (!p) { emit('hint', 'Retry needs a jump first · take off, then Backspace (d-pad ▼) puts you back on the approach'); return; }
     quick(() => {
       player.place({ x: p.x, y: 0, z: p.z }, p.h);
@@ -63,17 +65,24 @@ export function installRetry({ player, input, activities, ui, cam }) {
       emit('thrillRetry', { x: p.x, z: p.z, speed: player.speed });
       // Keep the take-off so the same retry works again and again.
       trail.s = trail.s.filter((s) => s.t <= p.t);
-      clock = p.t; trail.takeoffT = p.t + C.lead;
+      clock = p.t; trail.takeoffT = p.t + lead; last.ok = false;
     });
   }
 
   // A take-off counts once it proves to be a real air (≥ minAir s, or a crash), not a bump on the way out.
   let pending = null;
-  on('takeoff', () => { if (game.mode === Mode.RIDING) pending = clock; });
-  on('landed', (e) => { if (pending !== null && (e.air >= C.minAir || e.result === 'crash')) trail.markTakeoff(pending); pending = null; });
-  on('crashed', () => { if (pending !== null) trail.markTakeoff(pending); pending = null; });
-  on('rideStarted', () => { trail.clear(); clock = 0; pending = null; });
-  on('dropZone', () => trail.clear());
+  const mark = () => { trail.markTakeoff(pending); lead = pendingLead; };
+  on('takeoff', () => {
+    if (game.mode !== Mode.RIDING) return;
+    pending = clock;
+    pendingLead = Math.min(C.leadMax, Math.max(C.leadMin, Math.hypot(player.velocity.x, player.velocity.z) * C.lead));   // C.lead s at the take-off speed, in m
+  });
+  on('landed', (e) => { if (pending !== null && (e.air >= C.minAir || e.result === 'crash')) mark(); pending = null; });
+  on('crashed', () => { if (pending !== null) mark(); pending = null; });
+  on('rideStarted', () => { trail.clear(); clock = 0; pending = null; last.ok = false; });
+  on('dropZone', () => { trail.clear(); last.ok = false; });
+  on('resetTop', () => { last.ok = false; });
+  on('respawned', () => { last.ok = false; });
 
   return {
     trail,
@@ -81,13 +90,14 @@ export function installRetry({ player, input, activities, ui, cam }) {
     update(dt) {
       if (game.mode !== Mode.RIDING) return;
       if (input.codePressed('Backspace') || input.btnPressed(13)) retry();   // 13 = d-pad down
-      if (player.state === State.FROZEN || player._busy) return;
-      clock += dt;   // air and tumbles count too, so the lead is real riding time
-      if (player.state !== State.GROUNDED) return;
-      sampleT -= dt;
-      if (sampleT > 0) return;
-      sampleT = 1 / C.sampleHz;
+      if (player.state === State.FROZEN || player._busy) { last.ok = false; return; }
       const p = player.position, v = player.velocity;
+      const step = last.ok ? Math.hypot(p.x - last.x, p.z - last.z) : 0;
+      last.x = p.x; last.z = p.z; last.ok = true;
+      if (step > 25) return;   // a teleport (drop zone, a test placing the rider): not ridden distance
+      clock += step;           // air and tumbles count too
+      if (player.state !== State.GROUNDED || clock < sampleAt) return;
+      sampleAt = clock + C.sampleM;
       trail.push(clock, { x: p.x, y: p.y, z: p.z, h: player.heading, vx: v.x, vy: v.y, vz: v.z });
     },
   };
