@@ -123,7 +123,21 @@ Performance target: quality 1 around 14–16 ms GPU at 1600×900. Screenshots go
 4. **Chase camera** — fixed: hard turns now trail ~5° (was ~20°), and airs / flips / spins frame the predicted
    landing from ~0.9 s out with a level horizon and no snaps (see `docs/game-feel.md` §3c, `web/scripts/camshots.mjs`).
 5. Pink default poles/skis clash with the earth-tone outfits.
-6. Blackspruce's densest section peaks slightly above the 16 ms GPU target.
+6. Blackspruce's densest section peaks slightly above the 16 ms GPU target. Tonight's tree shadows (+~6 %) and
+   mountain rock detail (+~4 %) were measured only on the MacBook Air; re-measure on the Surface
+   (`node web/scripts/gfxab2.mjs <old>,<new> blackspruce 1`). Knobs, cheapest loss first: `MIDTERRAIN.rockDetailDist`
+   → 800, `nearRelief` → 0, `PERF.rockMacro` → false (docs/graphics.md "Mountain polish pass").
+8. Left over from the 2026-10-18 overnight QA pass (repro URLs in the QA notes, docs/game-feel.md):
+   level-up card stays at 18 % opacity over the next air (`progression/ui.js`); achievement toasts and the trail-name
+   toast can overlap the announcer at ≤960 px / in the first 4 s; floating score pops rise through the announcer;
+   speed read-out shows lift speed on lifts; the chase camera doesn't collide with trees / rocks (crash cam next to a
+   rock shows rock texture); Blackspruce board crash has the body off-screen ~18 frames at the start; map loads are
+   still full page reloads; loading-screen distant mountains are blocky (`src/loading/terrain.js`); re-run
+   `web/scripts/loadingstills.mjs` after big look changes; one 844×390 run showed the loading overlay over a started
+   ride (unverified).
+9. Design questions for the user: the spin throw window after take-off is short (lengthening makes timing easier);
+   at 16–22 m/s the last 10 % of steering adds skid rather than turn; directional skis can't land backwards
+   (rodeo / cork 540 on default skis crash — a hint explains it).
 7. On the user's Surface, a separate project (`Desktop/lap4lap`) leaves a Chrome profile in `%TEMP%` on every
    screenshot run (once filled the disk with ~80 GB) — its script should delete its temp profile.
 
