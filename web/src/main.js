@@ -197,6 +197,7 @@ async function boot() {
   addEventListener('resize', onResize);
   onResize();
   terrain.update(terrain.getSpawn().position, Infinity);   // full detail around the start before the first frame
+  globalThis.__loading?.mark?.('compileForPost');
   await compileForPost();
   // Warm-up behind the loading screen (gfx/prewarm.js): textures, every shader variant, LOD around start + lobby.
   await rockTextureReady();

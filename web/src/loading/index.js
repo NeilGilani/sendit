@@ -248,8 +248,11 @@ class LoadingScreen {
     });
   }
 
+  /** Timeline marks from the game's boot (e.g. prewarm phases), on the same clock as stages / stalls. */
+  mark(name) { (this.marks || (this.marks = [])).push([Math.round(performance.now() - T0), name]); }
+
   stats() {
-    return { firstFrameMs: Math.round(this.firstFrameAt), liveMs: Math.round(this.liveAt || 0), firstShotMs: Math.round(this.firstShotAt || 0), msgLagMs: Math.round(this.frameMsgLag || 0), modulesMs: Math.round(this.modulesAt || 0), stillMs: Math.round(window.__ldStillAt || 0), readyMs: Math.round(this.readyAt || 0), stages: this.stages, scene: this.sceneStats, shot: this.sceneInfo };
+    return { firstFrameMs: Math.round(this.firstFrameAt), liveMs: Math.round(this.liveAt || 0), firstShotMs: Math.round(this.firstShotAt || 0), msgLagMs: Math.round(this.frameMsgLag || 0), modulesMs: Math.round(this.modulesAt || 0), stillMs: Math.round(window.__ldStillAt || 0), readyMs: Math.round(this.readyAt || 0), stages: this.stages, marks: this.marks || [], scene: this.sceneStats, shot: this.sceneInfo };
   }
 }
 
