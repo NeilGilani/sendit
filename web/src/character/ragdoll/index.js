@@ -205,7 +205,11 @@ export class RagdollController {
       brace = _b.copy(_a.lengthSq() > 1 ? _a.normalize() : this.fallDir).multiplyScalar(0.75).add(_c.set(0, -1, 0)).normalize();
     }
     // Lying still: the muscles let go (a resting limb pushed by its tone against snow or bark would jitter).
-    this.rest = W.settling ? this.rest * Math.exp(-6 * W.h) : Math.min(1, this.rest + W.h);
+    // Still upright after the first moments (a board under both feet makes a stable base): the knees and hips let
+    // go, so the body sinks and falls instead of riding on like a skier.
+    _c.set(0, 1, 0).applyQuaternion(H.parts.chest.q);
+    const upright = W.t > C.uprightAfter && _c.y > 0.75 && H.parts.chest.x.y - H.parts.pelvis.x.y > 0.15;
+    this.rest = W.settling || upright ? this.rest * Math.exp(-6 * W.h) : Math.min(1, this.rest + W.h);
     updateTone(H, W.t, W.h, brace, C, this.rest);
   }
 

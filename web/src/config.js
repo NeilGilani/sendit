@@ -465,6 +465,7 @@ export const RAGDOLL = {
   toneEnd: 0.06,               // share of tone left after relaxing
   toneTau: 0.7,                // s
   tuck: { spine: 14, neck: 18, hip: 35, knee: 50, elbow: 55, shoulder: [0.45, -0.6, 0.6] },   // deg / arm direction (armature: x left, y up, z fwd)
+  uprightAfter: 0.4,           // s: a body still standing after this loses its muscle tone (falls)
   braceTime: 0.55,             // s: hands reach toward the snow the body falls onto
   braceTone: 1.6,              // × shoulder / elbow tone while bracing
   // Seeding from the crash
