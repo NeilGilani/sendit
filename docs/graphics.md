@@ -86,7 +86,7 @@ All new tunables are in `web/src/scene.js` (the scene file). `config.js` is unto
 - `SNOW`: albedo, subsurface, wrap, roughness, forward scatter, sparkle (brightness, density, facet cone), wind angle, drift / ripple / sastrugi / corduroy strengths, track depth, lip and darkening.
 - `ROCK`: colours, ledge spacing, ledge snow, the slope where snow slides off.
 - `SPRAY`: particle budget, emission rates, lifetimes, alphas, shadow coverage, velocity inheritance, stop burst, phase function, wind drift.
-- `TREES`: height, colours, snow load, needle translucency, fir share, LOD radii and pool sizes, tree-well radius.
+- `TREES`: height, colours, snow load, needle translucency, fir share, tree-well radius (LOD distances: `PERF.trees`).
 - `CLIFFS`: relief depth of the fall-line flutes sculpted into steep walls.
 - `CORNICES`, `RING` (distant ranges), `SNOWFALL`.
 - Post: `POST` at the top of `web/src/gfx/post.js` (exposure, tone map, grade, bloom, AO, glare, flare, goggles).

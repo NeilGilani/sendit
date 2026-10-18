@@ -567,12 +567,12 @@ void main() {`)
   return m;
 }
 
-/** Shadow-depth material for the impostor cells: a sun-facing card with the baked silhouette. */
-function impostorDepthMaterial(kind, lod, alb) {
+/** Shadow-depth material for the impostor cells: a sun-facing card with the baked sun-view silhouette. */
+function impostorDepthMaterial(kind, lod, sil) {
   const m = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
   m.name = 'treeImpDepth' + kind;
   m.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, lod, { uTime: globals.uTime, uWind: globals.uWind, uSunDir: globals.uSunDir, uImpAlb: { value: alb } });
+    Object.assign(shader.uniforms, lod, { uTime: globals.uTime, uWind: globals.uWind, uSunDir: globals.uSunDir, uImpAlb: { value: sil } });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nuniform float uTime; uniform vec2 uWind;\n' + IMP_VERT_PARS)
       .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + IMP_VERT_PRE);
@@ -582,15 +582,13 @@ uniform sampler2D uImpAlb;
 varying vec2 vImpUv; varying vec3 vImpA; varying vec3 vImpE; varying float vImpRow;`)
       .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n' + LOD_FRAG + `
   {
-    vec2 fsz = vec2(1.0 / IMP_NA, 1.0 / IMP_ROWS);
+    // Silhouette from the sun's own elevation (impSun: one row per kind and load level).
+    vec2 fsz = vec2(1.0 / IMP_NA, 1.0 / (2.0 * IMP_NL));
     vec2 u = clamp(vImpUv, vec2(0.004), vec2(0.996));
     vec2 gx = dFdx(vImpUv) * fsz, gy = dFdy(vImpUv) * fsz;
-    float w00 = (1.0 - vImpA.z) * (1.0 - vImpE.z), w10 = vImpA.z * (1.0 - vImpE.z);
-    float w01 = (1.0 - vImpA.z) * vImpE.z, w11 = vImpA.z * vImpE.z;
-    float cov = textureGrad(uImpAlb, (vec2(vImpA.x, vImpRow + vImpE.x) + u) * fsz, gx, gy).a * w00
-              + textureGrad(uImpAlb, (vec2(vImpA.y, vImpRow + vImpE.x) + u) * fsz, gx, gy).a * w10
-              + textureGrad(uImpAlb, (vec2(vImpA.x, vImpRow + vImpE.y) + u) * fsz, gx, gy).a * w01
-              + textureGrad(uImpAlb, (vec2(vImpA.y, vImpRow + vImpE.y) + u) * fsz, gx, gy).a * w11;
+    float row = floor(vImpRow / IMP_NE + 0.5);
+    float cov = mix(textureGrad(uImpAlb, (vec2(vImpA.x, row) + u) * fsz, gx, gy).r,
+                    textureGrad(uImpAlb, (vec2(vImpA.y, row) + u) * fsz, gx, gy).r, vImpA.z);
     if (cov < 0.5) discard;
   }`);
   };
@@ -654,6 +652,10 @@ export class TreeSystem {
     };
     this.impAlb = atlas();
     this.impNrm = atlas();
+    // Shadow silhouettes: one row of pictures per kind and load level from exactly the sun's elevation
+    // (coverage only, R8), for the sun-facing shadow cards.
+    this.impSun = new THREE.DataTexture(null, IMP.NA * IMP.FW, 2 * IMP.NL * IMP.FH, THREE.RedFormat, THREE.UnsignedByteType);
+    Object.assign(this.impSun, { minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: true, flipY: false, name: 'treeImpostorSun' });
     this.baked = false;
     this.mats = {
       lod0: treeMaterial({ name: 'spruceNear', map: tex, lod: this.lod }),
@@ -662,7 +664,7 @@ export class TreeSystem {
     };
     this.depthMats = {
       lod0: treeDepthMaterial(0, this.lod),
-      imp: [0, 1].map((k) => impostorDepthMaterial(k, this.lod, this.impAlb)),
+      imp: [0, 1].map((k) => impostorDepthMaterial(k, this.lod, this.impSun)),
     };
     this.geos = [0, 1].map((k) => ({ lod0: crownGeometry(k, 11 + k) }));
     this.impGeo = impostorGeometry();
@@ -696,19 +698,25 @@ export class TreeSystem {
     // Background: a needle-ish colour (albedo, sqrt-encoded) and an "up" normal, so mip levels that
     // mix in the empty border stay plausible; alpha 0 = no coverage.
     const bg = [[0.2, 0.26, 0.2], [0.5, 1, 0.5]];
-    [this.impAlb, this.impNrm].forEach((tex, pass) => {
+    const sunEl = Math.asin(THREE.MathUtils.clamp(SUN_DIR.y, 0.05, 1));
+    const passes = [
+      { tex: this.impAlb, mat: 0, rows: IMP_ROWS, els: IMP.NE },
+      { tex: this.impNrm, mat: 1, rows: IMP_ROWS, els: IMP.NE },
+      { tex: this.impSun, mat: 0, rows: 2 * IMP.NL, els: 1, sun: true },
+    ];
+    passes.forEach(({ tex, mat, rows, els, sun }) => {
       rt.scissorTest = false;
       rt.viewport.set(0, 0, W, H);
       renderer.setRenderTarget(rt);
-      renderer.setClearColor(new THREE.Color().setRGB(...bg[pass], THREE.LinearSRGBColorSpace), 0);
+      renderer.setClearColor(new THREE.Color().setRGB(...bg[mat], THREE.LinearSRGBColorSpace), 0);
       renderer.clear(true, true, true);
-      mesh.material = mats[pass];
+      mesh.material = mats[mat];
       for (let kind = 0; kind < 2; kind++) {
         mesh.geometry = this.geos[kind].lod0;
         for (let lb = 0; lb < IMP.NL; lb++) {
-          mats[pass].userData.uniforms.uBakeBin.value = lb;
-          for (let e = 0; e < IMP.NE; e++) {
-            const row = (kind * IMP.NL + lb) * IMP.NE + e, el = e * IMP.EL;
+          mats[mat].userData.uniforms.uBakeBin.value = lb;
+          for (let e = 0; e < els; e++) {
+            const row = (kind * IMP.NL + lb) * els + e, el = sun ? sunEl : e * IMP.EL;
             for (let a = 0; a < IMP.NA; a++) {
               const az = (a / IMP.NA) * Math.PI * 2;
               cam.position.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).multiplyScalar(40).add(C);
@@ -723,13 +731,15 @@ export class TreeSystem {
           }
         }
       }
-      const data = new Uint8Array(W * H * 4);
-      renderer.readRenderTargetPixels(rt, 0, 0, W, H, data);
-      tex.image = { data, width: W, height: H };
+      const h = rows * IMP.FH;
+      let data = new Uint8Array(W * h * 4);
+      renderer.readRenderTargetPixels(rt, 0, 0, W, h, data);
+      if (sun) { const r = new Uint8Array(W * h); for (let i = 0; i < r.length; i++) r[i] = data[i * 4 + 3]; data = r; }
+      tex.image = { data, width: W, height: h };
       tex.needsUpdate = true;
       // Upload now, then drop the CPU copy (the texture never changes again).
       renderer.initTexture(tex);
-      tex.image = { data: null, width: W, height: H };
+      tex.image = { data: null, width: W, height: h };
     });
     rt.dispose();
     renderer.setRenderTarget(prev.rt);
