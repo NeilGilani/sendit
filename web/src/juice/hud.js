@@ -68,7 +68,7 @@ const CSS = /* css */`
 #juiceHud .an.show { animation: jhSlam var(--hold, 1.6s) cubic-bezier(.2,.9,.3,1) forwards; }
 #juiceHud .an .g { display: inline-block; font-size: 22px; letter-spacing: .28em; padding: 3px 14px 3px 18px; border-radius: 3px; transform: skewX(-12deg); color: #1b1446; margin-bottom: 6px; }
 #juiceHud .an .g span { display: inline-block; transform: skewX(12deg); }
-#juiceHud .an .t { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.05; letter-spacing: .02em; -webkit-text-stroke: 3px #1b1446; paint-order: stroke fill; text-shadow: 0 5px 0 rgba(27,20,70,.55); }
+#juiceHud .an .t { font-size: min(clamp(34px, 4.6vw, 64px), var(--an-fit, 100vw)); line-height: 1.05; letter-spacing: .02em; -webkit-text-stroke: 3px #1b1446; paint-order: stroke fill; text-shadow: 0 5px 0 rgba(27,20,70,.55); }
 #juiceHud .an .s { font-size: 26px; color: #2ff5d6; margin-top: 2px; -webkit-text-stroke: 1.5px #1b1446; paint-order: stroke fill; }
 #juiceHud .an .s small { font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 900; font-size: 14px; letter-spacing: .16em; color: #fffaf0; margin-left: 10px; -webkit-text-stroke: 0; text-shadow: 0 1px 2px #1b1446, 0 0 8px rgba(27,20,70,.9); }
 #juiceHud .an .nw { display: none; margin: 6px auto 0; width: max-content; font-size: 13px; letter-spacing: .3em; padding: 3px 10px 3px 13px; border-radius: 3px; color: #1b1446;
@@ -168,7 +168,36 @@ const CSS = /* css */`
 #chal #comboHud { display: none; }
 #chal:not(.hidden) ~ #juiceHud .cb { top: 122px; }
 #chal:not(.hidden) ~ #juiceHud .bn { top: 196px; }
+/* With the combo panel up (it ends ~225 px down), the live air and the announcer go under it instead of on it:
+   at 720p 24 % / 30 % sat on its last lines. From ~1000 px tall the percentages already clear it. */
+#juiceHud .cb.on ~ .air { top: max(24%, 232px); }
+#juiceHud .cb.on ~ .an { top: max(30%, 290px); }
+#chal:not(.hidden) ~ #juiceHud .cb.on ~ .air { top: max(24%, 258px); }
+#chal:not(.hidden) ~ #juiceHud .cb.on ~ .an { top: max(30%, 316px); }
 body.fp #juiceHud .an { top: 42%; }   /* helmet cam: no rider in the middle, keep clear of the combo panel */
+/* Short screens (phones in landscape): the combo panel moves to the right under the score, everything shrinks, so
+   the announcer, live air and the rider in the middle stay clear of each other. */
+@media (max-height: 500px) {
+  #juiceHud .cb, #chal:not(.hidden) ~ #juiceHud .cb { left: auto; right: 20px; top: 96px; transform: none; text-align: right; }
+  #juiceHud .cb .m { font-size: 30px; }
+  #juiceHud .cb .p { font-size: 16px; margin-left: 8px; }
+  #juiceHud .cb .tr { font-size: 12px; height: 14px; }
+  #juiceHud .cb .it { font-size: 11px; margin-top: 3px; }
+  #juiceHud .cb .tm { width: 130px; margin: 4px 0 0 auto; }
+  #juiceHud .cb .rk { font-size: 11px; height: 13px; margin-top: 3px; }
+  #juiceHud .cb.on ~ .air, #juiceHud .air { top: 20%; }
+  #juiceHud .air .d { font-size: 32px; }
+  #juiceHud .air .x { font-size: 13px; }
+  #juiceHud .cb.on ~ .an, #juiceHud .an, #chal:not(.hidden) ~ #juiceHud .cb.on ~ .an { top: 28%; }
+  #juiceHud .an .g { font-size: 14px; margin-bottom: 3px; }
+  #juiceHud .an .t { font-size: min(28px, var(--an-fit, 100vw)); -webkit-text-stroke: 2px #1b1446; }
+  #juiceHud .an .s { font-size: 17px; }
+  #juiceHud .an .s small { font-size: 11px; }
+  #juiceHud .co { font-size: 18px; }
+  #juiceHud .bn { top: 120px; font-size: 26px; }
+  #juiceHud .ts { top: 92px; transform: scale(.8); transform-origin: top left; }
+  body.fp #juiceHud .an { top: 34%; }
+}
 body.fp #notes { bottom: 130px; }      /* the helmet cam's speed read-out sits bottom right */
 `;
 
@@ -270,6 +299,8 @@ export function mountJuiceHud({ player, combo, input, camera }) {
     anG.style.display = G ? '' : 'none';
     if (G) { anG.firstChild.textContent = G.text; anG.style.background = G.color; anG.style.boxShadow = `0 0 24px ${G.glow}`; }
     anT.textContent = title || '';
+    // Long combo names ("BS RODEO 720 TWEAKED TAIL GRAB") ran off both edges at 1280 px: shrink to fit the width.
+    anT.style.setProperty('--an-fit', title && title.length > 18 ? `${(120 / title.length).toFixed(2)}vw` : '100vw');
     anT.style.color = G && grade !== 'clean' ? G.color : '#fffaf0';
     anS.innerHTML = sub || '';
     an.style.setProperty('--hold', `${hold + 0.35}s`);

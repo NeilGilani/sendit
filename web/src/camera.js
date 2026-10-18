@@ -13,6 +13,8 @@ import { lerpAngle, angleDiff, clamp, smoothstep } from './world.js';
 import { FPView } from './fpview.js';
 
 const _v = new THREE.Vector3();
+const LIFT_SMOOTH = 0.12;   // s, follow smoothing on a lift ride
+const LIFT_SIDE = 1.1;      // rad the lift camera sits off the cable line (straight behind, the cable and the chair back hid the rider; from the side the seated rider shows)
 
 export class CameraController {
   constructor(camera, player, terrain, input) {
@@ -47,6 +49,9 @@ export class CameraController {
     on('bump', (v) => this.addTrauma(Math.min(1, v * 0.06) * C.obstacleTrauma));
     on('stumble', () => this.addTrauma(0.25));
     on('landed', ({ impact }) => this.fpView?.kick(impact));
+    // Respawns / drop zones / reset to top teleport the rider (often 10-35 m back up the track): jump the chase
+    // camera there instead of gliding after it, which flew it through the rider just as the fade cleared.
+    on('respawned', () => { if (this.intro >= 1 && game.mode !== Mode.MENU) this.snap(); });
   }
 
   addTrauma(a) { this.trauma = clamp(this.trauma + a, 0, 1); }
@@ -79,7 +84,7 @@ export class CameraController {
     this.vel = [0, 0, 0];
     this.yaw = this.player.heading + ((this.player.travelSign ?? 1) < 0 ? Math.PI : 0);
     this.lookYaw = 0; this.lookPitch = 0; this.side = 0;
-    this.airK = 0; this.preK = 0; this.airTotal = 0; this.turnRate = 0; this.prevVelYaw = null; this.armLift = 0; this.sv = {}; this.landPt.set(0, 0, 0);
+    this.airK = 0; this.preK = 0; this.airTotal = 0; this.turnRate = 0; this.prevVelYaw = null; this.armLift = 0; this.crashK = 0; this.sv = {}; this.landPt.set(0, 0, 0);
   }
 
   startIntro() {
@@ -148,7 +153,9 @@ export class CameraController {
     const steep = Math.max(0, THREE.MathUtils.radToDeg(Math.acos(Math.min(1, s.groundNormal.y))) - 30) / 10;
     this.steep = (this.steep || 0) + (steep - (this.steep || 0)) * k(2);
     const target = s.renderPos.clone().add(new THREE.Vector3(0, C.height + s.speedRatio * C.heightAtSpeed + this.steep * C.steepLift, 0));
-    const sm = lift ? 0.35 : C.followSmooth;
+    // Lift: long chairs run at up to ~20 m/s (length / liftRideSeconds); a 0.35 s smoothing trailed 7 m behind the
+    // set 7.5 m arm, so the chair was a speck 14-29 m away with the haul cable drawn straight through it.
+    const sm = lift ? LIFT_SMOOTH : C.followSmooth;
     // The anchor follows the path (renderPos), never the rotating body: flips turn about the rider's centre of
     // mass (rider.js) and spins about the vertical, so the anchor stays on the flight line and the horizon level.
     this.pos.x = this.damp(this.pos.x, target.x, 0, sm, dt);
@@ -229,7 +236,7 @@ export class CameraController {
     this.side = this.spring('side', sideWant, sideWant > this.side ? C.sideIn : C.sideReturn, dt);
 
     const r = s.speedRatio;
-    const yawT = this.yaw + this.lookYaw + this.orbit + this.side * this.sideSign * THREE.MathUtils.degToRad(C.airSideDeg);
+    const yawT = this.yaw + this.lookYaw + this.orbit + this.side * this.sideSign * THREE.MathUtils.degToRad(C.airSideDeg) + (lift ? LIFT_SIDE : 0);
     const back = new THREE.Vector3(Math.sin(yawT), 0, Math.cos(yawT));
     const n = s.groundNormal;
     const rise = -back.dot(new THREE.Vector3(n.x, 0, n.z)) / Math.max(n.y, 0.2);
@@ -245,12 +252,12 @@ export class CameraController {
       wantPitch += (C.landPitch - landSlope * 0.75 + this.lookPitch - wantPitch) * this.preK;
     }
     if (orbiting) wantPitch = -8 + this.lookPitch;
-    if (lift) wantPitch = -9 + this.lookPitch;
+    if (lift) wantPitch = -12 + this.lookPitch;
     this.pitch += (wantPitch - this.pitch) * k(3);
     let wantDist = C.distance + r * C.distanceAtSpeed - s.tuck * 0.4 + this.airK * C.airPull;
     wantDist = wantDist * (1 - this.side) + (C.airSideDist + this.airK * C.airPull) * this.side;
     if (orbiting) wantDist = 6.5;
-    if (lift) wantDist = 7.5;
+    if (lift) wantDist = 6.5;
     if (crash) wantDist = 7;
     this.dist += (wantDist - this.dist) * k(2);
 
@@ -295,6 +302,10 @@ export class CameraController {
       const maxA = THREE.MathUtils.degToRad(this.camera.fov * 0.5 * C.landKeep), ang = toR.angleTo(toA);
       if (ang > maxA) aim.copy(cp).addScaledVector(toR.lerp(toA, maxA / ang).normalize(), dA);
     }
+    // Crash: aim at the tumbling body. It slides fast down steep faces and the anchor's vertical smoothing left the
+    // camera 3-4 m above it, aimed past it: on Blackspruce the ragdoll sat below the bottom edge for most of the crash.
+    this.crashK = this.spring('crashK', crash ? 1 : 0, crash ? 4 : 3, dt);
+    if (this.crashK > 0.001) aim.lerp(_v.copy(s.renderPos).setY(s.renderPos.y + 0.3), clamp(this.crashK, 0, 1) * 0.85);
     this.camera.lookAt(aim);
     // Carve tilt
     const wantRoll = -s.turnInput * r * THREE.MathUtils.degToRad(7) * (1 - this.side) * (s.state === State.GROUNDED ? 1 : 0);

@@ -32,6 +32,7 @@ const SPRAY_VS = /* glsl */`
         uniform vec3 uSunDir; uniform vec3 uSunCol; uniform vec3 uSky; uniform vec3 uPhase;
         uniform sampler2D sunMaskTex; uniform float terrainSize;
         uniform sampler2D hmap; uniform float hres; uniform float hspacing;
+        uniform vec4 uFocus;   // world xyz of the rider's chest, w = how much spray in front of it thins out
         varying vec2 vQ; varying float vA; varying float vKind; varying vec3 vLit; varying vec3 vAmb; varying float vSeed; varying float vDens; varying float vGlint;
         varying vec3 vSunV; varying vec2 vDir;
         float hg(float g, float mu) { float g2 = g * g; return (1.0 - g2) / pow(1.0 + g2 - 2.0 * g * mu, 1.5); }
@@ -59,6 +60,7 @@ const SPRAY_VS = /* glsl */`
           float ang = seed * 6.28 + iData.w * (seed - 0.5) * 0.8;
           dir = normalize(mix(dir, vec2(cos(ang), sin(ang)), isMist) + vec2(1e-4, 0.0));
           vec2 perp = vec2(dir.y, -dir.x);   // keeps the quad front-facing
+          vec2 c0 = c.xy;   // the quad's centre (view space), before the corner offset
           c.xy += dir * (position.y * size * stretchF) + perp * (position.x * size * thinF);
           vDir = dir; vSunV = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz);
           gl_Position = projectionMatrix * c;
@@ -78,6 +80,14 @@ const SPRAY_VS = /* glsl */`
           float hag = iPos.y - groundAt(iPos.xz);
           vA = alpha * clamp((hag + size * 0.35) / max(size * 0.7, 0.05), 0.0, 1.0);
           vA *= smoothstep(0.6, 2.2, -c.z);   // never smear a puff across the lens
+          // Keep the rider readable: spray between the camera and the rider, over the rider's spot on screen,
+          // thins out (a landing cloud hid the whole body in the touchdown frames). Measured at the rider's depth:
+          // where the particle's quad lands on that plane vs the body (m). A puff inside the body's own depth (centre
+          // up to 0.6 m behind the chest) counts too: its quad cuts through the body. Spray beside or behind is untouched.
+          vec4 fc = viewMatrix * vec4(uFocus.xyz, 1.0);
+          float fd = -fc.z, pd = max(-c.z, 0.1);
+          float edge = length((c0 * (fd / pd) - fc.xy) * vec2(1.0, 0.75)) - size * fd / pd * 0.6;
+          vA *= 1.0 - uFocus.w * (1.0 - smoothstep(0.3, 1.2, edge)) * smoothstep(-0.6, 0.3, fd - pd);
         }`;
 
 const _v = new THREE.Vector3(), _p = new THREE.Vector3(), _r = new THREE.Vector3(), _u = new THREE.Vector3(0, 1, 0);
@@ -129,6 +139,7 @@ export class SprayEmitter {
         hmap: { value: terrain.heightTex }, hres: { value: terrain.res }, hspacing: { value: terrain.spacing },
         puff: { value: makePuffAtlas() }, grains: { value: makeGrainAtlas() }, uTime: globals.uTime,
         uPhase: { value: new THREE.Vector3(SPRAY.forwardG, SPRAY.forwardMix, SPRAY.albedo) },
+        uFocus: { value: new THREE.Vector4(0, -1e5, 0, 0) },
       },
       vertexShader: SPRAY_VS,
       fragmentShader: /* glsl */`

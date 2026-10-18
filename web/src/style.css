@@ -76,6 +76,15 @@ button.primary { border-left: 4px solid #2ff5d6; }
   transition: color .2s; }
 #speed small { font-family: var(--arcade); font-style: italic; font-weight: 900; font-size: 18px; letter-spacing: 0.08em;
   color: #2ff5d6; -webkit-text-stroke: 2px #141a3c; paint-order: stroke fill; text-shadow: 3px 3px 0 #141a3c; transform: skewX(-12deg); }
+/* Short screens (phones in landscape): a smaller speed read-out and hint so the call-outs and score stay clear. */
+@media (max-height: 500px) {
+  #speed { bottom: 18px; }
+  #speed span { font-size: 44px; -webkit-text-stroke: 3px #141a3c; text-shadow: 4px 4px 0 #141a3c; }
+  #speed small { font-size: 13px; }
+  #hint { top: 40px; font-size: 13px; white-space: normal; width: max-content; max-width: 62vw; text-align: center; }
+  #notes { right: 20px; bottom: 24px; }
+  .note { font-size: 14px; }
+}
 #speed.tier1 span { color: #7ff9ea; }
 #speed.tier2 span { color: #ffd34d; }
 #speed.tier3 span { color: #ff5fb0; }

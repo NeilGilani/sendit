@@ -15,6 +15,7 @@ import { on, emit, settings } from './state.js';
 import { SprayEmitter, K_MIST, K_CHUNK } from './gfx/spray.js';
 
 const KIND_LINE = 2;
+const FOCUS_THIN = 0.85;   // share of spray alpha removed in front of the rider's body (gfx/spray.js uFocus)
 const UP = new THREE.Vector3(0, 1, 0);
 
 /** Derive two ski contacts from the player (edge roll from the turn's lean angle, wedge/skid from brake). */
@@ -162,6 +163,9 @@ export class FXManager {
     const pl = this.player;
     if (settings.quality !== this._q) { this._q = settings.quality; this.spray.setQuality(this._q); }
     const ground = pl.state === State.GROUNDED;
+    // Spray in front of the rider thins out over the body (gfx/spray.js uFocus); in first person the
+    // rider is the camera, so the focus sits at the lens and nothing is in front of it.
+    this.spray.material.uniforms.uFocus.value.set(pl.renderPos.x, pl.renderPos.y + 0.9, pl.renderPos.z, FOCUS_THIN);
     const ratio = pl.speedRatio;
     const fwd = pl.forward();
     const side = new THREE.Vector3(-fwd.z, 0, fwd.x);

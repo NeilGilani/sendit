@@ -76,15 +76,16 @@ The HUD regions, from top to bottom:
 
 - **Combo panel.** It appears from ×1.5 and shows ×mult (cyan, then gold from ×2.5, then blazing orange from ×4), the points, the last three moves and a timer bar. The multiplier bumps on every increase.
 - **At risk.** While a chain of ×3 or more rides on an air or a rail, the screen edge pulses pink at 0.55 s to show the stakes. It is off with reduced motion.
-- **Announcer, at 30 % of the height**, under the combo panel and above the landing the chase camera frames near the middle of the screen (it was at 37 %, on top of it). A grade badge sits over the trick name in big slanted type, with +points and extras (drop height, SWITCH) below. It slams in at 1.9× scale with blur and settles in about 0.2 s.
+- **Announcer, at 30 % of the height**, under the combo panel and above the landing the chase camera frames near the middle of the screen (it was at 37 %, on top of it). A grade badge sits over the trick name in big slanted type, with +points and extras (drop height, SWITCH) below. It slams in at 1.9× scale with blur and settles in about 0.2 s. With the combo panel up it sits under it (`max(30%, 290px)`: on a 720p screen 30 % overlapped the panel), and names over 18 characters shrink to fit the width (`--an-fit`).
 - **Combo tiers.** Under the multiplier a tier word pops in as each tier is reached: NICE from ×2, SICK ×3, INSANE ×4, UNREAL ×5, GODLIKE ×6 (`TIERS`).
-- **Live air, at 24 % of the height, gone for the last 0.5 s before touchdown** (`liveAirClear`) so the landing is clear to spot (it was at 33 %, over the landing). Air and announcer never show together. A stumble's announcement carries why on its sub-line ("OVER-ROTATED 31°", "40° SIDEWAYS", "HARD LANDING": player.js `landingWhy`); a landing crash shows it as a call-out. A straight air with no spin, flip or grab shows its hang time ticking ("1.4s") from 1 s, and the height above the snow once it passes 4 m. The number heats up with the rotation: white, then cyan from 360, gold from 720, orange from 1080. Once the air passes 0.45 s, the rotation shows in 180° steps and bumps on each new 180. It also shows flips (`FLIP`, `2× FLIP`) and the grab being held.
+- **Live air, at 24 % of the height, gone for the last 0.5 s before touchdown** (`liveAirClear`) so the landing is clear to spot (it was at 33 %, over the landing); with the combo panel up, `max(24%, 232px)` keeps it under the panel. Air and announcer never show together. A stumble's announcement carries why on its sub-line ("OVER-ROTATED 31°", "40° SIDEWAYS", "HARD LANDING": player.js `landingWhy`); a landing crash shows it as a call-out. A straight air with no spin, flip or grab shows its hang time ticking ("1.4s") from 1 s, and the height above the snow once it passes 4 m. The number heats up with the rotation: white, then cyan from 360, gold from 720, orange from 1080. Once the air passes 0.45 s, the rotation shows in 180° steps and bumps on each new 180. It also shows flips (`FLIP`, `2× FLIP`) and the grab being held.
 - **Floating score pops.** Minor scores under 100 points rise off the rider's screen position as "+15 CLOSE SHAVE" or "+20 GATE", with at most 4 alive, one per 0.4 s, and no repeat of the same move within 1 s. They skip tricks (the announcer has those), distance markers and combo bonuses.
 - **Call-outs, below centre.** CLOSE SHAVE, then ×n for a streak within 2.6 s (gold from ×3). RAZOR CLOSE! appears under 0.8 m. RAIL LOST and line-goal steps also show here.
 - **Streak call-outs.** STOMP STREAK ×n appears from 3 stomped or perfect landings in a row. n CLEAN IN A ROW appears every 5 named tricks landed without a crash.
 - **Banners.** `COMBO ×3 +1,240` (MONSTER COMBO from ×4), with a gold edge glow from ×2.5. Line goals on flow maps also show here.
 - **Rolling score, top right.** It counts up toward the ride's score and bumps gold when a chunk of 100 or more lands. The snowflake counter moves under it.
 - **Toasts, top left.** Achievements, finished dailies, the daily halfway mark, "one to go!" for counted dailies, and personal bests. They sit on the left because the reward-cases notifications stack at the top right.
+- **Short screens** (under 500 px tall, e.g. a phone in landscape): the combo panel moves to the right under the score and the announcer, live air, call-outs, banner, toasts, speed, hint and notes shrink, so nothing overlaps at 844×390.
 - **Flash.** A white flash on STOMPED (0.26) and PERFECT (0.18) landings, with rumble.
 
 Grades (`gradeOf(e)`) work on every map:
@@ -195,6 +196,13 @@ It rises fast and settles slowly. Before, the arm collapsed toward the rider in 
 rose into it, which pitched the view ~5° per frame just before touchdown. On the snow, and beyond `liftMax`, the
 arm shortens as before. Maps with `airLook` (Ravenspire, Kitsune, Fjordline, Dragonback, Voltage) still look
 down toward the drop in big air. That fades out as the landing approach takes over.
+
+**Respawns, crashes, lifts.** A `respawned` event (crash respawn, drop zone, reset to top) snaps the chase camera to
+the rider (gliding after a 10–35 m teleport flew it through the body as the fade cleared). In a crash the aim eases
+85 % of the way to the tumbling body (`crashK`), so a ragdoll sliding fast down a steep face stays in frame. On a lift
+the follow smoothing is 0.12 s, the arm 6.5 m, 63° off the cable line (`LIFT_SMOOTH`, `LIFT_SIDE`): straight behind,
+the haul rope and the chair back hid the rider. Snow spray in front of the rider's body thins out (gfx/spray.js
+`uFocus`, fx.js `FOCUS_THIN`), so a landing powder cloud no longer hides the rider in the touchdown frames.
 
 **Turns (HANDOFF #4).** A plain exponential yaw chase trails a steady carve by turn rate / `yawRate`, about 14–20°
 in a hard turn. The camera now leads the travel direction by `turnLead` s of the turn rate, low-passed at
