@@ -115,9 +115,8 @@ Performance target: quality 1 around 14–16 ms GPU at 1600×900. Screenshots go
 
 1. **First person** — finished (see `docs/first-person.md`): gloves framed on skis and snowboard in every
    scenario, detailed poles with plants, goggle lens tint / fog / snow, breath, crash cam on the ragdoll.
-2. `trails-check --check` flags the declared length of two trails (Kitsune `okama` 2730 m vs 2415 m measured,
-   Fjordline `skaret` 3000 m vs 2400 m). The check measures along the map's main course path; those trails follow
-   their own lines. Fix either the numbers or the check.
+2. ~~`trails-check` length mismatches~~ fixed: Kitsune and Fjordline courses expose `rideLine(trailId)` and the check measures
+   along each trail's own line (docs/maps.md § Measuring trails). `--check` passes for all built-in maps.
 3. Voltage Park: no wallrides; the superpipe is hard to ride with keys.
 4. The chase camera trails ~20° behind in hard turns, which makes turns feel longer than they are.
 5. Pink default poles/skis clash with the earth-tone outfits.
