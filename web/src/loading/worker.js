@@ -37,9 +37,20 @@ function loop(now) {
   if (!sentFrame) { sentFrame = true; post('frame'); }
 }
 
+// Warm the HTTP cache for the rider (glTF + its buffers / textures) and the rock texture while the
+// scene's modules load and the terrain builds: the rider is what the first shot waits for.
+function prefetch() {
+  const base = new URL('/models/skier/skier.gltf', self.location.href);
+  fetch(base).then((r) => r.json()).then((j) => {
+    for (const x of [...(j.buffers || []), ...(j.images || [])]) if (x.uri && !x.uri.startsWith('data:')) fetch(new URL(x.uri, base)).then((r) => r.arrayBuffer()).catch(() => {});
+  }).catch(() => {});
+  fetch(new URL('/textures/web/rock_face_03_packed_1k.jpg', self.location.href)).then((r) => r.arrayBuffer()).catch(() => {});
+}
+
 self.onmessage = async (e) => {
   const m = e.data;
   if (m.type === 'init') {
+    prefetch();
     try {
       const ti = performance.now();
       const { LoadingScene } = await import('./scene.js');

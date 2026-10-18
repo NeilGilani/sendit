@@ -68,7 +68,12 @@ the main thread receives worker messages late (multi-second long tasks).
    frames (>90 ms), never drops below 0.7, and may climb to native when frames have headroom. It holds a
    locked 30 fps (slow motion hides it) instead of trading resolution for 60.
 6. **The loading code downloads first.** `index.html` starts `main.js` only once the loading worker has its
-   modules (or after 2.5 s), so the hero shot isn't queued behind the game's requests.
+   modules (or after 2.5 s), so the hero shot isn't queued behind the game's requests. The worker also
+   prefetches the rider's glTF / textures and the rock texture the moment it starts (the rider is what the
+   first shot waits for). Timing stats use the worker's own clock (messages reach the busy main thread
+   late). The page shows a dark frame, not the CSS mountains, during the ~0.1 s before the still decodes.
+   Landing powder fades out near the drone camera (no white-out when a close move flies through it).
+   On a map load the caption names the rider (the profile name, or "You").
 7. **Looks.** Denser far ring (every boundary column, 300 rows: smooth silhouettes), massif mask (a few
    dominant peak groups instead of an egg crate of equal cones), the game's own spruce and fir
    (`gfx/trees.js`, ~1400 trees in clumps on the slopes below the band, stunted higher up; `trees.js` now
