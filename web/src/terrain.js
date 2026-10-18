@@ -201,7 +201,24 @@ export class Terrain {
     }
   }
 
-  bakeMask(renderer, res, outSize, t0, s0) {
+  /**
+   * bakeSunMask() in horizontal strips with a yield between them (same result). The bake is one heavy
+   * full-screen pass (240 sun steps + 8×14 sky steps per texel); as a single draw it held the GPU for
+   * 1–3 s, freezing the loading screen's hero shot (a worker drawing on the same GPU) mid-map-load.
+   */
+  async bakeSunMaskSliced(renderer, strips = 8) {
+    this.sunMask = await this.bakeMask(renderer, 1024, this.size, 4.0, 6.0, strips);
+    globals.sunMaskTex.value = this.sunMask.texture;
+    if (this.mid) {
+      const size = this.mid.half * 2;
+      this.sunMaskMid = await this.bakeMask(renderer, MIDTERRAIN.maskRes, size, 12.0, 15.0, strips);
+      globals.sunMaskMidTex.value = this.sunMaskMid.texture;
+      globals.midSize.value = size;
+    }
+  }
+
+  /** strips > 1: renders in strips and returns a Promise of the target (yields between strips). */
+  bakeMask(renderer, res, outSize, t0, s0, strips = 1) {
     const rt = new THREE.WebGLRenderTarget(res, res, { type: THREE.UnsignedByteType, magFilter: THREE.LinearFilter, minFilter: THREE.LinearFilter });
     const mid = this.mid;
     const mat = new THREE.ShaderMaterial({
@@ -266,13 +283,30 @@ export class Terrain {
     const scene = new THREE.Scene();
     scene.add(quad);
     const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    const prev = renderer.getRenderTarget();
-    renderer.setRenderTarget(rt);
-    renderer.render(scene, cam);
-    renderer.setRenderTarget(prev);
-    quad.geometry.dispose();
-    mat.dispose();
-    return rt;
+    const done = () => { quad.geometry.dispose(); mat.dispose(); return rt; };
+    const draw = () => {
+      const prev = renderer.getRenderTarget();
+      renderer.setRenderTarget(rt);
+      renderer.render(scene, cam);
+      renderer.setRenderTarget(prev);
+    };
+    if (strips <= 1) { draw(); return done(); }
+    return (async () => {
+      const h = Math.ceil(res / strips), ac = renderer.autoClear;
+      renderer.autoClear = false;
+      rt.scissorTest = true;
+      try {
+        for (let y = 0; y < res; y += h) {
+          rt.scissor.set(0, y, res, Math.min(h, res - y));
+          draw();
+          await new Promise((r) => setTimeout(r, 16));
+        }
+      } finally {
+        rt.scissorTest = false;
+        renderer.autoClear = ac;
+      }
+      return done();
+    })();
   }
 
   buildMaterials(tex) {

@@ -22,7 +22,7 @@ const base = (process.argv[2] || 'http://localhost:5175/').replace(/\/?$/, '/');
 const shotDir = process.argv[3] || '';
 const browser = await chromium.launch({
   args: process.env.GPU
-    ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required']
+    ? [...(process.platform === 'darwin' ? ['--use-gl=angle', '--use-angle=metal'] : ['--use-angle=d3d11']), '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required']
     : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
 });
 const errors = [];

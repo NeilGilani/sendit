@@ -22,10 +22,16 @@ import { Powder, Snowfall } from './particles.js';
 import { PowderFX } from './powderfx.js';
 import { Shot } from './choreo.js';
 import { planMove, CameraRig } from './shots.js';
+import { TreeSystem } from '../gfx/trees.js';
+import { StillOverlay } from './still.js';
 
-// Max rendered pixels (CSS px × ratio²). A 1440×960 @2× laptop would ask for 5.5 MP; at that size the
-// scene was fill-rate bound (~30 fps, +4 s of boot). ~2.1 MP + SMAA stays crisp on a 13'' panel.
-const PIXEL_BUDGET = 1920 * 1100;
+// Max rendered pixels (CSS px × ratio²). A 1440×900 @2× laptop would ask for 5.2 MP; ~3.2 MP + SMAA is
+// crisp on a 13'' panel and still holds 30–60 fps next to the booting game (the scaler trims it if not).
+// The scaler may go up to the native size when frames have headroom (scale > 1, capped at the DPR).
+const PIXEL_BUDGET = 2400 * 1350;
+// Frames longer than this are GPU-process stalls (the game linking shaders on the shared GPU thread):
+// resolution doesn't change them, so they don't vote in the scaler (they used to drag it to 0.5).
+const STALL_MS = 90;
 const lum = (c) => 0.2126 * c.x + 0.7152 * c.y + 0.0722 * c.z;
 
 export class LoadingScene {
@@ -48,6 +54,9 @@ export class LoadingScene {
 
   async init() {
     const t0 = performance.now();
+    // The page's painted still, redrawn here until the first rider shot (loading/still.js).
+    this.stillOv = this.opts.still?.url ? new StillOverlay(this.opts.still) : null;
+    const stillLoad = this.stillOv?.load();
     const v = this.v = pickVariant(this.opts);
     const r = this.r = v.r;
     const renderer = this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, powerPreference: 'high-performance', alpha: false, stencil: false, depth: true });
@@ -93,6 +102,7 @@ export class LoadingScene {
     if (this.opts.debug === 'noterrshadow') terr.near.castShadow = false;
     this.timing.terrain = terr.stats.total;
     if (T.cloudSea || v.mountain.cloudSea) scene.add(this.cloudSea(v.mountain.seaLevel, terr.coarse));
+    if (this.opts.trees !== '0') this.plantTrees();
 
     // Sun light with a tight shadow box that follows the action (crisp rider shadow on the snow).
     const sun = this.sunLight = new THREE.DirectionalLight(new THREE.Color(...T.sun), 1);
@@ -128,15 +138,68 @@ export class LoadingScene {
     // first frame, so this thread never stalls on a link; the painted backdrop covers the wait.
     this.frame(0, true);
     const tc = performance.now();
-    const compiling = this.renderer.compileAsync(this.scene, this.camera);
+    const compiling = this.compileHDR(this.scene);
+    // Every frame this worker commits must show the still while the page shows it (a black or empty
+    // frame would flash over the page's still): wait for it before the first draw of any kind.
+    if (stillLoad && !(await Promise.race([stillLoad, new Promise((res) => setTimeout(() => res(false), 2500))]))) this.stillOv = null;
     // Meanwhile build the post passes' programs (sync, small) by running the chain over an empty scene.
     this.renderPass.scene = new THREE.Scene();
     this.composer.render(0);
     this.renderPass.scene = this.scene;
+    this.stillOv?.render(this.renderer, this.size.width, this.size.height);
     await compiling;
     this.stats = { build: Math.round(tc - t0), compile: Math.round(performance.now() - tc) };
     this.checkPrograms();
 
+  }
+
+  /**
+   * The game's own spruce and fir (gfx/trees.js, same LODs and snow load) on the slopes below the rock
+   * band: lone, stunted trees high up, thickening into forest groups down the face, never on the
+   * landing line. They give the drop its scale (a 14 m cliff over plain snow reads as any size).
+   */
+  plantTrees() {
+    const t0 = performance.now();
+    const H = this.height.H, r = rng((this.v.terrainSeed ^ 0x5eed) >>> 0);
+    const ts = this.trees = new TreeSystem(new THREE.Group());
+    ts.group.name = 'loadingTrees';
+    let n = 0;
+    for (let i = 0; i < 9000 && n < 1400; i++) {
+      const z = -55 - Math.pow(r(), 0.8) * 620, x = (r() * 2 - 1) * (40 + 520 * Math.min(1, -z / 500));
+      // Clear of the landing and ride-out (a corridor that widens downhill) and the arete above.
+      if (Math.abs(x) < 16 + 0.08 * -z) continue;
+      const e = 1.5, y = H(x, z);
+      const slope = Math.hypot(H(x + e, z) - H(x - e, z), H(x, z + e) - H(x, z - e)) / (2 * e);
+      if (slope > 0.95) continue;                                   // nothing grows on the steep rock
+      // Groups: a low-frequency density (clumps) that rises downhill; lone trees near the top.
+      const clump = 0.5 + 0.5 * Math.sin(x * 0.045 + Math.sin(z * 0.03) * 2.1) * Math.cos(z * 0.052 + x * 0.01);
+      const dens = Math.min(1, (-z - 50) / 380) * (0.25 + 0.75 * clump);
+      if (r() > dens * dens * 1.4) continue;
+      const sc = (0.55 + r() * 0.45) * (0.6 + 0.5 * Math.min(1, (-z - 40) / 300));   // stunted higher up
+      const kind = r() < 0.3 ? 1 : 0;
+      const w = kind ? 1.05 + r() * 0.2 : 0.85 + r() * 0.25;
+      ts.add(x, y - 0.3, z, r() * Math.PI * 2, sc * w, sc * (0.85 + r() * 0.3), sc * w, kind);
+      n++;
+    }
+    ts.build();
+    ts.setQuality(this.opts.q === 'low' ? 0 : 2);
+    this.scene.add(ts.group);
+    this.timing.trees = Math.round(performance.now() - t0);
+    this.timing.treeCount = n;
+  }
+
+  /**
+   * compileAsync for the programs the frames really use: the scene renders into the composer's HDR
+   * target (linear output), a different program variant from the canvas one — compiling for the canvas
+   * left the first live frame linking everything synchronously (a 1.8 s stall measured). compile() runs
+   * synchronously at the call, so the target only needs binding around it.
+   */
+  compileHDR(obj, target = null) {
+    const r = this.renderer, prev = r.getRenderTarget();
+    r.setRenderTarget(this.composer.inputBuffer);
+    let p;
+    try { p = r.compileAsync(obj, this.camera, target); } finally { r.setRenderTarget(prev); }
+    return p;
   }
 
   /**
@@ -189,12 +252,13 @@ export class LoadingScene {
           float thick = (uLevel - ground) + (n - 0.5) * 260.0;
           float a = smoothstep(-40.0, 160.0, thick);
           // Billows: a height field from the noise, lit by the sun (wrapped), cool sky-lit troughs.
-          float e = 0.012;
+          // Soft, broad billows (a steep gradient here mottled the sea into a dalmatian pattern).
+          float e = 0.02;
           float hx = cs(p + vec2(e, 0.0)), hz = cs(p + vec2(0.0, e));
-          vec3 N = normalize(vec3(-(hx - n) * 22.0, 1.0, -(hz - n) * 22.0));
-          float ndl = clamp(dot(N, uSunDirA) * 0.75 + 0.25, 0.0, 1.0);
-          float cav = smoothstep(0.3, 0.75, n);
-          vec3 col = uSunCol * ndl * (0.22 + 0.4 * cav) + uSkyAmb * (0.38 + 0.5 * cav);
+          vec3 N = normalize(vec3(-(hx - n) * 7.0, 1.0, -(hz - n) * 7.0));
+          float ndl = clamp(dot(N, uSunDirA) * 0.6 + 0.4, 0.0, 1.0);
+          float cav = smoothstep(0.15, 0.9, n);
+          vec3 col = uSunCol * ndl * (0.3 + 0.22 * cav) + uSkyAmb * (0.5 + 0.3 * cav);
           col = aerial(col, vW);
           gl_FragColor = vec4(col * a, a);
         }`,
@@ -213,7 +277,8 @@ export class LoadingScene {
   setupPost() {
     const renderer = this.renderer, camera = this.camera;
     this.low = this.opts.q === 'low';
-    this.high = this.opts.q === 'high';   // ?loadq=high: + real depth of field (costs boot time on laptops)
+    this.still = this.opts.q === 'still';  // ?loadq=still: full size, real DOF, freeze mid-air (scripts/loadingstills.mjs)
+    this.high = this.opts.q === 'high' || this.still;   // ?loadq=high: + real depth of field (costs boot time on laptops)
     // No MSAA: on a laptop GPU that is also compiling and warming the game, 4× MSAA on an HDR target
     // (plus DOF) cost ~3 s of boot time; SMAA keeps the edges crisp for a fraction of it.
     const composer = this.composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
@@ -238,7 +303,8 @@ export class LoadingScene {
     this.size = { width, height, dpr };
     const base = Math.min(dpr, 2);
     const fit = Math.sqrt((this.low ? 1280 * 720 : PIXEL_BUDGET) / Math.max(1, width * height));
-    this.ratio = Math.max(0.5, Math.min(base, fit) * this.scale);
+    this.ratio = Math.min(Math.max(1, dpr), Math.max(0.5, Math.min(base, fit) * this.scale));
+    if (this.opts.q === 'still') this.ratio = Math.max(1, dpr);   // stills: the full requested size
     this.renderer.setPixelRatio(this.ratio);
     this.renderer.setSize(width, height, false);
     this.composer.setSize(width, height, false);
@@ -266,14 +332,14 @@ export class LoadingScene {
     rider.root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     // Compile off-thread (behind the establishing shot) rather than as a hitch on the first trick frame.
     rider.update(0, this.camera);
-    await this.renderer.compileAsync(rider.root, this.camera, this.scene);
+    await this.compileHDR(rider.root, this.scene);
     this.checkPrograms();
     rider.root.visible = false;
     this.scene.add(rider.root);
     this.riderReady = true;
     // One line per load: what was picked and what the startup cost (the rest is in __loading.stats()).
     const T = this.timing;
-    this.log(`seed ${v.seed} · ${v.tod} · ${v.mtn} · ${v.gear}/${v.gearModel} — modules ${T.modules} ms, terrain ${T.terrain} ms, build ${this.stats?.build} ms, compile ${this.stats?.compile} ms, rider ready ${Math.round(performance.now())} ms`);
+    this.log(`seed ${v.seed} · ${v.tod} · ${v.mtn} · ${v.gear}/${v.gearModel} — modules ${T.modules} ms, terrain ${T.terrain} ms, trees ${T.trees ?? 0} ms (${T.treeCount ?? 0}), build ${this.stats?.build} ms, compile ${this.stats?.compile} ms, rider ready ${Math.round(performance.now())} ms`);
   }
 
   // ------------------------------------------------------------------ shots
@@ -293,11 +359,11 @@ export class LoadingScene {
     let trick = v.trick || r.pick(pool);
     if (!v.trick && trick === this.lastTrick) trick = r.pick(pool);
     // Night skies are the show: those loads favour the moves that look up or across (sky in frame).
-    const cams = v.time.aurora ? { close: CAMERAS.close, dolly: CAMERAS.dolly, low: CAMERAS.low, follow: CAMERAS.follow, orbit: { w: 0.5 } } : CAMERAS;
+    const cams = v.time.aurora ? { hero: CAMERAS.hero, close: CAMERAS.close, dolly: CAMERAS.dolly, low: CAMERAS.low, follow: CAMERAS.follow, orbit: { w: 0.5 } } : CAMERAS;
     // Most boots end during the first trick: open with a hero move and get to the lip quickly.
     const first = !this.shotCount;
     this.shotCount = (this.shotCount || 0) + 1;
-    let cam = v.cam || (first ? r.pick(v.time.aurora ? ['close', 'dolly', 'low'] : ['close', 'close', 'dolly', 'low', 'follow']) : r.weighted(cams, 'w'));
+    let cam = v.cam || (first ? r.pick(v.time.aurora ? ['hero', 'close', 'dolly', 'low'] : ['hero', 'hero', 'close', 'close', 'dolly', 'follow']) : r.weighted(cams, 'w'));
     if (!v.cam && cam === this.lastCam) cam = r.weighted(cams, 'w');
     this.lastTrick = trick; this.lastCam = cam;
     const shot = this.shot = new Shot({ H: this.height.H, line: this.height.line, trick, gear: v.gear, r });
@@ -310,13 +376,15 @@ export class LoadingScene {
     this.shotLen = shot.screenLength();
     this.powder.clear();
     this.rider.root.visible = true;
+    if (this.stillOv && !this.stillFadeT) this.stillFadeT = 1e-4;   // dissolve the still into the first shot
     const com = shot.pose(this.pl, this.simT, 0, this.fx, this.simT).com;
     this.rider.update(0, this.camera);
     this.rig.start(this.move, com);
     this.mode = 'shot';
-    this.dip = 0.6;                         // fade up from the cut
+    this.dip = this.stillFadeT && this.stillFadeT < 0.1 ? 0 : 0.6;   // fade up from the cut (not under the still)
     const T = TRICKS[trick];
-    this.post('shot', { info: { trick: T.name, camera: CAMERAS[cam].name, place: v.place, time: TIMES[v.tod].name, gear: v.gear, seed: v.seed } });
+    this.lastInfo = { trick: T.name, trickId: trick, cam, camera: CAMERAS[cam].name, place: v.place, time: TIMES[v.tod].name, tod: v.tod, mtn: v.mtn, gear: v.gear, seed: v.seed, own: !!v.own, rider: v.riderName };
+    this.post('shot', { info: this.lastInfo });
   }
 
   /** After a frame error: drop the current shot and start a new one (or keep establishing). */
@@ -328,6 +396,11 @@ export class LoadingScene {
   // ------------------------------------------------------------------ frame
   frame(dt, setupOnly = false) {
     dt = Math.min(dt, 1 / 20);
+    if (this.frozen) {
+      // Still capture: hold the moment; report once a few frames have settled at it.
+      dt = 0;
+      if (++this.frozen === 6) this.post('frozen', { info: this.lastInfo });
+    }
     this.screenT += dt;
     this.atmo.uSkyTime.value = this.screenT;
     const cam = this.camera;
@@ -340,7 +413,7 @@ export class LoadingScene {
       cam.lookAt(this.est.look.clone().lerp(this.est.look1, e));
       if (cam.fov !== 54) { cam.fov = 54; cam.updateProjectionMatrix(); }
       this.simT += dt;
-      if (this.riderReady && this.estT > 1.8) this.nextShot();
+      if (this.riderReady && this.estT > (this.opts.cover || this.still ? 0 : 1.8)) this.nextShot();   // cover: a still is showing, go straight to the rider
     }
     if (this.mode === 'shot') {
       const sh = this.shot;
@@ -353,7 +426,8 @@ export class LoadingScene {
       this.rider.update(dtr, cam);
       const s = Math.min(1, this.shotScreen / this.shotLen);
       this.rig.update(s, com, this.simT, dt);
-      if (this.simT >= sh.tEnd - 0.35 && !this.cutting) this.cutting = 0.35;
+      if (this.opts.freeze != null && !this.frozen && this.simT >= sh.Ta * Number(this.opts.freeze)) this.frozen = 1;
+      if (this.simT >= sh.tEnd - 0.35 && !this.cutting && !this.frozen) this.cutting = 0.35;
       if (this.cutting) {
         this.cutting -= dt;
         if (this.cutting <= 0) { this.cutting = 0; this.nextShot(); }
@@ -399,16 +473,23 @@ export class LoadingScene {
     // Depth of field only while the game isn't in its GPU-heavy last stretch (lobby, compile, prewarm).
     // Real DOF only on request: it measurably slowed the boot on a laptop GPU; the snowflake bokeh and
     // the long-lens framing carry the shallow-focus look by default.
-    if (!this.high || this.stageP >= 0.88) this.dofPass.enabled = false;
+    if (!this.high || (this.stageP >= 0.88 && !this.still)) this.dofPass.enabled = false;
     // Sun glare position for the grade.
     const sp = this.sunDir.clone().multiplyScalar(1000).add(cam.position).project(cam);
     const fwd = cam.getWorldDirection(new THREE.Vector3());
     const facing = Math.max(0, fwd.dot(this.sunDir));
     this.grade.uniforms.get('sunScreen').value.set(sp.x * 0.5 + 0.5, sp.y * 0.5 + 0.5, sp.z < 1 ? facing * facing : 0);
     globals.uTime.value = this.screenT;
+    this.trees?.update(cam.position);
     globals.uResolution.value.set(this.size.width, this.size.height);
     if (setupOnly || this.opts.q === 'idle') return;   // ?loadq=idle: measure the scene's startup cost alone
-    this.composer.render(dt);
+    // Under a fully opaque still the live scene only renders now and then (keeps its targets and
+    // programs warm without taking GPU time from the booting game).
+    const ov = this.stillOv;
+    if (ov && this.stillFadeT) { this.stillFadeT += dt; const x = Math.min(1, this.stillFadeT / 1.6); ov.alpha = 1 - x * x * (3 - 2 * x); }
+    const hidden = ov && ov.ready && ov.alpha >= 1;
+    if (!hidden || this.frames % 8 === 0) this.composer.render(dt);
+    if (ov) { ov.render(this.renderer, this.size.width, this.size.height); if (ov.alpha <= 0) this.stillOv = null; }
     this.frames++;
   }
 
@@ -419,7 +500,10 @@ export class LoadingScene {
     P.n++; P.sum += frameMs; P.max = Math.max(P.max, frameMs);
     if (frameMs > 25) P.over25++;
     if (frameMs > 50) P.over50++;
-    this.ft.push(frameMs);
+    // Stalls (the GPU thread held by someone else), as [epoch start ms, ms] for lining up with the boot stages.
+    if (frameMs > 250 && (P.stalls || (P.stalls = [])).length < 40) P.stalls.push([Math.round(performance.timeOrigin + performance.now() - frameMs), Math.round(frameMs)]);
+    if (this.opts.q === 'still') return;
+    if (frameMs < STALL_MS) this.ft.push(frameMs);
     if (this.ft.length < 20) return;
     const s = [...this.ft].sort((a, b) => a - b);
     const med = s[Math.floor(s.length * 0.5)], p90 = s[Math.floor(s.length * 0.9)];
@@ -429,11 +513,12 @@ export class LoadingScene {
     // Budget per frame: 60 fps, or a locked 30 once holding 60 would cost too much resolution (the GPU is
     // shared with the booting game; steady 30 fps slow motion at a crisp size beats a soft, jittery 40).
     const T = this.fps30 ? 1000 / 30 : 1000 / 60;
-    if (med > T + 2.5 || p90 > T * 1.8 || mean > T * 1.3) next = Math.max(0.5, this.scale * 0.85);
+    if (med > T + 2.5 || p90 > T * 1.8 || mean > T * 1.3) next = Math.max(0.7, this.scale * 0.88);
     else if (med < T + 1.2 && this.scale < 1) next = Math.min(1, this.scale * 1.06);   // at budget: creep back up
-    if (!this.fps30 && next < 0.72) { this.fps30 = true; next = Math.min(1, next * 1.45); }
+    else if (p90 < T * 0.7 && this.scale < 1.3) next = this.scale * 1.05;             // headroom: toward native
+    if (!this.fps30 && next < 0.8) { this.fps30 = true; next = Math.min(1, next * 1.4); }
     if (Math.abs(next - this.scale) > 0.01) { this.scale = next; this.resize(this.size); }
-    this.post('stats', { stats: { medMs: +med.toFixed(1), scale: +this.scale.toFixed(2), ratio: +this.ratio.toFixed(2), frames: this.frames, build: this.stats.build, compile: this.stats.compile, fps: +(1000 * P.n / P.sum).toFixed(1), fps30: !!this.fps30, over25: P.over25, over50: P.over50, maxMs: Math.round(P.max), px: `${Math.round(this.size.width * this.ratio)}x${Math.round(this.size.height * this.ratio)}` } });
+    this.post('stats', { stats: { medMs: +med.toFixed(1), scale: +this.scale.toFixed(2), ratio: +this.ratio.toFixed(2), frames: this.frames, build: this.stats.build, compile: this.stats.compile, fps: +(1000 * P.n / P.sum).toFixed(1), fps30: !!this.fps30, over25: P.over25, over50: P.over50, maxMs: Math.round(P.max), px: `${Math.round(this.size.width * this.ratio)}x${Math.round(this.size.height * this.ratio)}`, stalls: P.stalls || [] } });
   }
 }
 

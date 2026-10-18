@@ -28,7 +28,9 @@ import { UI } from './ui.js';
 import { Input } from './input.js';
 import { game, Mode, setMode, on, settings, setSetting, resetScore, emit, scoreSnapshot } from './state.js';
 import './maps/builtin.js';
-import { resolveMapSelection, loadMap, describeSelection, lobbySpot, getTrail, defaultTrail, needsReload, selectionQuery, trailSpawnFor, trailFinishFor, trailBoardId } from './maps/registry.js';
+import { resolveMapSelection, loadMap, describeSelection, lobbySpot, getTrail, defaultTrail, needsReload, selectionQuery, trailSpawnFor, trailFinishFor, trailBoardId, getMap } from './maps/registry.js';
+import { writeLoadHint } from './loading/hint.js';
+import { outfitSlotsFromProfile } from './character/profile.js';
 import { showTrailToast, hideTrailToast } from './maps/trailhud.js';
 import { profileStore } from './profile/store.js';
 import { installRideTracker } from './profile/tracker.js';
@@ -107,7 +109,7 @@ async function boot() {
   features = new Features(terrain);
   features.plan(course);
   ui.loading(0.5, 'Painting the snow…');
-  terrain.bakeSunMask(renderer);
+  await terrain.bakeSunMaskSliced(renderer);   // in strips: the loading worker shares the GPU
   const noise = makeNoiseTexture(512, 11);
   terrain.buildMaterials({ noise });
   terrain.build();
@@ -195,14 +197,17 @@ async function boot() {
   addEventListener('resize', onResize);
   onResize();
   terrain.update(terrain.getSpawn().position, Infinity);   // full detail around the start before the first frame
-  renderer.compile(scene, camera);
+  globalThis.__loading?.mark?.('compileForPost');
+  await compileForPost();
   // Warm-up behind the loading screen (gfx/prewarm.js): textures, every shader variant, LOD around start + lobby.
   await rockTextureReady();
   const ls = lobbySpot(currentMap.map, course, terrain);
   console.log('[gfx] prewarm', (await prewarm({ renderer, scene, camera, post, scatter, terrain, fx, spots: [terrain.getSpawn().position, new THREE.Vector3(ls.x, 0, ls.z)] })).toFixed(0), 'ms');
+  warming = false;
   setTimeout(() => warmQualityVariants({ renderer, camera, scene, current: settings.quality, makeVariants: (q) => terrain.qualityMaterials(q) }), 1500);
   ui.loading(1, '');
   ui.doneLoading();
+  saveLoadHint();
   ui.fade(false, 2.0);
   if (params.has('ride') || params.has('challenge')) startRide(true, params.has('challenge') ? 'challenge' : 'zen');
   else { setMode(Mode.MENU); ui.refresh(); }
@@ -249,6 +254,7 @@ async function selectTrail(mapId, trailId, { ride = false, mode } = {}) {
   if (!t) return false;
   if (needsReload(currentMap, mapId, trailId)) {
     profileStore.setMap(mapId, t.variant ?? null, t.id);
+    saveLoadHint(mapId, t, true);   // the next load's loading screen: the player's rider on this mountain
     const q = selectionQuery(mapId, t.id, location.search);
     if (ride) q.set('ride', '');
     location.search = q.toString();
@@ -267,6 +273,45 @@ async function selectTrail(mapId, trailId, { ride = false, mode } = {}) {
 }
 
 /**
+ * Tell the next page load's loading screen (loading/hint.js) who rides and where: the player's outfit
+ * and gear, and (on a lobby → mountain reload) the mountain and trail being loaded.
+ */
+function saveLoadHint(mapId = currentMap?.map.id, trail = null, transition = false) {
+  try {
+    const map = getMap(mapId);
+    const m = map?.mountain || {};
+    trail = trail || (currentMap ? getTrail(currentMap.map, currentMap.trail) : null);
+    writeLoadHint({
+      transition, mapId, mountain: m.name || map?.name, region: m.region, accent: m.accent,
+      trail: trail?.name, difficulty: trail?.difficulty,
+      gear: profileStore.equipment, gearModel: profileStore.gearModel(), outfit: outfitSlotsFromProfile(),
+      rider: profileStore.profile.displayName || null,
+    });
+  } catch (e) { console.warn('[loading] hint not saved', e); }
+}
+
+/**
+ * Compile the programs the game will actually draw with: it renders into the post stack's HDR target
+ * (linear output, another program variant than the canvas), so compile with that target bound. The
+ * frame loop holds off meanwhile (`warming`): a frame would link the same programs synchronously.
+ */
+async function compileForPost() {
+  warming = true;
+  const rt = composer?.inputBuffer;
+  if (!rt || !renderer.compileAsync) { renderer.compile(scene, camera); return; }
+  // One top-level group at a time with a yield between: ANGLE translates each shader on the GPU thread
+  // before the parallel part, and ~100 programs in one go held it ~0.9 s (a hitch in the loading shot).
+  for (const child of [...scene.children]) {
+    const prev = renderer.getRenderTarget();
+    renderer.setRenderTarget(rt);
+    let p;
+    try { p = renderer.compileAsync(child, camera, scene); } catch (e) { console.warn('[gfx] compileAsync failed', e); } finally { renderer.setRenderTarget(prev); }
+    try { await p; } catch { /* the first frames compile what's left */ }
+    await new Promise((res) => setTimeout(res, 0));
+  }
+}
+
+/**
  * Build the lobby stage once (plinth, preview rider, shaders). Never rejects: if the stage fails,
  * the lobby UI still works over the world's menu flyover (the camera controller drives the view).
  */
@@ -275,7 +320,10 @@ function ensureStage() {
     stageReady = stage.init(new GLTFLoader()).then(async () => {
       await stage.setEquipment(profileStore.equipment, { animate: false, variant: profileStore.gearModel() });
       stage.resize(innerWidth, innerHeight);
-      renderer.compile(scene, camera);
+      // During the boot the post stack doesn't exist yet and compileForPost() covers the stage with the
+      // rest of the scene (a canvas-variant compile here was wasted work: 0.9 s of GPU-thread time).
+      // A later first lobby visit (after ?ride) compiles the stage's real variants here.
+      if (composer) { const was = warming; await compileForPost(); warming = was; }
     }).catch((e) => {
       console.error('[lobby] stage failed to build; showing the lobby over the world instead', e);
       stage.ready = false;
@@ -294,6 +342,7 @@ function applyGameEquipment(type) {
 
 // Loadout changes (lobby toggle, other tabs, profile sync) reach the preview and the game rider.
 on('loadout', ({ equipment }) => {
+  if (currentMap) saveLoadHint();
   if (stage?.ready) {
     stage.setEquipment(equipment, { variant: profileStore.gearModel(equipment) });
     sfx('jump_pop', 0.3, 1.15);
@@ -466,11 +515,12 @@ function checkFinish() {
 // ---------------------------------------------------------------- loop (fixed 60 Hz physics, interpolated render)
 const STEP = 1 / 60;
 let acc = 0, last = performance.now(), time = 0;
+let warming = false;   // compileForPost(): no frames while the programs compile in parallel
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  if (!composer) return;
+  if (!composer || warming) return;
   input.poll(dt);
   if (game.mode === Mode.RIDING && input.pressed.has('KeyE') && rider) profileStore.setEquipment(profileStore.equipment === 'snowboard' ? 'skis' : 'snowboard');   // debug: swap gear while riding (via the profile, so the lobby stays in sync)
   if (input.justPressed('view') && (game.mode === Mode.RIDING || game.mode === Mode.LIFT)) {
