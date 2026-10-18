@@ -44,7 +44,7 @@ uniform vec3 uStudioTint; uniform float uStudio;
 vec3 studioEnv(vec3 d, float rough) {
   float w = 0.1 + rough * 0.9;
   vec3 c = mix(vec3(0.012, 0.014, 0.026), vec3(0.05, 0.055, 0.08), smoothstep(-0.3, 0.6, d.y));
-  c += vec3(1.7) * smoothstep(0.93 - w * 0.7, 1.0, d.y) * (1.0 - rough * 0.55);
+  c += vec3(1.25) * smoothstep(0.93 - w * 0.7, 1.0, d.y) * (1.0 - rough * 0.55);
   float az = atan(d.x, d.z);
   float sw = 0.07 + w * 0.45;
   float strips = exp(-pow((az - 0.95) / sw, 2.0)) + 0.6 * exp(-pow((az + 1.05) / sw, 2.0));
@@ -307,7 +307,7 @@ function buildCrate(series, tx) {
     body = std({ color: th.body, map: tx.wood.map, bumpMap: tx.wood.bump, bumpScale: 1.4, roughness: 0.86, env: 0.35 });
     accent = std({ color: th.accent, roughness: 0.6 });
   }
-  metal = std({ color: th.metal, metalness: 1, roughness: th.style === 'wood' ? 0.48 : th.style === 'neon' ? 0.3 : 0.16, env: 1.25 });
+  metal = std({ color: th.metal, metalness: 1, roughness: th.style === 'wood' ? 0.48 : th.style === 'neon' ? 0.3 : 0.2, env: 0.85 });
   trim = std({ color: th.trim, roughness: 0.75, env: 0.4 });
 
   // Body (the lower shell).

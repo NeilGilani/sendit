@@ -286,7 +286,7 @@ class Opener {
     }
     // The winner's pop on the canvas (until it settles).
     if (this.landT != null && t - this.landT < 0.8) this.reel.draw(this.x1, { win: this.result.reel.winAt, landK: Math.max(0.001, t - this.landT), color: rarityOf(this.result.rarity).color });
-    if (this.phase === 'hold' && t >= T.spin + T.spinDur + T.hold) { this.phase = 'reveal'; this.reveal(t); }
+    if (this.phase === 'hold' && t >= T.spin + T.spinDur + T.hold) { this.phase = 'reveal'; this.reveal(T.spin + T.spinDur + T.hold); }   // the scheduled time (exact frames when a capture seeks past it)
     if (this.phase === 'reveal' && this.autoAt != null && t >= this.autoAt && !this.frozen) { this.autoAt = null; this.act('next'); }
     if (this.particles) this.drawFx(now);
   }

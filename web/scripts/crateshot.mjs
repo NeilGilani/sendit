@@ -77,12 +77,12 @@ try {
         const seed = await page.evaluate(async ({ s, r }) => {
           const Rw = await import('/src/profile/rewards.js');
           const P = window.__sendit.profile;
-          P.grantCase('test', s);
+          const c = P.grantCase('test', s);
           const pity = P.rewards.sinceRed >= Rw.PITY - 1;
-          for (let k = 1; k < 200000; k++) if (Rw.rollCase(s, Rw.seeded(k), pity).rarity === r) return k;
-          return 1;
+          for (let k = 1; k < 200000; k++) if (Rw.rollCase(s, Rw.seeded(k), pity).rarity === r) return [c.id, k];
+          return [c.id, 1];
         }, { s, r });
-        await page.evaluate((seed) => { window.__senditCasesApi.open(null, seed); window.__senditCases.opener.seek(0); }, seed);
+        await page.evaluate(([id, seed]) => { window.__senditCasesApi.open(id, seed); window.__senditCases.opener.seek(0); }, seed);
         for (const t of mt) {
           await page.evaluate((t) => window.__senditCases.opener.seek(t), t);
           await page.waitForTimeout(t > 8 ? 600 : 250);
