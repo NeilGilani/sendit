@@ -471,6 +471,7 @@ export const RAGDOLL = {
   feetCatch: { pitch: 0.45, yaw: 0.65, impact: 0.35, compression: 0.45, landing: 0.5 },   // share of the legs' slide stopped by the catching edges
   ejectSpeed: 5,               // m/s: skis release above this (poles always drop)
   blendTime: 0.1,              // s from the animated pose to the ragdoll
+  shiftTime: 0.25,             // s to ease in the lift out of the snow / a trunk the animated pose was inside
   // Rest / respawn
   sleepSpeed: 0.3, sleepSpin: 1.5, sleepTime: 0.25,
   settleSpeed: 0.5, settleRate: 10,  // centre of mass slower than this (touching): what's left dies at this rate (1/s)

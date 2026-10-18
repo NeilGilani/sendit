@@ -117,6 +117,11 @@ export function buildHumanoid(seed, env, C) {
       const sh = { kind: 'c', a: tip.clone().sub(shin.x).applyQuaternion(inv), b: tail.clone().sub(shin.x).applyQuaternion(inv), r: 0.024 };
       shin.shapes.push(sh);
       for (let k = 0; k < 5; k++) shin.samples.push({ p: sh.a.clone().lerp(sh.b, k / 4), r: 0.024 });
+      // … with its mass and its long lever in the boot body's inertia (a light shin swinging a 1.7 m ski
+      // would be whipped round by every touch of the tip).
+      const d2 = sh.a.clone().lerp(sh.b, 0.5).lengthSq(), Iadd = M.ski * (L * L / 12 + d2);
+      shin.I.addScalar(Iadd); shin.invI.set(1 / shin.I.x, 1 / shin.I.y, 1 / shin.I.z);
+      shin.m += M.ski; shin.invM = 1 / shin.m;
       attach.push({ kind: 'ski', index: i, body: shin, pSeed: sk.p.clone(), qSeed: sk.q.clone() });
     }
   });
@@ -169,12 +174,17 @@ export function buildHumanoid(seed, env, C) {
   function hinge(name, kind, p, c, at, [lo, hi], flexDir) {
     const d = restDir(c);
     const axis = _b.crossVectors(d, flexDir).normalize().clone();
-    const iP = conj(p.restQ), iC = conj(c.restQ);
-    const hC = axis.clone().applyQuaternion(iC);
+    const iP = conj(p.restQ);
+    const hP = axis.clone().applyQuaternion(iP);
+    // The child's hinge axis is the parent's as the crash finds them: an animated knee / elbow is not always an
+    // exact hinge (IK twist), and aligning it in the first sub-steps would twist the limb with a pop.
+    const hC = hP.clone().applyQuaternion(p.q).applyQuaternion(conj(c.q));
     const refC = _c.crossVectors(hC, Y).lengthSq() > 1e-4 ? _c.crossVectors(hC, Y).normalize().clone() : X.clone();
+    const refP = refC.clone().applyQuaternion(c.restQ).applyQuaternion(iP);
+    refP.addScaledVector(hP, -refP.dot(hP)).normalize();
     const j = new Joint(p, c, {
       name, kind, type: 'hinge', ...anchors(p, c, at),
-      hP: axis.clone().applyQuaternion(iP), hC, refC, refP: refC.clone().applyQuaternion(c.restQ).applyQuaternion(iP),
+      hP, hC, refC, refP,
       min: lo * DEG, max: hi * DEG, damp: C.jointDamping[kind] || 0,
     });
     j.axisArm = axis;
@@ -300,7 +310,7 @@ export function seedMotion(H, { vCom, w, com, cause, groundN, rnd, C }) {
  * upward. The seed reference (xs) stays, and body.shift lets the drawing ease the move in over the blend.
  * Returns the group-0 shift.
  */
-export function depenetrate(H, env, maxLift = 0.45, maxPush = 1.2) {
+export function depenetrate(H, env, maxLift = 0.8, maxPush = 1.2, maxLiftGear = 2) {
   const W = H.world;
   const n = new THREE.Vector3(), p = new THREE.Vector3(), com = new THREE.Vector3();
   const shifts = new Map();
@@ -338,7 +348,7 @@ export function depenetrate(H, env, maxLift = 0.45, maxPush = 1.2) {
         lift = Math.max(lift, env.height(p.x, p.z) + s.r / Math.max(0.3, n.y) + 0.002 - p.y);
       }
     }
-    if (lift > 0) move(gid, n.set(0, Math.min(lift, maxLift), 0));
+    if (lift > 0) move(gid, n.set(0, Math.min(lift, gid === 0 ? maxLift : maxLiftGear), 0));
   }
   return shifts.get(0) || new THREE.Vector3();
 }

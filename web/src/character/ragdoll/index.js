@@ -256,9 +256,11 @@ export class RagdollController {
   /** rider.update while crashed: bones + gear from the bodies. */
   pose(rider) {
     if (!this.H) return;
-    const blend = Math.min(1, this.t / Math.max(1e-3, this.C.blendTime));
-    const s = blend * blend * (3 - 2 * blend);
-    applyPose(rider, this.H, this.seed, this.player.renderAlpha ?? 1, s, this.player.renderPos);
+    const ease = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+    // The pose blends in over blendTime; a lift out of the snow / a trunk eases in over shiftTime (a body that
+    // landed head-first into a slope has to come out of it somehow, not in one frame).
+    applyPose(rider, this.H, this.seed, this.player.renderAlpha ?? 1, ease(this.t / Math.max(1e-3, this.C.blendTime)), this.player.renderPos,
+      ease(this.t / Math.max(1e-3, this.C.shiftTime ?? 0.25)));
   }
 }
 

@@ -48,7 +48,7 @@ export function captureSeed(rider, fpPoleLength) {
  * interpolation between the last two frame steps, blend 0..1 (animated → ragdoll). The seed's depenetration
  * shift (body.shift, out of the snow / a trunk) is eased in with the blend so the body doesn't pop.
  */
-export function applyPose(rider, H, seed, alpha, blend, renderPos) {
+export function applyPose(rider, H, seed, alpha, blend, renderPos, shiftEase = blend) {
   const B = rider.bones;
   rider.root.position.copy(renderPos);
   rider.root.quaternion.identity();
@@ -106,7 +106,7 @@ export function applyPose(rider, H, seed, alpha, blend, renderPos) {
   // Pelvis position: its body's point, the depenetration shift eased in.
   const pe = D.get(P.pelvis);
   _v.copy(S.pelvis.p).sub(P.pelvis.xs).applyQuaternion(pe.d).add(pe.x);
-  if (P.pelvis.shift) _v.addScaledVector(P.pelvis.shift, blend - 1);
+  if (P.pelvis.shift) _v.addScaledVector(P.pelvis.shift, shiftEase - 1);
   _m.copy(rider.armature.matrixWorld).invert();
   _v.applyMatrix4(_m).applyMatrix4(H._rootInv);
   B.pelvis.position.copy(_v);
@@ -127,7 +127,7 @@ export function applyPose(rider, H, seed, alpha, blend, renderPos) {
     if (!m) continue;
     const e = D.get(L.body);
     _v.copy(L.pSeed).sub(L.body.xs).applyQuaternion(e.d).add(e.x);
-    if (L.body.shift) _v.addScaledVector(L.body.shift, blend - 1);
+    if (L.body.shift) _v.addScaledVector(L.body.shift, shiftEase - 1);
     _q2.copy(e.d).multiply(L.qSeed);
     m.parent.updateWorldMatrix(true, false);
     _m2.copy(m.parent.matrixWorld).invert();

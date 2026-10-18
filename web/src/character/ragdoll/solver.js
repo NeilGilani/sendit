@@ -230,7 +230,8 @@ export class World {
     this.rec = false;
     for (const b of this.bodies) if (b.touch && !b.G.asleep) this.collide(b, h);
     this.rec = true;
-    for (const j of this.joints) if (!j.b1.G.asleep) this.anchor(j, h);
+    for (const j of this.joints) if (!j.b1.G.asleep) this.solveJoint(j, h, true);
+    for (const j of this.joints) if (!j.b1.G.asleep) this.anchor(j, h);   // (closed loops: the board, both legs)
     // --- velocities from the positions
     const ih = 1 / h;
     for (const b of this.bodies) {
@@ -472,7 +473,14 @@ export class World {
           // Where was this sample at the start of the sub-step?
           _p1.copy(s.p).applyQuaternion(b.qp).add(b.xp);
           const prevGap = _p1.y - env.height(_p1.x, _p1.z);
-          if (prevGap > -0.05) { b.x.x = b.xp.x; b.x.z = b.xp.z; s.tk = undefined; continue; }
+          if (prevGap > -0.05) {
+            b.x.x = b.xp.x; b.x.z = b.xp.z; s.tk = undefined;
+            // Back where it came from: whatever is still under the snow there is an ordinary contact.
+            b.point(s.p, _p0);
+            const H2 = env.height(_p0.x, _p0.z), pen2 = r - (_p0.y - H2) * s.ny;
+            if (pen2 > 0 && pen2 <= C.wallPen) this.contact(b, _p0, _n.set(s.nx, s.ny, s.nz), r, pen2, b.mu, b.muS, b.e, h, s);
+            continue;
+          }
           // Already deep (started underground): ease out without gaining speed.
           const lift = Math.min(pen, 0.01);
           b.x.y += lift; b.xp.y += lift;
@@ -601,10 +609,12 @@ export class World {
         worst = Math.max(worst, Math.acos(Math.max(-1, Math.min(1, a0.dot(a1)))));
         const r0 = _b.copy(j.refP).applyQuaternion(b0.q), r1 = _c.copy(j.refC).applyQuaternion(b1.q);
         const phi = Math.atan2(_d.crossVectors(r0, r1).dot(a0), r0.dot(r1));
-        worst = Math.max(worst, j.min - phi, phi - j.max);
+        const v = Math.max(j.min - phi, phi - j.max);
+        if (v > worst) { worst = v; this.limitName = j.name; }
       } else {
         const a0 = _a.copy(j.aP).applyQuaternion(b0.q), a1 = _b.copy(j.aC).applyQuaternion(b1.q);
-        worst = Math.max(worst, Math.acos(Math.max(-1, Math.min(1, a0.dot(a1)))) - j.cone);
+        const v = Math.acos(Math.max(-1, Math.min(1, a0.dot(a1)))) - j.cone;
+        if (v > worst) { worst = v; this.limitName = j.name; }
       }
     }
     return worst;

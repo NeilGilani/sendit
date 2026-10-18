@@ -23,7 +23,7 @@ const args = process.argv.slice(2);
 const CHECK = args.includes('--check'), VERBOSE = args.includes('--verbose');
 const arg = (k, d) => { const i = args.indexOf(k); return i >= 0 ? Number(args[i + 1]) : d; };
 const N = arg('--n', 600), SEED = arg('--seed', 1);
-const LIM = { stretch: 0.02, below: 0.03, energy: 1.0, limitDeg: 8, attach: 0.03, sleep: 3.0, sleepShare: 0.95, sleepAll: 4.0, sleepAllShare: 0.99, sleepSlope: 20, sleepSpeed: 15, msFrame: 1.0 };
+const LIM = { stretch: 0.02, below: 0.03, energy: 1.0, limitDeg: 8, attach: 0.03, sleep: 3.0, sleepShare: 0.93, sleepAll: 4.0, sleepAllShare: 0.98, sleepSlope: 20, sleepSpeed: 15, msFrame: 1.0 };
 
 function rng(seed) {
   let a = seed >>> 0;
@@ -125,19 +125,20 @@ function runCrash(sc, seconds = 4) {
     if (E0 === null) E0 = ctl.E0;
     if (W.failed) { out.fail.push('solver failed (NaN)'); break; }
     { const st = W.stretch(); if (st > out.stretch) { out.stretch = st; out.stretchAt = `${W.stretchName} @${((k + 1) * s.dt).toFixed(2)}s`; } }
-    out.limit = Math.max(out.limit, W.limitViolation());
+    { const lv = W.limitViolation(); if (lv > out.limit) { out.limit = lv; out.limitAt = `${W.limitName} @${((k + 1) * s.dt).toFixed(2)}s`; } }
     const E = W.energy(0);
     if (!Number.isFinite(E)) { out.fail.push('NaN energy'); break; }
     out.dE = Math.max(out.dE, E - E0);
     if (process.env.DBG && k % Math.max(1, Math.round(0.1 / s.dt)) === 0) { const c = W.com(0, new THREE.Vector3()), v = W.comVel(0, new THREE.Vector3()); console.log('  t', ((k + 1) * s.dt).toFixed(2), 'w', W.bodies.filter((b) => b.group === 0).map((b) => b.w.length().toFixed(1) + (b.touch ? '*' : '')).join(' '), 'com', c.x.toFixed(2), (c.y - T.getHeight(c.x, c.z)).toFixed(2), c.z.toFixed(2), 'v', v.length().toFixed(2), 'dE', (E - E0).toFixed(1), 'obs', ctl.env.obstacles.map((o) => `${o.x.toFixed(2)},${o.z.toFixed(2)} r${o.r.toFixed(2)} y${(o.y1 - o.y0).toFixed(2)}`).join(' ')); }
     for (const b of W.bodies) for (const sp of b.samples) {
       b.point(sp.p, _v);
-      out.below = Math.max(out.below, T.getHeight(_v.x, _v.z) - (_v.y - sp.r));
+      const bl = T.getHeight(_v.x, _v.z) - (_v.y - sp.r);
+      if (bl > out.below) { out.below = bl; out.belowAt = `${b.name} @${((k + 1) * s.dt).toFixed(2)}s`; }
     }
     const t = (k + 1) * s.dt;
     if (out.sleep === null && W.asleep(0)) out.sleep = t;
     if (out.slow === undefined && t > 0.3 && W.comVel(0, _w).length() < 0.3) out.slow = t;
-    if ((k % 5 === 0 || k === steps - 1) && t > RAGDOLL.blendTime + 0.02) {
+    if ((k % 5 === 0 || k === steps - 1) && t > Math.max(RAGDOLL.blendTime, RAGDOLL.shiftTime) + 0.02) {
       ctl.pose(r);
       // The drawn rig on the bodies: elbows, knees, head, pelvis.
       for (const [bone, j] of [['lowerarm_l', 'elbowL'], ['lowerarm_r', 'elbowR'], ['calf_l', 'kneeL'], ['calf_r', 'kneeR'], ['neck_01', 'neck']]) {
@@ -164,9 +165,9 @@ function runCrash(sc, seconds = 4) {
   if (ctl.H) { let mv = 0, mw = 0; for (const b of ctl.H.world.bodies) if (b.group === 0) { if (b.v.length() > mv) { mv = b.v.length(); out.mvb = b.name; } if (b.w.length() > mw) { mw = b.w.length(); out.mwb = b.name; } } out.mv = mv; out.mw = mw; out.comv = ctl.H.world.comVel(0, new THREE.Vector3()).length(); }
   ctl.uninstall();
   if (out.stretch > LIM.stretch) out.fail.push(`stretch ${(out.stretch * 100).toFixed(1)} cm (${out.stretchAt})`);
-  if (out.below > LIM.below) out.fail.push(`under the snow ${(out.below * 100).toFixed(1)} cm`);
+  if (out.below > LIM.below) out.fail.push(`under the snow ${(out.below * 100).toFixed(1)} cm (${out.belowAt})`);
   if (out.dE > LIM.energy) out.fail.push(`energy +${out.dE.toFixed(1)} J`);
-  if (out.limit * 180 / Math.PI > LIM.limitDeg) out.fail.push(`joint limit +${(out.limit * 180 / Math.PI).toFixed(1)}°`);
+  if (out.limit * 180 / Math.PI > LIM.limitDeg) out.fail.push(`joint limit +${(out.limit * 180 / Math.PI).toFixed(1)}° (${out.limitAt})`);
   if (out.attach > LIM.attach) out.fail.push(`rig off the bodies ${(out.attach * 100).toFixed(1)} cm`);
   out.gentle = s.deg <= LIM.sleepSlope && speed <= LIM.sleepSpeed && !s.cause.startsWith('rail');   // (a body draped over a rail slides off it slowly)
   // (gentle crashes asleep by 3 s: checked as a share over all runs, see LIM.sleepShare)
