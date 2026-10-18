@@ -484,6 +484,7 @@ how fast you get back to try again, what you have to aim for, and how the moment
 | Adrenaline cues | Arousal: a heartbeat and closing edges when exposed | 8c |
 | Instant replay and clips | Savouring the moment, plus sharing (STEEP GoPro view, Riders Republic drone) | 8d |
 | Versus links | Social comparison and a named ghost (Trackmania, STEEP friends) | 8e |
+| SO CLOSE lines (the next medal, a missed spot) | Near misses turned into "one more try" | 8f, 8b |
 
 Considered and left out:
 
@@ -556,6 +557,8 @@ Every named feature on a mountain is a **spot** to discover.
   time after, as THPS gaps always score.
 - **Rails** count as spots when ground for 3 m or more.
 - **Combos.** All of these are score lines, so they also feed the combo chain.
+- **Near miss.** Launching off a spot you haven't found yet and then landing sketchy or crashing shows **SO
+  CLOSE · THE THRONE NOT SENT · BACKSPACE / ▼ RETRY** (the key part only in Zen). Event: `thrillSpotMissed`.
 
 Where names come from:
 
