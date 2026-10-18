@@ -427,3 +427,58 @@ export const HUD = {
   fpWindEarly: 0.2,                   // first person: streaks start this much earlier (fainter, see main.js)
   windStreakFull: 1.0,
 };
+
+// ------------------------------------------------------------------ Crash ragdoll (character/ragdoll/, docs/body.md)
+// Exists only while the real player is in State.CRASH. XPBD rigid bodies (capsules) on the rig's bones.
+export const RAGDOLL = {
+  enabled: true,
+  substep: 1 / 960,            // s, fixed internal step (frame-rate independent)
+  maxSubsteps: 96,             // per call (a long hitch just drops time)
+  iterations: 2,               // extra joint + snow rounds per sub-step after the first pass
+  gravity: 9.81,
+  // Masses (kg): an ~80 kg rider in kit
+  mass: { pelvis: 11, chest: 24, head: 5.5, upperarm: 2.2, forearm: 1.7, thigh: 8.5, shin: 4.6, boot: 1.4, board: 3.5, ski: 1.8, pole: 0.25 },
+  // Collision radii (m), puffy outfit included
+  radius: { pelvis: 0.125, chest: 0.145, shoulders: 0.075, neck: 0.055, head: 0.125, upperarm: 0.058, forearm: 0.047, hand: 0.05, thigh: 0.082, shin: 0.06, boot: 0.062 },
+  // Joint limits (degrees). Cones are centred on the rest direction tilted by `centre` [forward, down].
+  limits: {
+    spine: { cone: 38, centre: [12, 0], twist: 30 },
+    neck: { cone: 50, centre: [10, 0], twist: 65 },
+    shoulder: { cone: 95, centre: [25, 35], twist: 75 },
+    hip: { cone: 72, centre: [35, 0], twist: 40 },
+    elbow: [-3, 145],          // hinge (flexion +)
+    knee: [-3, 140],
+    ankle: { cone: 22, twist: 12 },   // snowboard: boots in the bindings
+  },
+  // Snow and obstacles
+  muSnow: 0.45, muStaticSnow: 0.9,    // body on snow (dynamic: sliding on the jacket / static: dug in)
+  plough: 2,                   // 1/s tangential drag while touching the snow (ploughing through it)
+  ploughSpin: 5,               // 1/s angular drag while touching (a body sinks in: it doesn't roll like a log)
+  restitution: 0.08,
+  impactGrip: 3,               // m/s: a slam into the snow grips as if it were at most this hard (it gives way)
+  muGear: 0.3, ploughGear: 2, // released skis (brakes out) / poles
+  muBark: 0.6,
+  airDrag: 0.02,               // 1/s
+  jointDamping: { spine: 10, neck: 12, shoulder: 10, elbow: 8, hip: 8, knee: 10, ankle: 12 },   // 1/s relative spin (near critical for the tone below)
+  // Muscle tone: drives toward a protective tuck, strong at first and relaxing (N·m/rad)
+  tone: { spine: 220, neck: 20, shoulder: 18, elbow: 6, hip: 150, knee: 80, ankle: 0 },
+  toneEnd: 0.06,               // share of tone left after relaxing
+  toneTau: 0.7,                // s
+  tuck: { spine: 14, neck: 18, hip: 35, knee: 50, elbow: 55, shoulder: [0.45, -0.6, 0.6] },   // deg / arm direction (armature: x left, y up, z fwd)
+  uprightAfter: 0.4,           // s: a body still standing after this loses its muscle tone (falls)
+  braceTime: 0.55,             // s: hands reach toward the snow the body falls onto
+  braceTone: 1.6,              // × shoulder / elbow tone while bracing
+  // Seeding from the crash
+  maxSeedSpin: 10,             // rad/s
+  feetCatch: { pitch: 0.45, yaw: 0.65, impact: 0.35, compression: 0.45, landing: 0.5 },   // share of the legs' slide stopped by the catching edges
+  ejectSpeed: 5,               // m/s: skis release above this (poles always drop)
+  blendTime: 0.1,              // s from the animated pose to the ragdoll
+  shiftTime: 0.25,             // s to ease in the lift out of the snow / a trunk the animated pose was inside
+  // Rest / respawn
+  sleepSpeed: 0.3, sleepSpin: 1.5, sleepTime: 0.25,
+  settleSpeed: 0.5, settleRate: 10,  // centre of mass slower than this (touching): what's left dies at this rate (1/s)
+  restHold: 0.45,              // s asleep before the respawn fade (never before PHYSICS.tumbleTime)
+  maxTumble: 3.0,              // s: respawn fade starts at the latest here
+  maxSpeed: 50, maxSpin: 30,   // safety clamps
+  impactSpeed: 3.2,            // m/s into the snow / a tree for an impact event (audio, camera)
+};

@@ -177,6 +177,7 @@ export class Player {
     if (this.state === State.FROZEN || this.debugFreeze) return;   // debugFreeze: hold a pose for inspection
     if (P.slowmo) dt *= this.slowmoScale(dt);                      // huge airs: a moment of slow motion (opt-in)
     this.simTime = (this.simTime || 0) + dt;                        // physics clock (fpview.js terrain chatter reads the ground per step)
+    this.stepDt = dt;                                               // (with renderAlpha: the game time a rendered frame shows; the crash ragdoll's tracker reads it)
     this.readInput(dt);
     switch (this.state) {
       case State.GROUNDED: this.groundStep(dt); break;
@@ -223,6 +224,7 @@ export class Player {
   }
 
   interpolate(alpha) {
+    this.renderAlpha = alpha;
     this.renderPos.lerpVectors(this.prevPos, this.position, alpha);
     this.renderBase.slerpQuaternions(this.prevOrient, this.orient, alpha);
     this.renderFlip = this.prevFlip + (this.visFlip - this.prevFlip) * alpha;
@@ -609,6 +611,12 @@ export class Player {
 
   crashStep(dt) {
     this.crashT += dt;
+    // Crash ragdoll (character/ragdoll/, installed by main.js): the body tumbles on its own and the player follows
+    // its centre of mass; the respawn fade starts once it has come to rest.
+    if (this.ragdoll?.stepCrash(this, dt)) {
+      if (this._crashStage === 0 && this.ragdoll.doneAt(this.crashT)) { this._crashStage = 1; this.fadeThen(() => this.respawnSafe()); }
+      return;
+    }
     this.velocity.multiplyScalar(Math.exp(-2.0 * dt));
     const n = this.terrain.getNormal(this.position.x, this.position.z, 2, _n);
     this.velocity.addScaledVector(n, -this.velocity.dot(n));

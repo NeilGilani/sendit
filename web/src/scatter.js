@@ -390,6 +390,20 @@ export class Scatter {
     return null;
   }
 
+  /** Every obstacle whose surface is within maxR of pos (the crash ragdoll's trees and rocks). Reuses one array. */
+  obstaclesNear(pos, maxR) {
+    const out = this._near || (this._near = []);
+    out.length = 0;
+    const span = Math.ceil(maxR / HASH);
+    const cx = Math.floor(pos.x / HASH), cz = Math.floor(pos.z / HASH);
+    for (let dz = -span; dz <= span; dz++) for (let dx = -span; dx <= span; dx++) {
+      const a = this.hash.get(`${cx + dx},${cz + dz}`);
+      if (!a) continue;
+      for (const o of a) if (Math.hypot(pos.x - o[0], pos.z - o[1]) - o[2] < maxR) out.push(o);
+    }
+    return out;
+  }
+
   /** Nearest obstacle surface distance within maxR: { dist, o } or null (for close shaves). */
   nearest(pos, maxR) {
     const cx = Math.floor(pos.x / HASH), cz = Math.floor(pos.z / HASH);

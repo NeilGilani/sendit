@@ -66,7 +66,7 @@ Each map is a mountain with named trails picked in the lobby's Maps tab.
 |---|---|---|
 | Physics (carve/skid, jumps, spins/flips set at take-off, grabs), skis + snowboard | `physics/`, `player.js`, `config.js` | `equipment.md`, `jumps-research.md` |
 | Grinding | `physics/grind.js` | `map4.md` |
-| Rider rig and poses, first person | `rider.js`, `fpview.js`, `camera.js` | `equipment.md`, `body.md` (the force-driven body dynamics and crash ragdoll were reverted; a new ragdoll is a separate task) |
+| Rider rig and poses, first person, crash ragdoll | `rider.js`, `fpview.js`, `camera.js`, `character/ragdoll/` | `equipment.md`, `body.md` (crash ragdoll: XPBD capsules, only in State.CRASH; `?ragdoll=0` = old crash) |
 | Outfit / character items | `character/` | `character.md` |
 | Graphics: HDR look, snow, trees, spray, LOD cross-fades, zero pop-in, per-map lighting | `gfx/` (`perf.js`, `prewarm.js`, `atmosphere.js`), `terrain.js`, `scatter.js`, `fx.js` | `graphics.md`, `graphics-perf.md` |
 | Lobby (tabs registry, Maps / mountains & trails, Equipment, Character) | `lobby/` | `lobby.md`, `maps.md` |
@@ -104,6 +104,8 @@ node web/scripts/map5-unit.mjs
 node web/scripts/map6-unit.mjs
 node web/scripts/map7-unit.mjs
 node web/scripts/trails-check.mjs --check
+node web/scripts/ragdoll-fuzz.mjs --check             # crash ragdoll: 600 crashes, frame-rate + no-crash identity
+node web/scripts/ragdoll-identity.mjs http://localhost:5180/ ski   # real game: jumps identical with / without it
 node web/scripts/gfxpopin.mjs http://localhost:5180 <mapId> 1 20
 node web/scripts/map3-perf.mjs http://localhost:5180 1600 900 1 60 <mapId>
 MAC=1 node web/scripts/combo-shots.mjs http://localhost:5180/ <outDir> ski cork720,dc1080   # side-camera frames of combo tricks
