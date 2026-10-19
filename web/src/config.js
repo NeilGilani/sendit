@@ -463,7 +463,7 @@ export const RAGDOLL = {
   restitution: 0.08,
   impactGrip: 6,               // m/s: a slam into the snow grips as if it were at most this hard (it gives way)
   muGear: 0.3, ploughGear: 2, // released skis (brakes out) / poles
-  muBark: 0.6,
+  muBark: 0.6, muStaticBark: 0.9,   // jacket on bark / rock: sliding, at rest (it grips more, like on snow)
   airDrag: 0.02,               // 1/s
   // 1/s: relative spin AND swing (the child's centre against the parent's rigid motion: swingDamping) die at this
   // rate. Strong on purpose: a braced body tumbles as a unit, limbs stay close (an impact can still throw one).
@@ -529,6 +529,7 @@ export const RAGDOLL = {
     eject: [99, 9, 5],           // m/s: skis release above this (small: they stay on; trees / rocks: always but small)
     restHold: [0.3, 0.4, 0.45],  // s at rest before the respawn fade …
     restSpeed: [0.45, 0.3, 0],   // m/s: … where 'at rest' for a small / medium fall is the centre of mass slower than this
+    plough: [1.6, 1.3, 1],       // × snow drag: a rider after a small fall digs the edge / hands in and stops (self-arrest)
     tip: [2.2, 2.4, 0],          // rad/s: small / medium falls tip over the way the body leans at least this fast
   },
 };

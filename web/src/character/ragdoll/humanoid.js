@@ -399,6 +399,9 @@ export function updateTone(H, t, dt, braceDir, C, rest = 1, hold = 0, mul = 1) {
     j.k = (C.tone[j.kind] || 0) * relax * (bracing && arm ? C.braceTone : 1);
   }
   const rate = C.toneRate;
+  // Goals and targets move every 4th sub-step (240 Hz: smooth enough, a quarter of the cost).
+  H.rt = (H.rt || 0) + 1;
+  const tick = H.rt % 4 === 0 && rest > 0.5;   // (settling: the targets stay where they are while the tone lets go)
   // Lying: the trunk down on the snow (its axis near the slope, touching): hips, knees and spine head for a lying
   // pose (legs along the snow, not held up in the air) and the legs' tone eases.
   // Which way it lies (the chest's front against the snow's up): on the back the knees come up so the skis / board
@@ -412,6 +415,7 @@ export function updateTone(H, t, dt, braceDir, C, rest = 1, hold = 0, mul = 1) {
     H.lie = H.lie === undefined ? lie : H.lie + (lie - H.lie) * Math.min(1, 6 * dt);
     H.face = H.face === undefined ? f : H.face + (f - H.face) * Math.min(1, 6 * dt);
     lie = H.lie;
+    if (tick) {
     const up = Math.min(1, Math.max(0, H.face / 0.6)), dn = Math.min(1, Math.max(0, -H.face / 0.6));
     for (const j of H.jl) {
       if (!j.lieSide || j.kind === 'shoulder' || j.kind === 'elbow') continue;
@@ -419,12 +423,14 @@ export function updateTone(H, t, dt, braceDir, C, rest = 1, hold = 0, mul = 1) {
       if (up > 0) _q2.slerp(j.lieUp, up); else if (dn > 0) _q2.slerp(j.lieDown, dn);
       j.goal.copy(j.tuck).slerp(_q2, lie);
     }
+    }
     for (const j of H.jl) if (j.kind === 'hip' || j.kind === 'knee') j.k *= 1 - (C.lieLegRelax ?? 0.5) * lie;
   }
   for (const S of ['L', 'R']) {
     const sh = H.joints['shoulder' + S], el = H.joints['elbow' + S];
     if (rate) {
       // Goals: the brace (below) or the tuck; every drive's target turns toward its goal at `rate` rad/s.
+      if (!tick) continue;
       if (bracing) braceGoal(sh, el, braceDir, C);
       else { sh.goal.copy(sh.tuck); el.goal.copy(el.tuck); }
       continue;
@@ -450,9 +456,7 @@ export function updateTone(H, t, dt, braceDir, C, rest = 1, hold = 0, mul = 1) {
       el.qT.slerp(el.tuck, k);
     }
   }
-  // (the targets move every 4th sub-step, 240 Hz: smooth enough, a quarter of the cost)
-  H.rt = (H.rt || 0) + 1;
-  if (rate && H.rt % 4 === 0) for (const j of H.jl) j.qT.rotateTowards(j.goal, (C.toneRateKind?.[j.kind] ?? rate) * dt * 4);
+  if (rate && tick) for (const j of H.jl) j.qT.rotateTowards(j.goal, (C.toneRateKind?.[j.kind] ?? rate) * dt * 4);
   void _q2;
 }
 

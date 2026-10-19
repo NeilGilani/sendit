@@ -408,6 +408,9 @@ export class RagdollController {
     // Stiffer, better-damped joints the smaller the crash; the tumble governor's cap and budget.
     this.toneMul = S('tone');
     for (const j of Object.values(H.joints)) j.damp *= S('damp');
+    // Self-arrest: after a small fall the rider digs the edge and hands in (more snow drag on the body and the board).
+    const pg = S('plough');
+    if (pg !== 1) for (const b of H.world.bodies) if (b.group === 0) b.plough *= pg;
     if (C.sev) H.world.gov = { cap: S('govCap'), budget: S('govBudget') * Math.PI / 180, ground: false };
     this.stats.seed = { kind: this.kind, reason, fall: this.fall?.mode, lean: this.fall?.lean, sev: +this.sev.s.toFixed(2), tier: this.sev.tier, imp: +(this.sev.vn || 0).toFixed(1), dev: this.sev.angleDeg !== undefined ? +(+this.sev.angleDeg).toFixed(0) : null, v: +mot.v.length().toFixed(2), vy: +mot.v.y.toFixed(2), w: +mot.w.length().toFixed(2), pl: +pl.velocity.length().toFixed(2), tracked: this.frames.length, shift: +shift.length().toFixed(3) };
     this.fallDir = new THREE.Vector3(mot.v.x, 0, mot.v.z);

@@ -181,7 +181,9 @@ export class World {
     this.stats = { substeps: 0 };
   }
 
-  add(b) { this.bodies.push(b); if (!this.groups.has(b.group)) this.groups.set(b.group, { asleep: false, still: 0 }); b.G = this.groups.get(b.group); return b; }
+  add(b) { this.bodies.push(b); if (!this.groups.has(b.group)) this.groups.set(b.group, { asleep: false, still: 0, list: [] }); b.G = this.groups.get(b.group); b.G.list.push(b); return b; }
+  /** The bodies of a group, in the order they were added. */
+  of(group) { return this.groups.get(group)?.list || []; }
   joint(j) { this.joints.push(j); return j; }
   asleep(group) { return this.groups.get(group)?.asleep ?? true; }
 
@@ -277,27 +279,27 @@ export class World {
       if (G.asleep) continue;
       let touch = false, m = 0;
       _a.set(0, 0, 0);
-      for (const b of this.bodies) if (b.group === gid) { _a.addScaledVector(b.v, b.m); m += b.m; if (b.touch) touch = true; }
+      for (const b of G.list) { _a.addScaledVector(b.v, b.m); m += b.m; if (b.touch) touch = true; }
       if (!touch || _a.length() / m > C.settleSpeed) continue;
       if (gid === 0) this.settling = true;
       // (only the wobble: spins and motion relative to the centre of mass; a body sliding off something keeps
       // sliding at gravity's pace instead of creeping through treacle)
       const k = Math.max(0, 1 - C.settleRate * h);
       _a.divideScalar(m);
-      for (const b of this.bodies) if (b.group === gid) { b.v.sub(_a).multiplyScalar(k).add(_a); b.w.multiplyScalar(k); }
+      for (const b of G.list) { b.v.sub(_a).multiplyScalar(k).add(_a); b.w.multiplyScalar(k); }
     }
     // Energy budget (group 0): muscle tone may move limbs but never adds energy beyond the crash's own
     // (World.budget is set from the seeded state); anything above it is taken out of the motion.
     if (this.budget !== undefined && !this.groups.get(0).asleep) {
       let ke = 0, pe = 0;
-      for (const b of this.bodies) if (b.group === 0) { const e = b.energy(g), p = b.m * g * b.x.y; pe += p; ke += e - p; }
+      for (const b of this.of(0)) { const e = b.energy(g), p = b.m * g * b.x.y; pe += p; ke += e - p; }
       if (ke + pe > this.budget && ke > 1e-9) {
         const k = Math.sqrt(Math.max(0, this.budget - pe) / ke);
-        for (const b of this.bodies) if (b.group === 0) { b.v.multiplyScalar(k); b.w.multiplyScalar(k); }
+        for (const b of this.of(0)) { b.v.multiplyScalar(k); b.w.multiplyScalar(k); }
         this.stats.budgetHits = (this.stats.budgetHits || 0) + 1;
       }
     }
-    if (this.gov && this.ticks % 2 === 0 && !this.groups.get(0).asleep) this.govern(2 * h);   // (480 Hz is plenty)
+    if (this.gov && this.ticks % 4 === 0 && !this.groups.get(0).asleep) this.govern(4 * h);   // (240 Hz is plenty)
     // --- safety, sleep
     for (const b of this.bodies) {
       const vl = b.v.length(), wl = b.w.length();
@@ -311,8 +313,7 @@ export class World {
       // finishing a small swing (it would take seconds to die out against the joint and self-contacts).
       let still = true, loose = true, m = 0;
       _a.set(0, 0, 0);
-      for (const b of this.bodies) {
-        if (b.group !== gid) continue;
+      for (const b of G.list) {
         const vl = b.v.length(), wl = b.w.length();
         if (vl > C.sleepSpeed || wl > C.sleepSpin) still = false;
         if (vl > 2 * C.sleepSpeed || wl > 2.5 * C.sleepSpin) loose = false;
@@ -322,7 +323,7 @@ export class World {
       G.still = still ? G.still + h : 0;
       if (G.still > C.sleepTime) {
         G.asleep = true;
-        for (const b of this.bodies) if (b.group === gid) { b.v.set(0, 0, 0); b.w.set(0, 0, 0); }
+        for (const b of G.list) { b.v.set(0, 0, 0); b.w.set(0, 0, 0); }
       }
     }
   }
@@ -331,13 +332,12 @@ export class World {
   rigidOmega(group, out) {
     let m = 0;
     const c = (this._govC ||= new THREE.Vector3()).set(0, 0, 0), P = _b.set(0, 0, 0);
-    for (const b of this.bodies) if (b.group === group) { c.addScaledVector(b.x, b.m); P.addScaledVector(b.v, b.m); m += b.m; }
+    for (const b of this.of(group)) { c.addScaledVector(b.x, b.m); P.addScaledVector(b.v, b.m); m += b.m; }
     c.divideScalar(m); P.divideScalar(m);
     // L about the centre of mass and the whole-body inertia tensor (world).
     const L = _c.set(0, 0, 0), I = this._govI || (this._govI = new Float64Array(9));
     I.fill(0);
-    for (const b of this.bodies) {
-      if (b.group !== group) continue;
+    for (const b of this.of(group)) {
       const r = _d.subVectors(b.x, c), vr = _e.subVectors(b.v, P);
       L.x += b.m * (r.y * vr.z - r.z * vr.y); L.y += b.m * (r.z * vr.x - r.x * vr.z); L.z += b.m * (r.x * vr.y - r.y * vr.x);
       // R·I·Rᵀ (body inertia, diagonal in its frame) + parallel axis
@@ -386,13 +386,15 @@ export class World {
     if (G.ground && !touch) return;
     // The cap: full up to 70 % of the budget, then down to a crawl (0.4 rad/s) at the budget.
     const over = (this.turned - 0.7 * G.budget) / (0.3 * G.budget);
-    const cap = over <= 0 ? G.cap : over >= 1 ? 0.4 : G.cap + (0.4 - G.cap) * over * over * (3 - 2 * over);
+    let cap = over <= 0 ? G.cap : over >= 1 ? 0.4 : G.cap + (0.4 - G.cap) * over * over * (3 - 2 * over);
+    // A body crawling on the snow doesn't roll on like a log (a capsule body rolling down a slope without slipping
+    // is never stopped by friction): once the centre of mass is under settleSpeed, the crawl cap.
+    if (touch && this.comVel(0, _e).length() < this.C.settleSpeed) cap = Math.min(cap, 0.4);
     if (wl <= cap) return;
     // Take out (1 − cap/|ω|) of the rigid rotation, at most `rate` per second (no visible jolt).
     const k = Math.min(1 - cap / wl, (G.rate ?? 40) * h);
     om.multiplyScalar(k);
-    for (const b of this.bodies) {
-      if (b.group !== 0) continue;
+    for (const b of this.of(0)) {
       b.v.sub(_d.crossVectors(om, _e.subVectors(b.x, c)));
       b.w.sub(om);
     }
@@ -610,7 +612,7 @@ export class World {
         if (o.cap) {
           const dy = _p0.y - (o.y1 - o.r), d = Math.sqrt(dx * dx + dy * dy + dz * dz);
           if (d >= R || d < 1e-6) continue;
-          this.contact(b, _p0, _g.set(dx / d, dy / d, dz / d), r, R - d, C.muBark, C.muBark, 0.1, h);
+          this.contact(b, _p0, _g.set(dx / d, dy / d, dz / d), r, R - d, C.muBark, C.muStaticBark ?? C.muBark, 0.1, h);
           continue;
         }
         // Push out the side the sample came from (no tunnelling through a trunk in one sub-step).
@@ -618,7 +620,7 @@ export class World {
         let nx = _p1.x - o.x, nz = _p1.z - o.z;
         const dp = Math.sqrt(nx * nx + nz * nz);
         if (dp > 1e-6) { nx /= dp; nz /= dp; } else { const d = Math.sqrt(dx * dx + dz * dz) || 1; nx = dx / d; nz = dz / d; }
-        this.contact(b, _p0, _g.set(nx, 0, nz), r, R - (nx * dx + nz * dz), C.muBark, C.muBark, 0.15, h);
+        this.contact(b, _p0, _g.set(nx, 0, nz), r, R - (nx * dx + nz * dz), C.muBark, C.muStaticBark ?? C.muBark, 0.15, h);
       }
       // Rails / boxes: capsules along their top line.
       for (const rl of env.rails) {
@@ -709,19 +711,19 @@ export class World {
   // ------------------------------------------------------------------ measurements
   energy(group = 0) {
     let E = 0;
-    for (const b of this.bodies) if (b.group === group) E += b.energy(this.g);
+    for (const b of this.of(group)) E += b.energy(this.g);
     return E;
   }
   com(group, out) {
     out.set(0, 0, 0);
     let m = 0;
-    for (const b of this.bodies) if (b.group === group) { out.addScaledVector(b.x, b.m); m += b.m; }
+    for (const b of this.of(group)) { out.addScaledVector(b.x, b.m); m += b.m; }
     return m ? out.divideScalar(m) : out;
   }
   comVel(group, out) {
     out.set(0, 0, 0);
     let m = 0;
-    for (const b of this.bodies) if (b.group === group) { out.addScaledVector(b.v, b.m); m += b.m; }
+    for (const b of this.of(group)) { out.addScaledVector(b.v, b.m); m += b.m; }
     return m ? out.divideScalar(m) : out;
   }
   /** Largest anchor separation of any joint (m). */
