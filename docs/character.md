@@ -116,9 +116,12 @@ Pants (`PANT_FITS`):
 
 | fit | garment | look |
 |---|---|---|
-| `relaxed` | `tuff-bib` (default) | roomy, straight below the knee, three folds over the boot |
-| `tapered` | `cargo-pant` | roomy thigh, narrowing to the boot, two folds |
-| `baggy` | `wide-pant` (new) | wide straight leg, long inseam, four folds piling up over the boot |
+| `relaxed` | `tuff-bib` (default) | roomy, a round tube below the knee falling over the boot, three folds, hem at 0.11 |
+| `tapered` | `cargo-pant` | roomy thigh, narrowing to the boot, two folds, hem at 0.14 |
+| `baggy` | `wide-pant` (new) | wide straight tube, long inseam, four folds piling up over the boot, hem at 0.09 |
+
+`round` (0–1) is how far the leg becomes a round tube instead of tracing the thigh and calf; it gets
+stronger below the knee.
 
 Under the jacket the pant legs shrink to a slim lining (`covered()` in garments.js), so the seat never
 bulges through a jacket's back hem. Below the jacket hem, covered skin (the crotch between the legs)
@@ -131,28 +134,47 @@ takes the pants colour (`uJHem` in bodyMaterial).
 | `hemFront`, `hemBack` | hem height at the centre front and back (back lower = drop tail) |
 | `hemFlare` | + flares the last 12 cm out; − pulls the hem in (rib or drawcord) with the fabric blousing above |
 | `torso.chest / waist / hem` | `[half width, front depth, back depth]` from the body's centre line at 1.38, 1.12 and the hem; `torso.n` = superellipse exponent (2 = round, 3 = boxy) |
-| `shoulder` | stand-off over the yoke (shoulders, upper back), where the shell follows the body |
+| `shoulder`, `shoulderY` | extra stand-off near the neck; height where the shoulder line starts rounding off to the neck (default 1.43) |
 | `sleeve {upper, elbow, forearm, cuff}`, `sleeveEnd` | target sleeve radius at \|x\| 0.30, 0.46, 0.58 and the cuff; cuff position (wrist 0.706) |
 | `collarTop`, `collarEase` | collar height and stand-off |
-| `hood`, `hoodRoll` | `'down'` (roll `[thickness, height]`), `'up'` (over the helmet), `'hoodie'`, `'none'` |
+| `hood`, `hoodRoll` | `'down'` (collapsed hood, `[thickness, height above the neckline, drop down the back]`), `'up'` (over the helmet), `'hoodie'`, `'none'` |
 | `folds` | drape / fold amplitude (shell 1, slim 0.75, puffer 0.3, cotton 1.3) |
 | `quilt {pitch, depth}` | horizontal baffles (null = flat fabric) |
 | `kangaroo` | bulge of a front kangaroo pocket (m) |
 | `style` | shader layout: 0 shell, 1 anorak, 2 puffer, 3 hoodie, 4 one-piece (`uFit.x`) |
 | `gaiter`, `gaiterTop` | fleece gaiter pulled up under the goggle |
 
-**How the torso is built** (garments.js, jacket body):
-1. The yoke (above 1.40–1.50) is the body outline plus `shoulder`, flattened at the chest, sloping to
-   the armholes.
-2. Below it, each ring is the fit's superellipse.
-3. The back may only shrink 12 cm per metre below 1.5, so it hangs straight from the shoulder blades
-   and there is no crease where the yoke ends.
-4. The shell never comes closer than 2.6 cm inside the unshrunk skin. The body material pulls covered
-   skin in by about 4 cm. The limit is max-filtered around the ring, so the shell bridges the grooves
-   between the superhero muscles instead of showing them.
+**How the torso is built** (garments.js, jacket body). The second pass came out of integration review:
+the shoulders and chest were still too broad, and muscles showed on the back.
+1. **Every ring is the fit's superellipse, the yoke included.** From `shoulderY` (1.43) to the neckline,
+   the half width and both depths round off to the neck `[0.085, 0.076, 0.072]` along a quarter-ellipse.
+   This makes a soft, slightly dropped shoulder line: the fabric bridges from the neck to the upper arm
+   instead of hugging the deltoids and traps. The chest is no longer sculpted, and the torso is a
+   straight to slightly A-line column from the armpit to the hem.
+2. **The back may only shrink 12 cm per metre below 1.5**, so it hangs straight from the shoulder blades.
+3. **The shell never comes closer than 5.8 cm inside the unshrunk skin** (`MIN`). On the shoulder tops
+   the limit is 3.6 cm, because the clavicles lift there in a crouch.
+   - The body material pulls covered jacket-zone skin in by about 6.2 cm (`2.8 × uShrink`). It collapses
+     the arms toward their axis from |x| 0.12, so the superhero deltoids stay inside the dropped shoulder.
+   - The limit is max-filtered around the ring (±5 segments), so the shell bridges the grooves between
+     the muscles instead of showing them.
+4. **Skinning.** The jacket's weights are smoothed 24 times over the grid (other pieces use 6), so the
+   back panel bends as one sheet: no spine groove and no shoulder-blade dents in a crouch.
+   `weightFloor` makes the front of the hem below the crotch follow the thighs (up to 80 %), so long
+   hems lift and bunch over the legs in crouches and grabs instead of being cut by them.
+5. **Folds and hem.**
+   - Folds: vertical drape folds growing toward the hem, flutes in the free-hanging bottom, light
+     tension folds from the armpit.
+   - Hem: a slight blouse 6–15 cm above it, and a rib or drawcord pull for negative `hemFlare`.
 
-Sleeves use the target radius, never thinner than the collapsed arm (`bodyMaterial` pulls the arm 60 %
-toward its axis from |x| 0.15). Gauntlets open just over the sleeve (`gauntlet[1]` = clearance).
+Sleeves are relaxed tubes. The target radius barely tapers from the upper arm to the cuff, with a gentle
+elbow fold and a stack at the wrist. A sleeve is never thinner than the collapsed arm (`bodyMaterial`
+pulls the arm 60 % toward its axis). Near the armhole its top stays under the dropped shoulder line.
+Gauntlets open just over the sleeve (`gauntlet[1]` = clearance).
+
+Shell hoods (`hood: 'down'`) are a collapsed helmet hood with volume. `hoodRoll = [thickness, height
+above the neckline, drop down the back]`, piled up behind the neck under the helmet and thinning toward
+the collar at the sides. The hoodie's hood is a softer, longer lobe lying down the back.
 ## Files
 
 ```

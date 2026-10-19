@@ -93,13 +93,15 @@ export function buildOutfitGeometry(body, cut) {
           const dB = neck[2] + (dB0 - neck[2]) * Math.sqrt(Math.max(0, 1 - Math.pow(u, 3.0)));
           // The skin limit is max-filtered around the ring: where the shell rests on the body it bridges
           // over the grooves between muscles instead of showing them.
+          // Below the waist the skin is the pants zone, pulled in only ~2.7 cm: less allowance there.
+          const minAt = THREE.MathUtils.lerp(-0.02, MIN, smooth(0.98, 1.1, r.t));
           const lim = new Float32Array(S);
           for (let q = 0; q < S; q++) { let m = -1; for (let d = -5; d <= 5; d++) m = Math.max(m, r.raw[(q + d + S) % S]); lim[q] = m; }
           for (let q = 0; q < S; q++) {
             const th = (q / S) * TAU, s = Math.abs(Math.sin(th)), c = Math.cos(th);
             const tr = 1 / Math.pow(Math.pow(s / hw, n) + Math.pow(Math.abs(c) / (c > 0 ? dF : dB), n), 1 / n);
             // (less allowance on the shoulder tops: the clavicles lift there in a crouch)
-            r.r[q] = Math.max(tr + cut.shoulder * u, lim[q] + MIN + 0.022 * smooth(1.42, 1.48, r.t) * smooth(0.4, 0.75, s));
+            r.r[q] = Math.max(tr + cut.shoulder * u, lim[q] + minAt + 0.022 * smooth(1.42, 1.48, r.t) * smooth(0.4, 0.75, s));
           }
         }
         // The back hangs straight from the shoulder blades: below 1.5 a back radius may only shrink a
@@ -125,7 +127,7 @@ export function buildOutfitGeometry(body, cut) {
         for (const r of rings) {
           const f = fl >= 0 ? smooth(bot + 0.12, bot, r.t) * fl + 0.0045 * bump(r.t, bot + 0.085, 0.065)
             : fl * smooth(bot + 0.075, bot + 0.02, r.t) - fl * 0.45 * bump(r.t, bot + 0.12, 0.07);
-          for (let k = 0; k < S; k++) r.r[k] = Math.max(r.r[k] + f, r.raw[k] + MIN);
+          for (let k = 0; k < S; k++) r.r[k] = Math.max(r.r[k] + f, r.raw[k] + THREE.MathUtils.lerp(-0.02, MIN, smooth(0.98, 1.1, r.t)));
         }
       },
     });
