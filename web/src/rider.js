@@ -760,8 +760,8 @@ export class Rider {
     const l1 = this.restLocal.get(B['lowerarm' + s]).p.length(), l2 = this.restLocal.get(B['hand' + s]).p.length();
     const w = sh.clone().addScaledVector(_v2.copy(u).normalize(), l1).addScaledVector(_v3.copy(l).normalize(), l2).applyMatrix4(F.Minv[0]);
     const row = plankSurfaceAt(this.board, w.z, {});
-    const depth = row && Math.abs(w.x) < row.hw + GRAB_OUT ? row.top + GRAB_UP - w.y : 0;
-    const want = THREE.MathUtils.smoothstep(depth, -0.05, 0.01);
+    const depth = row && Math.abs(w.x) < row.hw + GRAB_OUT + 0.1 ? row.top + GRAB_UP - w.y : -1;
+    const want = THREE.MathUtils.smoothstep(depth, -0.1, 0);
     fix[k] = Math.max(want, fix[k] * Math.exp(-10 * (this._dtLast || 1 / 60)));
     if (fix[k] < 0.002) return;
     const t = this.board.userData.plank?.geometry.userData.surface;
