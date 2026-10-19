@@ -460,6 +460,71 @@ specialists get a short, proud label ("Fastest") rather than a paragraph.
 - **Ski presses:** the skis pitch about the pressed tails or tips, the hips move over that end, and the tips snap up on the pop.
 - **Gear in the snow:** only 15% of the physics powder sink is drawn (`gearSinkVisual`). Before, a slow board sat 10–12 cm deep and was invisible except for the bindings.
 
+### Boots, bindings and clearance: nothing goes through the gear (Oct 2026)
+
+The user saw clothing and the butt sink through the board when the rider leaned down for a grab (mostly on
+the loading screen), and ski boots showing through the bases even in a plain stance. Measured on the old rig:
+the boot sole sat 3.7 cm *under* the ski base (the foot bone was placed at the rest ankle height, but the boot
+mesh reaches 12.4 cm below the ankle), the feet never rolled or pitched with the gear (an edged board put a boot
+corner 20 cm through the base in a slide stop), and a grab dropped the hips while pulling the board up 48 cm, so
+the butt, hem and thighs went 9–13 cm into the deck. What rider.js does now:
+
+- **Boots seated in the bindings** (`seatAnkle`, `measureBoot`). At load the boot zone of the body mesh is
+  skinned in the rest pose: per foot, the offset from the ankle to the centre of the sole. Every frame the ankle
+  target comes from the real ski / board transform (`gearFrames`: each part's matrix in the armature's space),
+  so the sole sits on the plate (`SKI_BINDING_SEAT` 3.3 cm, `BOARD_BINDING_SEAT` 2.6 cm, equipment/models.js)
+  and the foot turns with the gear: edge roll, press / pop pitch, plough wedge, crossed skis, board tweaks. The
+  whole body is lifted by the boot + binding stack and moved back so the ankles sit behind the boot centres
+  (`stackOffset`): the pose is the same as before, the rider just stands on the gear instead of in it.
+- **Bindings sized to the boot.** Ski toe / heel pieces now clamp the 33 cm boot's ends; the board binding
+  (baseplate, heel cup, highback, straps) is sized for a 33 × 16 cm boot centred on the binding.
+- **Clearance pass** (`clearance`, in `pose`). Garment vertices on the hips, butt, jacket hem, thighs and shins
+  (~3800 of them, skinned on the CPU from the posed bone matrices) are tested against each plank's real cross
+  section (`plankSurfaceAt`: half width, top-sheet and base height along its length, camber and kicks included).
+  Anything inside the footprint and below the top sheet + 1.2 cm raises the pelvis along the gear's up by
+  exactly that much, and the pose is solved again (the feet stay in the bindings, so the knees open). It is
+  coarse-to-fine (every 8th probe first, the rest only when cloth comes within 6 cm of a plank) and skipped
+  while the hips are > 0.62 m and the knees > 0.3 m above every plank: 0.05–0.3 ms a frame while riding,
+  ~1.3 ms in a grab.
+- **Grabs: the gear comes to the hand.** Real riders suck the knees up and bring the board to the hand instead
+  of bending down to it (Snowboard Addiction, *Basic grabs*). The grabbing hand is two-bone IK'd to just outside
+  and above the edge (`grabPoint`, `armReach`) with its fingers turned down the sidewall (`aimHand`), and it
+  approaches from outside as the grab comes in, so it never sweeps through the deck. In the air a hand that
+  still can't reach brings the board to it (up to `grabGearReach` 0.4 m); skis come up further for every grab
+  (`skiGrabLift` 0.46 m) and the upper body folds a little over them. Grab targets: board Indy = rear hand, toe
+  edge between the feet; Melon = front hand, heel edge by the front foot; Nose / Tail = the toe edge near that
+  end. Skis Safety = own ski, outside edge ahead of the toe piece; Japan = further forward; Mute = the right hand
+  across to the left ski's inside edge; Tail grab = own tail; Truck driver = both hands to the fronts. Each grab
+  owns a stretch of edge and the hand closes on its point nearest the shoulder (`nearestStation`). A Tail-grab
+  tweak now swings the tail toward the hand (it swung away). Tweaks go only as far as the arm reaches
+  (`tweakFit`: while the grabbing hand falls short the tweak eases back, and it returns once the hand holds):
+  tweaked board grabs went from 11–24 cm short of the board to ≤ 3 cm. Of the ski grabs only the Tail grab
+  brings the skis back to the hand (skis pulled into the folded legs bunch the jacket hem between the knees).
+- **Legs never leave the bindings.** If a leg can't reach its binding, the gear follows the foot in the air and
+  the hips come down on the snow.
+- **Chairlift:** the skis hang from the boots exactly (sole on the plate, tips down with the foot,
+  `liftSkiHang`), the board under the soles (they used to hang 10 cm under the ankle bone, inside the boots).
+- **Loading stills** (`assets/loading/*.webp`, first paint of every load) were re-rendered with
+  `scripts/loadingstills.mjs`: the old ones baked in the board through the knees. Re-render them whenever the
+  rig or the clothes change.
+
+Measured with `node web/scripts/gear-clip.mjs` (below): max penetration over 630 poses (5 ski and 5 board
+models, both stances, every riding / air / grab pose and every loading-screen shot frame by frame) went from
+body 13.2 / hand 4.3 / boot sunk 20 / boot through base 22 cm to ≤ 0.34 cm everywhere; with the night-2
+clothing (`--fits`: all 7 jackets, 3 pants, both gloves) ≤ 0.33 cm over 694 poses.
+
+#### gear-clip.mjs — the penetration check
+
+`node web/scripts/gear-clip.mjs http://localhost:<port>/ [--quick] [--check] [--shots dir] [--json file]`
+opens `src/equipment/clipharness.html` (dev only, not in the build) and poses the real rider (rider.js +
+character/ + equipment/) through every pose, CPU-skins the outfit and boot vertices and reports per pose, in cm:
+`body` (garments under a plank's top sheet inside its footprint, the smaller of the depth and the distance to
+the edge), `hand` (mitt inside a plank; a grip may wrap 3 cm under the edge), `sunk` (boot sole below its
+seat), `base` (boot below the base: visible from under the gear), `gap` (boot floating off its plate). It also
+says when a grabbing hand falls short of the gear. `--check` fails above 1 cm (0.3 cm for `base`, 1.5 for `gap`).
+Filters: `--gear ski|snowboard`, `--mode game|loading`, `--only <pose names>`, `--tricks <loading tricks>`;
+`--fits` adds every outfit fit; `--where` prints the worst vertex; `--views side,below,front,side2,chase --size WxH` for the contact sheets.
+
 ## Testing and tuning results
 
 - `node web/scripts/physics-sim.mjs [ski|snowboard|both] [variant]` prints each value next to its target from the research. Current results:

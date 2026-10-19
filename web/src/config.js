@@ -249,6 +249,9 @@ export const ANIM = {
   skiPopSnap: 0.3,            // rad the tips snap up at the pop
   flipLoadArch: 0.45,         // rad the upper body arches back while preloading a backflip (S while charging)
   flipPivot: 0.85,
+  liftSkiHang: 0.35,          // rad the boots and skis hang tips-down on the chairlift
+  grabGearReach: 0.4,         // m a grabbed board / ski may come further toward a hand that can't reach it (air)
+  skiGrabLift: 0.46,          // m the skis come up toward the hips while grabbing (the hand meets the ski)
   flipTuckLift: 0.14,         // m the feet pull up toward the hips while flipping            // m above the feet the rider flips about (centre of mass)
   // Head in the air (rider.airLook): leads the rotation, then spots the landing point.
   airHeadLead: 0.09,          // rad of head yaw per rad/s of spin (into the spin) …
