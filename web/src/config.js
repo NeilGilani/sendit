@@ -249,6 +249,9 @@ export const ANIM = {
   skiPopSnap: 0.3,            // rad the tips snap up at the pop
   flipLoadArch: 0.45,         // rad the upper body arches back while preloading a backflip (S while charging)
   flipPivot: 0.85,
+  liftSkiHang: 0.35,          // rad the boots and skis hang tips-down on the chairlift
+  grabGearReach: 0.4,         // m a grabbed board / ski may come further toward a hand that can't reach it (air)
+  skiGrabLift: 0.46,          // m the skis come up toward the hips while grabbing (the hand meets the ski)
   flipTuckLift: 0.14,         // m the feet pull up toward the hips while flipping            // m above the feet the rider flips about (centre of mass)
   // Head in the air (rider.airLook): leads the rotation, then spots the landing point.
   airHeadLead: 0.09,          // rad of head yaw per rad/s of spin (into the spin) …
@@ -445,7 +448,7 @@ export const RAGDOLL = {
     spine: { cone: 30, centre: [12, 0], twist: 20 },
     neck: { cone: 35, centre: [10, 0], twist: 45 },
     shoulder: { cone: 75, centre: [25, 35], twist: 50 },
-    hip: { cone: 60, centre: [35, 0], twist: 30 },
+    hip: { cone: 52, centre: [35, 0], twist: 30 },
     elbow: [0, 135],           // hinge (flexion +); the hand rides on the forearm (no wrist joint to flop)
     knee: [-3, 140],
     ankle: { cone: 22, twist: 12 },   // snowboard: boots in the bindings
@@ -454,6 +457,7 @@ export const RAGDOLL = {
   // Body on snow: a jacket sliding on hardpack μ ≈ 0.3 (static, dug in: more); powder adds grip and drag
   muSnow: 0.32, muStaticSnow: 0.65, muPowder: 0.2,
   slowGrip: 1.5,               // m/s: slower slides grip more, up to muStaticSnow at a crawl (Stribeck-like)
+  skiDragDown: true,           // … but not once the trunk is down on the snow (lying on them / beside them, the skis drag)
   muSkiOn: 0.12,               // skis still on: the bases slide (a crash with the skis on carries further)
   plough: 3,                 // 1/s tangential drag while touching the snow (ploughing through it) …
   ploughPowder: 1,             // … × (1 + this · powder)
@@ -462,7 +466,7 @@ export const RAGDOLL = {
   restitution: 0.08,
   impactGrip: 6,               // m/s: a slam into the snow grips as if it were at most this hard (it gives way)
   muGear: 0.3, ploughGear: 2, // released skis (brakes out) / poles
-  muBark: 0.6,
+  muBark: 0.6, muStaticBark: 0.9,   // jacket on bark / rock: sliding, at rest (it grips more, like on snow)
   airDrag: 0.02,               // 1/s
   // 1/s: relative spin AND swing (the child's centre against the parent's rigid motion: swingDamping) die at this
   // rate. Strong on purpose: a braced body tumbles as a unit, limbs stay close (an impact can still throw one).
@@ -475,11 +479,26 @@ export const RAGDOLL = {
   toneHoldSpeed: 3,            // m/s: full tone while the body moves faster than this; it only fades as it slows
   toneEnd: 0.15,               // share of tone left after relaxing (then limp once it lies still)
   toneTau: 1.5,                // s
+  toneRate: 5,                 // rad/s: each muscle's target pose turns from the crash's pose toward the tuck / brace at this speed
   limitEase: 2,                // rad/s: a hinge the crash found past its range is let back in at this rate
   tuck: { spine: 14, neck: 18, hip: 35, knee: 50, elbow: 55, shoulder: [0.45, -0.6, 0.6] },   // deg / arm direction (armature: x left, y up, z fwd)
+  // … per fall mode (severity crashes; docs/body.md § Fall modes): back = a sit-down onto the back, knees up, chin in;
+  // front = onto the hands and knees; side = onto the hip (the default tuck, chin in)
+  tuckModes: {
+    back: { spine: 22, neck: 26, hip: 45, knee: 60, elbow: 40, shoulder: [0.55, -0.75, 0.25] },
+    front: { spine: 16, neck: 20, hip: 50, knee: 75, elbow: 35, shoulder: [0.35, -0.6, 0.75] },
+    side: { neck: 24, hip: 45, knee: 60 },
+  },
+  // … once the trunk lies on the snow, by which way it faces: on the back knees up (skis / board flat on the snow),
+  // face down legs out, on the side half bent; chin still in
+  tuckLie: { up: { spine: 10, neck: 24, hip: 55, knee: 115 }, down: { spine: 4, neck: 18, hip: 8, knee: 20 }, side: { spine: 10, neck: 22, hip: 40, knee: 60 } },
+  lieLegRelax: 0.5,            // share of the hips' / knees' tone let go while lying
+  backCatch: 0.2,              // × feetCatch in a back fall: the skis / board shoot on, the hips drop behind them
   uprightAfter: 0.4,           // s: a body still standing after this loses its muscle tone (falls)
   braceTime: 0.55,             // s: hands reach toward the snow the body falls onto
   braceTone: 1.2,              // × shoulder / elbow tone while bracing
+  braceCone: 55,               // deg: the bracing arm stays within this of the trunk's down axis (a hand put down, not flung out)
+  braceElbow: 0.45,            // share of the elbow's tuck bend kept while bracing (a soft elbow)
   // Seeding from the crash
   maxSeedSpin: 10,             // rad/s
   feetCatch: { pitch: 0.45, yaw: 0.65, impact: 0.35, compression: 0.45, landing: 0.5 },   // share of the legs' slide stopped by the catching edges
@@ -496,4 +515,24 @@ export const RAGDOLL = {
   steepFadeDeg: 30, steepFadeSpeed: 2.5,   // … or is still sliding (m/s) on a face steeper than this
   maxSpeed: 50, maxSpin: 30,   // safety clamps
   impactSpeed: 3.2,            // m/s into the snow / a tree for an impact event (audio, camera)
+  // Severity (docs/body.md § Severity; character/ragdoll/severity.js): every crash is graded 0..1 from how far past
+  // the landing limit it was, the impact into the slope, the spin left and the speed (trees / rocks never small).
+  // Settings below are [small, medium, big], blended by the severity.
+  tiers: { small: 0.3, big: 0.62 },
+  severityWeights: { angle: 0.6, impact: 0.75, spin: 0.4, speed: 0.25 },
+  sev: {
+    spinKeep: [0.25, 0.6, 1],    // share of the trunk's spin (a flip / spin's leftover) carried into the fall
+    spinCap: [2.5, 5, 9],        // rad/s: … at most
+    feetCatch: [0.3, 0.7, 1],    // × feetCatch: how hard the edges stop the legs (the upper body pitching over them)
+    twist: [0.2, 0.6, 1],        // × the random twist of its own
+    tone: [2.2, 1.7, 1.5],       // × muscle tone: a small fall is held stiff (a powered fall), a big one still has bones
+    damp: [1.5, 1.35, 1.3],      // × joint damping
+    govCap: [3.5, 6, 9],          // rad/s: the body's whole rotation while touching something (tumble governor) …
+    govBudget: [110, 260, 620],  // deg: … and after turning this much in all it comes to a stop
+    eject: [99, 9, 5],           // m/s: skis release above this (small: they stay on; trees / rocks: always but small)
+    restHold: [0.3, 0.4, 0.45],  // s at rest before the respawn fade …
+    restSpeed: [0.45, 0.3, 0],   // m/s: … where 'at rest' for a small / medium fall is the centre of mass slower than this
+    plough: [1.6, 1.3, 1],       // × snow drag: a rider after a small fall digs the edge / hands in and stops (self-arrest)
+    tip: [2.2, 2.4, 0],          // rad/s: small / medium falls tip over the way the body leans at least this fast
+  },
 };

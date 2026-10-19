@@ -17,7 +17,14 @@ const CSS = `
 #trail-toast small { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; opacity: .7; }
 #trail-toast b { font-size: 22px; font-weight: 800; letter-spacing: .01em; white-space: nowrap; }
 #trail-toast em { font-style: normal; font-size: 12.5px; opacity: .78; }
+#trail-toast .tt-pb { display: flex; flex-direction: column; align-items: flex-end; margin-left: 6px; padding-left: 14px;
+  border-left: 1px solid rgba(255,255,255,0.16); line-height: 1.15; }
+#trail-toast .tt-pb small { font-size: 10px; }
+#trail-toast .tt-pb b { font-size: 17px; font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 6px; }
+#trail-toast .tt-medal { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(0,0,0,.25); }
+#trail-toast .tt-medal.gold { background: #ffd23f; } #trail-toast .tt-medal.silver { background: #cfd6de; } #trail-toast .tt-medal.bronze { background: #d08a4a; }
 body.fp #trail-toast { top: 64px; }
+@media (max-width: 520px) { #trail-toast { max-width: calc(100vw - 32px); } #trail-toast b { font-size: 18px; white-space: normal; } #trail-toast .tt-pb b { font-size: 15px; } }
 `;
 
 let el = null, timer = 0;
@@ -37,8 +44,12 @@ function ensure() {
   return el;
 }
 
-/** Show the trail sign for `trail` on `map` (registry entries). */
-export function showTrailToast(map, trail, { duration = 4200 } = {}) {
+/**
+ * Show the trail sign for `trail` on `map` (registry entries). `best` (optional) = the saved best run
+ * here ({ time, medal } from activities.js bestFor): shown as a "Your best" chip, STEEP drop-zone style,
+ * so every start says what to beat.
+ */
+export function showTrailToast(map, trail, { duration = 4200, best = null } = {}) {
   const box = ensure();
   if (!box || !trail) return;
   const diff = DIFFICULTIES[trail.difficulty];
@@ -46,12 +57,19 @@ export function showTrailToast(map, trail, { duration = 4200 } = {}) {
   box.style.setProperty('--tt-accent', map?.mountain?.accent || '#5fa8ff');
   box.innerHTML = `${difficultyBadge(trail.difficulty, 34, 'tt-badge')}
     <span class="tt-text"><small>${esc(map?.mountain?.name || map?.name || '')}${trail.group ? ` · ${esc(trail.group)}` : ''}</small>
-    <b>${esc(trail.name)}</b><em>${esc(diff?.label || '')}${stats ? ` · ${esc(stats)}` : ''}</em></span>`;
+    <b>${esc(trail.name)}</b><em>${esc(diff?.label || '')}${stats ? ` · ${esc(stats)}` : ''}</em></span>${pbChip(best)}`;
   box.classList.remove('on');
   void box.offsetWidth;
   box.classList.add('on');
   clearTimeout(timer);
   timer = setTimeout(() => box.classList.remove('on'), duration);
+}
+
+function pbChip(best) {
+  if (!best || !Number.isFinite(best.time)) return '';
+  const m = Math.floor(best.time / 60), sec = best.time - m * 60;
+  const medal = ['gold', 'silver', 'bronze'].includes(best.medal) ? `<i class="tt-medal ${best.medal}" title="${best.medal}"></i>` : '';
+  return `<span class="tt-pb"><small>Your best</small><b>${medal}${m}:${sec.toFixed(2).padStart(5, '0')}</b></span>`;
 }
 
 export function hideTrailToast() { clearTimeout(timer); el?.classList.remove('on'); }

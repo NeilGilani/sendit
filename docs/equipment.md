@@ -315,6 +315,117 @@ Frontside means the toe side, and so the chest, swings toward the direction of t
 
 At runtime, `registerVariant(type, spec)` adds a model (for DLC or user presets). A colourway or graphic is a partial spec, `{ id: 'park', graphic: {...} }`, passed to `setEquipment` or `createEquipmentModel`. The lobby can expose `graphic` fields as paint options. Per-rider stance overrides go through `player.setStance()`, with binding angles in `spec.stance`.
 
+A new model also gets its Locker ratings automatically (next section); the rating scale re-fits to include it.
+
+## Gear stats in the Locker (ratings, best-at badges, the ★ pick)
+
+Every ski and board card in the Locker shows what it rides like, so you never have to equip pieces one by
+one to feel the difference. Code: `web/src/lobby/gearAdvisor.js` (pure, Node-testable maths),
+`web/src/lobby/gearUi.js` (HTML builders, reads the profile and progression), `web/src/lobby/tabs/gear.css`,
+used by `tabs/equipment.js` (Locker → Gear) and the Skis / Board slots of `tabs/locker.js` (Locker → Skins).
+Tests: `node web/scripts/gear-advisor-unit.mjs` (also part of `unittest.mjs`) and lobbytest step 6d.
+**Nothing here changes physics**: the ratings are read from the same `deriveHandling()` multipliers the
+physics uses, and the specs are never written.
+
+### What the player sees
+
+- **Gear tab:** the Skis / Snowboard choice, then the **★ Recommended for you** plate (the pick, its name and one
+  line saying why, e.g. "You land lots of spins → Twin 168 pops and spins best") and under it **Best for
+  <loaded mountain>: …** with the terrain that decides it. Then one card per owned ski (or board): picture,
+  name, badges, five rating bars with their numbers. Hover or keyboard-focus a card and each bar shows the
+  difference to what you ride: the bar drops to the lower value and the gap fills green (better) or striped
+  red (worse), with ▲ / ▼ and the amount (on touch screens the deltas are always on). Click a card to ride it.
+- **Compare:** the Compare button on a card compares it with what you ride; press it on a second card to
+  compare those two. Mirrored bars per rating (Gran Turismo / FIFA style) with the winner of each row lit, a
+  "Ride this" button on each side, and a fold-out with the physics numbers behind it (pop, spin rate,
+  pivot / butter, edge grip, stability and float as % of the stock model, turn radius, length, switch landings).
+  Clicking the ★ plate opens the pick vs what you ride.
+- **Skins tab (Skis / Board slots):** every tile carries its badges as icons and five thin bars under the art;
+  hovering or focusing a tile (owned, or a "missing" silhouette) previews it in the detail plate below with
+  labelled bars and deltas vs what you ride, plus Compare (opens the Gear tab with that piece compared).
+
+### The five ratings (1–10)
+
+| rating | from the physics (`deriveHandling`, ≈ 1 for the stock model) | why |
+|---|---|---|
+| **Speed** | 0.7 · stability + 0.3 · grip | skid scrub is divided by stability (edge.js); grip keeps you carving instead of skidding |
+| **Carve** | 0.75 · grip + 0.25 · (stock radius / sidecut radius) | edge hold at high angles + how tight the carved arc is (κ = 1/R) |
+| **Control** | 0.4 · pivot + 0.3 · stability + 0.3 · grip | pivot multiplies the turn rate you can ask for; stability calms it; grip stops wash-outs |
+| **Park** | (0.45 · spin + 0.35 · pivot + 0.2 · pop) × 1.15 if twin | spin rate, butters, pop height, clean switch landings |
+| **Powder** | √float | powder glide μ ÷ √float, sink and bog ÷ float (edge.js) |
+
+The scale is fixed per type over every registered model (legendary topsheets share a stock shape): the best
+model of each rating is 10, the weakest about 3.6 (40 % headroom below it, like Forza's 3–10 ratings), so the
+bars never jump when you pull a new piece and a ski you don't own yet can be compared fairly. Skis and boards
+have their own scales (different physics). Current values:
+
+| ski | SPD | CRV | CTL | PRK | PWD | | board | SPD | CRV | CTL | PRK | PWD |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Ridge 172 | 5.9 | 6.6 | 4.9 | 5.6 | 6.0 | | Atlas 156 | 6.6 | 7.5 | 3.6 | 4.8 | 4.6 |
+| SL Race 165 | 7.8 | **10** | 3.6 | 4.7 | 3.6 | | Steeple 161 | 9.1 | 9.5 | 4.6 | 4.0 | 5.1 |
+| GS Race 188 | **10** | 8.3 | 5.3 | 3.6 | 4.2 | | Edge 163 | **10** | **10** | 4.7 | 3.6 | 3.6 |
+| Float 186 | 4.8 | 3.6 | **10** | 6.8 | **10** | | Fish 158 | 5.7 | 5.5 | 6.5 | 5.6 | **10** |
+| Twin 168 | 3.6 | 4.2 | 6.5 | **10** | 6.9 | | Butter 152 | 3.6 | 3.6 | **10** | **10** | 6.5 |
+
+The older hand-typed `item.stats` in profile/items.js are no longer shown: they disagreed with the physics
+(they gave the soft park ski the most pop, while its soft flex actually pops lowest; it wins Park on spin
+rate, butters and switch landings instead).
+
+### Best-at badges
+
+Among the pieces **you own** of one type: **Fastest**, **Best carver**, **Most controllable**, **Best for
+park**, **Best in powder**, each with its line icon (chevrons, carve arc, target, spin arrow, snowflake). A
+badge needs two or more different models owned and a lead of at least 0.5 rating points over every other
+model (`BADGE_MARGIN`); an exact or near tie gives no badge. A legendary topsheet rides exactly like its stock
+model, so the two share a badge and count as one model.
+
+### The ★ pick
+
+`recommend(items, { maps, life, stats })` scores each owned piece with a weight per rating:
+
+1. **The mountains** (`mapNeeds`): each map has a terrain mix (groomers, steep faces, trees, park; from its
+   docs and description, `MAP_TERRAIN`; unknown maps fall back to their tags) and a powder weight from its own
+   physics (`powderDepth` in `maps/<id>/tuning.js`: Kitsune 0.75, Ravenspire / Dragonback 0.6, Fjordline 0.45,
+   Voltage 0.05). Each terrain asks for different ratings (`TERRAIN_NEEDS`, e.g. trees: control 0.6, carve
+   0.25, speed 0.15). All non-experimental maps are averaged, shifted toward the ones you ride most.
+2. **Your playstyle** (`playstyle(progression life, profile stats)`): tricks per km (and which kind: spins,
+   flips, grinds from the trick book), top speed, wipeouts per km, clean turns per km. Its confidence grows
+   with km ridden (15 km ≈ full) and is capped at 0.6, so the mountains always count. Under ~1 km it is zero
+   and the pick is the all-mountain one.
+3. The pick maximises Σ weight · u(raw rating) with u(r) = 1 − 1/r on the raw physics numbers: a weakness
+   costs more than an equal strength earns, so a balanced piece beats a specialist unless the terrain or the
+   rider asks for that speciality. Ties go to what you ride.
+
+The one-line reason names the rating where the pick gains most and who asked for it: your playstyle ("You
+ride fast (top 104 km/h) → GS Race 188 holds its speed best"), your favourite mountain ("You ride Kitsune Peak
+most → Float 186 suits its deep powder"), or the mountains ("Most mountains here are deep snow → Float 186
+floats best" / "Best all-rounder across all 7 mountains → Ridge 172"). With one model owned there is no pick
+(the plate says to get a second one from cases). Because six of the seven mountains are deep-snow freeride,
+the all-mountain pick among a full rack is the rockered powder ski / the soft park board; among the classic
+three skis (Ridge, SL, GS) it is the Ridge.
+
+`recommendForMap(items, map)` uses the loaded map's needs alone ("Best for Ravenspire"). It sits under the ★
+plate in the Gear tab rather than in the Ride cluster, which belongs to Lobby.js and stays uncluttered.
+
+### Research: how other games and ski shops present gear (October 2026)
+
+| source | what it does | what we took |
+|---|---|---|
+| **STEEP** (Ubisoft 2016) | Gear is cosmetic: every ski and board rides the same; you pick a sport, not a stat line. Its progression was criticised as thin and unstructured. | Our gear does ride differently (spec-driven physics), so it has to *say* so on the card. |
+| **Riders Republic** | Snow gear carries Speed, Acceleration, Absorption, Trick and Control plus one gear score; reviewers note the score goes up but the game never shows how a piece changes the handling (Ludo.guide; Digital Trends review). | Five named ratings with plain meanings, and per-rating deltas instead of one opaque score. |
+| **SSX (2012)** | Each Deadly Descent has the gear for its hazard (armour for trees and rocks, wingsuit for gaps, headlamp for darkness, pulse goggles for whiteout). | "Best for <mountain>" from the map's terrain and snow. |
+| **Forza Horizon** | Cars rated 3.0–10.0 on Speed, Handling, Acceleration, Launch, Braking, plus one Performance Index / class; the PI is one test-track lap and doesn't promise the car suits every route (support.forza.net). | A fixed ~3.6–10 ruler; the pick is explained per terrain rather than as one number. |
+| **Gran Turismo 7** | Performance Points: one overall number used to cap events; tuning can raise PP without making the car faster (GT7 manual; Traxion). | No single power number; ratings straight from the physics. Mirrored compare bars. |
+| **Mario Kart 8 Deluxe** | Kart / tyre / glider parts show bars (speed, acceleration, weight, handling, traction); bars are imprecise and a hidden mini-turbo stat matters a lot (MarioWiki). | Bars at a glance, exact numbers beside them, the physics behind them one fold away; nothing hidden. |
+| **Destiny 2 / Diablo IV / COD** | Hover an item: stat bars show gains in green and losses in red against what's equipped; players complain when one green number hides a loss elsewhere (Blizzard forums). | Green / red on every rating, never one net arrow. |
+| **Fortnite / Rocket League** | Lockers are cosmetic grids; hovering a tile previews it without equipping. | Hover / focus previews in the Skins detail plate; tile art stays the cases' art. |
+| **RPG / Pokémon-style "recommended"** | One starred suggestion with a reason ("super effective"). | One ★ per type, always with its reason. |
+| **Ski shops and reviews** | Categories: carving / frontside, all-mountain, freeride / powder, park, race (SL / GS). Reviews score stability at speed, edge hold / carving, float, playfulness, forgiveness, maneuverability (Blister 0–10; OutdoorGearLab weights stability 20 %, carving 20 %, crud 20 %, powder 20 %, playfulness 15 %, bumps 5 %; SKI magazine's hard-snow integrity and carving). | Speed ≈ stability at speed, Carve ≈ edge hold, Control ≈ forgiveness + maneuverability, Park ≈ playfulness, Powder ≈ float; the badges are the shop categories. |
+
+What the best of these share: the comparison happens **where you choose** (on the card, on hover), deltas
+are **per attribute and colour-coded**, the overall suggestion is **one symbol with a reason**, and
+specialists get a short, proud label ("Fastest") rather than a paragraph.
+
 ## Rider animation (rider.js)
 
 - **Proportions** (`web/src/character/body.js`, `PROPORTIONS`, applied once to the rest pose at load). The Quaternius model has a superhero cut. Measured on its bind pose (1.81 m), the head was about 20% too wide for the body, and the arm span was 1.65 m (real arm span ≈ height), mostly from a short upper arm. Now the head is ×0.94 (helmet included), the upper arm +4.5 cm, the forearm +1.5 cm and the hands ×0.92. Bones move, not vertices, so the body, outfit and helmet follow.
@@ -348,6 +459,71 @@ At runtime, `registerVariant(type, spec)` adds a model (for DLC or user presets)
 - **Flips (both):** the rider rotates about the hips (`flipPivot`). While flipping the knees pull up and the hands go to the shins (`flipTuck`). A backflip preload arches the chest up and back.
 - **Ski presses:** the skis pitch about the pressed tails or tips, the hips move over that end, and the tips snap up on the pop.
 - **Gear in the snow:** only 15% of the physics powder sink is drawn (`gearSinkVisual`). Before, a slow board sat 10–12 cm deep and was invisible except for the bindings.
+
+### Boots, bindings and clearance: nothing goes through the gear (Oct 2026)
+
+The user saw clothing and the butt sink through the board when the rider leaned down for a grab (mostly on
+the loading screen), and ski boots showing through the bases even in a plain stance. Measured on the old rig:
+the boot sole sat 3.7 cm *under* the ski base (the foot bone was placed at the rest ankle height, but the boot
+mesh reaches 12.4 cm below the ankle), the feet never rolled or pitched with the gear (an edged board put a boot
+corner 20 cm through the base in a slide stop), and a grab dropped the hips while pulling the board up 48 cm, so
+the butt, hem and thighs went 9–13 cm into the deck. What rider.js does now:
+
+- **Boots seated in the bindings** (`seatAnkle`, `measureBoot`). At load the boot zone of the body mesh is
+  skinned in the rest pose: per foot, the offset from the ankle to the centre of the sole. Every frame the ankle
+  target comes from the real ski / board transform (`gearFrames`: each part's matrix in the armature's space),
+  so the sole sits on the plate (`SKI_BINDING_SEAT` 3.3 cm, `BOARD_BINDING_SEAT` 2.6 cm, equipment/models.js)
+  and the foot turns with the gear: edge roll, press / pop pitch, plough wedge, crossed skis, board tweaks. The
+  whole body is lifted by the boot + binding stack and moved back so the ankles sit behind the boot centres
+  (`stackOffset`): the pose is the same as before, the rider just stands on the gear instead of in it.
+- **Bindings sized to the boot.** Ski toe / heel pieces now clamp the 33 cm boot's ends; the board binding
+  (baseplate, heel cup, highback, straps) is sized for a 33 × 16 cm boot centred on the binding.
+- **Clearance pass** (`clearance`, in `pose`). Garment vertices on the hips, butt, jacket hem, thighs and shins
+  (~3800 of them, skinned on the CPU from the posed bone matrices) are tested against each plank's real cross
+  section (`plankSurfaceAt`: half width, top-sheet and base height along its length, camber and kicks included).
+  Anything inside the footprint and below the top sheet + 1.2 cm raises the pelvis along the gear's up by
+  exactly that much, and the pose is solved again (the feet stay in the bindings, so the knees open). It is
+  coarse-to-fine (every 8th probe first, the rest only when cloth comes within 6 cm of a plank) and skipped
+  while the hips are > 0.62 m and the knees > 0.3 m above every plank: 0.05–0.3 ms a frame while riding,
+  ~1.3 ms in a grab.
+- **Grabs: the gear comes to the hand.** Real riders suck the knees up and bring the board to the hand instead
+  of bending down to it (Snowboard Addiction, *Basic grabs*). The grabbing hand is two-bone IK'd to just outside
+  and above the edge (`grabPoint`, `armReach`) with its fingers turned down the sidewall (`aimHand`), and it
+  approaches from outside as the grab comes in, so it never sweeps through the deck. In the air a hand that
+  still can't reach brings the board to it (up to `grabGearReach` 0.4 m); skis come up further for every grab
+  (`skiGrabLift` 0.46 m) and the upper body folds a little over them. Grab targets: board Indy = rear hand, toe
+  edge between the feet; Melon = front hand, heel edge by the front foot; Nose / Tail = the toe edge near that
+  end. Skis Safety = own ski, outside edge ahead of the toe piece; Japan = further forward; Mute = the right hand
+  across to the left ski's inside edge; Tail grab = own tail; Truck driver = both hands to the fronts. Each grab
+  owns a stretch of edge and the hand closes on its point nearest the shoulder (`nearestStation`). A Tail-grab
+  tweak now swings the tail toward the hand (it swung away). Tweaks go only as far as the arm reaches
+  (`tweakFit`: while the grabbing hand falls short the tweak eases back, and it returns once the hand holds):
+  tweaked board grabs went from 11–24 cm short of the board to ≤ 3 cm. Of the ski grabs only the Tail grab
+  brings the skis back to the hand (skis pulled into the folded legs bunch the jacket hem between the knees).
+- **Legs never leave the bindings.** If a leg can't reach its binding, the gear follows the foot in the air and
+  the hips come down on the snow.
+- **Chairlift:** the skis hang from the boots exactly (sole on the plate, tips down with the foot,
+  `liftSkiHang`), the board under the soles (they used to hang 10 cm under the ankle bone, inside the boots).
+- **Loading stills** (`assets/loading/*.webp`, first paint of every load) were re-rendered with
+  `scripts/loadingstills.mjs`: the old ones baked in the board through the knees. Re-render them whenever the
+  rig or the clothes change.
+
+Measured with `node web/scripts/gear-clip.mjs` (below): max penetration over 630 poses (5 ski and 5 board
+models, both stances, every riding / air / grab pose and every loading-screen shot frame by frame) went from
+body 13.2 / hand 4.3 / boot sunk 20 / boot through base 22 cm to ≤ 0.34 cm everywhere; with the night-2
+clothing (`--fits`: all 7 jackets, 3 pants, both gloves) ≤ 0.33 cm over 694 poses.
+
+#### gear-clip.mjs — the penetration check
+
+`node web/scripts/gear-clip.mjs http://localhost:<port>/ [--quick] [--check] [--shots dir] [--json file]`
+opens `src/equipment/clipharness.html` (dev only, not in the build) and poses the real rider (rider.js +
+character/ + equipment/) through every pose, CPU-skins the outfit and boot vertices and reports per pose, in cm:
+`body` (garments under a plank's top sheet inside its footprint, the smaller of the depth and the distance to
+the edge), `hand` (mitt inside a plank; a grip may wrap 3 cm under the edge), `sunk` (boot sole below its
+seat), `base` (boot below the base: visible from under the gear), `gap` (boot floating off its plate). It also
+says when a grabbing hand falls short of the gear. `--check` fails above 1 cm (0.3 cm for `base`, 1.5 for `gap`).
+Filters: `--gear ski|snowboard`, `--mode game|loading`, `--only <pose names>`, `--tricks <loading tricks>`;
+`--fits` adds every outfit fit; `--where` prints the worst vertex; `--views side,below,front,side2,chase --size WxH` for the contact sheets.
 
 ## Testing and tuning results
 
