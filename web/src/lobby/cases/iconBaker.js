@@ -9,12 +9,12 @@
 // pose and proportions as rider.js) dressed with character/ (dressRider + resolveOutfit + applyLook),
 // so every print, finish and colour comes from the real shaders; only the item's own pieces are drawn
 // (jacket + sleeves + collar + hood, the pant legs, the mitts…), double-sided so the openings show the
-// lining. Helmets, goggles and face pieces sit on a matte mannequin bust. Skis and boards are
+// lining. Helmets and goggles are shot on their own; face pieces on a slate head that fades out. Skis and boards are
 // equipment/models.js planks with their real topsheet. Lighting is a fixed studio set (warm key from the
 // upper left, cool sky fill, a Fresnel rim), set through the shared shader globals only for the bake
 // and restored right after, so the icons never depend on the map. The HDR frame (2x supersampled) goes
-// through the game's neutral tone curve, gets a soft bloom, a contact shadow and a faint glow in the
-// grade colour, and is read back asynchronously.
+// through the game's neutral tone curve and one of two looks (TILE: flatter, outlined, no bloom; HD:
+// full shading, soft bloom) with a soft contact shadow, and is read back asynchronously.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
@@ -209,7 +209,7 @@ export class IconBaker {
     // competing with the item for attention).
     this.fade = { uFadeY: { value: new THREE.Vector2(0, 1) } };
     this.mannequin = toonMaterial({
-      name: 'iconMannequin', color: 0x8b929c, rim: 0.25, transparent: true, uniforms: this.fade,
+      name: 'iconMannequin', color: 0x626a76, rim: 0.25, transparent: true, uniforms: this.fade,
       fragPars: 'uniform vec2 uFadeY;', frag: 'diffuseColor.a *= smoothstep(uFadeY.x, uFadeY.y, vW.y);',
     });
     look.meshes.body.material = this.mannequin;
@@ -316,7 +316,9 @@ export class IconBaker {
     this.pose(slot);
     const head = slot === 'helmet' || slot === 'goggles' || slot === 'face';
     const cloth = !!PIECES[slot];
-    M.body.visible = head;
+    // Helmets and goggles are shot on their own (a clean product silhouette); a face piece keeps the
+    // head inside it, fading out under the gaiter.
+    M.body.visible = slot === 'face';
     M.helmet.visible = M.lens.visible = head;
     for (const m of this.others) m.visible = false;
     M.garments.visible = cloth;
@@ -329,7 +331,7 @@ export class IconBaker {
     if (head) {
       // The bust fades out from the chin down: gone a hand below the helmet's rim.
       const rim = new THREE.Box3().setFromObject(M.helmet, true).min.y;
-      this.fade.uFadeY.value.set(rim - 0.16, rim - 0.04);
+      this.fade.uFadeY.value.set(rim - 0.13, rim - 0.06);
     }
     // Points to frame.
     const pts = [];

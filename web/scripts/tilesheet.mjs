@@ -115,6 +115,8 @@ try {
       await page.waitForTimeout(400);
       await page.evaluate(() => document.querySelector('.lk-item:not(.on)')?.click());
       await page.waitForTimeout(400); await icons(page); await page.waitForTimeout(700);
+      if (slot !== 'jacket') await page.evaluate(() => document.querySelector('.lk-sel')?.scrollIntoView({ block: 'end' }));
+      await page.waitForTimeout(200);
       await page.screenshot({ path: `${out}/locker-${slot}${flat ? '-flat' : ''}.png` });
       console.log('wrote', `${out}/locker-${slot}${flat ? '-flat' : ''}.png`);
     }
