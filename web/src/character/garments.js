@@ -311,6 +311,8 @@ export function buildOutfitGeometry(body, cut) {
       const t0 = PT.rise, t1 = cut.cuffY;
       const knee = J['calf_' + sd].y;
       const hemLow = Math.min(cut.hemFront, cut.hemBack);
+      // Lowest point of the seat that stays with the pelvis: the crotch, or under a long hem a little below it.
+      const seatLo = Math.min(PT.crotch, hemLow - 0.05);
       // Leg radius along the leg: thigh (just below the crotch) → knee → hem.
       const legR = (t) => {
         if (t >= knee) return THREE.MathUtils.lerp(L.knee, L.thigh, smooth(knee, PT.crotch - 0.06, t));
@@ -386,7 +388,7 @@ export function buildOutfitGeometry(body, cut) {
         anchor: { bone: body.bone('pelvis'), y0: 1.0, y1: 0.9 },
         // The seat stays with the pelvis down to the crotch (as the jacket's back hem over it does), so a
         // crouch rounds it under the hem instead of swinging it out through the jacket with the thigh.
-        weightLimit: (b, x, y, z) => (b.startsWith('thigh') ? 1 - 0.85 * smooth(-0.03, -0.1, z) * smooth(PT.crotch - 0.02, PT.crotch + 0.08, y) : undefined),
+        weightLimit: (b, x, y, z) => (b.startsWith('thigh') ? 1 - 0.85 * smooth(-0.03, -0.1, z) * smooth(seatLo - 0.02, seatLo + 0.08, y) : undefined),
       }));
     }
     // Bib: the chest and back panel above the waist, just inside the jacket (it follows the jacket's own
