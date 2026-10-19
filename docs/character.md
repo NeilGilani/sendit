@@ -1,11 +1,13 @@
 # Sendit rider look: outfit system
 
 The rider wears modern new-school / freeride kit. Jackets come in six **fits** (slim technical shell,
-relaxed freeride shell, long anorak, insulated puffer, tall hoodie over a shell, 90s one-piece). They
+relaxed freeride shell, baggy anorak, insulated puffer, hoodie over a shell, 90s one-piece). They
 sit close at the neck and shoulders and hang straight from the chest and shoulder blades, so the volume
-is low (waist, seat, hem) instead of inflated all over. The default is the relaxed shell. Each jacket has
+is low (waist, hem) instead of inflated all over, and they **end at the hip** (the baggy cuts just cover
+the seat; see § Clothing pass 3). The default is the relaxed shell. Each jacket has
 a high collar and a stowed hood or a hoodie hood, plus a fleece gaiter pulled up under the goggle. The
-legs are a relaxed bib, a tapered cargo pant or a wide pant, stacking over the boots. Gloves are leather
+pants are real snow pants from the waist down (waistband, seat, hips, relaxed legs): a relaxed bib, a
+tapered cargo pant or a wide pant with a dropped crotch, with a gentle break over the boots. Gloves are leather
 mitts with nylon gauntlets, and the helmet is a low-profile matte shell with a big frameless mirror goggle.
 Everything is built procedurally around the Quaternius body when the rider loads. It is skinned to the
 same bones the animation drives and coloured from data. Research: § Research below (October 2026)
@@ -92,7 +94,7 @@ the hood but keep the shoulders narrow, so the volume sits low.
 - quilted baffles on the puffer;
 - a kangaroo pocket bulge on the anorak and hoodie;
 - the hoodie's soft hood lying on the back;
-- pants that stay slim under the jacket and open out below it;
+- pants with a full waist, seat and hips under a hip-length jacket (clothing pass 3; the first pass kept them slim under the jacket);
 - materials: a matte hardshell with a soft sheen, ripstop puffer nylon with more spec, cotton fleece
   that is fully matte with a fuzzy sheen;
 - new skins in the trend palettes.
@@ -107,33 +109,58 @@ are now narrower than the waist and hem on the long fits (A-line). The sleeve co
 
 | fit (`FITS`) | garments | silhouette | chest / waist (cm) | sleeve r (cm) | hem F / B |
 |---|---|---|---|---|---|
-| `relaxed` | `tuff-shell` (default), `storm-shell` (hood up) | Sabre-style relaxed freeride shell: soft dropped shoulder, straight / slight A-line column, drop tail to the lower seat | 46 × 35 / 48 × 34 | 7.7 / 7.2 / 7.1 | 0.765 / 0.725 |
-| `shell` | `ridge-shell` (new) | slim technical hardshell: close, straight, vertical chest zips, pit zips, hem over the seat | 44 × 34 / 44 × 31 | 6.9 / 6.4 / 6.3 | 0.83 / 0.80 |
-| `anorak` | `tall-anorak` (new) | long new-school pullover: half zip, kangaroo pocket, side zip, A-line to mid-thigh | 47 × 35 / 50 × 36 | 8.1 / 7.6 / 7.6 | 0.68 / 0.65 |
-| `puffer` | `cloud-puffer` (new) | the one round cut: 10.5 cm baffles, high quilted collar, hem cinched at the hip | 50 × 37 / 50 × 35 (+1.2 cm loft) | 7.9 / 8.1 / 8.0 | 0.88 / 0.875 |
-| `hoodie` | `layer-hoodie` (new) | tall cotton hoodie over a shell: ribbed hem blousing at the hip, kangaroo pocket, drawcords, the shell collar out the top in the panel colour | 47 × 35 / 50 × 35 | 7.9 / 7.3 / 7.3 | 0.71 / 0.69 |
-| `suit` | `retro-suit` | 90s one-piece: fitted, waist belt with a buckle | 46 × 34 / 44 × 31 | 7.1 / 6.6 / 6.5 | 0.84 / 0.84 |
+| `relaxed` | `tuff-shell` (default), `storm-shell` (hood up) | Sabre-style relaxed freeride shell: soft dropped shoulder, straight column, hip length with a slight drop tail over the top of the seat | 46 × 35 / 48 × 34 | 7.7 / 7.2 / 7.1 | 0.905 / 0.88 |
+| `shell` | `ridge-shell` | slim technical hardshell: close, straight, vertical chest zips, pit zips, hem at the hip bone | 44 × 34 / 44 × 31 | 6.9 / 6.4 / 6.3 | 0.935 / 0.915 |
+| `anorak` | `tall-anorak` | baggy new-school pullover: half zip, kangaroo pocket, side zip, the longest cut, just covering the seat | 47 × 35 / 50 × 36 | 8.1 / 7.6 / 7.6 | 0.855 / 0.835 |
+| `puffer` | `cloud-puffer` | the one round cut: 10.5 cm baffles, high quilted collar, hem cinched at the hip | 50 × 37 / 50 × 35 (+1.2 cm loft) | 7.9 / 8.1 / 8.0 | 0.95 / 0.945 |
+| `hoodie` | `layer-hoodie` | cotton hoodie over a shell: ribbed hem blousing over the top of the seat, kangaroo pocket, drawcords, the shell collar out the top in the panel colour | 47 × 35 / 50 × 35 | 7.9 / 7.3 / 7.3 | 0.875 / 0.86 |
+| `suit` | `retro-suit` | 90s one-piece: a fitted top bloused over the waist belt (1.02), the legs in the suit colour below | 46 × 34 / 44 × 31 | 7.1 / 6.6 / 6.5 | 0.93 / 0.93 |
+
+Below the waist (1.1) every jacket is widened where needed to clear the pants' trunk by `seatClear`
+(default 2.8 cm; anorak 3.2, hoodie 3.0, suit 2.2), so the hem always hangs over the hips.
 
 Pants (`PANT_FITS`):
 
-| fit | garment | look |
-|---|---|---|
-| `relaxed` | `tuff-bib` (default) | roomy, a round tube below the knee falling over the boot, three folds, hem at 0.11 |
-| `tapered` | `cargo-pant` | roomy thigh, narrowing to the boot, two folds, hem at 0.14 |
-| `baggy` | `wide-pant` (new) | wide straight tube, long inseam, four folds piling up over the boot, hem at 0.09 |
+| fit | garment | rise / crotch | seat: hip half width × front × back (cm) | leg r thigh / knee / hem (cm) | look |
+|---|---|---|---|---|---|
+| `relaxed` | `tuff-bib` (default) | 1.10 / 0.83 + bib to 1.36 front, 1.30 back | 23.6 × 14.8 × 18 | 12.8 / 11.6 / 11.2 | relaxed straight leg, three soft folds over the boot, hem at 0.11; a bib panel and straps |
+| `tapered` | `cargo-pant` | 1.08 / 0.835 | 23.2 × 14.6 × 17.6 | 12.4 / 10.4 / 9.4 | roomy seat and thigh, tapering to the boot, two folds, hem at 0.14 |
+| `baggy` | `wide-pant` | 1.08 / 0.80 | 24.6 × 15.6 × 18.8 | 13.8 / 13.2 / 13.0 | dropped crotch, wide straight leg, four folds where the long inseam stacks, hem at 0.09 |
 
-`round` (0–1) is how far the leg becomes a round tube instead of tracing the thigh and calf; it gets
-stronger below the knee.
+**How the pants are built** (garments.js, "pants"; clothing pass 3):
+1. **Trunk.** `pantsTrunk(cut)` is one superellipse per height around the body's mid-line: the waist at
+   `rise`, the hips at 0.93 (`seat.hip`), then the front curves in to the crotch and the seat rounds
+   under. Each leg ring above the crotch is its leg's half of it (a ray cast from the leg's centre to the
+   trunk edge, cut at 1.2 cm past the mid-line), so the two legs meet flush at the centre front and back
+   and read as one pair of pants with a seat, not two tubes.
+2. **Legs.** Below the crotch (blend 0.05 below to 0.07 above it) the ring is a round tube of the fit's
+   target radius (`leg.thigh` → `leg.knee` → `leg.hem`, a little deeper than wide at the bent knee). It is
+   never closer than 4 mm over the bind-pose leg (the body shader also pulls the pants zone in 2.7 cm),
+   and the legs never cross the mid-line. No flare: the hem radius is at most the knee radius; the boot
+   break is 2 to 4 soft rolls that fade toward the top of the stack.
+3. **Under the jacket.** Above the jacket's hem the pants stay 1.4 cm inside its rings, and the jacket
+   below the waist is widened to clear the trunk by `seatClear`, so in the bind pose nothing touches.
+4. **Skinning.** Above 1.0 the pants follow the pelvis only (`anchor`), blending to the transferred
+   weights by 0.9; at the back the thigh may only take 15 % down to the crotch (`weightLimit`, lower
+   under a long hem), so a crouch rounds the seat under the hem instead of swinging it out through the
+   jacket. The jacket's hem band is held on the pelvis the same way (`weightFloor`, 90 % below 0.98).
+   The body shader pulls the seat and hips (pants zone above 0.8) in as far as the jacket zone.
+5. **Bib** (`cut.bib`): a panel from just inside the pants up to `bib.front` (back cut lower, `bib.back`),
+   2.2 cm inside the jacket's own rings and skinned like it (24 smoothing passes, pelvis floor). Two
+   shoulder straps run from its top over the shoulders to the back panel; they are only drawn when
+   `uStraps` is 1 (the icon studio), since in the game they would sit under the jacket's close yoke.
+6. **Shader** (pant piece, `uHemY.w` = rise): a waistband seam and a slightly darker band, a slanted
+   hand pocket at the front of each hip, the outer seam, thigh vent zip, cargo pocket and knee darts as
+   before; the bib (side 0) has side seams with zips and a zipped chest pocket.
 
-Under the jacket the pant legs shrink to a slim lining (`covered()` in garments.js), so the seat never
-bulges through a jacket's back hem. Below the jacket hem, covered skin (the crotch between the legs)
-takes the pants colour (`uJHem` in bodyMaterial).
+Below the jacket hem + 12 cm, covered skin takes the pants colour (`uJHem` in bodyMaterial).
 
 **Parameters of a jacket fit** (`FITS[fit]`; a garment is `jacketCut(fit, overrides)`):
 
 | key | meaning |
 |---|---|
 | `hemFront`, `hemBack` | hem height at the centre front and back (back lower = drop tail) |
+| `seatClear` | how far the jacket below the waist must clear the pants' trunk (default 0.028) |
 | `hemFlare` | + flares the last 12 cm out; − pulls the hem in (rib or drawcord) with the fabric blousing above |
 | `torso.chest / waist / hem` | `[half width, front depth, back depth]` from the body's centre line at 1.38, 1.12 and the hem; `torso.n` = superellipse exponent (2 = round, 3 = boxy) |
 | `shoulder`, `shoulderY` | extra stand-off near the neck; height where the shoulder line starts rounding off to the neck (default 1.43) |
@@ -177,6 +204,38 @@ Gauntlets open just over the sleeve (`gauntlet[1]` = clearance).
 Shell hoods (`hood: 'down'`) are a collapsed helmet hood with volume. `hoodRoll = [thickness, height
 above the neckline, drop down the back]`, piled up behind the neck under the helmet and thinning toward
 the collar at the sides. The hoodie's hood is a softer, longer lobe lying down the back.
+## Clothing pass 3 (October 2026): hip-length jackets, real pants
+
+The user's review: most jackets ended almost at the knee, and the pants icons showed a skinny top over
+a wide bottom ("they don't even look like pants"). The jacket should end at the torso: regular shells at
+the hip bone / just below the belt line, the baggy new-school look a little longer (upper thigh, just
+covering the seat), never near the knee.
+
+**References.** Arc'teryx sells the Sabre / Sabre AR as hip length (CB ~79 cm in M, a slight drop hem);
+new-school brands (Beyond Medals, Planks, Dope, Volcom) go longer by cutting relaxed fits a few cm longer
+or by riders sizing up, but the hem still sits on the upper thigh, under the seat at most. Snow pant
+spec sheets (686 and others) measure rise, hip, thigh and leg opening: relaxed fits keep a full seat
+and hip, a roomy thigh and a leg opening close to the knee width (straight), with a short break over
+the boot; bibs add a chest panel and straps. On the game's body (bind pose: belt line ~1.05–1.1, hip
+joint 0.97, crotch ~0.84, knee 0.54) a real 79 cm back length would land below the crotch, which is
+exactly what read as "almost at the knees" in the chase cam's crouched stance, so the hems are set by
+eye to the body's landmarks instead of copied from the garment specs:
+
+| fit | before (F / B) | now (F / B) | lands at |
+|---|---|---|---|
+| shell | 0.83 / 0.80 | 0.935 / 0.915 | hip bone |
+| relaxed (default) | 0.765 / 0.725 | 0.905 / 0.88 | hip, a slight drop tail over the top of the seat |
+| puffer | 0.88 / 0.875 | 0.95 / 0.945 | hip, cinched |
+| hoodie | 0.71 / 0.69 | 0.875 / 0.86 | top of the thigh, rib bloused over the seat |
+| anorak | 0.68 / 0.65 | 0.855 / 0.835 | upper thigh, just covering the seat (the longest) |
+| suit | 0.84 / 0.84 | 0.93 / 0.93 | top bloused over the waist belt, legs in the suit colour |
+
+With more of the pants showing, last night's "slim lining under the jacket" (which made the pants' top
+skinny and was visible in every pants icon) is gone: the pants now have a waistband, seat and hips (§
+Pants above). Checked with turntables (front / 3/4 / side / back; stand, crouch, carve, air grab, reach,
+tuck) for every jacket fit and pants fit and the in-game sheets (carve, tuck, grab, first person, skis
+and snowboard): the hem overlaps the pants by 15–25 cm and no body shows in any of those poses.
+
 ## Files
 
 ```
@@ -301,7 +360,7 @@ helmet {base, liner, accent}, goggles {lens, lensBase, strap, strapLogo}, gloves
 | `arcade` | retro park: teal + magenta, cream pants, white helmet, violet lens, yellow mitts |
 | `summit` | pro team: brick red under a black yoke, white helmet, sapphire lens |
 
-**Jacket length** (history of the first shell; the October 2026 fits are in § Fits; with the slimmer
+**Jacket length**, clothing pass 3 (current): see § Clothing pass 3 below. Older history (of the first shell; the October 2026 fits are in § Fits; with the slimmer
 cut a longer hem no longer reads as a coat, so the relaxed shell went back to 0.785 / 0.76 and the anorak
 to 0.72 / 0.70). `hemFront` / `hemBack` are the hem's height above the ground in the bind pose
 (1.8 m rider: hip joint 0.97, crotch ≈ 0.86, knee 0.54). `hemBack` below `hemFront` drops the back (a
@@ -431,9 +490,11 @@ No new asset files: everything is generated in code, so CREDITS.md is unchanged.
   doesn't collide with the legs). The shorter hem makes this much smaller than it was, and it reads as the
   hem tucked behind the thighs. From the front, the back hem shows between the legs as a thin olive edge.
 - Modern fits:
-  - The long cuts (anorak 0.72, hoodie 0.75) ride up over the thighs in a deep crouch or grab, because
-    the shell doesn't collide with the legs. Seen from behind in a crouch, the seat rounds the back hem.
-  - The bib's top (chest panel, braces) is never modelled, since every jacket covers it.
+  - In an air grab the knees come up beside and in front of the jacket (the shell doesn't collide with
+    the legs); with the hip-length hems this now reads as the knees in front of the jacket.
+  - Bib straps are only drawn in the item icon (`uStraps`); in the game the jacket always covers them.
+  - Seen from behind in a deep crouch, a little of the background shows between the thighs under the
+    long anorak / hoodie hems (it is the gap between the legs, not a hole in the clothes).
   - The hoodie's hood is a soft lobe on the back, not a real hood opening.
   - The folds are static bind-pose geometry plus shader wrinkles; there is no cloth simulation.
   - The superhero back can still show faint muscle relief through the slim shell's upper back.

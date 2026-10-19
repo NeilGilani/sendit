@@ -13,6 +13,46 @@ export const PIECE = { jacket: 0, sleeve: 1, pants: 2, collar: 3, hood: 4, gaite
 const TAU = Math.PI * 2;
 
 /**
+ * The pants' trunk (waist, hips and seat, above the crotch) as one superellipse per height, centred on
+ * the body's mid-line: `cut.seat = { waist, hip }` = [half width, front depth, back depth] at the waist
+ * (cut.rise) and the hips (0.93). Each pant leg takes its half of it, so the two legs meet flush at the
+ * centre front and back and read as one pair of pants with a real seat. Returns { dims(t), inside(x, z, t) }.
+ */
+function pantsTrunk(cut) {
+  const S = cut.seat, rise = cut.rise ?? 1.08, crotch = cut.crotch ?? 0.84, yHip = 0.93, cz = -0.022, n = 2.3;
+  const dims = (t) => {
+    if (t >= rise) return S.waist;
+    if (t >= yHip) return S.waist.map((v, i) => S.hip[i] + (v - S.hip[i]) * smooth(yHip, rise, t));
+    // Below the hips the front curves in to the crotch and the seat rounds under.
+    const f = smooth(yHip, crotch - 0.04, t);
+    return [S.hip[0] * (1 - 0.05 * f), S.hip[1] * (1 - 0.22 * f), S.hip[2] * (1 - 0.18 * f)];
+  };
+  const inside = (x, z, t) => {
+    const [hw, dF, dB] = dims(t), dz = z - cz;
+    return Math.pow(Math.abs(x) / hw, n) + Math.pow(Math.abs(dz) / (dz > 0 ? dF : dB), n) <= 1;
+  };
+  return { dims, inside, rise, crotch, cz };
+}
+
+/** Distance from (ox, oz) along (dx, dz) to the edge of a convex region `inside(x, z)` (bisection). */
+function rayEdge(ox, oz, dx, dz, inside, rMax = 0.5) {
+  let a = 0, b = rMax;
+  for (let i = 0; i < 22; i++) {
+    const m = (a + b) / 2;
+    if (inside(ox + dx * m, oz + dz * m)) a = m; else b = m;
+  }
+  return a;
+}
+
+/** Radius of a ring (polar around c in x/z, θ = 0 toward +z) in the direction of world point (x, z). */
+function ringRadiusToward(ring, x, z) {
+  const S = ring.r.length;
+  const th = Math.atan2(x - ring.c.x, z - ring.c.z);
+  const f = ((((th / TAU) % 1) + 1) % 1) * S, k0 = Math.floor(f) % S, fx = f - Math.floor(f);
+  return ring.r[k0] * (1 - fx) + ring.r[(k0 + 1) % S] * fx;
+}
+
+/**
  * Build the outfit geometry. `cut` (from outfits.js) sets lengths and ease:
  *   { hemFront, hemBack, hemFlare, jacketEase, sleeveEase, pantsEase, cuffY, stack, gaiter, hood, mitts }
  */
@@ -129,6 +169,20 @@ export function buildOutfitGeometry(body, cut) {
             : fl * smooth(bot + 0.075, bot + 0.02, r.t) - fl * 0.45 * bump(r.t, bot + 0.12, 0.07);
           for (let k = 0; k < S; k++) r.r[k] = Math.max(r.r[k] + f, r.raw[k] + THREE.MathUtils.lerp(-0.02, MIN, smooth(0.98, 1.1, r.t)));
         }
+        // The pants' waist and seat sit inside the jacket's lower body: it always clears them by a few cm,
+        // so the full-rise pants never poke through the hem (the hem hangs over the hips, not on them).
+        if (cut.seat) {
+          const PT = pantsTrunk(cut), clear = cut.seatClear ?? 0.028;
+          for (const r of rings) {
+            if (r.t > PT.rise + 0.02) continue;
+            const fade = smooth(PT.rise + 0.02, PT.rise - 0.04, r.t);
+            for (let q = 0; q < S; q++) {
+              const th = (q / S) * TAU, dx = Math.sin(th), dz = Math.cos(th);
+              const e = rayEdge(r.c.x, r.c.z, dx, dz, (x, z) => PT.inside(x, z, Math.min(r.t, PT.rise)));
+              r.r[q] = Math.max(r.r[q], (e + clear) * fade + r.r[q] * (1 - fade));
+            }
+          }
+        }
       },
     });
     const S = segs;
@@ -176,6 +230,9 @@ export function buildOutfitGeometry(body, cut) {
       // Below the crotch the front of a long hem rides on the thighs: it lifts and bunches over them in a
       // crouch instead of staying behind while the legs come up through it.
       weightFloor: (b, x, y, z) => {
+        // The hem band over the hips rides on the pelvis, like the pants' waist and seat under it (with
+        // the spine's share it would swing forward off the seat in a crouch and let the pants show through).
+        if (b === 'pelvis') return 0.9 * smooth(1.1, 0.98, y);
         if (!b.startsWith('thigh')) return 0;
         const sgn = b.endsWith('_l') ? 1 : -1;
         return 0.8 * smooth(0.9, 0.8, y) * smooth(-0.04, 0.05, z) * smooth(0.0, 0.06, x * sgn);
@@ -239,61 +296,160 @@ export function buildOutfitGeometry(body, cut) {
       anchor: { bone: body.bone('clavicle_' + sd), axis: 0, abs: true, y0: 0.2, y1: 0.28 },
     }));
   }
-  // ---------------------------------------------------------------- pant legs
-  for (const s of [1, -1]) {
-    const segs = 36;
-    const sd = s > 0 ? 'l' : 'r';
-    const bones = B(new RegExp(`^(thigh_${sd}|calf_${sd}|foot_${sd}|ball_${sd}|pelvis)$`));
-    const t0 = 1.02, t1 = cut.cuffY;
-    const hemLow = Math.min(cut.hemFront, cut.hemBack);
-    const covered = (t) => smooth(hemLow - 0.01, hemLow + 0.08, t);
-    const knee = J['calf_' + sd].y;
-    const rings = bodyRings(body, {
-      axis: 'y', t0, t1, rings: 70, segs, half: 0.025, bones,
-      axisPoint: (t) => new THREE.Vector3(s * 0.114, t, -0.04),
-      filter: (x, y, z, b) => (b === 'pelvis' ? x * s > 0.015 : true) && (y > 0.14 || z < 0.0),
-      smoothA: 3, smoothT: 4, smoothC: 5, minEase: 0.015,
-      ease: (t) => {
-        let e = THREE.MathUtils.lerp(cut.pantsEase.thigh, cut.pantsEase.knee, smooth(0.8, knee, t));
-        e = THREE.MathUtils.lerp(e, cut.pantsEase.cuff, smooth(knee, 0.25, t));
-        return e;
-      },
-      post: (rings, S) => {
-        // Straight, wide leg: below the knee the leg never narrows (bootcut over the boot).
-        // Fabric, not a leg: below the knee the leg becomes a round tube (it hangs from the knee and falls
-        // over the boot instead of tracing the calf); the thigh rounds off a little too.
-        for (const r of rings) {
-          let m = 0; for (let k = 0; k < S; k++) m = Math.max(m, r.r[k]);
-          const f = (cut.round ?? 0.5) * (0.35 + 0.65 * smooth(knee + 0.15, knee - 0.05, r.t));
-          for (let k = 0; k < S; k++) r.r[k] = THREE.MathUtils.lerp(r.r[k], m, f);
+  // ---------------------------------------------------------------- pants
+  // Real snow pants from the waist down: each leg is half of the trunk (waist, hips and seat, one
+  // superellipse per height, pantsTrunk) above the crotch, blending into a relaxed leg tube below it
+  // (target radius per fit at the thigh / knee / hem, never closer than a little ease to the leg), and the
+  // two legs meet flush at the centre front and back. Under the jacket the pants stay inside its shell
+  // (the jacket is cut to clear them), and the top rolls over as a waistband.
+  {
+    const PT = pantsTrunk(cut), L = cut.leg;
+    for (const s of [1, -1]) {
+      const segs = 36;
+      const sd = s > 0 ? 'l' : 'r';
+      const bones = B(new RegExp(`^(thigh_${sd}|calf_${sd}|foot_${sd}|ball_${sd}|pelvis)$`));
+      const t0 = PT.rise, t1 = cut.cuffY;
+      const knee = J['calf_' + sd].y;
+      const hemLow = Math.min(cut.hemFront, cut.hemBack);
+      // Lowest point of the seat that stays with the pelvis: the crotch, or under a long hem a little below it.
+      const seatLo = Math.min(PT.crotch, hemLow - 0.05);
+      // Leg radius along the leg: thigh (just below the crotch) → knee → hem.
+      const legR = (t) => {
+        if (t >= knee) return THREE.MathUtils.lerp(L.knee, L.thigh, smooth(knee, PT.crotch - 0.06, t));
+        return THREE.MathUtils.lerp(L.hem, L.knee, smooth(cut.cuffY + 0.06, knee, t));
+      };
+      const rings = bodyRings(body, {
+        axis: 'y', t0, t1, rings: 74, segs, half: 0.025, bones,
+        axisPoint: (t) => new THREE.Vector3(s * 0.114, t, -0.04),
+        filter: (x, y, z, b) => (b === 'pelvis' ? x * s > 0.015 : true) && (y > 0.14 || z < 0.0),
+        smoothA: 3, smoothT: 4, smoothC: 6, minEase: -0.01,
+        ease: () => 0,
+        post: (rings, S) => {
+          for (const r of rings) {
+            const wT = smooth(PT.crotch - 0.05, PT.crotch + 0.07, r.t);
+            const R = legR(r.t);
+            // The bent knee: the leg is a little deeper than wide around the knee.
+            const deep = 1 + 0.07 * bump(r.t, knee, 0.16);
+            for (let k = 0; k < S; k++) {
+              const th = (k / S) * TAU, dx = Math.sin(th), dz = Math.cos(th);
+              const leg = R / Math.sqrt(dx * dx + (dz * dz) / (deep * deep));
+              let rr = leg;
+              if (wT > 0) {
+                const half = rayEdge(r.c.x, r.c.z, dx, dz, (x, z) => x * s > -0.012 && PT.inside(x, z, r.t));
+                rr = THREE.MathUtils.lerp(leg, half, wT);
+              }
+              // Ease over the (shrunk) body: the pants zone is pulled in ~2.7 cm in the body shader.
+              rr = Math.max(rr, r.raw[k] + (r.t > 1.0 ? -0.012 : 0.004));
+              // The legs never cross the centre line (they meet there, flush).
+              if (dx * s < -1e-3) rr = Math.min(rr, (-0.012 * s - r.c.x) / dx);
+              r.r[k] = rr;
+            }
+          }
+        },
+      });
+      for (const r of rings) {
+        const free = smooth(hemLow + 0.02, hemLow - 0.1, r.t);     // below the jacket: free-hanging fabric
+        for (let k = 0; k < segs; k++) {
+          const th = (k / segs) * TAU, u = k / segs;
+          const back = (1 - Math.cos(th)) / 2;
+          const inner = Math.max(0, -Math.sin(th) * s);
+          // Boot stack: a few soft rolls where the inseam breaks over the boot (not a flare).
+          const st = cut.stack;
+          const stackY = (r.t - st.y0) / (st.y1 - st.y0);
+          const roll = stackY > -0.1 && stackY < 1.1 ? Math.pow(Math.max(0, Math.sin(stackY * Math.PI * st.n + pnoise(u * 5, 7.3 + s, 5) * 0.9)), 1.5) * st.amp * (1 - 0.4 * smooth(0.3, 0.9, stackY)) : 0;
+          // Knee: compression folds behind the knee, softer ones in front.
+          const kf = Math.sin((r.t - knee) * TAU / 0.05 + pnoise(u * 4, 3.3 + s, 4) * 2) * bump(r.t, knee + 0.02, 0.1) * (0.003 + back * 0.011);
+          // Long drape folds down the thigh and shin (not on the inner face where the legs meet), a slight twist.
+          const drape = pnoise(u * 6 + r.t * 2.2 * s, r.t * 2, 6) * 0.008 + Math.sin(u * TAU * 5 + r.t * 9 * s + pnoise(u * 3, r.t * 4, 3) * 2) * 0.0035 * smooth(0.95, 0.75, r.t);
+          // Seat and crotch: a few soft folds radiating from the crotch at the back and front.
+          const crotchF = Math.sin(th * 4 * s + r.t * 30 + pnoise(u * 4, 5.5 + s, 4) * 1.6) * 0.003 * bump(r.t, PT.crotch + 0.01, 0.07) * inner;
+          r.r[k] += roll + kf + (drape * (1 - 0.7 * inner * smooth(PT.crotch - 0.1, PT.crotch, r.t)) + crotchF) * free;
+          // Pre-bent knee: the fabric hangs forward of the kneecap.
+          if (Math.cos(th) > 0) r.r[k] += Math.cos(th) * 0.01 * bump(r.t, knee, 0.12);
         }
-        if (cut.straight !== false) hang(rings, S, knee + 0.05, 0.04);
-        // Under the jacket the leg is a slim lining (the hidden seat and hips must not bulge through the
-        // jacket's back hem); it opens out to the full cut just above the hem.
-        for (const r of rings) {
-          const cov = covered(r.t);
-          for (let k = 0; k < S; k++) r.r[k] = THREE.MathUtils.lerp(r.r[k], Math.min(r.r[k], r.raw[k] - 0.016), cov);
+        // Under the jacket the pants stay inside its shell (a little room for the shell's folds).
+        if (r.t > hemLow - 0.05 && jacketRings) {
+          let jr = jacketRings[jacketRings.length - 1];
+          for (const q of jacketRings) if (Math.abs(q.t - r.t) < Math.abs(jr.t - r.t)) jr = q;
+          const under = smooth(hemLow - 0.05, hemLow + 0.02, r.t);
+          const inJ = (x, z) => Math.hypot(x - jr.c.x, z - jr.c.z) <= ringRadiusToward(jr, x, z) - 0.014;
+          for (let k = 0; k < segs; k++) {
+            const th = (k / segs) * TAU, dx = Math.sin(th), dz = Math.cos(th);
+            if (inJ(r.c.x + dx * r.r[k], r.c.z + dz * r.r[k])) continue;
+            const e = rayEdge(r.c.x, r.c.z, dx, dz, inJ, r.r[k]);
+            r.r[k] = THREE.MathUtils.lerp(r.r[k], e, under);
+          }
         }
-      },
-    });
-    for (const r of rings) {
-      for (let k = 0; k < segs; k++) {
-        const th = (k / segs) * TAU, u = k / segs;
-        const back = (1 - Math.cos(th)) / 2;
-        // Boot stack: soft stacked rolls where the long inseam piles up on the boot.
-        const st = cut.stack;
-        const stackY = (r.t - st.y0) / (st.y1 - st.y0);
-        const roll = stackY > -0.1 && stackY < 1.1 ? Math.pow(Math.max(0, Math.sin(stackY * Math.PI * st.n + pnoise(u * 5, 7.3 + s, 5) * 0.9)), 1.5) * st.amp : 0;
-        // Knee: compression folds behind the knee, softer ones in front.
-        const kf = Math.sin((r.t - knee) * TAU / 0.05 + pnoise(u * 4, 3.3 + s, 4) * 2) * bump(r.t, knee + 0.02, 0.1) * (0.003 + back * 0.011);
-        // Long drape folds down the thigh and shin, a slight twist.
-        const drape = pnoise(u * 6 + r.t * 2.2 * s, r.t * 2, 6) * 0.009 + Math.sin(u * TAU * 5 + r.t * 9 * s + pnoise(u * 3, r.t * 4, 3) * 2) * 0.004 * smooth(0.95, 0.75, r.t);
-        r.r[k] += roll + kf + drape * (1 - covered(r.t));
-        // Pre-bent knee: the fabric hangs forward of the kneecap.
-        if (Math.cos(th) > 0) r.r[k] += Math.cos(th) * 0.012 * bump(r.t, knee, 0.12);
+      }
+      pieces.push(sweep(rings, {
+        id: PIECE.pants, side: s, ...frame('y'), lipEnd: true, lipStart: true, gaiterEnd: true,
+        skinBones: B(new RegExp(`^(thigh_${sd}|calf_${sd}|foot_${sd}|pelvis)$`)),
+        // The waist and seat ride on the pelvis like the jacket over them; the hip blends into the thigh.
+        anchor: { bone: body.bone('pelvis'), y0: 1.0, y1: 0.9 },
+        // The seat stays with the pelvis down to the crotch (as the jacket's back hem over it does), so a
+        // crouch rounds it under the hem instead of swinging it out through the jacket with the thigh.
+        weightLimit: (b, x, y, z) => (b.startsWith('thigh') ? 1 - 0.85 * smooth(-0.03, -0.1, z) * smooth(seatLo - 0.02, seatLo + 0.08, y) : undefined),
+      }));
+    }
+    // Bib: the chest and back panel above the waist, just inside the jacket (it follows the jacket's own
+    // rings 2 cm in and is skinned like it), so it only shows when the jacket is off (the item icon) or
+    // rides up. The back panel is cut lower than the front.
+    if (cut.bib && jacketRings) {
+      const segs = jacketRings[0].r.length, top = cut.bib.front, n = 16;
+      const rings = [];
+      for (let i = 0; i < n; i++) {
+        const t = THREE.MathUtils.lerp(top, PT.rise - 0.06, i / (n - 1));
+        let jr = jacketRings[0];
+        for (const q of jacketRings) if (Math.abs(q.t - t) < Math.abs(jr.t - t)) jr = q;
+        const off = new Float32Array(segs);
+        for (let k = 0; k < segs; k++) {
+          const back = (1 - Math.cos((k / segs) * TAU)) / 2;
+          off[k] = (cut.bib.back - top) * smooth(0.25, 0.75, back) * smooth(top - 0.12, top, t);
+        }
+        rings.push({ t, c: new THREE.Vector3(jr.c.x, t, jr.c.z), r: jr.r.map((x) => Math.max(0.05, x - 0.022)), off });
+      }
+      pieces.push(sweep(rings, {
+        id: PIECE.pants, side: 0, ...frame('y'), lipStart: true,
+        skinBones: B(/^(pelvis|spine_0[123])$/),
+        weightFloor: (b, x, y) => (b === 'pelvis' ? 0.9 * smooth(1.1, 0.98, y) : 0),
+      }));
+      pieces[pieces.length - 1].smoothIters = 24;
+      // Shoulder straps (aG.w = 2): from the top of the bib over the shoulders to the back panel. They lie
+      // under the jacket's yoke, so the fabric shader only draws them when the jacket is off (the item
+      // icon, uStraps); in the game they would only risk poking through the close shoulders.
+      for (const sx of [1, -1]) {
+        const x0 = sx * 0.1, inset = 0.02;
+        const surf = (jr, dirZ) => {
+          const inJ = (x, z) => Math.hypot(x - jr.c.x, z - jr.c.z) <= ringRadiusToward(jr, x, z) - inset;
+          if (!inJ(x0, jr.c.z)) return null;
+          return jr.c.z + dirZ * rayEdge(x0, jr.c.z, 0, dirZ, inJ, 0.4);
+        };
+        const front = [], back = [];
+        for (const jr of jacketRings) {
+          if (jr.t >= top - 0.03) { const z = surf(jr, 1); if (z !== null) front.push(new THREE.Vector3(x0, jr.t, z)); }
+          if (jr.t >= cut.bib.back - 0.03) { const z = surf(jr, -1); if (z !== null) back.push(new THREE.Vector3(x0 * 0.9, jr.t, z)); }
+        }
+        if (front.length < 3 || back.length < 3) continue;
+        // front runs up (jacketRings go top → bottom), then over the shoulder and down the back
+        const path = [...front.reverse(), ...back];
+        const pts = [path[0]];
+        for (const p of path) if (p.distanceTo(pts[pts.length - 1]) > 0.012) pts.push(p);
+        const rings = [], seg = 12;
+        for (let i = 0; i < pts.length; i++) {
+          const T = pts[Math.min(pts.length - 1, i + 1)].clone().sub(pts[Math.max(0, i - 1)]).normalize();
+          const e2 = new THREE.Vector3(1, 0, 0);
+          const e1 = new THREE.Vector3().crossVectors(e2, T).normalize();
+          const r = new Float32Array(seg);
+          for (let k = 0; k < seg; k++) {
+            const th = (k / seg) * TAU, a = Math.cos(th), b = Math.sin(th);
+            r[k] = 1 / Math.sqrt((a * a) / (0.005 * 0.005) + (b * b) / (0.02 * 0.02));
+          }
+          rings.push({ c: pts[i], r, e1, e2 });
+        }
+        const p = sweepFrames(rings, { id: PIECE.pants, side: 2, capStart: true, capEnd: true, skinBones: B(/^(spine_0[23]|clavicle_[lr])$/) });
+        pieces.push(p);
       }
     }
-    pieces.push(sweep(rings, { id: PIECE.pants, side: s, ...frame('y'), lipEnd: true, gaiterEnd: true, skinBones: B(new RegExp(`^(thigh_${sd}|calf_${sd}|foot_${sd}|pelvis)$`)) }));
   }
 
   // ---------------------------------------------------------------- gaiter (pulled up under the goggle)

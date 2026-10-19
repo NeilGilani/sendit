@@ -229,16 +229,17 @@ const FABRIC_LIGHT = /* glsl */`
 /**
  * Fabric for the merged outfit geometry (garments.js). Attributes: aG = (piece, u, v, side), aLin.
  * Uniforms (THREE.Color): uJacket, uPanel, uAccent, uGaiter, uPants, uCuff, uMitt, uGauntlet; uStyle.
- * uHide (0/1) collapses the pieces worn around the face (first person).
+ * uHide (0/1) collapses the pieces worn around the face (first person); uStraps (0/1) shows the bib's straps.
  */
 export function fabricMaterial() {
   const U = {
     uJacket: { value: col('#5e5f45') }, uPanel: { value: col('#b9a27a') }, uAccent: { value: col('#ff5b14') },
     uGaiter: { value: col('#d9ceb5') }, uPants: { value: col('#3a3129') }, uCuff: { value: col('#231d18') },
     uMitt: { value: col('#9c6f45') }, uGauntlet: { value: col('#1c1c1b') }, uStyle: { value: 0 },
-    uHemY: { value: new THREE.Vector3(0.84, 0.15, 0.69) },    // jacket hem, pants cuff, sleeve end
+    uHemY: { value: new THREE.Vector4(0.84, 0.15, 0.69, 1.08) },    // jacket hem, pants cuff, sleeve end, pants waistband
     uFit: { value: new THREE.Vector4(0, 0.1, 0, 0) },          // jacket fit layout (outfits.js FITS style), quilt pitch
     uHide: { value: 0 },
+    uStraps: { value: 0 },   // 1 = draw the bib's shoulder straps (the item icon: no jacket over them)
     // Reward looks (applyLook): x = print, y = scale, z = finish; A / B = the print's colours.
     uJPat: { value: new THREE.Vector4(0, 1, 0, 0) }, uJPatA: { value: col('#222222') }, uJPatB: { value: col('#888888') },
     uPPat: { value: new THREE.Vector4(0, 1, 0, 0) }, uPPatA: { value: col('#222222') }, uPPatB: { value: col('#888888') },
@@ -247,11 +248,11 @@ export function fabricMaterial() {
   };
   const m = toonMaterial({
     name: 'riderFabric', rim: 0.25, uniforms: U,
-    vertPars: 'attribute vec4 aG; attribute float aLin; attribute float aCrease; varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj; uniform float uHide;',
-    vertPre: 'vG = aG; vLin = aLin; vCrease = aCrease; vObj = position;\n  if (uHide > 0.5 && ((aG.x > 2.5 && aG.x < 5.5) || aG.x > 7.5)) transformed *= 0.0;\n  if (uHide > 0.5 && (abs(aG.x - 1.0) < 0.5 || abs(aG.x - 7.0) < 0.5)) transformed.yz = mix(transformed.yz, vec2(1.45, -0.075), 0.25 * smoothstep(0.4, 0.6, abs(position.x)));',
+    vertPars: 'attribute vec4 aG; attribute float aLin; attribute float aCrease; varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj; uniform float uHide, uStraps;',
+    vertPre: 'vG = aG; vLin = aLin; vCrease = aCrease; vObj = position;\n  if (aG.w > 1.5 && uStraps < 0.5) transformed *= 0.0;\n  if (uHide > 0.5 && ((aG.x > 2.5 && aG.x < 5.5) || aG.x > 7.5)) transformed *= 0.0;\n  if (uHide > 0.5 && (abs(aG.x - 1.0) < 0.5 || abs(aG.x - 7.0) < 0.5)) transformed.yz = mix(transformed.yz, vec2(1.45, -0.075), 0.25 * smoothstep(0.4, 0.6, abs(position.x)));',
     fragPars: `${COMMON}
-varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj; uniform float uHide;
-uniform vec3 uJacket, uPanel, uAccent, uGaiter, uPants, uCuff, uMitt, uGauntlet; uniform float uStyle; uniform vec3 uHemY; uniform vec4 uFit;
+varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj; uniform float uHide, uStraps;
+uniform vec3 uJacket, uPanel, uAccent, uGaiter, uPants, uCuff, uMitt, uGauntlet; uniform float uStyle; uniform vec4 uHemY; uniform vec4 uFit;
 uniform vec4 uJPat, uPPat, uGPat, uMPat; uniform vec3 uJPatA, uJPatB, uPPatA, uPPatB, uGPatA, uGPatB, uMPatA;
 float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fabAO = 1.0, fabH = 0.0;
 float fabMetal = 0.0, fabRefl = 0.0, fabIri = 0.0;
@@ -445,8 +446,27 @@ ${PRINTS}`,
           } else {
             fabRough = 0.7; fabSpec = 0.34; fabSheen = 0.26;
           }
+        } else if (id < 2.5 && (abs(side) < 0.5 || side > 1.5)) {
+          if (side > 1.5 && uStraps < 0.5) discard;
+          // ---------------- bib (side 0): chest and back panel under the jacket, uc 0 = front
+          float x = uc * 1.3;
+          c = chPrint(uPPat.x, vec2(u, v), floor(6.0 * uPPat.y + 0.5), uPants, uPPatA, uPPatB, 0.6, ink);
+          seam += chLine(abs(abs(uc) - 0.25) * 1.3, 0.0018);                  // side seams
+          zip += chLine(abs(uc) * 1.3 - 0.25 * 1.3 + 0.012, 0.003) * step(uHemY.w, v);   // side zips
+          // chest pocket with a vertical zip
+          seam += chLine(chBox(vec2(x - 0.03, v - 1.24), vec2(0.075, 0.06), 0.012), 0.0018);
+          zip += chLine(x + 0.02, 0.003) * step(abs(v - 1.245), 0.05);
+          wr = 1.0; wf = vec2(10.0, 5.0);
         } else if (id < 2.5) {
           // ---------------- pant leg: uc 0 = front, outer side at uc = +0.25·side
+          // Waistband (plain pants; a bib carries on as its chest panel, so only a seam) and a slanted
+          // hand pocket at the front of the hip.
+          float wb = step(uHemY.w - 0.045, v);
+          seam += chLine(v - (uHemY.w - 0.045), 0.0018);
+          {
+            float hx = (uc - 0.11 * side) * 0.95;
+            seam += chLine(hx * side * 0.9 - (v - (uHemY.w - 0.17)) * 0.55, 0.0018) * step(uHemY.w - 0.2, v) * step(v, uHemY.w - 0.05) * step(abs(hx), 0.06);
+          }
           float a = uc * 0.95;
           float outer = (uc - 0.25 * side) * 0.95, inner = (uc + 0.25 * side) * 0.95;
           outer -= floor(outer / 0.95 + 0.5) * 0.95; inner -= floor(inner / 0.95 + 0.5) * 0.95;
@@ -454,6 +474,7 @@ ${PRINTS}`,
           float kick = (1.0 - step(0.07, abs(inner))) * step(v, uHemY.y + 0.14);
           vec3 pb = chPrint(uPPat.x, vec2(u, v), floor(6.0 * uPPat.y + 0.5), uPants, uPPatA, uPPatB, 0.6, ink);
           c = mix(pb, uCuff, max(cuffBand, kick));
+          c *= 1.0 - 0.07 * wb;
           seam += chLine(v - (uHemY.y + 0.075), 0.002);
           seam += chLine(chBox(vec2(inner, v - uHemY.y - 0.07), vec2(0.07, 0.07), 0.03), 0.0018) * (1.0 - cuffBand);
           // knee darts
@@ -590,7 +611,9 @@ export function bodyMaterial(src) {
     float hand = color.a * color.b / tot * smoothstep(0.66, 0.7, abs(position.x)) * step(1.25, position.y);
     transformed.yz = mix(transformed.yz, vec2(1.43, -0.05), hand * 0.55);
     transformed.x = mix(transformed.x, sign(transformed.x) * min(abs(transformed.x), 0.84), hand);   // fingers curl into the fist
-    float cover = color.a * (color.r / tot * 2.8 * (1.0 - arm) + color.g / tot * 1.25 + step(1.2, position.y) * color.b / tot * 0.8);
+    // The seat and hips (under the pants' trunk and the jacket's hem) pull in as far as the jacket zone:
+    // in a crouch the buttocks swing out with the thighs and must stay inside both shells.
+    float cover = color.a * (color.r / tot * 2.8 * (1.0 - arm) + color.g / tot * mix(1.25, 2.8, smoothstep(0.8, 0.9, position.y)) + step(1.2, position.y) * color.b / tot * 0.8);
     transformed -= objectNormal * uShrink * cover;
   }`,
     fragPars: `${COMMON}\nvarying vec4 vZone; varying vec3 vObj;\nuniform vec3 uJacket, uPants, uMitt, uBoot, uBootAccent; uniform float uJHem;\nfloat fabRough = 0.85, fabSheen = 0.1, fabSheenRough = 0.6, fabSpec = 0.2, fabAO = 1.0;`,

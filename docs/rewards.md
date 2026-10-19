@@ -371,6 +371,10 @@ into an off-screen target, so the game's real models and shaders make the pictur
   chrome, holographic, reflective, neon), panels and zips are the real shader. Only the slot's pieces of
   the outfit mesh are drawn (an index subset by piece id: jacket + sleeves + collar + hood, pant legs,
   mitts + gauntlets, gaiter), double-sided so openings show the lining; a one-piece also draws the legs.
+  Pants are shot from the waist down with the legs a few degrees apart (straight, like a product photo),
+  so the waistband, seat and crotch read; a bib also shows its chest panel and shoulder straps (the
+  straps are drawn only in the icon studio, `uStraps`: in the game they would sit under the jacket).
+  ICON_VERSION 4 (clothing pass 3: hip-length jackets, full-rise pants) re-bakes every clothing icon.
 - **Helmets and goggles** are drawn alone (goggles on a neutral dark helmet so the lens is the subject);
   **face pieces** sit on a slate head that fades out below the gaiter.
 - **Skis and boards** are `equipment/models.js` planks with their real topsheet (legendary gold leaf,

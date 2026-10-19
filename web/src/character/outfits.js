@@ -31,26 +31,26 @@
  *   style               shader layout of the fit: 0 shell, 1 anorak, 2 puffer, 3 hoodie, 4 one-piece
  */
 export const FITS = {
-  // Slim technical shell (Rush / lofoten class): close shoulders, follows the taper, hem over the seat.
+  // Slim technical shell (Rush / lofoten class): close shoulders, follows the taper, hem at the hip bone.
   shell: {
-    style: 0, hemFront: 0.83, hemBack: 0.8, hemFlare: 0.002,
+    style: 0, hemFront: 0.935, hemBack: 0.915, hemFlare: 0.002,
     torso: { chest: [0.222, 0.15, 0.158], waist: [0.218, 0.146, 0.158], hem: [0.226, 0.15, 0.164], n: 2.4 },
     shoulder: 0.004, sleeve: { upper: 0.068, elbow: 0.066, forearm: 0.063, cuff: 0.06 }, sleeveEnd: 0.69,
     collarTop: 1.628, collarEase: 0.016, hood: 'down', hoodRoll: [0.034, 0.05, 0.045], gaiter: true, gaiterTop: 1.69,
     folds: 0.75, quilt: null, kangaroo: 0,
   },
   // Relaxed freeride shell (Sabre class): roomy through chest, waist and hip but hanging straight from the
-  // chest and shoulder blades, close at the shoulders, a slight drop tail below the seat.
+  // chest and shoulder blades, close at the shoulders, hip length with a slight drop tail over the top of the seat.
   relaxed: {
-    style: 0, hemFront: 0.765, hemBack: 0.725, hemFlare: 0.0,
+    style: 0, hemFront: 0.905, hemBack: 0.88, hemFlare: 0.0,
     torso: { chest: [0.232, 0.158, 0.164], waist: [0.238, 0.16, 0.168], hem: [0.25, 0.168, 0.178], n: 2.4 },
     shoulder: 0.005, sleeve: { upper: 0.075, elbow: 0.074, forearm: 0.071, cuff: 0.066 }, sleeveEnd: 0.695,
     collarTop: 1.628, collarEase: 0.02, hood: 'down', hoodRoll: [0.044, 0.068, 0.065], gaiter: true, gaiterTop: 1.69,
     folds: 1, quilt: null, kangaroo: 0,
   },
-  // New-school anorak (relaxed anorak / long pullover class): long and loose, half zip, kangaroo pocket.
+  // New-school anorak (relaxed anorak class): the longest cut, just covering the seat, loose, half zip, kangaroo pocket.
   anorak: {
-    style: 1, hemFront: 0.68, hemBack: 0.65, hemFlare: 0.0,
+    style: 1, hemFront: 0.855, hemBack: 0.835, hemFlare: 0.0, seatClear: 0.032,
     torso: { chest: [0.236, 0.164, 0.168], waist: [0.246, 0.168, 0.174], hem: [0.262, 0.178, 0.188], n: 2.35 },
     shoulder: 0.006, sleeve: { upper: 0.079, elbow: 0.078, forearm: 0.075, cuff: 0.07 }, sleeveEnd: 0.7,
     collarTop: 1.628, collarEase: 0.02, hood: 'down', hoodRoll: [0.048, 0.072, 0.075], gaiter: true, gaiterTop: 1.69,
@@ -58,23 +58,23 @@ export const FITS = {
   },
   // Insulated puffer: the one cut that is meant to be round. Wide baffles, hem cinched at the hip.
   puffer: {
-    style: 2, hemFront: 0.88, hemBack: 0.875, hemFlare: -0.014,
+    style: 2, hemFront: 0.95, hemBack: 0.945, hemFlare: -0.014,
     torso: { chest: [0.25, 0.172, 0.174], waist: [0.248, 0.17, 0.174], hem: [0.238, 0.164, 0.17], n: 2.1 },
     shoulder: 0.012, sleeve: { upper: 0.079, elbow: 0.077, forearm: 0.073, cuff: 0.06 }, sleeveEnd: 0.69,
     collarTop: 1.632, collarEase: 0.028, hood: 'none', hoodRoll: null, gaiter: true, gaiterTop: 1.69,
     folds: 0.3, quilt: { pitch: 0.105, depth: 0.012 }, kangaroo: 0,
   },
-  // Tall hoodie worn over a shell: soft cotton, ribbed hem blousing at the hip, the shell's collar out the top.
+  // Hoodie worn over a shell: soft cotton, ribbed hem blousing over the top of the seat, the shell's collar out the top.
   hoodie: {
-    style: 3, hemFront: 0.71, hemBack: 0.69, hemFlare: -0.016,
+    style: 3, hemFront: 0.875, hemBack: 0.86, hemFlare: -0.016, seatClear: 0.03,
     torso: { chest: [0.236, 0.16, 0.164], waist: [0.246, 0.164, 0.17], hem: [0.244, 0.162, 0.17], n: 2.3 },
     shoulder: 0.006, sleeve: { upper: 0.077, elbow: 0.076, forearm: 0.073, cuff: 0.062 }, sleeveEnd: 0.695,
     collarTop: 1.622, collarEase: 0.016, hood: 'hoodie', hoodRoll: null, gaiter: true, gaiterTop: 1.69,
     folds: 1.3, quilt: null, kangaroo: 0.01,
   },
-  // 90s one-piece: fitted top over the hem belt (the pants take the suit's colours).
+  // 90s one-piece: a fitted top bloused over the waist belt, the legs below it (the pants take the suit's colours).
   suit: {
-    style: 4, hemFront: 0.84, hemBack: 0.84, hemFlare: 0.0,
+    style: 4, hemFront: 0.93, hemBack: 0.93, hemFlare: 0.0, seatClear: 0.022,
     torso: { chest: [0.23, 0.152, 0.162], waist: [0.22, 0.146, 0.158], hem: [0.226, 0.149, 0.162], n: 2.4 },
     shoulder: 0.004, sleeve: { upper: 0.07, elbow: 0.068, forearm: 0.065, cuff: 0.06 }, sleeveEnd: 0.69,
     collarTop: 1.628, collarEase: 0.018, hood: 'down', hoodRoll: [0.03, 0.045, 0.04], gaiter: true, gaiterTop: 1.69,
@@ -90,17 +90,23 @@ export function jacketCut(fit, over = {}) {
 }
 
 /**
- * Pant fits. pantsEase = stand-off from the leg at the thigh / knee / cuff, straight = the leg never
- * narrows below the knee (wide, straight leg) instead of tapering, cuffY = hem height over the boot,
- * stack = stacked folds above the boot { y0, y1, n, amp }.
+ * Pant fits (docs/character.md, "Pants"). Real snow pants from the waist down (the jackets end at the
+ * hip, so the seat and the top of the thighs show):
+ *   rise     height of the waistband (the trunk runs from here down to the crotch)
+ *   crotch   crotch height (lower = a dropped crotch, the baggy look)
+ *   seat     the trunk's superellipse { waist, hip } = [half width, front depth, back depth] at the waist
+ *            (rise) and the hips (0.93) around the body's mid-line; each leg is its half of it
+ *   leg      target leg radius { thigh, knee, hem } (never closer than a little ease to the leg)
+ *   cuffY    hem height over the boot; stack = stacked folds above the boot { y0, y1, n, amp }
+ *   bib      a bib's chest piece under the jacket: { front, back } top heights (null = plain pants)
  */
 export const PANT_FITS = {
-  // Relaxed bib: roomy, straight below the knee, two or three folds over the boot.
-  relaxed: { pantsEase: { thigh: 0.034, knee: 0.044, cuff: 0.058 }, straight: true, round: 0.6, cuffY: 0.11, stack: { y0: 0.13, y1: 0.34, n: 3, amp: 0.018 } },
-  // Relaxed tapered pant: roomy thigh, narrowing to the boot.
-  tapered: { pantsEase: { thigh: 0.032, knee: 0.034, cuff: 0.044 }, straight: false, round: 0.45, cuffY: 0.14, stack: { y0: 0.15, y1: 0.3, n: 2, amp: 0.013 } },
-  // Wide new-school pant: wide straight leg, long inseam piling up over the boot.
-  baggy: { pantsEase: { thigh: 0.046, knee: 0.056, cuff: 0.07 }, straight: true, round: 0.75, cuffY: 0.09, stack: { y0: 0.1, y1: 0.37, n: 4, amp: 0.022 } },
+  // Relaxed bib: roomy seat and thigh, straight leg, a gentle break over the boot.
+  relaxed: { rise: 1.1, bib: { front: 1.36, back: 1.3 }, crotch: 0.83, seat: { waist: [0.2, 0.15, 0.152], hip: [0.236, 0.148, 0.18] }, leg: { thigh: 0.128, knee: 0.116, hem: 0.112 }, cuffY: 0.11, stack: { y0: 0.12, y1: 0.3, n: 3, amp: 0.014 } },
+  // Relaxed tapered pant: roomy seat and thigh, narrowing to the boot.
+  tapered: { rise: 1.08, crotch: 0.835, seat: { waist: [0.198, 0.148, 0.15], hip: [0.232, 0.146, 0.176] }, leg: { thigh: 0.124, knee: 0.104, hem: 0.094 }, cuffY: 0.14, stack: { y0: 0.15, y1: 0.28, n: 2, amp: 0.011 } },
+  // Wide new-school pant: dropped crotch, wide straight leg, a long inseam stacking over the boot.
+  baggy: { rise: 1.08, crotch: 0.8, seat: { waist: [0.204, 0.152, 0.155], hip: [0.246, 0.156, 0.188] }, leg: { thigh: 0.138, knee: 0.132, hem: 0.13 }, cuffY: 0.09, stack: { y0: 0.1, y1: 0.33, n: 4, amp: 0.016 } },
 };
 
 /** Garment shapes, per slot. Lengths are metres in the rider's bind pose (1.8 m tall, feet at 0). */
@@ -108,7 +114,7 @@ export const GARMENTS = {
   jacket: {
     'tuff-shell': {
       name: 'Tuff Shell',
-      blurb: 'Relaxed 3-layer freeride shell: hangs straight from the chest, drop tail below the seat, stowed hood.',
+      blurb: 'Relaxed 3-layer freeride shell: hangs straight from the chest, hip length with a slight drop tail, stowed hood.',
       cut: jacketCut('relaxed'),
     },
     'storm-shell': {
@@ -122,11 +128,11 @@ export const GARMENTS = {
       cut: jacketCut('suit'),
     },
     'ridge-shell': {
-      name: 'Ridge Shell', blurb: 'Slim technical hardshell: close at the shoulders, articulated sleeves, hem over the seat.',
+      name: 'Ridge Shell', blurb: 'Slim technical hardshell: close at the shoulders, articulated sleeves, hip length.',
       cut: jacketCut('shell'),
     },
     'tall-anorak': {
-      name: 'Tall Anorak', blurb: 'Long new-school pullover: half zip, kangaroo pocket, cut loose to mid-thigh.',
+      name: 'Tall Anorak', blurb: 'Baggy new-school pullover: half zip, kangaroo pocket, cut loose to just cover the seat.',
       cut: jacketCut('anorak'),
     },
     'cloud-puffer': {
