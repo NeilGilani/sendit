@@ -25,7 +25,7 @@ function part(geo, c, pos, rot = [0, 0, 0]) {
 
 // Background people wear simplified versions of the real outfits: whole colourways from the
 // character catalog (character/outfits.js), so the mountain looks like the same game as your rider.
-const KITS = Object.values(COLORWAYS).filter((c) => c.jacket && c.pants && c.helmet && c.goggles && c.gloves);
+const KITS = Object.entries(COLORWAYS).filter(([id]) => id !== 'basic').map(([, c]) => c).filter((c) => c.jacket && c.pants && c.helmet && c.goggles && c.gloves);
 const TOPSHEETS = ['#e9e4d8', '#1d1e22', '#ff5b14', '#2f7be0', '#c8392b', '#3a4a3a', '#f2c230'];
 const _q = new THREE.Quaternion(), _up = new THREE.Vector3(0, 1, 0), _d = new THREE.Vector3();
 
@@ -75,6 +75,15 @@ function head(K, h, face = [0, 0, -1]) {
   return parts;
 }
 
+/** A rounded ski / snowboard boot at (x, z) on the snow, toe pointing along `fwd`. */
+function boot(K, x, z, fwd) {
+  const [fx, , fz] = fwd;
+  return [
+    limb([x - fx * 0.09, 0.075, z - fz * 0.09], [x + fx * 0.1, 0.07, z + fz * 0.1], 0.06, K.boot),
+    limb([x - fx * 0.03, 0.08, z - fz * 0.03], [x - fx * 0.01, 0.22, z - fz * 0.01], 0.068, K.boot),
+  ];
+}
+
 function kitColors(jacket, pants, helmet, skis, kit) {
   const K = kit ? hexes(Object.fromEntries(Object.entries(kit).map(([k, v]) => [k, typeof v === 'object' ? hexes(v) : v]))) : null;
   const J = rgb(jacket), P = rgb(pants), H = rgb(helmet);
@@ -84,7 +93,7 @@ function kitColors(jacket, pants, helmet, skis, kit) {
     helmet: K?.helmet ?? { base: H },
     goggles: K?.goggles ?? { lens: [0.15, 0.85, 0.8], strap: [0.05, 0.05, 0.09] },
     gloves: K?.gloves ?? { base: [0.08, 0.08, 0.1] },
-    skis: rgb(skis), skin: [0.86, 0.66, 0.54], boot: [0.07, 0.07, 0.09], pole: [0.12, 0.12, 0.14],
+    skis: rgb(skis), skin: [0.86, 0.66, 0.54], boot: [0.11, 0.11, 0.13], pole: [0.12, 0.12, 0.14],
   };
 }
 
@@ -98,7 +107,7 @@ export function skierGeometry(jacket, pants, helmet, skis, kit = null) {
   const parts = [];
   for (const sx of [-1, 1]) {
     parts.push(...plank(sx * 0.12, 0.085, 1.68, K.skis));
-    parts.push(part(new THREE.BoxGeometry(0.11, 0.17, 0.3), K.boot, [sx * 0.12, 0.12, 0.0]));
+    parts.push(...boot(K, sx * 0.12, 0, [0, 0, -1]));
     parts.push(limb([sx * 0.12, 0.2, -0.02], [sx * 0.13, 0.5, -0.17], 0.068, K.pants.base));    // shin (pants over the boot)
     parts.push(limb([sx * 0.13, 0.5, -0.17], [sx * 0.11, 0.84, 0.03], 0.082, K.pants.base));    // thigh
     parts.push(limb([sx * 0.2, 1.3, -0.1], [sx * 0.27, 1.1, -0.27], 0.058, J.base));            // upper arm
@@ -123,7 +132,7 @@ export function boarderGeometry(kit, board) {
   for (const sz of [-1, 1]) {
     const fz = sz * 0.25;
     parts.push(part(new THREE.BoxGeometry(0.28, 0.06, 0.15), K.boot, [0.0, 0.06, fz], [0, 0, 0]));   // binding
-    parts.push(part(new THREE.BoxGeometry(0.12, 0.17, 0.3), K.boot, [0.02, 0.13, fz], [0, Math.PI / 2 - sz * 0.25, 0]));
+    parts.push(...boot(K, 0.02, fz, [Math.cos(sz * 0.25), 0, Math.sin(sz * 0.25)]));
     parts.push(limb([0.03, 0.2, fz], [0.17, 0.5, fz * 0.9], 0.07, K.pants.base));
     parts.push(limb([0.17, 0.5, fz * 0.9], [0.0, 0.84, fz * 0.5], 0.085, K.pants.base));
     parts.push(limb([0.02, 1.3, sz * 0.18], [0.12, 1.08, sz * 0.32], 0.058, J.base));
@@ -150,7 +159,7 @@ function seatedGeometry(kit, skis) {
   for (const sx of [-1, 1]) {
     parts.push(limb([sx * 0.11, 0.05, 0.0], [sx * 0.11, 0.05, -0.38], 0.08, K.pants.base));
     parts.push(limb([sx * 0.11, 0.05, -0.38], [sx * 0.11, -0.36, -0.45], 0.068, K.pants.base));
-    parts.push(part(new THREE.BoxGeometry(0.11, 0.17, 0.3), K.boot, [sx * 0.11, -0.44, -0.52]));
+    parts.push(...boot(K, sx * 0.11, -0.5, [0, 0, -1]).map((g) => g.translate(0, -0.58, 0)));
     parts.push(...plank(sx * 0.12, 0.085, 1.6, K.skis).map((g) => { g.rotateX(0.25); g.translate(0, -0.5, -0.55); return g; }));
     parts.push(limb([sx * 0.2, 0.42, 0.04], [sx * 0.24, 0.2, -0.1], 0.058, J.base));
     parts.push(limb([sx * 0.24, 0.2, -0.1], [sx * 0.16, 0.14, -0.3], 0.052, J.panel));

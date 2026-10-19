@@ -4,9 +4,13 @@
 import { on, game, Mode } from '../state.js';
 import { progression } from './index.js';
 
+/** Screens / cards a level-up celebration waits for (and hides under while they are up). */
+const LV_BLOCKERS = '.screen.modal:not(.hidden), #pause:not(.hidden), #flowHud .rs.on, #parkHud .card.on';
+
 const CSS = /* css */`
 #lvlUp { position: fixed; inset: 0; z-index: 40; pointer-events: none; display: grid; place-items: center; opacity: 0; }
 #lvlUp.show { animation: luIn 3.2s ease-out forwards; }
+body:has(#pause:not(.hidden)) #lvlUp, body:has(#flowHud .rs.on) #lvlUp, body:has(#parkHud .card.on) #lvlUp { visibility: hidden; }   /* a card opened mid-celebration */
 #lvlUp.yield .box, #lvlUp.yield .ring { opacity: .18; transition: opacity .15s; }   /* a trick announcement takes the stage */
 #lvlUp .ring { position: absolute; left: 50%; top: 32%; width: 140px; height: 140px; margin: -70px 0 0 -70px; border-radius: 50%; border: 6px solid var(--rc, #ffe14d); opacity: 0; }
 #lvlUp.show .ring { animation: luRing 1.1s cubic-bezier(.1,.8,.3,1) forwards; }
@@ -81,7 +85,9 @@ export function mountProgressionUi({ juice }) {
     if (!queue.length) { playing = false; return; }
     playing = true;
     // A results / settings card is up: wait until it closes (the card shows the level-up row itself).
-    if (document.querySelector('.screen.modal:not(.hidden)')) { setTimeout(play, 300); return; }
+    // Same for the pause menu and the end-of-run cards (freeride judging, park judging): the
+    // celebration over them was unreadable (QA 2026-10-19: Kitsune finish, pause after a level-up).
+    if (document.querySelector(LV_BLOCKERS)) { setTimeout(play, 300); return; }
     // Let a trick announcement (or the air it comes from) finish first, up to 4 s.
     if (juice?.hud?.busy?.() && waited < 4000) { waited += 250; setTimeout(play, 250); return; }
     waited = 0;

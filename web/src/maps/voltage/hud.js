@@ -46,6 +46,16 @@ const CSS = /* css */`
 #parkHud .card .bar i { display: block; height: 100%; background: linear-gradient(90deg, #2ff5d6, #ff3d9a); }
 #parkHud .card .tot { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; }
 #parkHud .card .tot b { font-family: "Arial Black", Impact, sans-serif; font-style: italic; font-size: 44px; color: #ffe14d; }
+/* Phones (portrait): compact judged card low on the screen, under the achievement toasts. */
+@media (max-width: 600px) {
+  #parkHud .card { top: auto; bottom: 108px; transform: translate(-50%, 0) scale(.96); min-width: 0; width: calc(100vw - 32px); box-sizing: border-box; padding: 14px 18px 12px; }
+  #parkHud .card.on { transform: translate(-50%, 0) scale(1); }
+  #parkHud .card .row { font-size: 12.5px; padding: 0; }
+  #parkHud .card .bar { margin: 1px 0 3px; }
+  #parkHud .card .sub { margin-bottom: 6px; }
+  #parkHud .card .tot { margin-top: 6px; }
+  #parkHud .card .tot b { font-size: 36px; }
+}
 `;
 
 const DROPS = [['plunge', 'DROPPING IN · THE PLUNGE'], ['launch', 'DROPPING IN · THE LAUNCH'], ['mega', 'MEGAWATT · SEND IT']];

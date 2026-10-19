@@ -48,6 +48,19 @@ body.fp #flowHud .fm { bottom: 46px; }
 #flowHud .rs .tot { display: flex; align-items: baseline; justify-content: space-between; margin-top: 10px; }
 #flowHud .rs .tot b { font-family: "Arial Black", Impact, sans-serif; font-style: italic; font-size: 46px; color: #ffe14d; line-height: 1; }
 #flowHud .rs .tot span { font-size: 13px; letter-spacing: 0.18em; color: rgba(250,248,243,0.7); }
+/* Phones (portrait): the flow meter moves to the top-left corner (it sat under the big speed read-out),
+   and the end-of-run card goes compact and low so the achievement toasts above it stay readable. */
+@media (max-width: 600px) {
+  #flowHud .fm, body.fp #flowHud .fm { left: 16px; top: 22px; bottom: auto; width: min(150px, 34vw); }
+  #flowHud .fm .lab { font-size: 11px; margin-bottom: 4px; }
+  #flowHud .fm .bar { height: 8px; }
+  #flowHud .fm .send { top: 100%; bottom: auto; font-size: 30px; }
+  #flowHud .rs { top: auto; bottom: 108px; transform: translate(-50%, 0) scale(.96); min-width: 0; width: calc(100vw - 32px); box-sizing: border-box; padding: 14px 18px 12px; }
+  #flowHud .rs.on { transform: translate(-50%, 0) scale(1); }
+  #flowHud .rs .row { font-size: 12.5px; padding: 1px 0; }
+  #flowHud .rs .sub { margin-bottom: 6px; }
+  #flowHud .rs .tot b { font-size: 36px; }
+}
 `;
 
 const GRADES = { stomped: ['STOMPED', '#ffe14d'], clean: ['CLEAN', '#2ff5d6'], sketchy: ['SKETCHY', '#ff6bb0'] };
