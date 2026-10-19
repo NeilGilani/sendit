@@ -249,6 +249,12 @@ export class RagdollController {
 
   /** Time for the respawn fade? (player.crashStep asks once the ragdoll ran) */
   doneAt(crashT) {
+    const d = this._doneAt(crashT);
+    if (d && this.m && this.m.fadeAt === undefined) this.m.fadeAt = +crashT.toFixed(3);
+    return d;
+  }
+
+  _doneAt(crashT) {
     const C = this.C;
     if ((crashT > PHYSICS.tumbleTime && this.restT > C.restHold) || crashT > C.maxTumble || this.H?.world.failed) return true;
     // Still going after the tumble: on a steep face (a body keeps sliding there) or once it has slid far enough,

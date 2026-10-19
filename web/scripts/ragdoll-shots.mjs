@@ -178,6 +178,31 @@ for (const name of names) {
         dist: +cam.position.distanceTo(pv).toFixed(2), jump: +jump.toFixed(3), ms: +(s.ragdoll?.stats.lastMs || 0).toFixed(3), active: !!s.ragdoll?.active, sleep: !!s.ragdoll?.H?.world.asleep(0) };
     };
     window.__vt.hook = () => { if (window.__rec && s.game.mode === 1) window.__log.push(window.__info()); };
+    // Ghost marks: every track stamp is checked against what really touches the snow there — a crash stamp needs a
+    // ragdoll sample within 5 cm of the snow within 0.5 m of it, a riding stamp a grounded player on the snow; no
+    // stamp on a raised mesh (kicker, roof, deck: getHeight above baseHeight).
+    window.__ghost = { stamps: 0, crash: 0, bad: 0, worst: 0, at: [] };
+    const sp = new V();
+    s.fx.track.onStamp = (key, p) => {
+      const g = window.__ghost, T = s.terrain;
+      g.stamps++;
+      let gap = 0;
+      if (key.startsWith('rd:')) {
+        g.crash++;
+        const W = s.ragdoll?.H?.world;
+        gap = Infinity;
+        if (W) for (const b of W.bodies) for (const smp of b.samples) {
+          b.point(smp.p, sp);
+          if (Math.hypot(sp.x - p.x, sp.z - p.z) > 0.5) continue;
+          gap = Math.min(gap, sp.y - smp.r - T.getHeight(sp.x, sp.z));
+        }
+      } else {
+        const pl = s.player;
+        gap = pl.state !== 1 ? Infinity : Math.abs(pl.position.y - T.getHeight(pl.position.x, pl.position.z));
+      }
+      if (T.getHeight(p.x, p.z) - T.baseHeight(p.x, p.z) > 0.02) gap = Math.max(gap, 9);
+      if (gap > 0.05) { g.bad++; g.worst = Math.max(g.worst, Math.min(gap, 99)); if (g.at.length < 5) g.at.push(key + '@' + gap.toFixed(2)); }
+    };
     window.__snap = (tag) => {
       window.__shots.push({ tag, info: window.__info() }); s.game.mode = 2;
       // CLOSE=1: a close side view of the body (the inspect camera) for the crash frames.
@@ -230,6 +255,9 @@ for (const name of names) {
     asleepAt: (() => { const i = act.findIndex((o) => o.sleep); return i < 0 ? null : +(i / 60).toFixed(2); })(),
   };
   m.seed = await page.evaluate(() => window.__sendit.ragdoll?.stats.seed);
+  // Flappiness (limb spin relative to the trunk), the slide (centre of mass travel) and the fade of this crash.
+  m.flap = await page.evaluate(() => { const q = window.__sendit.ragdoll?.m; return q ? { peak: +q.peak.toFixed(1), mean: +q.mean.toFixed(2), swings: q.swings, dist: +q.dist.toFixed(1), fadeAt: q.fadeAt ?? null } : null; });
+  m.ghost = await page.evaluate(() => window.__ghost);
   console.log(`${equip} ${view} ${name.padEnd(9)} ${JSON.stringify(m)}`);
   sheets.push({ name, frames, m });
   await page.close();

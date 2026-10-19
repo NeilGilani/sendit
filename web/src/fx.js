@@ -150,9 +150,9 @@ export class FXManager {
 
   /**
    * Is world point p on snow that tracks and spray belong to: within `tol` m of the terrain's height there, and
-   * that height is the drawn snow (not a roof, a deck, a box or a pipe: terrain.trackable, when the map says which
-   * raised surfaces are structures). Tracks are carved into the terrain mesh from above, so a stamp under a rider
-   * on a roof or a rail would show on the snow below.
+   * that height is the terrain mesh's snow (not a kicker, a roof, a deck, a Voltage Park feature, the seabed).
+   * Tracks are carved into the terrain mesh from above by x / z only, so a stamp made on a roof, a deck or a kicker
+   * would show on the snow beside / below it.
    */
   onSnow(p, tol = 0.05) {
     const T = this.player.terrain;
