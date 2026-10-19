@@ -316,6 +316,8 @@ export class FXManager {
         for (const sk of [-1, 1]) {
           // (each ski on its own: one can hang over a kicker's edge while the other is still on it)
           at.copy(pl.renderPos).addScaledVector(side, sk * (FX.skiSpacing * 0.5 + wedge * 0.1));
+          const gn = pl.groundNormal || UP;
+          at.y -= ((at.x - pl.renderPos.x) * gn.x + (at.z - pl.renderPos.z) * gn.z) / Math.max(0.3, gn.y);   // (on the slope's plane)
           if (this.onSnow(at, tol)) T.stamp(sk < 0 ? 'L' : 'R', at, h + sk * wedge * 0.28, FX.trackWidth + wedge * 0.12 + (pl.skid || 0) * 0.15, depth);
         }
       }
