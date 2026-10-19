@@ -55,7 +55,7 @@ body.fp #flowHud .fm { bottom: 46px; }
   #flowHud .fm .lab { font-size: 11px; margin-bottom: 4px; }
   #flowHud .fm .bar { height: 8px; }
   #flowHud .fm .send { top: 100%; bottom: auto; font-size: 30px; }
-  #flowHud .rs { top: auto; bottom: 108px; transform: translate(-50%, 0) scale(.96); min-width: 0; width: calc(100vw - 32px); box-sizing: border-box; padding: 14px 18px 12px; }
+  #flowHud .rs { top: auto; bottom: 172px; transform: translate(-50%, 0) scale(.96); min-width: 0; width: calc(100vw - 32px); box-sizing: border-box; padding: 14px 18px 12px; }
   #flowHud .rs.on { transform: translate(-50%, 0) scale(1); }
   #flowHud .rs .row { font-size: 12.5px; padding: 1px 0; }
   #flowHud .rs .sub { margin-bottom: 6px; }

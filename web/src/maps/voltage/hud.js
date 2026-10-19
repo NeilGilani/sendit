@@ -48,7 +48,7 @@ const CSS = /* css */`
 #parkHud .card .tot b { font-family: "Arial Black", Impact, sans-serif; font-style: italic; font-size: 44px; color: #ffe14d; }
 /* Phones (portrait): compact judged card low on the screen, under the achievement toasts. */
 @media (max-width: 600px) {
-  #parkHud .card { top: auto; bottom: 108px; transform: translate(-50%, 0) scale(.96); min-width: 0; width: calc(100vw - 32px); box-sizing: border-box; padding: 14px 18px 12px; }
+  #parkHud .card { top: auto; bottom: 172px; transform: translate(-50%, 0) scale(.96); min-width: 0; width: calc(100vw - 32px); box-sizing: border-box; padding: 14px 18px 12px; }
   #parkHud .card.on { transform: translate(-50%, 0) scale(1); }
   #parkHud .card .row { font-size: 12.5px; padding: 0; }
   #parkHud .card .bar { margin: 1px 0 3px; }
