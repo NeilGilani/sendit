@@ -384,6 +384,12 @@ export class Rider {
     if (board) this.placeBoard(gearRoll);
     else this.placeSkis(gearRoll, pl, dt);
     this.pose(pl);
+    // Tweak only as far as the arm reaches: while a grabbing hand falls short the tweak eases back, and
+    // it comes back once the hand holds the gear (next frame's placeBoard / placeSkis).
+    if (p.grab > 0.5 && (p.tweak || 0) > 0.05) {
+      const f = this.tweakFit ?? 1;
+      this.tweakFit = this.reachMiss > 0.02 ? Math.max(0.25, f - dt * 1.2) : this.reachMiss < 0.008 ? Math.min(1, f + dt * 0.4) : f;
+    } else this.tweakFit = 1;
     if (p.sit > 0.01) this.gearToFeet(p.sit);
     this.placePoles(pl);
     this.root.updateMatrixWorld(true);
@@ -446,7 +452,7 @@ export class Rider {
     // In the air with a grab, cross the skis a little (Japan / mute flavour).
     if (p.grab > 0.01) { L.rotation.y += p.grab * 0.25; R.rotation.y -= p.grab * 0.1; }
     // Tweaked: skis crossed hard (Japan / Mute / Safety), tips pulled up (Truck driver) or tails (Tail grab).
-    const tw = p.tweak || 0;
+    const tw = (p.tweak || 0) * (this.tweakFit ?? 1);
     if (tw > 0.01) {
       const gn = pl.grabName || '';
       if (gn === 'Truck driver') { L.rotation.x += tw * 0.45; R.rotation.x += tw * 0.45; }
@@ -471,7 +477,7 @@ export class Rider {
     // Roll about the edge that's in the snow, pitch about the end that's pressed.
     const hw = spec.waist * 0.5;
     const roll = -gearRoll;
-    const tw = p.tweak || 0, tsg = /Melon/.test(this.player.grabName || '') ? -1 : 1;   // (the grabbed end swings toward the hand)
+    const tw = (p.tweak || 0) * (this.tweakFit ?? 1), tsg = /Melon/.test(this.player.grabName || '') ? -1 : 1;   // (the grabbed end swings toward the hand)
     B.rotation.set(p.pitch + tw * 0.22, tw * 0.5 * tsg, roll + tw * 0.38 * tsg, 'ZXY');
     B.position.set(0, lift + Math.abs(Math.sin(roll)) * hw + Math.abs(Math.sin(p.pitch)) * spec.length * 0.38, 0);
   }
@@ -741,6 +747,14 @@ export class Rider {
     return new THREE.Vector3(side * (row.hw + GRAB_OUT + 0.3 * away), row.top + GRAB_UP + 0.3 * away, z).applyMatrix4(this.gf.M[i]);
   }
 
+  /** The station along plank i (part-local z within range zr) nearest to arm `side`'s shoulder. */
+  nearestStation(i, side, zr) {
+    const B = this.bones, s = side > 0 ? '_l' : '_r';
+    this.inherit(B['clavicle' + s]); this.inherit(B['upperarm' + s]);
+    const z = _v3.setFromMatrixPosition(this.g(B['upperarm' + s])).applyMatrix4(this.gf.Minv[i]).z;
+    return THREE.MathUtils.clamp(z, zr[0], zr[1]);
+  }
+
   /** Fingers of a grabbing hand (armature space): straight down past plank i's edge on `side` (the mitt hugs the sidewall). */
   grabFingers(i, side) {
     const up = this.gf.up[i], out = new THREE.Vector3(side, 0, 0).transformDirection(this.gf.M[i]);
@@ -822,9 +836,9 @@ export class Rider {
       if (d >= 0.002) { this.lift.addScaledVector(this._clearDir, d + 0.002); again = true; }
       const airy = p.air > 0.3 && !(p.grind > 0.1);
       // A grab that can't reach: the gear comes to the hand (only while nothing clips: the hips win).
-      if (airy && d < 0.002 && it < 5 && this.board) {
+      if (airy && d < 0.002 && it < 5) {
         for (const n of this.grabNeed) {
-          if (n.miss < 0.004 || moved[n.part] > ANIM.grabGearReach) continue;
+          if (n.miss < 0.004 || moved[n.part] > ANIM.grabGearReach || n.skiHold) continue;
           const step = Math.min(n.miss + 0.004, ANIM.grabGearReach - moved[n.part]) * p.air;
           _v2.copy(n.dir).transformDirection(this.gf.Mva);
           // (skis come up together — the legs tuck as a pair — and never sideways into the other leg)
@@ -1138,11 +1152,14 @@ export class Rider {
     if (g > 0.01) {
       const ski = name === 'Mute' ? 0 : side > 0 ? 0 : 1;            // armature +X (left) = ski 0
       const out = ski === 0 ? -1 : 1;                                  // ski-local X away from the other ski
-      const z = name === 'Tail grab' ? 0.5 : name === 'Truck driver' ? -0.5 : name === 'Japan' ? -0.42 : -0.3;
+      const zr = name === 'Tail grab' ? [0.35, 0.6] : name === 'Truck driver' ? [-0.62, -0.4] : name === 'Japan' ? [-0.5, -0.32] : [-0.42, -0.26];
+      const z = this.nearestStation(ski, side, zr);
       const edge = name === 'Mute' ? -out : out;                        // Mute: the inside edge (across)
       grabIK = this.armReach(side, this.grabPoint(ski, z, edge, 1 - g), V(side, 0.4, name === 'Tail grab' ? -0.5 : 0.1));
       grabIK.push(this.grabFingers(ski, edge));
-      if (this.lastReach.miss > 0 && this.grabNeed) this.grabNeed.push({ part: ski, miss: this.lastReach.miss * g, dir: this.lastReach.dir });
+      // (only a Tail grab brings the skis back to the hand: the others reach, and skis pulled into the
+      // folded legs bunch the jacket hem between the knees)
+      if (this.lastReach.miss > 0 && this.grabNeed) this.grabNeed.push({ part: ski, miss: this.lastReach.miss * g, dir: this.lastReach.dir, skiHold: name !== 'Tail grab' });
     }
     // Double-pole push: reach forward and up, then plant and drive the hands back past the hips.
     const ph = p.pushPhase || 0, reachF = ph < 0.4 ? ph / 0.4 : 1 - (ph - 0.4) / 0.6;
@@ -1219,8 +1236,10 @@ export class Rider {
       // The hand closes round the board's edge (two-bone IK to the real board, wherever the tweak put it):
       // Indy = toe edge between the feet, Melon = heel edge, Nose / Tail = the toe edge near that end.
       const spec = this.equip.spec, toe = this.equip.stance === 'goofy' ? -1 : 1, sb = spec.setback || 0;
-      const z = name === 'Nose grab' ? -spec.length * 0.36 - sb : name === 'Tail grab' ? spec.length * 0.36 - sb : name === 'Melon' ? -0.12 : 0.05;
-      const target = this.grabPoint(0, z, name === 'Melon' ? -toe : toe, 1 - p.grab);
+      // The stretch of edge each grab may take (board-local z), the hand closing on its nearest point.
+      const L = spec.length;
+      const zr = name === 'Nose grab' ? [-L * 0.44 - sb, -L * 0.3 - sb] : name === 'Tail grab' ? [L * 0.3 - sb, L * 0.44 - sb] : name === 'Melon' ? [-0.2, 0.05] : [-0.1, 0.2];
+      const target = this.grabPoint(0, this.nearestStation(0, side, zr), name === 'Melon' ? -toe : toe, 1 - p.grab);
       const [uI, lI] = this.armReach(side, target, V(side, 0.5, name === 'Melon' ? -0.6 : 0.2));
       if (this.lastReach.miss > 0 && this.grabNeed) this.grabNeed.push({ part: 0, miss: this.lastReach.miss * p.grab, dir: this.lastReach.dir });
       const w = THREE.MathUtils.smoothstep(p.grab, 0, 0.35);
