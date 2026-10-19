@@ -28,6 +28,10 @@ export const SEED_BONES = ['pelvis', 'spine_01', 'spine_02', 'spine_03', 'neck_0
  */
 export function buildHumanoid(seed, env, C) {
   const world = new World(env, { ...C, wallPen: C.wallPen ?? 0.25 });
+  // Snow under the crash: hardpack (0) … deep powder (1): the jacket grips more and the body digs in further.
+  const pw = Math.min(1, Math.max(0, seed.powder || 0));
+  const muBody = C.muSnow + (C.muPowder || 0) * pw, muSBody = C.muStaticSnow + (C.muPowder || 0) * pw;
+  const ploughBody = C.plough * (1 + (C.ploughPowder || 0) * pw);
   const B = seed.bones, R = seed.rest, M = C.mass, RA = C.radius;
   const P = (n) => B[n].p;
   const parts = {};
@@ -41,7 +45,7 @@ export function buildHumanoid(seed, env, C) {
     const main = shapes[0];
     const L = main.kind === 'c' ? main.a.distanceTo(main.b) : 0;
     const b = new Body({ name, mass, inertia: opts.inertia || capsuleInertia(mass, main.r, L), x: com, q: Qb, group: opts.group || 0,
-      mu: opts.mu ?? C.muSnow, muS: opts.muS ?? C.muStaticSnow, plough: opts.plough ?? C.plough, ploughSpin: opts.ploughSpin ?? C.ploughSpin, e: C.restitution });
+      mu: opts.mu ?? muBody, muS: opts.muS ?? muSBody, plough: opts.plough ?? ploughBody, ploughSpin: opts.ploughSpin ?? C.ploughSpin, e: C.restitution });
     const inv = conj(Qb);
     const loc = (p) => p.clone().sub(com).applyQuaternion(inv);
     for (const s of shapes) {
@@ -116,7 +120,10 @@ export function buildHumanoid(seed, env, C) {
       const inv = conj(shin.q);
       const sh = { kind: 'c', a: tip.clone().sub(shin.x).applyQuaternion(inv), b: tail.clone().sub(shin.x).applyQuaternion(inv), r: 0.024 };
       shin.shapes.push(sh);
-      for (let k = 0; k < 5; k++) shin.samples.push({ p: sh.a.clone().lerp(sh.b, k / 4), r: 0.024 });
+      // (the ski's base slides: it grips less than the jacket, so a crash with the skis on carries further)
+      // Along the ski only: across it the edge bites like the body does (and holds it on a slope at rest).
+      const axis = sh.b.clone().sub(sh.a).normalize();
+      for (let k = 0; k < 5; k++) shin.samples.push({ p: sh.a.clone().lerp(sh.b, k / 4), r: 0.024, mu: muBody, muS: muSBody, muAlong: C.muSkiOn ?? muBody, axis, gear: 'ski' + i });
       // … with its mass and its long lever in the boot body's inertia (a light shin swinging a 1.7 m ski
       // would be whipped round by every touch of the tip).
       const d2 = sh.a.clone().lerp(sh.b, 0.5).lengthSq(), Iadd = M.ski * (L * L / 12 + d2);
@@ -238,7 +245,7 @@ export function buildHumanoid(seed, env, C) {
     const want = new THREE.Vector3(T.shoulder[0] * side, T.shoulder[1], T.shoulder[2]).normalize();
     sh.tuck = conj(chest.restQ).multiply(new THREE.Quaternion().setFromUnitVectors(d, want)).multiply(sh.b1.restQ);
   }
-  for (const j of Object.values(joints)) { j.qT = (j.tuck || j.qRest).clone(); j.k = 0; }
+  for (const j of Object.values(joints)) { j.qT = (j.tuck || j.qRest).clone(); j.k = 0; j.maxErr = C.toneMaxErr?.[j.kind] ?? 0; }
 
   // ---- self-collision: limbs can't pass through the trunk or each other
   const main = (n) => [parts[n], parts[n].shapes[0]];
@@ -357,8 +364,10 @@ export function depenetrate(H, env, maxLift = 0.8, maxPush = 1.2, maxLiftGear = 
  * Muscle tone for this moment: strong at first, relaxing to C.toneEnd (× rest: 0 once the body lies still, so no
  * muscle keeps nudging a limb against the snow or a trunk); while bracing the arms reach toward `braceDir` (world).
  */
-export function updateTone(H, t, dt, braceDir, C, rest = 1) {
-  const relax = (C.toneEnd + (1 - C.toneEnd) * Math.exp(-t / C.toneTau)) * rest;
+export function updateTone(H, t, dt, braceDir, C, rest = 1, hold = 0) {
+  // Protective tone holds while the body is still moving (hold: 0..1 from its speed) and only fades with time
+  // once it slows down; `rest` takes it to limp when the body lies still.
+  const relax = (C.toneEnd + (1 - C.toneEnd) * Math.max(Math.exp(-t / C.toneTau), hold)) * rest;
   const bracing = !!braceDir;
   for (const j of Object.values(H.joints)) {
     const arm = j.kind === 'shoulder' || j.kind === 'elbow';

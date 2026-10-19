@@ -177,6 +177,7 @@ export class World {
     this.impact = 0;         // largest approach speed into the snow / an obstacle since last read (group 0)
     this.impactAt = new THREE.Vector3();
     this.handTouch = false;  // a hand touched something (bracing ends)
+    this.snow = new Map();   // key → { b, gear, p (sum), n, imp }: snow contacts since the last snowContacts() read
     this.stats = { substeps: 0 };
   }
 
@@ -212,6 +213,18 @@ export class World {
       b.touch = 0; b.touchN.set(0, 0, 0);
     }
     this.nc = 0;
+    // A hinge the crash found outside its range (an animated elbow / knee) is let back in gently: its range was
+    // widened to the starting angle and closes at limitEase rad/s (snapping it in one sub-step whips the limb).
+    if (this.easing) {
+      let any = false;
+      const r = (C.limitEase ?? 2) * h;
+      for (const j of this.joints) {
+        if (j.min0 === undefined) continue;
+        if (j.min < j.min0) { j.min = Math.min(j.min0, j.min + r); any = true; }
+        if (j.max > j.max0) { j.max = Math.max(j.max0, j.max - r); any = true; }
+      }
+      this.easing = any;
+    }
     // --- positions: joints (anchors, limits, drives), self-collision, then the world (priority)
     for (const j of this.joints) if (!j.b1.G.asleep) this.solveJoint(j, h);
     this.np = 0;
@@ -240,11 +253,15 @@ export class World {
     // --- velocity pass: friction, restitution, snow drag, joint damping
     for (let i = 0; i < this.nc; i++) this.contactVel(this.contacts[i], h);
     for (let i = 0; i < this.np; i++) this.pairVel(this.pc[i]);
+    const digDecay = Math.exp(-(C.digDecay ?? 0) * h);
     for (const b of this.bodies) {
-      if (!b.touch || b.G.asleep) continue;
+      if (b.G.asleep) continue;
+      b.dig = (b.dig || 0) * digDecay;
+      if (!b.touch) continue;
       const n = _n.copy(b.touchN).normalize();
       const vn = b.v.dot(n);
-      const k = Math.min(1, b.plough * h);
+      // Snow drag while touching: ploughing, plus the hole a hard hit dug (b.dig, from the approach speeds).
+      const k = Math.min(1, (b.plough + (C.ploughDig || 0) * Math.min(b.dig, C.digMax ?? 1e9)) * h);
       b.v.addScaledVector(_a.copy(b.v).addScaledVector(n, -vn), -k);
       b.w.multiplyScalar(Math.max(0, 1 - b.ploughSpin * h));
     }
@@ -394,6 +411,9 @@ export class World {
     if (j.k > 0 && j.qT && !noDrive) {
       _q.copy(b0.q).multiply(j.qT).multiply(_q2.set(-b1.q.x, -b1.q.y, -b1.q.z, b1.q.w));
       rotVec(_q, _d);
+      // Muscles have a strength limit: far from the target the pull saturates (no whip-crack snap into the tuck).
+      const e = _d.length();
+      if (j.maxErr && e > j.maxErr) _d.multiplyScalar(j.maxErr / e);
       this.rot(b0, b1, _d, 1 / j.k, h);
     }
   }
@@ -401,6 +421,21 @@ export class World {
   /** Relative spin damping (velocity pass). */
   dampJoint(j, h) {
     const b0 = j.b0, b1 = j.b1;
+    // The child's swing is in its centre's velocity too (a pendulum about the joint): damp its velocity relative to
+    // where the parent's rigid motion would carry it, as an equal and opposite impulse at the joint.
+    if (this.C.swingDamping) {
+      b0.offset(j.r0, _r0);
+      _p0.addVectors(b0.x, _r0);                       // the joint
+      _r1.subVectors(_p0, b1.x);                       // child centre → joint
+      _a.subVectors(b1.x, b0.x);
+      const vr = _b.crossVectors(b0.w, _a).add(b0.v).sub(b1.v);   // parent-rigid velocity − child velocity (at the child's centre)
+      const k = Math.min(1, j.damp * h);
+      if (vr.lengthSq() > 1e-10) {
+        const p = _c.copy(vr).multiplyScalar(k / (b1.invM + b0.invM));
+        b1.v.addScaledVector(p, b1.invM);
+        b0.impulse(_d.subVectors(b1.x, b0.x), p.negate());
+      }
+    }
     _d.subVectors(b1.w, b0.w);
     const s = _d.length();
     if (s < 1e-6) return;
@@ -480,7 +515,7 @@ export class World {
             // Back where it came from: whatever is still under the snow there is an ordinary contact.
             b.point(s.p, _p0);
             const H2 = env.height(_p0.x, _p0.z), pen2 = r - (_p0.y - H2) * s.ny;
-            if (pen2 > 0 && pen2 <= C.wallPen) this.contact(b, _p0, _n.set(s.nx, s.ny, s.nz), r, pen2, b.mu, b.muS, b.e, h, s);
+            if (pen2 > 0 && pen2 <= C.wallPen) this.contact(b, _p0, _n.set(s.nx, s.ny, s.nz), r, pen2, s.mu ?? b.mu, s.muS ?? b.muS, b.e, h, s);
             continue;
           }
           // Already deep (started underground): ease out without gaining speed.
@@ -488,7 +523,7 @@ export class World {
           b.x.y += lift; b.xp.y += lift;
           continue;
         }
-        this.contact(b, _p0, _n.set(s.nx, s.ny, s.nz), r, pen, b.mu, b.muS, b.e, h, s);
+        this.contact(b, _p0, _n.set(s.nx, s.ny, s.nz), r, pen, s.mu ?? b.mu, s.muS ?? b.muS, b.e, h, s);
       }
       // Obstacles: trunks / posts are vertical cylinders from the snow to their top; rocks are domes (a sphere of
       // the rock's radius whose top is the rock's top: smooth, no corner for a limb to rattle on).
@@ -539,13 +574,26 @@ export class World {
       return;
     }
     b.touch++; b.touchN.add(nn);
+    if (smp) {
+      // Snow contacts since the controller last read them (snow marks / spray only where something touches):
+      // one entry per body (or per strapped-on ski), averaged contact point, hardest approach speed.
+      const key = smp.gear || b.name;
+      let e2 = this.snow.get(key);
+      if (!e2) this.snow.set(key, e2 = { key, b, gear: smp.gear || null, p: new THREE.Vector3(), n: 0, imp: 0 });
+      if (e2.n === 0) { e2.p.set(0, 0, 0); e2.imp = 0; }
+      e2.p.add(_c.copy(p).addScaledVector(nn, -r));
+      e2.n++;
+      if (-vn > e2.imp) e2.imp = -vn;
+    }
     if (this.nc < 256) {
       const c = this.contacts[this.nc] ||= { r: new THREE.Vector3(), n: new THREE.Vector3() };
       this.nc++;
       c.b = b; c.r.copy(loc).applyQuaternion(b.q); c.n.copy(nn); c.lam = lam; c.vn = vn; c.mu = mu; c.e = e;
+      c.ax = smp?.axis || null; c.muA = smp?.muAlong ?? mu; c.muS = smp ? muS : mu;
       if (smp) { smp.cTick = this.ticks; smp.cRec = c; }
     }
     if (b.group === 0 && -vn > this.impact) { this.impact = -vn; this.impactAt.copy(p); }
+    if (smp && -vn > (b.dig || 0)) b.dig = -vn;
     if (b.isHand) this.handTouch = true;
   }
 
@@ -562,7 +610,15 @@ export class World {
     // impactGrip m/s into the snow: the snow gives way, the body doesn't stop dead on its first hit.
     if (vtl > 1e-9) {
       const wt = b.wPos(c.r, _d.copy(vt).divideScalar(vtl));
-      dv.addScaledVector(vt, -Math.min(c.mu * Math.min(Math.abs(c.lam) * wt / h, this.C.impactGrip ?? 1e9), vtl) / vtl);
+      // Slow slides grip more (the body settles into the snow): μ rises toward the static μ under slowGrip m/s.
+      const sg = this.C.slowGrip || 0;
+      let mu = sg > 0 && vtl < sg ? c.muS + (c.mu - c.muS) * (vtl / sg) * (2 - vtl / sg) : c.mu;
+      if (c.ax) {
+        // A ski base: slides along its length (muA), its edge bites across it (mu).
+        const ca = _e.copy(c.ax).applyQuaternion(b.q).dot(_d), c2 = ca * ca;
+        mu = c.muA * c2 + mu * (1 - c2);
+      }
+      dv.addScaledVector(vt, -Math.min(mu * Math.min(Math.abs(c.lam) * wt / h, this.C.impactGrip ?? 1e9), vtl) / vtl);
     }
     const target = c.vn < -2 * this.g * h ? Math.max(-c.e * c.vn, 0) : 0;
     dv.addScaledVector(c.n, target - vn);
@@ -601,6 +657,23 @@ export class World {
     }
     return s;
   }
+  /** Hinge angle (rad) as the limits see it. */
+  hingeAngle(j) {
+    const a0 = _a.copy(j.hP).applyQuaternion(j.b0.q);
+    const r0 = _b.copy(j.refP).applyQuaternion(j.b0.q), r1 = _c.copy(j.refC).applyQuaternion(j.b1.q);
+    return Math.atan2(_d.crossVectors(r0, r1).dot(a0), r0.dot(r1));
+  }
+  /** Widen every hinge's range to include its starting angle (it closes again at C.limitEase rad/s). */
+  easeLimits() {
+    for (const j of this.joints) {
+      if (j.type !== 'hinge') continue;
+      const phi = this.hingeAngle(j);
+      j.min0 = j.min; j.max0 = j.max;
+      if (phi < j.min) { j.min = phi; this.easing = true; }
+      if (phi > j.max) { j.max = phi; this.easing = true; }
+    }
+  }
+
   /** Largest joint-limit violation (rad). */
   limitViolation() {
     let worst = 0;

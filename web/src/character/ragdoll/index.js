@@ -19,6 +19,9 @@ const CRASH = 3;
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4();
 const TRACK = ['pelvis', 'spine_03', 'thigh_l', 'thigh_r', 'Head'];
+// Limb → the trunk body its flapping is measured against (measure()).
+const FLAP = [['upperarmL', 'chest'], ['upperarmR', 'chest'], ['forearmL', 'chest'], ['forearmR', 'chest'], ['head', 'chest'],
+  ['thighL', 'pelvis'], ['thighR', 'pelvis'], ['shinL', 'pelvis'], ['shinR', 'pelvis']];
 
 /** Terrain / obstacle / rail adapter the solver talks to. */
 export function makeEnv(terrain, scatter, course) {
@@ -184,14 +187,86 @@ export class RagdollController {
     }
     W.impact = 0;
     this.restT = W.asleep(0) ? this.restT + dt : 0;
+    this.measure(dt);
     const ms = typeof performance !== 'undefined' ? performance.now() - t0 : 0;
     this.stats.lastMs = ms; this.stats.maxMs = Math.max(this.stats.maxMs, ms); this.stats.sumMs = (this.stats.sumMs || 0) + ms; this.stats.steps = (this.stats.steps || 0) + 1;
     return true;
   }
 
+  /**
+   * Crash metrics (tests: ragdoll-fuzz / ragdoll-shots): how much the limbs flap relative to the trunk (arms and
+   * head against the chest, legs against the pelvis: peak and mean rad/s over the first 2.5 s awake, and the number
+   * of big swings: a limb's relative spin rising past 8 rad/s after it had dropped under 4), and how far the
+   * centre of mass travels (horizontal, from the crash) — `m.dist` — plus where it was at the fade (`m.fadeDist`).
+   */
+  measure(dt) {
+    const H = this.H, P = H.parts, m = this.m;
+    const com = H.world.com(0, _a);
+    if (!m.c0) m.c0 = com.clone();
+    m.dist = Math.hypot(com.x - m.c0.x, com.z - m.c0.z);
+    if (H.world.asleep(0) || this.t > 2.5) return;
+    let sum = 0;
+    for (let i = 0; i < FLAP.length; i++) {
+      const [limb, trunk] = FLAP[i];
+      const w = _b.subVectors(P[limb].w, P[trunk].w).length();
+      sum += w;
+      if (w > m.peak) m.peak = w;
+      if (m.armed[i] && w > 8) { m.swings++; m.armed[i] = false; } else if (w < 4) m.armed[i] = true;
+    }
+    m.sum += sum / FLAP.length * dt; m.T += dt;
+    m.mean = m.sum / m.T;
+  }
+
+  /**
+   * Where the crashed body (and its gear) touched the snow since the last call (fx.js: snow marks and spray only
+   * at real contacts, nothing under a body in the air). Fills `out` with
+   *   { key, part: 'chest' | 'pelvis' | 'head' | 'thigh' | 'shin' | 'upperarm' | 'forearm' | 'ski' | 'board' | 'pole',
+   *     p (contact point on the snow), v (that body's velocity), speed, imp (hardest approach speed, m/s), heading,
+   *     axis (body axis, world), hits (sub-step contacts) }
+   * and returns it. Entries are pooled (copy what you keep).
+   */
+  snowContacts(out = []) {
+    out.length = 0;
+    if (!this.H) return out;
+    const W = this.H.world, pool = this._snowPool || (this._snowPool = new Map());
+    for (const e of W.snow.values()) {
+      if (e.n === 0) continue;
+      let c = pool.get(e.key);
+      if (!c) pool.set(e.key, c = { key: e.key, part: '', p: new THREE.Vector3(), v: new THREE.Vector3(), axis: new THREE.Vector3(), speed: 0, imp: 0, heading: 0, hits: 0 });
+      const b = e.b;
+      c.part = e.gear ? 'ski' : b.name.replace(/[LR]$/, '').replace(/\d+$/, '');
+      c.p.copy(e.p).divideScalar(e.n);
+      c.v.copy(b.v); c.speed = b.v.length(); c.imp = e.imp; c.hits = e.n;
+      // Axis: a strapped-on ski along its length, a body along its capsule.
+      if (e.gear) { const s = b.samples.find((q) => q.gear === e.gear); c.axis.copy(s.axis).applyQuaternion(b.q); }
+      else c.axis.set(0, 1, 0).applyQuaternion(b.q);
+      c.heading = Math.atan2(-c.axis.x, -c.axis.z);
+      e.n = 0;
+      out.push(c);
+    }
+    return out;
+  }
+
   /** Time for the respawn fade? (player.crashStep asks once the ragdoll ran) */
   doneAt(crashT) {
-    return (crashT > PHYSICS.tumbleTime && this.restT > this.C.restHold) || crashT > this.C.maxTumble || this.H?.world.failed;
+    const d = this._doneAt(crashT);
+    if (d && this.m && this.m.fadeAt === undefined) this.m.fadeAt = +crashT.toFixed(3);
+    return d;
+  }
+
+  _doneAt(crashT) {
+    const C = this.C;
+    if ((crashT > PHYSICS.tumbleTime && this.restT > C.restHold) || crashT > C.maxTumble || this.H?.world.failed) return true;
+    // Still going after the tumble: on a steep face (a body keeps sliding there) or once it has slid far enough,
+    // the fade starts instead of showing a long slide.
+    if (crashT > C.slideFadeTime && this.H) {
+      if (this.m.dist > C.slideFadeDist) return true;
+      if (this.player.speed > C.steepFadeSpeed) {
+        const n = this.player.groundNormal;
+        if (n && n.y < Math.cos(C.steepFadeDeg * Math.PI / 180)) return true;
+      }
+    }
+    return false;
   }
 
   /** Before every sub-step: obstacles nearby, bracing, muscle tone (all on the sub-step clock). */
@@ -200,8 +275,10 @@ export class RagdollController {
     if (W.ticks % 12 === 0) this.env.refresh(W.bodies[0].x, 4);
     // Bracing: the hands reach toward the snow the body is falling onto until one lands (or braceTime).
     let brace = null;
+    const sp = W.comVel(0, _a).length(), hs = C.toneHoldSpeed || 0;
+    const hold = hs > 0 ? Math.min(1, Math.max(0, (sp - hs * 0.25) / (hs * 0.75))) : 0;
     if (W.t < C.braceTime && !W.handTouch) {
-      W.comVel(0, _a).setY(0);
+      _a.setY(0);
       brace = _b.copy(_a.lengthSq() > 1 ? _a.normalize() : this.fallDir).multiplyScalar(0.75).add(_c.set(0, -1, 0)).normalize();
     }
     // Lying still: the muscles let go (a resting limb pushed by its tone against snow or bark would jitter).
@@ -210,7 +287,7 @@ export class RagdollController {
     _c.set(0, 1, 0).applyQuaternion(H.parts.chest.q);
     const upright = W.t > C.uprightAfter && _c.y > 0.75 && H.parts.chest.x.y - H.parts.pelvis.x.y > 0.15;
     this.rest = W.settling || upright ? this.rest * Math.exp(-6 * W.h) : Math.min(1, this.rest + W.h);
-    updateTone(H, W.t, W.h, brace, C, this.rest);
+    updateTone(H, W.t, W.h, brace, C, this.rest, hold * hold * (3 - 2 * hold));
   }
 
   begin(pl) {
@@ -226,11 +303,13 @@ export class RagdollController {
     if (!mot) mot = { v: pl.velocity.clone(), w: new THREE.Vector3() };
     if (this.kind === 'rail' && reason === 'balance') mot.v.copy(pl.velocity);
     const sp = mot.v.length();
+    seed.powder = pl.powder || 0;
     seed.eject = seed.type === 'ski' && (sp > C.ejectSpeed || /tree|rock|tower|post|wall|fence/.test(this.kind || ''));
     this.env.obstacles.length = 0;
     this.env.refresh(seed.bones.pelvis.p, 4);
     const H = buildHumanoid(seed, this.env, C);
     const shift = depenetrate(H, this.env);
+    H.world.easeLimits();
     const com = H.world.com(0, new THREE.Vector3());
     const groundN = this.env.normal(com.x, com.z, new THREE.Vector3());
     const p0 = seed.bones.pelvis.p;
@@ -242,6 +321,7 @@ export class RagdollController {
     this.fallDir.normalize();
     this.H = H; this.seed = seed; this.shift = shift;
     this.t = 0; this.restT = 0; this.rest = 1; this.active = true;
+    this.m = { peak: 0, mean: 0, sum: 0, T: 0, swings: 0, armed: FLAP.map(() => true), dist: 0, c0: null };
     this.E0 = H.world.energy(0);
     H.world.budget = this.E0;
     this.stats.crashes++;

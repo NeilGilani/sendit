@@ -263,6 +263,48 @@ highest spawns. The loading screen's stills use their own terrain (`src/loading/
 changed later, re-run `node web/scripts/loadingstills.mjs` (not needed for this pass: nothing here alters
 the loading scene).
 
+## Tracks and spray only where something touches the snow (`fx.js`)
+
+The track map is carved into the **terrain mesh only** (the near chunks' snow shader samples `uTrackMap`; the
+terrain mesh is the baked heightfield, `terrain.baseHeight`). Kickers, Voltage Park's features, roof snow, the
+Fjordline quay / pier decks are their own meshes and never show tracks, and the shader carves by x / z with no
+height test — so a stamp made on a roof, a deck, a kicker or in the air shows on the snow below / beside it.
+Every writer now asks `FXManager.onSnow(p, tol)`: within `tol` of `terrain.getHeight` there, that height is the
+heightfield (`getHeight − baseHeight ≤ 2 cm`), not under the fjord (`course.sea`), not sinking after a splash.
+
+- **Riding**: ski grooves (each ski on its own, its height on the slope's plane), the board groove and the powder
+  plough only while GROUNDED on heightfield snow (tolerance 6 cm + powder sink). Spray contacts the same (10 cm +
+  their sink depth). Landing / jump / pole-plant / hard-brake bursts only on the snow.
+- **No bridges**: `TrackMap.beginFrame / endFrame` forget the last point of every key not stamped this frame, so
+  the first groove after an air, a grind, a roof or a lifted body part starts fresh (before, a capsule up to 4 m
+  long joined take-off and touchdown — a mark under the jump).
+- **Crashes** (ragdoll): `ragdoll.snowContacts()` lists the body parts / gear touching the snow since the last
+  frame (averaged contact point, hardest approach speed, the part's axis). Each touching part stamps its own groove,
+  shaped by the part (`CRASH_MARK`: trunk 0.36–0.42 m wide, head 0.24, limbs 0.12–0.18, skis 0.09, board 0.26,
+  poles 0.04) and as deep as the hit / slide (powder deeper); nothing for a part in the air. Spray: the sliding
+  trunk / thighs / skis / board throw snow (`spray.emit`), and the hardest fresh hit makes a burst, one at a time
+  (0.22 s), the first as big as the old crash burst. The old crash stamped a 1.2 m mark at the player every frame
+  (under a body flying off a cliff) and the `crashed` event burst at the crash spot (a rail bail in the air):
+  both gone while the ragdoll runs (`?ragdoll=0` keeps the old slide, its marks / burst only on the snow).
+- Cases checked and fixed (all wrote marks before): airs and micro-hops (bridging capsule), kickers (stamps on
+  the kicker carved the snow beside its sidewalls), Ravenspire / Kitsune / Fjordline roofs and the quay / pier
+  (carved under them), Voltage Park features and pipe (beside them), rail grinds (bridged from the take-off to the
+  landing), the fjord (the seabed while sinking after a splash), crashes in the air. Clean already: lifts (LIFT
+  isn't grounded; the dismount is placed on the snow), the lobby stage rider (no FX attached), the loading-screen
+  worker (no track map; its spray events are at the snow height by construction), replays (`fx.update` doesn't
+  run while one plays).
+
+```bash
+node web/scripts/track-ghost.mjs http://localhost:5197/ --check [--lifts] [--equip ski|snowboard] [--only case,…]
+```
+
+`track-ghost.mjs` drives the real game through those cases (Valcrest air / backflip / over-flip crash,
+micro-hops, Ravenspire cliff + roofs, Voltage rails / rail bail / features, Kitsune roofs, Fjordline roofs + decks +
+a splash, a chairlift ride at Diamond Peak with `--lifts`) and checks every stamp and spray emission against what
+really touches the snow: riding stamps need a GROUNDED player within 5 cm (+ sink) of the heightfield, crash stamps
+a ragdoll sample within 5 cm of the snow within 0.5 m, no stamp on a raised mesh or under water, no groove
+bridging a frame without contact. The pre-fix build fails all 12 ski cases; now 25 / 25 (skis and board, lifts).
+
 ## Known issues / not done
 
 - Performance: see `docs/graphics-perf.md`. Earlier versions of this file claimed about 2 ms per frame, and later about 13 / 27 / 29 ms. The first came from headless `requestAnimationFrame` deltas, which don't measure GPU cost. The second came from an unpipelined render plus `readPixels`, which overstates the frame time. Measured with GPU timer queries on an Intel Arc 130V iGPU at 1600×900, the game is GPU-bound at about **9 / 14 / 22 ms per frame** on quality 0 / 1 / 2 (about 110 / 72 / 45 fps). The main thread costs about 5 ms.
