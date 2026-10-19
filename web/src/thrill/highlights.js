@@ -25,7 +25,6 @@ export const CLIPS = {
   patchMargin: 26,      // m of snow kept around the line
   patchStep: 0.75,      // m between height samples …
   patchMax: 40000,      // … at most this many samples (the step grows for very long lines)
-  samplesPerSlice: 1500, // getHeight calls per frame (~1–2 ms)
 };
 const PAD_LB = 4;
 
@@ -118,12 +117,20 @@ export function installHighlights({ player, rider, terrain, input, activities, r
     const nx = Math.ceil((x1 - x0) / step) + 1, nz = Math.ceil((z1 - z0) / step) + 1;
     const h = new Float32Array(nx * nz);
     let k = 0;
+    // Sampled in the browser's idle time after each frame (requestIdleCallback), a few hundred heights at a
+    // time and never past the idle deadline, so a frame already near its budget isn't pushed over a vsync
+    // (fixed 1500-sample slices cost ~1 ms and made ~5 % of Ravenspire frames miss one). Without idle
+    // callbacks: small slices per animation frame.
     let maxSlice = 0;
     while (k < h.length) {
-      const ts = performance.now(), end = Math.min(h.length, k + CLIPS.samplesPerSlice);
-      for (; k < end; k++) { const i = k % nx, j = (k / nx) | 0; h[k] = terrain.getHeight(x0 + i * step, z0 + j * step); }
+      const dl = await idle();
+      const ts = performance.now();
+      const budget = dl ? Math.max(0.3, Math.min(4, dl.timeRemaining() - 0.5)) : 0.5;
+      do {
+        const end = Math.min(h.length, k + 100);
+        for (; k < end; k++) { const i = k % nx, j = (k / nx) | 0; h[k] = terrain.getHeight(x0 + i * step, z0 + j * step); }
+      } while (k < h.length && performance.now() - ts < budget);
       maxSlice = Math.max(maxSlice, performance.now() - ts);
-      if (k < h.length) await nextFrame();
     }
     stats.patchSliceMaxMs = +maxSlice.toFixed(2);
     // Trees and rocks near the line (the real ones, so the replay rides past the same trunks).
@@ -182,10 +189,13 @@ export function installHighlights({ player, rider, terrain, input, activities, r
       const t0 = raw.times[0];
       const meta = { v: CLIP_VERSION, ...c.ctx, ...c.info, takeoff: Math.max(0, c.takeoff - t0), land: Math.max(0, c.land - t0), date: Date.now() };
       T.worstFrame = Math.max(stats.patchSliceMaxMs || 0, T.copy);   // the most save work in any one frame (main thread)
+      T.posted = performance.now() - T.start;
       const res = await build({ raw, keys: c.keys, meta, patch, trees });
+      T.built = performance.now() - T.start;
       T.build = res.ms;
       await syncIndex().catch(() => {});   // the loading screens' localStorage mirror (workers have no localStorage)
       T.total = performance.now() - T.start;
+      stats.startedAt = T.start;
       stats.saves++;
       stats.lastSave = { id: res.id, bytes: res.bytes, frames: res.frames, nodes: c.nodes, patch: `${patch.nx}x${patch.nz}`, trees: trees.length, ms: Object.fromEntries(Object.entries(T).filter(([k]) => k !== 'start').map(([k, v]) => [k, typeof v === 'number' ? +v.toFixed(1) : v])) };
       ui?.prompt(true, c.info.trick, 'saved');
@@ -218,6 +228,8 @@ export function installHighlights({ player, rider, terrain, input, activities, r
 }
 
 const nextFrame = () => new Promise((res) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => res()) : setTimeout(res, 16)));
+/** The next idle period (its deadline), or the next frame (null) where there are no idle callbacks. */
+const idle = () => new Promise((res) => (typeof requestIdleCallback === 'function' ? requestIdleCallback((d) => res(d), { timeout: 250 }) : nextFrame().then(() => res(null))));
 
 function mountUi() {
   const st = document.createElement('style');

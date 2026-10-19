@@ -304,8 +304,8 @@ export class LoadingScene {
   setupPost() {
     const renderer = this.renderer, camera = this.camera;
     this.low = this.opts.q === 'low';
-    this.still = this.opts.q === 'still';  // ?loadq=still: full size, real DOF, freeze mid-air (scripts/loadingstills.mjs)
-    this.high = this.opts.q === 'high' || this.still;   // ?loadq=high: + real depth of field (costs boot time on laptops)
+    this.still = this.opts.q === 'still' || this.opts.q === 'thumb';  // ?loadq=still: full size, real DOF, freeze mid-air (scripts/loadingstills.mjs); 'thumb' (highlight thumbnails): the same without DOF (a sun in frame overflowed it to a black disc)
+    this.high = this.opts.q === 'high' || this.opts.q === 'still';   // ?loadq=high: + real depth of field (costs boot time on laptops)
     // No MSAA: on a laptop GPU that is also compiling and warming the game, 4× MSAA on an HDR target
     // (plus DOF) cost ~3 s of boot time; SMAA keeps the edges crisp for a fraction of it.
     const composer = this.composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
@@ -331,7 +331,7 @@ export class LoadingScene {
     const base = Math.min(dpr, 2);
     const fit = Math.sqrt((this.low ? 1280 * 720 : PIXEL_BUDGET) / Math.max(1, width * height));
     this.ratio = Math.min(Math.max(1, dpr), Math.max(0.5, Math.min(base, fit) * this.scale));
-    if (this.opts.q === 'still') this.ratio = Math.max(1, dpr);   // stills: the full requested size
+    if (this.still) this.ratio = Math.max(1, dpr);   // stills: the full requested size
     this.renderer.setPixelRatio(this.ratio);
     this.renderer.setSize(width, height, false);
     this.composer.setSize(width, height, false);
@@ -592,7 +592,7 @@ export class LoadingScene {
     if (frameMs > 50) P.over50++;
     // Stalls (the GPU thread held by someone else), as [epoch start ms, ms] for lining up with the boot stages.
     if (frameMs > 250 && (P.stalls || (P.stalls = [])).length < 40) P.stalls.push([Math.round(performance.timeOrigin + performance.now() - frameMs), Math.round(frameMs)]);
-    if (this.opts.q === 'still') return;
+    if (this.still) return;
     if (frameMs < STALL_MS) this.ft.push(frameMs);
     if (this.ft.length < 20) return;
     const s = [...this.ft].sort((a, b) => a - b);
