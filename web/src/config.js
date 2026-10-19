@@ -442,11 +442,11 @@ export const RAGDOLL = {
   radius: { pelvis: 0.125, chest: 0.145, shoulders: 0.075, neck: 0.055, head: 0.125, upperarm: 0.058, forearm: 0.047, hand: 0.05, thigh: 0.082, shin: 0.06, boot: 0.062 },
   // Joint limits (degrees). Cones are centred on the rest direction tilted by `centre` [forward, down].
   limits: {
-    spine: { cone: 38, centre: [12, 0], twist: 30 },
-    neck: { cone: 50, centre: [10, 0], twist: 65 },
-    shoulder: { cone: 95, centre: [25, 35], twist: 75 },
-    hip: { cone: 72, centre: [35, 0], twist: 40 },
-    elbow: [-3, 145],          // hinge (flexion +)
+    spine: { cone: 30, centre: [12, 0], twist: 20 },
+    neck: { cone: 35, centre: [10, 0], twist: 45 },
+    shoulder: { cone: 75, centre: [25, 35], twist: 50 },
+    hip: { cone: 60, centre: [35, 0], twist: 30 },
+    elbow: [0, 135],           // hinge (flexion +); the hand rides on the forearm (no wrist joint to flop)
     knee: [-3, 140],
     ankle: { cone: 22, twist: 12 },   // snowboard: boots in the bindings
   },
@@ -459,15 +459,22 @@ export const RAGDOLL = {
   muGear: 0.3, ploughGear: 2, // released skis (brakes out) / poles
   muBark: 0.6,
   airDrag: 0.02,               // 1/s
-  jointDamping: { spine: 10, neck: 12, shoulder: 10, elbow: 8, hip: 8, knee: 10, ankle: 12 },   // 1/s relative spin (near critical for the tone below)
-  // Muscle tone: drives toward a protective tuck, strong at first and relaxing (N·m/rad)
-  tone: { spine: 220, neck: 20, shoulder: 18, elbow: 6, hip: 150, knee: 80, ankle: 0 },
-  toneEnd: 0.06,               // share of tone left after relaxing
-  toneTau: 0.7,                // s
+  // 1/s: relative spin AND swing (the child's centre against the parent's rigid motion: swingDamping) die at this
+  // rate. Strong on purpose: a braced body tumbles as a unit, limbs stay close (an impact can still throw one).
+  jointDamping: { spine: 60, neck: 100, shoulder: 80, elbow: 80, hip: 70, knee: 80, ankle: 15 },
+  swingDamping: true,
+  // Muscle tone: drives toward a protective tuck (N·m/rad), with a strength limit (toneMaxErr, rad: further from the
+  // target the pull saturates, so limbs move into the tuck instead of whip-cracking there)
+  tone: { spine: 350, neck: 60, shoulder: 45, elbow: 18, hip: 220, knee: 120, ankle: 0 },
+  toneMaxErr: { spine: 0.35, neck: 0.35, shoulder: 0.5, elbow: 0.5, hip: 0.4, knee: 0.5 },
+  toneHoldSpeed: 3,            // m/s: full tone while the body moves faster than this; it only fades as it slows
+  toneEnd: 0.15,               // share of tone left after relaxing (then limp once it lies still)
+  toneTau: 1.5,                // s
+  limitEase: 2,                // rad/s: a hinge the crash found past its range is let back in at this rate
   tuck: { spine: 14, neck: 18, hip: 35, knee: 50, elbow: 55, shoulder: [0.45, -0.6, 0.6] },   // deg / arm direction (armature: x left, y up, z fwd)
   uprightAfter: 0.4,           // s: a body still standing after this loses its muscle tone (falls)
   braceTime: 0.55,             // s: hands reach toward the snow the body falls onto
-  braceTone: 1.6,              // × shoulder / elbow tone while bracing
+  braceTone: 1.2,              // × shoulder / elbow tone while bracing
   // Seeding from the crash
   maxSeedSpin: 10,             // rad/s
   feetCatch: { pitch: 0.45, yaw: 0.65, impact: 0.35, compression: 0.45, landing: 0.5 },   // share of the legs' slide stopped by the catching edges

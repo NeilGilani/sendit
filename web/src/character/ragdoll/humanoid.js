@@ -238,7 +238,7 @@ export function buildHumanoid(seed, env, C) {
     const want = new THREE.Vector3(T.shoulder[0] * side, T.shoulder[1], T.shoulder[2]).normalize();
     sh.tuck = conj(chest.restQ).multiply(new THREE.Quaternion().setFromUnitVectors(d, want)).multiply(sh.b1.restQ);
   }
-  for (const j of Object.values(joints)) { j.qT = (j.tuck || j.qRest).clone(); j.k = 0; }
+  for (const j of Object.values(joints)) { j.qT = (j.tuck || j.qRest).clone(); j.k = 0; j.maxErr = C.toneMaxErr?.[j.kind] ?? 0; }
 
   // ---- self-collision: limbs can't pass through the trunk or each other
   const main = (n) => [parts[n], parts[n].shapes[0]];

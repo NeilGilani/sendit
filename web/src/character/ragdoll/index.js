@@ -261,6 +261,7 @@ export class RagdollController {
     this.env.refresh(seed.bones.pelvis.p, 4);
     const H = buildHumanoid(seed, this.env, C);
     const shift = depenetrate(H, this.env);
+    H.world.easeLimits();
     const com = H.world.com(0, new THREE.Vector3());
     const groundN = this.env.normal(com.x, com.z, new THREE.Vector3());
     const p0 = seed.bones.pelvis.p;

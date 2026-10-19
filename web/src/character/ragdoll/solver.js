@@ -212,6 +212,18 @@ export class World {
       b.touch = 0; b.touchN.set(0, 0, 0);
     }
     this.nc = 0;
+    // A hinge the crash found outside its range (an animated elbow / knee) is let back in gently: its range was
+    // widened to the starting angle and closes at limitEase rad/s (snapping it in one sub-step whips the limb).
+    if (this.easing) {
+      let any = false;
+      const r = (C.limitEase ?? 2) * h;
+      for (const j of this.joints) {
+        if (j.min0 === undefined) continue;
+        if (j.min < j.min0) { j.min = Math.min(j.min0, j.min + r); any = true; }
+        if (j.max > j.max0) { j.max = Math.max(j.max0, j.max - r); any = true; }
+      }
+      this.easing = any;
+    }
     // --- positions: joints (anchors, limits, drives), self-collision, then the world (priority)
     for (const j of this.joints) if (!j.b1.G.asleep) this.solveJoint(j, h);
     this.np = 0;
@@ -394,6 +406,9 @@ export class World {
     if (j.k > 0 && j.qT && !noDrive) {
       _q.copy(b0.q).multiply(j.qT).multiply(_q2.set(-b1.q.x, -b1.q.y, -b1.q.z, b1.q.w));
       rotVec(_q, _d);
+      // Muscles have a strength limit: far from the target the pull saturates (no whip-crack snap into the tuck).
+      const e = _d.length();
+      if (j.maxErr && e > j.maxErr) _d.multiplyScalar(j.maxErr / e);
       this.rot(b0, b1, _d, 1 / j.k, h);
     }
   }
@@ -401,6 +416,21 @@ export class World {
   /** Relative spin damping (velocity pass). */
   dampJoint(j, h) {
     const b0 = j.b0, b1 = j.b1;
+    // The child's swing is in its centre's velocity too (a pendulum about the joint): damp its velocity relative to
+    // where the parent's rigid motion would carry it, as an equal and opposite impulse at the joint.
+    if (this.C.swingDamping) {
+      b0.offset(j.r0, _r0);
+      _p0.addVectors(b0.x, _r0);                       // the joint
+      _r1.subVectors(_p0, b1.x);                       // child centre → joint
+      _a.subVectors(b1.x, b0.x);
+      const vr = _b.crossVectors(b0.w, _a).add(b0.v).sub(b1.v);   // parent-rigid velocity − child velocity (at the child's centre)
+      const k = Math.min(1, j.damp * h);
+      if (vr.lengthSq() > 1e-10) {
+        const p = _c.copy(vr).multiplyScalar(k / (b1.invM + b0.invM));
+        b1.v.addScaledVector(p, b1.invM);
+        b0.impulse(_d.subVectors(b1.x, b0.x), p.negate());
+      }
+    }
     _d.subVectors(b1.w, b0.w);
     const s = _d.length();
     if (s < 1e-6) return;
@@ -601,6 +631,23 @@ export class World {
     }
     return s;
   }
+  /** Hinge angle (rad) as the limits see it. */
+  hingeAngle(j) {
+    const a0 = _a.copy(j.hP).applyQuaternion(j.b0.q);
+    const r0 = _b.copy(j.refP).applyQuaternion(j.b0.q), r1 = _c.copy(j.refC).applyQuaternion(j.b1.q);
+    return Math.atan2(_d.crossVectors(r0, r1).dot(a0), r0.dot(r1));
+  }
+  /** Widen every hinge's range to include its starting angle (it closes again at C.limitEase rad/s). */
+  easeLimits() {
+    for (const j of this.joints) {
+      if (j.type !== 'hinge') continue;
+      const phi = this.hingeAngle(j);
+      j.min0 = j.min; j.max0 = j.max;
+      if (phi < j.min) { j.min = phi; this.easing = true; }
+      if (phi > j.max) { j.max = phi; this.easing = true; }
+    }
+  }
+
   /** Largest joint-limit violation (rad). */
   limitViolation() {
     let worst = 0;
