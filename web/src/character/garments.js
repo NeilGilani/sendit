@@ -171,6 +171,13 @@ export function buildOutfitGeometry(body, cut) {
       skinMask: (b, x, y) => !b.startsWith('upperarm') || (y > 1.45 && Math.abs(x) > 0.13),
       // …and only partly, at the outer edge: the chest panel stays flat when the arms reach forward.
       weightLimit: (b, x, y) => (b.startsWith('upperarm') ? 0.55 * smooth(0.15, 0.23, Math.abs(x)) * smooth(1.43, 1.5, y) : undefined),
+      // Below the crotch the front of a long hem rides on the thighs: it lifts and bunches over them in a
+      // crouch instead of staying behind while the legs come up through it.
+      weightFloor: (b, x, y, z) => {
+        if (!b.startsWith('thigh')) return 0;
+        const sgn = b.endsWith('_l') ? 1 : -1;
+        return 0.8 * smooth(0.9, 0.8, y) * smooth(-0.04, 0.05, z) * smooth(0.0, 0.06, x * sgn);
+      },
     }));
     // Spread the weights further over the shell than on other pieces: a jacket panel bends as one sheet
     // when the spine flexes (no groove along the spine, no shoulder-blade dents in a crouch).
