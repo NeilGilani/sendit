@@ -22,6 +22,8 @@ const PATTERNS = { solid: 0, stripe: 1, fade: 2, chevron: 3, split: 4, gold: 5, 
 /** Topsheet patterns a graphic can use (spec.graphic.pattern) — for paint menus. */
 export const GRAPHIC_PATTERNS = Object.keys(PATTERNS);
 const SKI_SPACING = 0.13;   // boot centre → ski centre line (m)
+/** Height of the boot seat above the base (m): the ski binding plate's top / the board baseplate's top. */
+export const SKI_BINDING_SEAT = 0.033, BOARD_BINDING_SEAT = 0.026;
 
 export function createEquipmentModel(type, variant, opts = {}) {
   const t = normalizeType(type);
@@ -40,6 +42,7 @@ export function createEquipmentModel(type, variant, opts = {}) {
       const m = new THREE.Mesh(geo, mat);
       m.castShadow = true;
       ski.add(m);
+      ski.userData.plank = m;
       if (o.outline) ski.add(new THREE.Mesh(geo, outlineMaterial(1.0)));
       ski.add(skiBinding());
       ski.position.x = x;
@@ -67,6 +70,7 @@ export function createEquipmentModel(type, variant, opts = {}) {
     const m = new THREE.Mesh(geo, mat);
     m.castShadow = true;
     board.add(m);
+    board.userData.plank = m;
     if (o.outline) board.add(new THREE.Mesh(geo, outlineMaterial(1.0)));
     group.add(board);
     parts.board = board;
@@ -162,7 +166,36 @@ function plankGeometry(spec, kind) {
   }
   g.setAttribute('aPlank', new THREE.BufferAttribute(plank, 3));
   g.computeVertexNormals();
+  g.userData.surface = surfaceRows(g, plank);
   return g;
+}
+
+/** Rows along the plank, sorted by z: { z, hw (base half width), top, base } (see plankSurfaceAt). */
+function surfaceRows(g, plank) {
+  const P = g.attributes.position, rows = new Map();
+  for (let i = 0; i < P.count; i++) {
+    const z = Math.round(P.getZ(i) * 1e4) / 1e4, top = plank[i * 3 + 2] > 0.5;
+    const r = rows.get(z) || { z, hw: 0, top: -1e9, base: 1e9 };
+    if (top) r.top = Math.max(r.top, P.getY(i));
+    else { r.base = Math.min(r.base, P.getY(i)); r.hw = Math.max(r.hw, Math.abs(P.getX(i))); }
+    rows.set(z, r);
+  }
+  return [...rows.values()].filter((r) => r.top > -1e8 && r.base < 1e8).sort((a, b) => a.z - b.z);
+}
+
+/**
+ * The plank's cross-section at z (part-local, the ski / board group's frame): { hw, top, base } — half
+ * width of the base, top-sheet and base heights (camber, rocker and kicks included) — or null past the
+ * ends. `part` = a ski or the board group (parts.skis[i] / parts.board), or the plank geometry.
+ */
+export function plankSurfaceAt(part, z, out = {}) {
+  const t = (part.isBufferGeometry ? part : part.userData.plank?.geometry ?? part.children?.[0]?.geometry)?.userData.surface;
+  if (!t || z < t[0].z || z > t[t.length - 1].z) return null;
+  let lo = 0, hi = t.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (t[m].z <= z) lo = m; else hi = m; }
+  const a = t[lo], b = t[hi], f = b.z > a.z ? (z - a.z) / (b.z - a.z) : 0;
+  out.hw = a.hw + (b.hw - a.hw) * f; out.top = a.top + (b.top - a.top) * f; out.base = a.base + (b.base - a.base) * f;
+  return out;
 }
 
 function plankMaterial(spec) {
@@ -255,9 +288,11 @@ float plNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 
 let _skiBindingGeo = null;
 function skiBinding() {
   if (!_skiBindingGeo) {
-    const toe = new THREE.BoxGeometry(0.07, 0.045, 0.1); toe.translate(0, 0.04, -0.14);
-    const heel = new THREE.BoxGeometry(0.075, 0.055, 0.11); heel.translate(0, 0.045, 0.16);
-    const plate = new THREE.BoxGeometry(0.07, 0.016, 0.42); plate.translate(0, 0.025, 0.01);
+    // Sized to the rider's boot (≈ 33 cm sole centred on the mount point, the sole on the plate at
+    // SKI_BINDING_SEAT): the toe and heel pieces clamp the boot's ends, the plate runs between them.
+    const toe = new THREE.BoxGeometry(0.075, 0.05, 0.085); toe.translate(0, 0.042, -0.19);
+    const heel = new THREE.BoxGeometry(0.08, 0.06, 0.1); heel.translate(0, 0.047, 0.2);
+    const plate = new THREE.BoxGeometry(0.07, 0.016, 0.44); plate.translate(0, 0.025, 0.005);
     _skiBindingGeo = mergeGeometries([toe, heel, plate].map((g) => g.toNonIndexed()));
     _skiBindingGeo.userData.shared = true;
   }
@@ -269,11 +304,13 @@ function skiBinding() {
 /** Snowboard binding with toes toward +X: base plate, heel cup + highback on −X, two straps. */
 function snowboardBinding(mat, outline) {
   const parts = [];
-  const plate = new THREE.BoxGeometry(0.27, 0.014, 0.13); plate.translate(0, 0.007, 0); parts.push(plate);
-  const cup = new THREE.CylinderGeometry(0.075, 0.075, 0.06, 12, 1, true, Math.PI * 0.5, Math.PI); cup.translate(-0.06, 0.04, 0); parts.push(cup);
-  const hb = new THREE.BoxGeometry(0.018, 0.2, 0.12); hb.rotateZ(-0.25); hb.translate(-0.14, 0.12, 0); parts.push(hb);
-  const ankle = new THREE.BoxGeometry(0.05, 0.03, 0.15); ankle.translate(-0.02, 0.1, 0); parts.push(ankle);
-  const toeS = new THREE.BoxGeometry(0.04, 0.025, 0.14); toeS.translate(0.1, 0.055, 0); parts.push(toeS);
+  // Sized to the rider's boot (≈ 33 × 16 cm, centred on the binding, the sole on the plate at
+  // BOARD_BINDING_SEAT): the heel cup and highback wrap the heel, the straps cross the boot.
+  const plate = new THREE.BoxGeometry(0.31, 0.014, 0.14); plate.translate(0.01, 0.007, 0); parts.push(plate);
+  const cup = new THREE.CylinderGeometry(0.088, 0.088, 0.07, 14, 1, true, Math.PI * 0.5, Math.PI); cup.translate(-0.085, 0.045, 0); parts.push(cup);
+  const hb = new THREE.BoxGeometry(0.018, 0.22, 0.13); hb.rotateZ(-0.25); hb.translate(-0.19, 0.13, 0); parts.push(hb);
+  const ankle = new THREE.BoxGeometry(0.06, 0.03, 0.18); ankle.translate(-0.03, 0.125, 0); parts.push(ankle);
+  const toeS = new THREE.BoxGeometry(0.045, 0.025, 0.17); toeS.translate(0.11, 0.075, 0); parts.push(toeS);
   const geo = mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)).map((g) => { g.deleteAttribute('uv'); return g; }));
   const m = new THREE.Mesh(geo, mat);
   m.castShadow = true;

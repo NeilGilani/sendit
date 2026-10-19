@@ -18,7 +18,7 @@ import { ANIM, ART, PHYSICS } from './config.js';
 import { chairGeo } from './lifts.js';
 import { toonMaterial, outlineMaterial, mulberry32 } from './world.js';
 import { on, emit } from './state.js';
-import { createEquipmentModel, disposeEquipmentModel, poleGeometry } from './equipment/models.js';
+import { createEquipmentModel, disposeEquipmentModel, poleGeometry, plankSurfaceAt, SKI_BINDING_SEAT, BOARD_BINDING_SEAT } from './equipment/models.js';
 import { getEquipmentSpec, normalizeType } from './equipment/registry.js';
 import { dressRider, HEAD_SCALE, OUTFIT_SLOTS } from './character/index.js';
 import { outfitSlotsFromProfile } from './character/profile.js';
@@ -30,6 +30,16 @@ const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.
 const _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
 const BA = ANIM.board;
 const DEFAULT_COM = new THREE.Vector3(0, ANIM.flipPivot, 0);
+const _qI = new THREE.Quaternion();
+// Gear clearance (rider.clearance): garment points this far above the deck count as touching it (cloth
+// thickness the sampled vertices don't carry); deeper than CLEAR_MAX below the top sheet is not "through
+// the deck" but beside / under it (ignored).
+const CLEAR_MARGIN = 0.012, CLEAR_MAX = 0.3;
+const CLEAR_NEAR = 0.62, CLEAR_NEAR_KNEE = 0.3;   // m: hips / knees higher than this above every plank skip the garment check (a jacket hem hangs well below the hip joint in a squat)
+// Garment bones whose vertices are checked against the deck: hips, butt, jacket hem, thighs, shins.
+const CLEAR_BONES = /^(pelvis|spine_01|spine_02|thigh_|calf_)/;
+// Grabbing wrist: this far outside the plank's edge and above its top sheet (the mitt closes round the edge).
+const GRAB_OUT = 0.075, GRAB_UP = 0.09;
 // [bone, child bone (segment midpoint) or null, mass share] for the posed body's centre of mass.
 const COM_SEGMENTS = [['pelvis', 'spine_01', 0.14], ['spine_01', 'spine_03', 0.22], ['spine_03', 'neck_01', 0.13], ['Head', null, 0.08],
   ['thigh_l', 'calf_l', 0.1], ['thigh_r', 'calf_r', 0.1], ['calf_l', 'foot_l', 0.045], ['calf_r', 'foot_r', 0.045], ['foot_l', null, 0.035], ['foot_r', null, 0.035],
@@ -121,6 +131,12 @@ export class Rider {
     on('loadout', (e) => { if (!e.slot || OUTFIT_SLOTS.includes(e.slot)) this.setOutfit(outfitSlotsFromProfile()); });
     this.ankleH = pos(this.restGlobal.get(this.bones.foot_l)).y;
     this.pelvisH = pos(this.restGlobal.get(this.bones.pelvis)).y;
+    this.measureBoot();
+    // Armature ← visual chain (body, model, glTF scene, …, armature): gear frames in pose space.
+    this.armChain = [];
+    for (let o = this.armature; o && o !== this.visual; o = o.parent) this.armChain.unshift(o);
+    this.gf = { Mav: new THREE.Matrix4(), qva: new THREE.Quaternion(), qav: new THREE.Quaternion(), M: [new THREE.Matrix4(), new THREE.Matrix4()], Minv: [new THREE.Matrix4(), new THREE.Matrix4()], tilt: [new THREE.Quaternion(), new THREE.Quaternion()], up: [new THREE.Vector3(), new THREE.Vector3()] };
+    this.lift = new THREE.Vector3();   // clearance push of the pelvis (armature space), per frame
     this.buildGear();
     const eq = this.player.equipment;
     this.buildEquipment(eq.type, eq.spec, this.player.stance);
@@ -151,6 +167,7 @@ export class Rider {
     this.board = parts.board || null;
     for (const pole of this.poles) pole.visible = type === 'ski';
     this.p.stanceYaw = this.stanceYawTarget();
+    this.stack = this.stackOffset(type, spec, stance);
     this.contacts = (type === 'ski' ? ['left', 'right'] : ['nose', 'waist', 'tail']).map((id) => ({
       id, position: new THREE.Vector3(), direction: new THREE.Vector3(0, 0, -1), normal: new THREE.Vector3(0, 1, 0),
       edgeAngle: 0, load: 0, speed: 0, grounded: false, depth: 0,
@@ -367,6 +384,12 @@ export class Rider {
     if (board) this.placeBoard(gearRoll);
     else this.placeSkis(gearRoll, pl, dt);
     this.pose(pl);
+    // Tweak only as far as the arm reaches: while a grabbing hand falls short the tweak eases back, and
+    // it comes back once the hand holds the gear (next frame's placeBoard / placeSkis).
+    if (p.grab > 0.5 && (p.tweak || 0) > 0.05) {
+      const f = this.tweakFit ?? 1;
+      this.tweakFit = this.reachMiss > 0.02 ? Math.max(0.25, f - dt * 1.2) : this.reachMiss < 0.008 ? Math.min(1, f + dt * 0.4) : f;
+    } else this.tweakFit = 1;
     if (p.sit > 0.01) this.gearToFeet(p.sit);
     this.placePoles(pl);
     this.root.updateMatrixWorld(true);
@@ -418,7 +441,8 @@ export class Rider {
     const snap = this.snapT < 0.5 ? this.snapSign * ANIM.skiPopSnap * Math.exp(-9 * this.snapT) * Math.min(1, this.snapT * 25) : 0;
     p.pitch += ((-p.press * ANIM.skiPressPitch + snap) - p.pitch) * (this.snapT < 0.5 ? 0.6 : 0.3);
     this.skiPitchLift = Math.abs(Math.sin(p.pitch)) * this.equip.spec.length * 0.4;
-    const lift = 0.0 + p.air * 0.12 + p.grab * 0.1 + p.flipTuck * ANIM.flipTuckLift + this.skiPitchLift;
+    // Grabs bring the skis up to the hand (knees to the chest), not the hand down through the body.
+    const lift = 0.0 + p.air * 0.12 + p.grab * ANIM.skiGrabLift + p.flipTuck * ANIM.flipTuckLift + this.skiPitchLift;
     const wide = ANIM.skiStance + p.plow * 0.1 + Math.abs(p.lean) / ANIM.maxLean * ANIM.skiStanceCarve * (1 - p.air);   // wider in deep carves (matches poseSki)
     const [L, R] = this.skis;
     // Carving, the inside ski runs a little ahead (tip lead; + lean = right turn → the right ski, R).
@@ -428,7 +452,7 @@ export class Rider {
     // In the air with a grab, cross the skis a little (Japan / mute flavour).
     if (p.grab > 0.01) { L.rotation.y += p.grab * 0.25; R.rotation.y -= p.grab * 0.1; }
     // Tweaked: skis crossed hard (Japan / Mute / Safety), tips pulled up (Truck driver) or tails (Tail grab).
-    const tw = p.tweak || 0;
+    const tw = (p.tweak || 0) * (this.tweakFit ?? 1);
     if (tw > 0.01) {
       const gn = pl.grabName || '';
       if (gn === 'Truck driver') { L.rotation.x += tw * 0.45; R.rotation.x += tw * 0.45; }
@@ -453,7 +477,7 @@ export class Rider {
     // Roll about the edge that's in the snow, pitch about the end that's pressed.
     const hw = spec.waist * 0.5;
     const roll = -gearRoll;
-    const tw = p.tweak || 0, tsg = /Melon|Tail/.test(this.player.grabName || '') ? -1 : 1;
+    const tw = (p.tweak || 0) * (this.tweakFit ?? 1), tsg = /Melon/.test(this.player.grabName || '') ? -1 : 1;   // (the grabbed end swings toward the hand)
     B.rotation.set(p.pitch + tw * 0.22, tw * 0.5 * tsg, roll + tw * 0.38 * tsg, 'ZXY');
     B.position.set(0, lift + Math.abs(Math.sin(roll)) * hw + Math.abs(Math.sin(p.pitch)) * spec.length * 0.38, 0);
   }
@@ -463,13 +487,20 @@ export class Rider {
     this.root.updateMatrixWorld(true);
     const fl = this.visual.worldToLocal(this.bones.foot_l.getWorldPosition(new THREE.Vector3()));
     const fr = this.visual.worldToLocal(this.bones.foot_r.getWorldPosition(new THREE.Vector3()));
-    const drop = 0.1;
-    if (this.skis) {
-      // Armature +X (left foot) is visual −X: left ski under the left boot.
-      for (const [ski, f] of [[this.skis[0], fl], [this.skis[1], fr]]) {
-        ski.position.lerp(new THREE.Vector3(f.x, f.y - drop, f.z - 0.05), w);
-        ski.rotation.x = 0.35 * w;   // tips hang down
-      }
+    // (the boot sole is ~12 cm under the ankle bone; the plank hangs under the sole, seated on its binding)
+    const sole = this.boot ? -(this.boot[1].off.y + this.boot[-1].off.y) / 2 : 0.1;
+    const drop = sole + (this.skis ? SKI_BINDING_SEAT : BOARD_BINDING_SEAT);
+    if (this.skis && this.boot && this.footQ) {
+      // Each ski hangs from its boot exactly: the boot's sole on the binding plate, the ski turned with the
+      // foot (tips down, poseSki). Armature +X (left foot) = ski 0.
+      const F = this.gf;
+      [[this.skis[0], 1, 'foot_l'], [this.skis[1], -1, 'foot_r']].forEach(([ski, side, fb], i) => {
+        const fq = this.footQ[i];
+        const solePt = pos(this.g(this.bones[fb])).add(_v2.copy(this.boot[side].off).applyQuaternion(fq)).applyMatrix4(F.Mva);
+        const q = _q.copy(F.qva).multiply(fq).multiply(F.qav);
+        ski.position.lerp(solePt.sub(_v2.set(0, SKI_BINDING_SEAT, 0).applyQuaternion(q)), w);
+        ski.quaternion.slerp(q, w);
+      });
     } else if (this.board) {
       const mid = fl.clone().add(fr).multiplyScalar(0.5);
       this.board.position.lerp(new THREE.Vector3(mid.x, mid.y - drop, mid.z), w);
@@ -523,6 +554,230 @@ export class Rider {
     }
   }
 
+  // ------------------------------------------------------------- boots in the bindings, gear clearance
+  /**
+   * The boot (the body mesh's boot zone, materials.js) in the rest pose: per foot (+1 = left, armature
+   * +X) the offset from the ankle (foot bone) to the centre of the sole, armature axes (+Z forward).
+   * The bindings seat that point on the binding plate (seatAnkle).
+   */
+  measureBoot() {
+    const body = this.look?.meshes.body;
+    this.boot = { 1: { off: new THREE.Vector3(0, -this.ankleH, 0.07) }, [-1]: { off: new THREE.Vector3(0, -this.ankleH, 0.07) } };
+    const g = body?.geometry, C = g?.attributes.color;
+    if (!C) return;
+    const P = g.attributes.position, SI = g.attributes.skinIndex, SW = g.attributes.skinWeight, sk = body.skeleton;
+    const mats = sk.bones.map((b, i) => (this.restGlobal.has(b) ? this.restGlobal.get(b).clone().multiply(sk.boneInverses[i]).multiply(body.bindMatrix) : null));
+    const box = { 1: new THREE.Box3(), [-1]: new THREE.Box3() };
+    const v = new THREE.Vector3(), acc = new THREE.Vector3(), t = new THREE.Vector3();
+    for (let i = 0; i < P.count; i++) {
+      if (P.getY(i) > 0.6) continue;
+      const r = C.getX(i), gg = C.getY(i), b = C.getZ(i);
+      if (!(b > r + gg && b > 0.2)) continue;   // the boot zone (zone colour b below 0.6 m)
+      v.fromBufferAttribute(P, i); acc.set(0, 0, 0);
+      for (let k = 0; k < 4; k++) { const w = SW.getComponent(i, k), m = mats[SI.getComponent(i, k)]; if (w > 0 && m) acc.addScaledVector(t.copy(v).applyMatrix4(m), w); }
+      box[acc.x > 0 ? 1 : -1].expandByPoint(acc);
+    }
+    for (const side of [1, -1]) {
+      const bx = box[side];
+      if (bx.isEmpty()) continue;
+      const ank = pos(this.restGlobal.get(this.bones[side > 0 ? 'foot_l' : 'foot_r']));
+      this.boot[side].off.set((bx.min.x + bx.max.x) / 2 - ank.x, bx.min.y - ank.y, (bx.min.z + bx.max.z) / 2 - ank.z);
+      this.boot[side].size = bx.getSize(new THREE.Vector3());
+    }
+  }
+
+  /**
+   * Whole-body shift (armature space) that keeps the old pose while the boots stand on their bindings:
+   * up by the boot + binding stack, back so the ankles sit behind the boot centres.
+   */
+  stackOffset(type, spec, stance) {
+    const out = new THREE.Vector3();
+    if (!this.boot) return out;
+    if (type === 'ski') {
+      for (const side of [1, -1]) { const o = this.boot[side].off; out.y += (SKI_BINDING_SEAT - o.y - this.ankleH) / 2; out.z -= o.z / 2; }
+    } else {
+      const nx = stance === 'goofy' ? -1 : 1, st = spec.stance;
+      for (const [side, ang] of [[nx, st.front], [-nx, st.back]]) {
+        const o = this.boot[side].off.clone().applyAxisAngle(Y, nx * THREE.MathUtils.degToRad(ang));
+        out.y += (BOARD_BINDING_SEAT - o.y - this.ankleH - 0.02) / 2; out.z -= o.z / 2;
+      }
+    }
+    return out;
+  }
+
+  /** Gear parts (skis / board) in pose (armature) space for this frame: matrices, inverses, tilt, up. */
+  gearFrames() {
+    const F = this.gf, M = _m.identity();
+    F.qva.identity();
+    for (const o of this.armChain) { o.updateMatrix(); M.multiply(o.matrix); F.qva.multiply(o.quaternion); }
+    (F.Mva || (F.Mva = new THREE.Matrix4())).copy(M);
+    F.Mav.copy(M).invert();
+    F.qav.copy(F.qva).invert();
+    this.gear.updateMatrix();
+    const parts = this.board ? [this.board] : this.skis;
+    parts.forEach((part, i) => {
+      part.updateMatrix();
+      F.M[i].multiplyMatrices(F.Mav, this.gear.matrix).multiply(part.matrix);
+      F.Minv[i].copy(F.M[i]).invert();
+      // The part's rotation away from flat, expressed about the armature's axes.
+      F.tilt[i].copy(F.qav).multiply(this.gear.quaternion).multiply(part.quaternion).multiply(F.qva);
+      F.up[i].set(0, 1, 0).transformDirection(F.M[i]);
+    });
+    F.n = parts.length;
+  }
+
+  /**
+   * Ankle target (armature space) and foot rotation that stand boot `side` (+1 = left) on part `i`'s
+   * binding: `seat` = the binding's centre on the plate (part-local), `footYaw` = the binding angle.
+   * The foot turns with the gear (edge roll, pitch, tweaks, a plough's wedge), so the sole stays flat
+   * on the plate and nothing pokes through the base.
+   */
+  seatAnkle(i, side, seat, footYaw, outQ) {
+    outQ.copy(this.gf.tilt[i]).multiply(_q.setFromAxisAngle(Y, footYaw));
+    return seat.clone().applyMatrix4(this.gf.M[i]).sub(_v2.copy(this.boot[side].off).applyQuaternion(outQ));
+  }
+
+  /**
+   * Garment vertices checked against the deck (CLEAR_BONES), with their bone offsets precomputed, so a
+   * frame skins only these few hundred points (armature space, from the posed bone matrices).
+   */
+  buildProbes() {
+    const m = this.look?.meshes.garments, g = m?.geometry;
+    this._probeGeo = g;
+    this.probes = null;
+    const P = g?.attributes.position;
+    if (!P || !g.attributes.skinIndex) return;
+    const sk = m.skeleton, SI = g.attributes.skinIndex, SW = g.attributes.skinWeight;
+    const pick = [];
+    for (let i = 0; i < P.count; i++) {
+      let best = 0, bw = -1;
+      for (let k = 0; k < 4; k++) { const w = SW.getComponent(i, k); if (w > bw) { bw = w; best = SI.getComponent(i, k); } }
+      if (CLEAR_BONES.test(sk.bones[best].name)) pick.push(i);
+    }
+    // Coarse probes first (every 8th: clearance() runs the rest only when the cloth comes near the gear).
+    const order = [];
+    for (let k = 0; k < 8; k++) for (let j = k; j < pick.length; j += 8) order.push(pick[j]);
+    const n = order.length;
+    const bones = [], w = new Float32Array(n * 4), u = new Float32Array(n * 12);
+    const v = new THREE.Vector3(), t = new THREE.Vector3(), bm = new THREE.Matrix4();
+    for (let j = 0; j < n; j++) {
+      const i = order[j];
+      v.fromBufferAttribute(P, i);
+      for (let k = 0; k < 4; k++) {
+        const bi = SI.getComponent(i, k);
+        bones[j * 4 + k] = sk.bones[bi];
+        w[j * 4 + k] = SW.getComponent(i, k);
+        bm.multiplyMatrices(sk.boneInverses[bi], m.bindMatrix);
+        t.copy(v).applyMatrix4(bm).toArray(u, j * 12 + k * 3);
+      }
+    }
+    // (coarse = the first 1/8, dense = the first half: ~1 cm apart on the hips and thighs)
+    this.probes = { n: Math.ceil(n / 2), coarse: Math.ceil(n / 8), bones, w, u };
+  }
+
+  /**
+   * How far (m) the pelvis must rise along the gear's up for the garments to clear the deck / skis, and
+   * that direction (armature space) in this._clearDir. Garment points inside a plank's footprint and below
+   * its top sheet (+ CLEAR_MARGIN) count; ones much deeper than their distance to the edge are beside the
+   * plank, not through it.
+   */
+  clearance() {
+    if (this.look?.meshes.garments.geometry !== this._probeGeo) this.buildProbes();
+    const pr = this.probes, F = this.gf;
+    if (!pr || !F.n) return 0;
+    const parts = this.board ? [this.board] : this.skis;
+    const p = _v1, l = _v3, row = this._row || (this._row = {}), mats = new Map();
+    // Cheap early-out (every riding frame): hips and knees well clear of every plank's plane → nothing to do.
+    let near = false;
+    for (let i = 0; i < parts.length && !near; i++) {
+      for (const b of ['pelvis', 'calf_l', 'calf_r']) if (l.setFromMatrixPosition(this.g(this.bones[b])).applyMatrix4(F.Minv[i]).y < (b === 'pelvis' ? CLEAR_NEAR : CLEAR_NEAR_KNEE)) { near = true; break; }
+    }
+    if (!near) return 0;
+    let need = 0, at = 0, close = false;
+    for (let j = 0; j < pr.n; j++) {
+      if (j === pr.coarse && !close) break;   // the coarse pass found no cloth near any plank
+      p.set(0, 0, 0);
+      for (let k = 0; k < 4; k++) {
+        const wt = pr.w[j * 4 + k];
+        if (wt <= 0) continue;
+        const b = pr.bones[j * 4 + k];
+        let m = mats.get(b);
+        if (!m) { m = this.g(b); mats.set(b, m); }
+        p.addScaledVector(_v2.fromArray(pr.u, j * 12 + k * 3).applyMatrix4(m), wt);
+      }
+      for (let i = 0; i < parts.length; i++) {
+        l.copy(p).applyMatrix4(F.Minv[i]);
+        if (!plankSurfaceAt(parts[i], l.z, row)) continue;
+        const lat = row.hw - Math.abs(l.x);
+        if (lat <= 0) continue;
+        const d = row.top + CLEAR_MARGIN - l.y;
+        if (d > -0.06 && d < CLEAR_MAX) close = true;
+        if (d <= 0 || d > CLEAR_MAX || d > lat + 0.06) continue;
+        if (d > need) { need = d; at = i; }
+      }
+    }
+    if (need > 0) (this._clearDir || (this._clearDir = new THREE.Vector3())).copy(F.up[at]);
+    return need;
+  }
+
+  /**
+   * Two-bone arm IK: upper / lower arm directions (armature space) that put the wrist of arm `side` on
+   * `target`, the elbow bending toward `pole`.
+   */
+  armReach(side, target, pole) {
+    const B = this.bones, s = side > 0 ? '_l' : '_r';
+    this.inherit(B['clavicle' + s]); this.inherit(B['upperarm' + s]);
+    const sh = pos(this.g(B['upperarm' + s]));
+    const l1 = this.restLocal.get(B['lowerarm' + s]).p.length(), l2 = this.restLocal.get(B['hand' + s]).p.length();
+    const to = target.clone().sub(sh);
+    const miss = to.length() - (l1 + l2);
+    this.reachMiss = Math.max(this.reachMiss, miss);   // (m the hand falls short: gear-clip reports it)
+    this.lastReach = { miss, dir: to.clone().normalize().negate() };   // (toward the shoulder)
+    const d = Math.min(Math.max(to.length(), 0.05), l1 + l2 - 0.002);
+    const dir = to.normalize();
+    const pl = pole.clone().addScaledVector(dir, -pole.dot(dir)).normalize();
+    const cosA = THREE.MathUtils.clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1);
+    const axis = new THREE.Vector3().crossVectors(dir, pl).normalize();
+    const u = dir.clone().applyAxisAngle(axis, Math.acos(cosA));
+    const elbow = sh.clone().addScaledVector(u, l1);
+    return [u, target.clone().sub(elbow).normalize()];
+  }
+
+  /**
+   * Where the grabbing wrist goes (armature space): just outside and above a plank's edge (or end), so the
+   * mitt closes round the edge instead of sinking into the deck. part = index, z = part-local station,
+   * side = which edge (+1 = part-local +X). `away` (0..1, = 1 − grab) holds the wrist out beside and
+   * above that edge, so a grab coming in (or letting go) reaches round the edge, never through the deck.
+   */
+  grabPoint(i, z, side, away = 0) {
+    const parts = this.board ? [this.board] : this.skis, row = plankSurfaceAt(parts[i], z, {}) || { hw: 0.1, top: 0.02 };
+    return new THREE.Vector3(side * (row.hw + GRAB_OUT + 0.3 * away), row.top + GRAB_UP + 0.3 * away, z).applyMatrix4(this.gf.M[i]);
+  }
+
+  /** The station along plank i (part-local z within range zr) nearest to arm `side`'s shoulder. */
+  nearestStation(i, side, zr) {
+    const B = this.bones, s = side > 0 ? '_l' : '_r';
+    this.inherit(B['clavicle' + s]); this.inherit(B['upperarm' + s]);
+    const z = _v3.setFromMatrixPosition(this.g(B['upperarm' + s])).applyMatrix4(this.gf.Minv[i]).z;
+    return THREE.MathUtils.clamp(z, zr[0], zr[1]);
+  }
+
+  /** Fingers of a grabbing hand (armature space): straight down past plank i's edge on `side` (the mitt hugs the sidewall). */
+  grabFingers(i, side) {
+    const up = this.gf.up[i], out = new THREE.Vector3(side, 0, 0).transformDirection(this.gf.M[i]);
+    return up.clone().multiplyScalar(-1).addScaledVector(out, 0.05).normalize();
+  }
+
+  /** After armAim: turn the grabbing hand so its fingers point along `dir` (weight w). */
+  aimHand(side, dir, w) {
+    const B = this.bones, s = side > 0 ? '_l' : '_r', hand = B['hand' + s], mid = B['middle_01' + s];
+    if (!mid || w < 0.01) return;
+    const m = this.g(hand), ps = new THREE.Vector3(), rq = new THREE.Quaternion(), sc = new THREE.Vector3();
+    m.decompose(ps, rq, sc);
+    const cur = this.restLocal.get(mid).p.clone().multiply(sc).applyQuaternion(rq).normalize();
+    this.aim(hand, mid, cur.lerp(dir, w));
+  }
+
   // ------------------------------------------------------------- skeleton posing (armature space)
   g(b) {
     if (this.G.has(b)) return this.G.get(b);
@@ -566,6 +821,60 @@ export class Rider {
   }
 
   pose(pl) {
+    this.gearFrames();
+    this.lift.set(0, 0, 0);
+    const p = this.p, parts = this.board ? [this.board] : this.skis;
+    const moved = this._gearMoved || (this._gearMoved = [0, 0]);
+    moved[0] = moved[1] = 0;
+    // Clearance: no pose may sink the hips, butt, jacket or thighs into the deck / skis. Pose, measure the
+    // garments against the gear (clearance()), raise the pelvis along the gear's up by what's missing and
+    // pose again (the feet stay in the bindings, so the knees open up: the body rises off the board).
+    // Grabs: in the air a hand that can't reach brings the board / ski to it (the knees pull up), as riders
+    // do — the hand never reaches down through the body.
+    for (let it = 0; ; it++) {
+      this.reachMiss = 0;
+      this.grabNeed = [];
+      this.legNeed = [null, null];
+      this.poseOnce(pl);
+      this.poseIters = it + 1;
+      if (p.sit > 0.01 || p.crash > 0.5 || it >= 9) break;
+      let again = false, gearMoved = false;
+      const d = this.clearance();
+      if (d >= 0.002) { this.lift.addScaledVector(this._clearDir, d + 0.002); again = true; }
+      const airy = p.air > 0.3 && !(p.grind > 0.1);
+      // A grab that can't reach: the gear comes to the hand (only while nothing clips: the hips win).
+      if (airy && d < 0.002 && it < 5) {
+        for (const n of this.grabNeed) {
+          if (n.miss < 0.004 || moved[n.part] > ANIM.grabGearReach || n.skiHold) continue;
+          const step = Math.min(n.miss + 0.004, ANIM.grabGearReach - moved[n.part]) * p.air;
+          _v2.copy(n.dir).transformDirection(this.gf.Mva);
+          // (skis come up together — the legs tuck as a pair — and never sideways into the other leg)
+          if (!this.board) { _v2.x = 0; if (_v2.lengthSq() < 1e-4) continue; _v2.normalize(); }
+          for (let i = 0; i < parts.length; i++) { parts[i].position.addScaledVector(_v2, step); moved[i] += step; }
+          gearMoved = again = true;
+          break;
+        }
+      }
+      // Boots never leave their bindings: a leg that can't reach its binding brings the gear to the foot in
+      // the air, or lowers the hips on the snow.
+      let worst = null;
+      for (let k = 0; k < 2; k++) {
+        const n = this.legNeed[k];
+        if (!n || n.miss < 0.003) continue;
+        if (airy) {
+          const part = this.board ? 0 : k;
+          parts[part].position.addScaledVector(_v2.copy(n.dir).transformDirection(this.gf.Mva), n.miss + 0.002);
+          gearMoved = again = true;
+          if (this.board) break;
+        } else if (!worst || n.miss > worst.miss) worst = n;
+      }
+      if (worst) { this.lift.addScaledVector(worst.dir, -(worst.miss + 0.002)); again = true; }
+      if (gearMoved) this.gearFrames();
+      if (!again) break;
+    }
+  }
+
+  poseOnce(pl) {
     const B = this.bones;
     for (const [b, r] of this.restLocal) { b.position.copy(r.p); b.quaternion.copy(r.q); b.scale.copy(r.s); }
     this.G.clear();
@@ -584,7 +893,8 @@ export class Rider {
       off = off.clone(); off.y += id * 0.008 * Math.sin(t * 1.7);
     }
     const rp = this.restGlobal.get(B.pelvis);
-    const pp = pos(rp).add(off);
+    // (+ the boot / binding stack, and the clearance lift that keeps the garments out of the gear)
+    const pp = pos(rp).add(off).addScaledVector(this.stack || _v1.set(0, 0, 0), 1 - p.sit).add(this.lift);
     const pq = new THREE.Quaternion().setFromAxisAngle(Y, yaw)
       .multiply(_q.setFromAxisAngle(X, pitch))
       .multiply(_q2.setFromRotationMatrix(rp));
@@ -609,7 +919,7 @@ export class Rider {
     const p = this.p;
     const ns = 1 - p.sit;
     const drop = p.crouch * 0.38 + p.tuck * 0.1;
-    const hipPitch = THREE.MathUtils.degToRad(10 + p.crouch * 22 + p.tuck * 22) * ns;
+    const hipPitch = THREE.MathUtils.degToRad(10 + p.crouch * 22 + p.tuck * 22 + p.grab * 14) * ns;   // (grabs: folding over the skis that came up)
     // Angulation: hips move to the inside of the turn, upper body stays more upright than the legs.
     // Only edge on the lean's side and beyond it angulates. A lean with less edge under it (a
     // cross-slope, a turn being let go) or an edge already rolled to the other side (the edge change)
@@ -627,7 +937,7 @@ export class Rider {
     // Pressing shifts the hips over the pressed end (tails: back, tips: forward).
     const off = new THREE.Vector3(-angul * 0.12, -drop * ns - p.crash * 0.5, -p.crouch * 0.06 * ns - p.stop * 0.05 + p.press * ANIM.skiPressShift * ns);
     const twist = p.twist * ns;
-    let bend = THREE.MathUtils.degToRad(10 + p.crouch * 16 + p.tuck * 30) * (1 - p.air * 0.3) - p.flipLoad * ANIM.flipLoadArch;
+    let bend = THREE.MathUtils.degToRad(10 + p.crouch * 16 + p.tuck * 30) * (1 - p.air * 0.3) + p.grab * THREE.MathUtils.degToRad(18) - p.flipLoad * ANIM.flipLoadArch;
     bend -= THREE.MathUtils.degToRad(12) * p.sit;
     const wob = p.stumble * Math.sin(p.t * 9) * 0.25;
     // Riding switch (twin tips): twist the torso and look back over the shoulder down the path.
@@ -646,11 +956,14 @@ export class Rider {
       headYaw + look.yaw, -(hipPitch * 0.55 + bend) * 0.95 * (1 - back * 0.6) + look.pitch, headRoll);
     for (const side of [1, -1]) {
       // Armature +X is the rider's left (visual −X): match the ski's lift so the boots stay clipped in.
-      const wide = ANIM.skiStance + p.plow * 0.1 + Math.abs(p.lean) / ANIM.maxLean * ANIM.skiStanceCarve * (1 - p.air);
-      const lx = -side * wide;
-      const ankle = new THREE.Vector3(side * wide, this.ankleH + p.air * 0.12 + p.grab * 0.1 + p.flipTuck * ANIM.flipTuckLift + (this.skiPitchLift || 0) + lx * Math.tan(p.lean), Math.max(0, -side * this.skiTipLead()));
-      // Feet point down the skis; tips pinch together in a snowplough.
-      this.leg(side, ankle, new THREE.Vector3(side * 0.12, 0, 1), -side * p.plow * 0.28);
+      // Boots clipped into the bindings: the sole on the plate, the foot turning with the ski (edge roll,
+      // pitch, the plough's wedge, crossed / tweaked skis), so no boot pokes through the ski.
+      const fq = new THREE.Quaternion();
+      const ankle = this.seatAnkle(side > 0 ? 0 : 1, side, _v1.set(0, SKI_BINDING_SEAT, 0), 0, fq);
+      fq.slerp(_qI, p.crash);
+      fq.slerp(_q.setFromAxisAngle(X, ANIM.liftSkiHang), p.sit);   // on the chairlift the boots (and skis) hang tips down
+      (this.footQ || (this.footQ = [new THREE.Quaternion(), new THREE.Quaternion()]))[side > 0 ? 0 : 1].copy(fq);
+      this.leg(side, ankle, new THREE.Vector3(side * 0.12, 0, 1), 0, fq);
       this.armSki(side, pl);
     }
   }
@@ -659,7 +972,6 @@ export class Rider {
     const p = this.p, st = this.equip.spec.stance;
     const ns = 1 - p.sit;
     const nx = this.equip.stance === 'goofy' ? -1 : 1;   // armature X of the board nose
-    const lift = p.air * BA.airTuck + p.grab * BA.grabTuck + p.flipTuck * ANIM.flipTuckLift;
     const drop = BA.crouch + p.crouch * 0.14 + pl.speedRatio * BA.crouchSpeed * (1 - p.air) + p.grab * 0.08;
     const off = new THREE.Vector3(
       nx * p.press * BA.pressShift - nx * 0.02,
@@ -701,30 +1013,32 @@ export class Rider {
     for (const [sx, ang] of feet) {
       const along = sx * w;
       const legSide = along > 0 ? 1 : -1;    // armature +X → left leg
-      // Board pitch (press / pop snap): the board pivots about the end on the snow (placeBoard), so each
-      // binding rises by sin(pitch)·(distance toward the nose) plus the pivot lift.
-      const sp = Math.sin(p.pitch);
-      const pitchLift = sp * along * nx + Math.abs(sp) * this.equip.spec.length * 0.38;
-      const ankle = new THREE.Vector3(along, this.ankleH + 0.02 + lift + pitchLift, 0);
-      ankle.lerp(new THREE.Vector3(legSide * 0.12, this.ankleH + 0.35, 0.42), p.sit);
+      // Boots strapped into the bindings: the sole on the baseplate, the foot turning with the board (edge
+      // roll, press / pop pitch, tweaks), so nothing pokes through the deck or the base.
       let footYaw = nx * THREE.MathUtils.degToRad(ang) * ns;
+      const fq = new THREE.Quaternion();
+      const bz = this.gear.userData.parts.bindings[sx === nx ? 0 : 1].position.z;
+      const ankle = this.seatAnkle(0, legSide, _v1.set(0, BOARD_BINDING_SEAT, bz), footYaw, fq);
+      ankle.lerp(new THREE.Vector3(legSide * 0.12, this.ankleH + 0.35, 0.42), p.sit);
       if (sx !== nx && sk > 0.01) {
         // Skating foot: plant beside the front binding on the toe side, push back past the tail,
         // then lift and swing forward again; the foot points down the board.
         const ph = p.skatePhase || 0;
         const push = ph < 0.6 ? ph / 0.6 : 1 - (ph - 0.6) / 0.4;
         const lift2 = ph < 0.6 ? 0 : Math.sin((ph - 0.6) / 0.4 * Math.PI) * 0.12;
-        ankle.lerp(new THREE.Vector3(nx * (0.08 - push * 0.6), this.ankleH + lift2, 0.3), sk);
+        ankle.lerp(new THREE.Vector3(nx * (0.08 - push * 0.6), -this.boot[legSide].off.y + lift2, 0.3), sk);
         footYaw += (nx * Math.PI * 0.5 - footYaw) * sk;
+        fq.slerp(_q.setFromAxisAngle(Y, footYaw), sk);   // (off the board: flat on the snow)
       }
+      fq.slerp(_q.setFromAxisAngle(Y, footYaw), Math.max(p.sit, p.crash));
       const pole = new THREE.Vector3(legSide * 0.25, 0, 1);
-      this.leg(legSide, ankle, pole, footYaw);
+      this.leg(legSide, ankle, pole, footYaw, fq);
     }
     for (const side of [1, -1]) this.armBoard(side, nx, pl);
   }
 
   /** Two-bone leg IK toward `ankle` (armature space), knee bending toward `pole`, foot yaw `footYaw`. */
-  leg(side, ankle, pole, footYaw) {
+  leg(side, ankle, pole, footYaw, footQ = null) {
     const B = this.bones, p = this.p, s = side > 0 ? '_l' : '_r';
     const thigh = B['thigh' + s], calf = B['calf' + s], foot = B['foot' + s];
     this.inherit(thigh);
@@ -733,6 +1047,8 @@ export class Rider {
     ankle.lerp(hip.clone().add(new THREE.Vector3(side * 0.25, -0.75, 0.25)), p.crash);
     const l1 = this.restLocal.get(calf).p.length(), l2 = this.restLocal.get(foot).p.length();
     const to = ankle.clone().sub(hip);
+    // (out of reach: rider.pose brings the gear / the hips so the boot stays in its binding)
+    if (this.legNeed && to.length() > l1 + l2 - 0.002 && p.sit < 0.01 && p.crash < 0.01) this.legNeed[side > 0 ? 0 : 1] = { miss: to.length() - (l1 + l2 - 0.002), dir: to.clone().normalize().negate() };
     const d = Math.min(Math.max(to.length(), 0.05), l1 + l2 - 0.002);
     const dir = to.normalize();
     pole = pole.clone().addScaledVector(dir, -pole.dot(dir)).normalize();
@@ -744,7 +1060,7 @@ export class Rider {
     this.aim(calf, foot, ankle.clone().sub(pos(this.g(calf))));
     this.inherit(foot);
     const rf = this.restGlobal.get(foot);
-    const fq = new THREE.Quaternion().setFromAxisAngle(Y, footYaw).multiply(_q.setFromRotationMatrix(rf));
+    const fq = (footQ ? new THREE.Quaternion().copy(footQ) : new THREE.Quaternion().setFromAxisAngle(Y, footYaw)).multiply(_q.setFromRotationMatrix(rf));
     this.setGlobal(foot, new THREE.Matrix4().compose(pos(this.g(foot)), fq, scl(rf)));
   }
 
@@ -837,17 +1153,36 @@ export class Rider {
     const loG = name === 'Mute' ? V(0.35, -0.85, 0.3) : name === 'Japan' ? V(-side * 0.1, -0.9, 0.35) : name === 'Tail grab' ? V(side * 0.12, -0.75, -0.6)
       : name === 'Truck driver' ? V(side * 0.08, -0.6, 0.78) : V(side * 0.1, -0.9, 0.3);
     const g = side === grabHand || name === 'Truck driver' ? p.grab : 0;
+    // The grabbing hand closes round a ski's edge (two-bone IK to the real ski, crossed / tweaked or not):
+    // Safety = own ski, outside edge ahead of the toe piece; Japan = further forward (the skis cross under
+    // it); Mute = the right hand across to the left ski's inside edge;
+    // Tail grab = own ski's tail; Truck driver = both hands to their ski's front.
+    let grabIK = null;
+    if (g > 0.01) {
+      const ski = name === 'Mute' ? 0 : side > 0 ? 0 : 1;            // armature +X (left) = ski 0
+      const out = ski === 0 ? -1 : 1;                                  // ski-local X away from the other ski
+      const zr = name === 'Tail grab' ? [0.35, 0.6] : name === 'Truck driver' ? [-0.62, -0.4] : name === 'Japan' ? [-0.5, -0.32] : [-0.42, -0.26];
+      const z = this.nearestStation(ski, side, zr);
+      const edge = name === 'Mute' ? -out : out;                        // Mute: the inside edge (across)
+      grabIK = this.armReach(side, this.grabPoint(ski, z, edge, 1 - g), V(side, 0.4, name === 'Tail grab' ? -0.5 : 0.1));
+      grabIK.push(this.grabFingers(ski, edge));
+      // (only a Tail grab brings the skis back to the hand: the others reach, and skis pulled into the
+      // folded legs bunch the jacket hem between the knees)
+      if (this.lastReach.miss > 0 && this.grabNeed) this.grabNeed.push({ part: ski, miss: this.lastReach.miss * g, dir: this.lastReach.dir, skiHold: name !== 'Tail grab' });
+    }
     // Double-pole push: reach forward and up, then plant and drive the hands back past the hips.
     const ph = p.pushPhase || 0, reachF = ph < 0.4 ? ph / 0.4 : 1 - (ph - 0.4) / 0.6;
     const upP = V(side * 0.3, -0.75 + reachF * 0.45, -0.25 + reachF * 1.0), loP = V(side * 0.1, -0.5 + reachF * 0.3, 0.2 + reachF * 0.7);
     const upF = V(side * 0.3, -0.55, 0.65), loF = V(-side * 0.05, -0.45, 0.9);   // flip tuck: hands to the shins
     let u = upS.lerp(upP, p.push).lerp(upT, p.tuck).lerp(upA, p.air * (1 - g)).lerp(upF, p.flipTuck).lerp(upG, g);
     let l = loS.lerp(loP, p.push).lerp(loT, p.tuck).lerp(loA, p.air * (1 - g)).lerp(loF, p.flipTuck).lerp(loG, g);
+    if (grabIK) { const w = THREE.MathUtils.smoothstep(g, 0, 0.35); u.normalize().lerp(grabIK[0], w); l.normalize().lerp(grabIK[1], w); }
     this.armSpin(side, u, l, 1 - g);
     this.armGrind(side, u, l, 1 - g);
     [u, l] = this.armOverlays(side, u, l);
     if (this.fp) [u, l] = fpSkiArm(this, side, pl, u, l);   // first person: gloves framed in view (fpview.js)
     this.armAim(side, u, l);
+    if (grabIK && !this.fp) this.aimHand(side, grabIK[2], THREE.MathUtils.smoothstep(g, 0, 0.35) * (1 - p.stumble) * (1 - p.crash));
     // First person: turn the gloves into a pole grip (palms in, knuckles forward).
     if (this.fp) fpHand(this, side, true);
   }
@@ -905,21 +1240,27 @@ export class Rider {
     // Grabs: Indy = rear hand, toe edge between the feet; Melon = front hand, heel edge; Nose / Tail.
     const name = pl.grabName || 'Indy';
     const grabFront = name === 'Melon' || name === 'Nose grab';
+    let handAim = null;
     if (front === grabFront && p.grab > 0.01) {
-      const B = this.bones, s = side > 0 ? '_l' : '_r';
-      this.inherit(B['clavicle' + s]); this.inherit(B['upperarm' + s]);
-      const sh = pos(this.g(B['upperarm' + s]));
-      const gy = this.ankleH + p.air * BA.airTuck + p.grab * BA.grabTuck + 0.05;
-      const half = this.equip.spec.length * 0.42;
-      const target = name === 'Melon' ? V(0, gy, -0.14) : name === 'Nose grab' ? V(nx * half, gy, 0) : name === 'Tail grab' ? V(-nx * half, gy, 0) : V(0, gy, 0.14);
-      const d = target.sub(sh).normalize();
-      u.lerp(d.clone().add(V(0, 0, 0.15)), p.grab);
-      l.lerp(d, p.grab);
+      // The hand closes round the board's edge (two-bone IK to the real board, wherever the tweak put it):
+      // Indy = toe edge between the feet, Melon = heel edge, Nose / Tail = the toe edge near that end.
+      const spec = this.equip.spec, toe = this.equip.stance === 'goofy' ? -1 : 1, sb = spec.setback || 0;
+      // The stretch of edge each grab may take (board-local z), the hand closing on its nearest point.
+      const L = spec.length;
+      const zr = name === 'Nose grab' ? [-L * 0.44 - sb, -L * 0.3 - sb] : name === 'Tail grab' ? [L * 0.3 - sb, L * 0.44 - sb] : name === 'Melon' ? [-0.2, 0.05] : [-0.1, 0.2];
+      const target = this.grabPoint(0, this.nearestStation(0, side, zr), name === 'Melon' ? -toe : toe, 1 - p.grab);
+      const [uI, lI] = this.armReach(side, target, V(side, 0.5, name === 'Melon' ? -0.6 : 0.2));
+      if (this.lastReach.miss > 0 && this.grabNeed) this.grabNeed.push({ part: 0, miss: this.lastReach.miss * p.grab, dir: this.lastReach.dir });
+      const w = THREE.MathUtils.smoothstep(p.grab, 0, 0.35);
+      u.normalize().lerp(uI, w);
+      l.normalize().lerp(lI, w);
+      handAim = [this.grabFingers(0, name === 'Melon' ? -toe : toe), w];
     }
     this.armGrind(side, u, l, 1 - p.grab);
     [u, l] = this.armOverlays(side, u, l);
     if (this.fp) [u, l] = fpBoardArm(this, side, front, pl, u, l);   // first person: gloves at the frame edges (fpview.js)
     this.armAim(side, u, l);
+    if (handAim && !this.fp) this.aimHand(side, handAim[0], handAim[1] * (1 - p.stumble) * (1 - p.crash));
     if (this.fp) fpHand(this, side, false);
   }
 

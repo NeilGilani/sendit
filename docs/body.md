@@ -305,3 +305,11 @@ Each one drives the real game with `player.script`, freezes physics (`player.deb
 moment and photographs the rider with the inspect camera (`cam.inspect`) from the listed angles. HUD and
 snow spray are hidden. `GPU=1` on Windows; on macOS it uses ANGLE/Metal. Run it against a server whose
 files you are not editing: a source edit reloads the page mid-run.
+
+## Rider vs gear (no clipping)
+
+Boots seated in the bindings, the garment clearance pass, grabs that bring the gear to the hand and the
+`gear-clip.mjs` penetration check are documented in docs/equipment.md § *Boots, bindings and clearance*.
+The clearance pass reads the outfit's skinned vertices (hips, butt, hem, thighs, shins), so new garment cuts
+are covered automatically; run `node web/scripts/gear-clip.mjs <url> --quick --fits --check` after changing
+garments.

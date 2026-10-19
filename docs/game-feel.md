@@ -715,6 +715,34 @@ Event: `thrillNextMedal {medal, gap, close}`.
   - A versus link: the ghost, the live gap, the verdict row and the share button.
   - No console errors.
 
+## 9. Polish pass, night 2 (2026-10-19)
+
+**Background people (`life.js`).** Valcrest is the only built-in map with other riders on the run, and they
+used to be blocky box-and-cylinder figures in neon jackets with flat (faceted) normals. One walked right past the
+lobby camera, so it filled the left of the Home screen.
+- *Lobby:* `life.setStage(spot)` (main.js passes the stage spot while the lobby is up). Over the stretch of run
+  from 30 m above the plinth (where the stage camera sits) to 30 m below it, skiers swing at least
+  `LOBBY_CLEAR` = 22 m to their own side of it. The swing is eased in over 35 m and stays continuous, so nobody
+  pops in or out; they ski past beyond the edge of the shot. Leaving the lobby eases the swing off over 3 s.
+  Measured over 30 s of lobby: nearest skier 23 m from the plinth, 28 m from the camera (was about 2 m).
+- *Look:* smooth capsule limbs and torso, a round helmet with a goggle lens band and strap, gaiter, gloves, rounded
+  boots, skis with upturned tips. Colours are whole outfit colourways from `character/outfits.js` `COLORWAYS`
+  (everything except the grey Rental kit), so the mountain dresses like your locker. Every third rider is a
+  snowboarder (`boarderGeometry`). Chairlift passengers use the same parts. `skierGeometry(j, p, h, s, kit?)` keeps
+  its signature, so the activity ghost and versus ghost get the smoother body too.
+
+**Trail sign: your best.** When a ride starts, the trail sign (`maps/trailhud.js`) now carries a "Your best"
+chip with your saved best time and medal on this course, like STEEP's drop-zone card that always says what to beat.
+It shows nothing until you have a time.
+
+**QA fixes (headless play-tests: Valcrest ski, Ravenspire board, Voltage ski + board, Kitsune board + ski, at 1440×900 and 390×844):**
+- The level-up celebration (`progression/ui.js`) played over the pause menu and over the end-of-run cards
+  (Kitsune / Ravenspire freeride judging, Voltage slopestyle judging), so both were unreadable. It now waits for
+  those cards like it already waited for modals (`LV_BLOCKERS`), and hides if one opens mid-celebration.
+- Phones (≤ 600 px wide): the flow meter moved to the top-left corner (it sat under the speed read-out); the
+  freeride and slopestyle result cards are compact and sit low, under the achievement toasts; hints wrap inside
+  the screen instead of running off both edges.
+
 ## Tests and tools
 
 - `node web/scripts/unittest.mjs` includes `progression-unit.mjs`. It covers:
