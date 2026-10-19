@@ -13,7 +13,7 @@ import { patchShaderChunks, globals, makeNoiseTexture, applyMapAtmosphere } from
 import { HUD } from './config.js';
 import { ATMOSPHERE, col, createSnowfall } from './scene.js';
 import { Terrain } from './terrain.js';
-import { Activities } from './activities.js';
+import { Activities, bestFor, courseKey } from './activities.js';
 import { Life } from './life.js';
 import { Sky } from './sky.js';
 import { Scatter } from './scatter.js';
@@ -435,7 +435,7 @@ async function startRide(instant = false, mode = 'zen') {
   emit('rideStarted', { mapId: currentMap.map.id, trailId: currentMap.trail, equipment: profileStore.equipment });
   if (!instant) ui.fade(false, 0.9);
   const trail = getTrail(currentMap.map, currentMap.trail);
-  if (trail) setTimeout(() => { if (game.mode === Mode.RIDING) showTrailToast(currentMap.map, trail); }, instant ? 150 : 650);
+  if (trail) setTimeout(() => { if (game.mode === Mode.RIDING) showTrailToast(currentMap.map, trail, { best: bestFor(courseKey(course)) }); }, instant ? 150 : 650);
   busy = false;
 }
 
@@ -578,6 +578,7 @@ function frame(now) {
   terrain.update(camera.position);
   scatter.update(camera.position);
   lifts.update(time, camera.position);
+  life.setStage(inLobby ? stage.spot : null);   // background skiers swing wide of the lobby plinth
   life.update(paused ? 0 : dt, time, player, camera.position);
   snowfall.update(camera, time, innerHeight);
   if (!paused && !replaying) { fx.update(dt, camera); activities.update(dt * (juice?.warp.k ?? 1)); }
