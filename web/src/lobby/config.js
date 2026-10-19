@@ -8,8 +8,8 @@ export const STAGE = {
   plinthBury: 0.6,               // m the skirt reaches below the lowest snow under it
 
   // Neon rim + ticks (HDR colours: > 1 blooms through the game's post stack).
-  neon: '#2ff5d6',
-  neon2: '#ff5fb0',
+  neon: '#ff5a1f',               // ski-patrol orange (the lobby accent, --c-signal)
+  neon2: '#dfe8f0',              // snow-white ticks
   neonGlow: 2.6,
 };
 

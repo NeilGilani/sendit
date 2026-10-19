@@ -335,14 +335,14 @@ body.cr-open #lobby, body.cr-open .cn-stack { opacity: 0 !important; pointer-eve
 .cr-stats i, .cr-stats i::after { border-radius: 0; box-shadow: none; }
 .cr-summary small { font-family: var(--font-mono); font-weight: 500; }
 .cr-overlay.d3 .cr-rtext { border-radius: var(--r1); }
-.cr-btn { border-radius: var(--r1); font-weight: 800; font-stretch: 78%; font-style: normal; text-transform: uppercase; letter-spacing: .05em;
+.cr-overlay .cr-btn { border-radius: var(--r1); font-weight: 800; font-stretch: 78%; font-style: normal; text-transform: uppercase; letter-spacing: .05em;
   background: transparent; border: 1px solid var(--c-line-2) !important; }
-.cr-btn small { font-family: var(--font-mono); font-weight: 500; text-transform: none; letter-spacing: 0; }
-.cr-btn.primary { background: var(--c-snow); color: var(--c-paper-ink); border-color: var(--c-snow) !important; box-shadow: inset 0 -3px 0 var(--rc, var(--c-signal)); }
-.cr-btn:hover, .cr-btn:focus-visible { transform: none; background: rgba(255,255,255,.08); }
-.cr-btn.primary:hover, .cr-btn.primary:focus-visible { background: #fff; }
+.cr-overlay .cr-btn small { font-family: var(--font-mono); font-weight: 500; text-transform: none; letter-spacing: 0; }
+.cr-overlay .cr-btn.primary { background: var(--c-snow); color: var(--c-paper-ink); border-color: var(--c-snow) !important; box-shadow: inset 0 -3px 0 var(--rc, var(--c-signal)); }
+.cr-overlay .cr-btn:hover, .cr-overlay .cr-btn:focus-visible { transform: none; background: rgba(255,255,255,.08); }
+.cr-overlay .cr-btn.primary:hover, .cr-overlay .cr-btn.primary:focus-visible { background: #fff; }
 .cr-overlay :focus-visible { outline: 2px solid var(--c-signal); outline-offset: 2px; }
-.cr-skip { border-radius: var(--r1); background: rgba(10,18,26,.85); border: 1px solid var(--c-line-2); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: .85em; }
+.cr-overlay .cr-skip { border-radius: var(--r1); background: rgba(10,18,26,.85); border: 1px solid var(--c-line-2); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: .85em; }
 .cr-skip kbd, .cr-auto kbd, .cr-quick kbd { font-family: var(--font-mono); border-radius: var(--r1); }
 .cr-hold { background: rgba(255, 90, 31, .4); }
 .cr-quick input { accent-color: var(--c-signal); }
