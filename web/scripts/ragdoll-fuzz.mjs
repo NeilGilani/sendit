@@ -150,9 +150,14 @@ function runCrash(sc, seconds = 4) {
         out.attach = Math.max(out.attach, _v.distanceTo(_w));
       }
     }
-    if (out.sleep !== null && t > out.sleep + 0.3 && t > 1.5) break;
+    // The respawn fade (player.crashStep asks doneAt): what the player sees slide is the travel until the fade
+    // has covered the screen (0.45 s, player.fadeThen).
+    if (out.fadeAt === undefined && ctl.doneAt(t)) out.fadeAt = t;
+    if (out.shown === undefined && out.fadeAt !== undefined && t >= out.fadeAt + 0.45) out.shown = ctl.m.dist;
+    if (out.sleep !== null && t > out.sleep + 0.3 && t > 1.5 && out.shown !== undefined) break;
   }
   out.E0 = E0;
+  if (ctl.m) { out.peak = ctl.m.peak; out.mean = ctl.m.mean; out.swings = ctl.m.swings; out.shown ??= ctl.m.dist; out.fadeAt ??= seconds; }
   if (process.env.DBG && ctl.H) {
     const W = ctl.H.world, { closestSegSeg } = await_solver;
     for (const [A, sa, B, sb] of W.pairs) { const a = A.point(sa.a, new THREE.Vector3()), b = A.point(sa.kind === 'c' ? sa.b : sa.a, new THREE.Vector3()), c = B.point(sb.a, new THREE.Vector3()), d = B.point(sb.kind === 'c' ? sb.b : sb.a, new THREE.Vector3()); const p0 = new THREE.Vector3(), p1 = new THREE.Vector3(); closestSegSeg(a, b, c, d, p0, p1); const pen = sa.r + sb.r - p0.distanceTo(p1); if (pen > -0.005) console.log('  PAIR', A.name, B.name, pen.toFixed(4)); }
@@ -259,6 +264,7 @@ for (let i = (process.env.ONLY ? Number(process.env.ONLY) : 0); i < (process.env
   if (VERBOSE || ((r.fail.length || (r.late && process.env.LATE)) && !CHECK)) console.log(`#${i} ${r.type} ${r.cause} ${r.deg.toFixed(0)}° ${r.speed.toFixed(1)} m/s dt 1/${Math.round(1 / r.dt)}: ${r.fail.join(', ') || 'ok'} (stretch ${(r.stretch * 100).toFixed(2)} cm, below ${(r.below * 100).toFixed(2)} cm, dE ${r.dE.toFixed(1)} J, limit ${(r.limit * 57.3).toFixed(1)}°, rig ${(r.attach * 100).toFixed(1)} cm, sleep ${r.sleep?.toFixed(2) ?? '-'} s; end v ${r.mv?.toFixed(2)} ${r.mvb} w ${r.mw?.toFixed(2)} ${r.mwb} com ${r.comv?.toFixed(2)})`);
 }
 const fails = results.filter((r) => r.fail.length);
+if (process.env.DUMP) (await import('node:fs')).writeFileSync(process.env.DUMP, JSON.stringify(results.map(({ i, type, cause, deg, speed, sleep, fadeAt, shown, peak, mean, swings }) => ({ i, type, cause, deg, speed, sleep, fadeAt, shown, peak, mean, swings }))));
 if (process.env.SLOW) for (const r of results.filter((x) => x.gentle)) console.log('slow', r.i, r.cause, r.deg.toFixed(0), r.speed.toFixed(1), 'com<0.3 at', r.slow?.toFixed(2), 'asleep', r.sleep?.toFixed(2));
 const q = (arr, p) => { const a = [...arr].sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(p * a.length))]; };
 const sleepers = results.filter((r) => r.sleep !== null);
@@ -272,6 +278,15 @@ console.log(`  joints    max ${(Math.max(...results.map((r) => r.limit)) * 57.3)
 console.log(`  rig       max ${(Math.max(...results.map((r) => r.attach)) * 100).toFixed(2)} cm off the bodies   limit < ${LIM.attach * 100}`);
 console.log(`  sleep     ${gentle.filter((r) => r.sleep !== null && r.sleep <= LIM.sleep).length}/${gentle.length} gentle (≤ ${LIM.sleepSlope}°, ≤ ${LIM.sleepSpeed} m/s) asleep by ${LIM.sleep} s (rails aside); median ${q(sleepers.map((r) => r.sleep), 0.5)?.toFixed(2)} s, p95 ${q(sleepers.map((r) => r.sleep), 0.95)?.toFixed(2)} s; all slopes ${sleepers.length}/${N} asleep within 4 s`);
 console.log(`  CPU       ${q(perFrame, 0.5).toFixed(3)} ms per 60 Hz frame median, p95 ${q(perFrame, 0.95).toFixed(3)}, max step ${Math.max(...results.map((r) => r.ms)).toFixed(2)} ms (Node)`);
+// Flappiness (limbs relative to the trunk) and the distance shown sliding before the respawn fade, by slope band.
+const med = (a) => q(a, 0.5), p90 = (a) => q(a, 0.9);
+console.log(`  flapping  peak limb spin vs trunk median ${med(results.map((r) => r.peak)).toFixed(1)} rad/s, p90 ${p90(results.map((r) => r.peak)).toFixed(1)}; mean ${med(results.map((r) => r.mean)).toFixed(2)} rad/s (p90 ${p90(results.map((r) => r.mean)).toFixed(2)}); big swings per crash median ${med(results.map((r) => r.swings))}, p90 ${p90(results.map((r) => r.swings))}, max ${Math.max(...results.map((r) => r.swings))}`);
+for (const [lo, hi] of [[0, 10], [10, 20], [20, 30], [30, 46]]) {
+  const rs = results.filter((r) => r.deg >= lo && r.deg < hi && !r.cause.startsWith('rail'));
+  if (!rs.length) continue;
+  const d = rs.map((r) => r.shown), f = rs.map((r) => r.fadeAt);
+  console.log(`  slide ${String(lo).padStart(2)}–${hi > 45 ? 45 : hi}° ${String(rs.length).padStart(3)} runs: shown before the fade median ${med(d).toFixed(1)} m, p90 ${p90(d).toFixed(1)} m, max ${Math.max(...d).toFixed(1)} m; fade starts median ${med(f).toFixed(2)} s, p90 ${p90(f).toFixed(2)} s`);
+}
 const cats = {};
 for (const r of fails) for (const f of r.fail) { const k = f.replace(/[-+]?[0-9.]+.*$/, '').trim(); cats[k] = (cats[k] || 0) + 1; }
 console.log('  failures by check:', JSON.stringify(cats));
