@@ -1,10 +1,83 @@
-/* Rendered item icons (itemIcons.js): only the picture's box. Card, panel and colour styling live in
-   cases.css / lobby.css. */
-.cr-card .ca-img { display: block; width: 100%; height: 100%; max-height: 7em; object-fit: contain; aspect-ratio: 1; image-rendering: auto; pointer-events: none; user-select: none; }
-.cr-card.big .ca-img { max-height: 14.5em; }
+/* Item tiles: the picture (itemIcons.js) and the rarity frame around it, everywhere an item is a card
+   (reel DOM fallback, case contents, best / recent pulls, the session summary, the Locker grid and
+   detail, the 2D reveal). The reel canvas draws the same tile (reelCanvas.js cardSvg).
+   Reading order, as in CS2 / Fortnite: the grade first (colour field + bold bar), the item second (a
+   smaller, outlined picture at a fixed framing per category), the name third.
+   Selectors are doubled (.cr-card.cr-card) so these win over the older frame rules in cases.css
+   whatever order the two files load in. */
+
+.cr-card.cr-card {
+  /* Grade colour strength: grey is light, so it gets less wash (white text stays readable). */
+  --rw: 50%;
+  --rg: 46%;
+  background:
+    radial-gradient(56% 44% at 50% 42%, color-mix(in srgb, var(--rc) var(--rg), transparent), transparent),
+    linear-gradient(0deg, color-mix(in srgb, var(--rc) var(--rw), transparent), color-mix(in srgb, var(--rc) 12%, transparent) 48%, transparent 74%),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, .035) 0 1px, transparent 1px 7px),
+    linear-gradient(180deg, #172430, #0b131b);
+  box-shadow: inset 0 -0.42em 0 var(--rc), inset 0 0 0 1px color-mix(in srgb, var(--rc) 28%, rgba(214, 228, 240, .07));
+}
+.cr-card.r-common { --rw: 30%; --rg: 26%; }
+.cr-card.r-uncommon { --rw: 56%; --rg: 50%; }
+.cr-card.r-rare { --rw: 58%; --rg: 52%; }
+.cr-card.r-epic { --rw: 56%; --rg: 52%; }
+.cr-card.r-legendary { --rw: 60%; --rg: 56%; }
+/* The top two grades get a lit top edge too. */
+.cr-card.r-epic.cr-card, .cr-card.r-legendary.cr-card {
+  box-shadow: inset 0 -0.42em 0 var(--rc), inset 0 0 0 1px color-mix(in srgb, var(--rc) 55%, transparent), inset 0 2px 0 color-mix(in srgb, var(--rc) 70%, #fff);
+}
+/* ★ gold: a gold field, a gold bar and a slow shimmer across the card. */
+.cr-card.r-gold.cr-card {
+  background:
+    radial-gradient(58% 46% at 50% 42%, rgba(255, 222, 120, .62), transparent),
+    linear-gradient(0deg, rgba(228, 174, 57, .7), rgba(228, 174, 57, .14) 50%, transparent 76%),
+    repeating-linear-gradient(135deg, rgba(255, 240, 190, .06) 0 1px, transparent 1px 7px),
+    linear-gradient(180deg, #4a3712, #1d1505);
+  box-shadow: inset 0 -0.42em 0 #e4ae39, inset 0 0 0 1px rgba(255, 215, 90, .6), inset 0 2px 0 #ffe69a;
+}
+.cr-card.r-gold:not(.missing)::before {
+  content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 246, 200, .32) 48%, rgba(255, 255, 255, .5) 50%, rgba(255, 246, 200, .32) 52%, transparent 62%);
+  transform: translateX(-110%); animation: caShimmer 3.4s ease-in-out infinite;
+}
+@keyframes caShimmer { 0%, 55% { transform: translateX(-110%); } 85%, 100% { transform: translateX(110%); } }
+
+/* The picture: about two thirds of the card's width, centred a little above the middle. */
+.cr-card.cr-card .cr-art { padding: 9% 17% 3%; }
+.cr-card .ca-img { display: block; width: 100%; height: 100%; max-height: none; object-fit: contain; image-rendering: auto; pointer-events: none; user-select: none; }
+.cr-card.cr-card .ca-svg { max-height: none; filter: drop-shadow(0 0 1px #05080c) drop-shadow(0 0 1px #05080c); }
+/* Cards without a name line (session summary, recent pulls): the picture fills more. */
+.cr-card.cr-card:not(:has(.cr-name)) .cr-art { padding: 11% 13% 15%; }
+.cr-card.big.cr-card .cr-art { padding: 10% 12% 6%; }
+
+/* Name strip: a darker band between the picture and the bar, so text stays readable on any grade. */
+.cr-card.cr-card .cr-name { position: relative; z-index: 2; padding: .3em .5em .72em; background: linear-gradient(180deg, rgba(6, 10, 15, 0), rgba(6, 10, 15, .58) 40%); }
+.cr-card.cr-card .cr-name small { color: rgba(222, 232, 240, .66); }
+.cr-card.cr-card .cr-name b { color: #f2f4f1; text-shadow: 0 1px 2px rgba(0, 0, 0, .55); }
+.cr-card.r-gold.cr-card .cr-name b { color: #ffd76a; }
+
+/* Owned-elsewhere / missing silhouettes keep the plain frame (cases.css). */
+.cr-card.missing.cr-card { background: repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 6px, transparent 6px 12px), #111a23;
+  box-shadow: inset 0 -0.32em 0 color-mix(in srgb, var(--rc) 45%, transparent), inset 0 0 0 1px rgba(214, 228, 240, .06); }
+
+/* Locker grid: the selection ring around the new bar. */
+#lobby .lk-item .cr-card.cr-card { transition: box-shadow var(--t1, .11s); }
+#lobby .lk-item.on .cr-card.cr-card { box-shadow: inset 0 -0.42em 0 var(--rc), 0 0 0 2px var(--c-snow), 0 0 0 4px var(--c-signal); }
+#lobby .lk-item:hover .cr-card.cr-card { box-shadow: inset 0 -0.42em 0 var(--rc), 0 0 0 1px var(--c-snow); }
+#lobby .lk-item.on:hover .cr-card.cr-card { box-shadow: inset 0 -0.42em 0 var(--rc), 0 0 0 2px var(--c-snow), 0 0 0 4px var(--c-signal); }
+
 .ca-img.fresh { animation: ca-img-in .28s ease-out both; }
 @keyframes ca-img-in { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .ca-img.fresh { animation: none; } }
-/* Locker detail and the Equipment card: a picture box next to the text. */
-.lk-sel-icon, .eq-icon { float: right; width: 6.5em; height: 6.5em; margin: -.2em -.2em .2em .6em; padding: 0; display: grid; place-items: center; }
+@media (prefers-reduced-motion: reduce) { .ca-img.fresh, .cr-card.r-gold::before { animation: none; } }
+
+/* Locker detail: the big picture (HD) on its own grade stage. The Equipment card keeps a small box. */
+.lk-sel-icon { float: right; width: 9.5em; height: 9.5em; margin: -.3em -.3em .4em .7em; padding: .5em; display: grid; place-items: center; border-radius: var(--r2, 4px);
+  background:
+    radial-gradient(60% 50% at 50% 45%, color-mix(in srgb, var(--rc) 50%, transparent), transparent),
+    linear-gradient(0deg, color-mix(in srgb, var(--rc) 48%, transparent), transparent 70%),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, .035) 0 1px, transparent 1px 7px),
+    linear-gradient(180deg, #172430, #0b131b);
+  box-shadow: inset 0 -.32em 0 var(--rc), inset 0 0 0 1px color-mix(in srgb, var(--rc) 35%, transparent); }
+.eq-icon { float: right; width: 6.5em; height: 6.5em; margin: -.2em -.2em .2em .6em; padding: 0; display: grid; place-items: center; }
 .lk-sel-icon .ca-img, .eq-icon .ca-img, .lk-sel-icon .ca-svg, .eq-icon .ca-svg { width: 100%; height: 100%; max-height: none; object-fit: contain; }
+@media (max-width: 760px) { .lk-sel-icon { width: 7em; height: 7em; } }

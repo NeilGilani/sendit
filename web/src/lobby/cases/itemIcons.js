@@ -9,6 +9,11 @@
 //   iconImage(id)             Promise<HTMLImageElement | null>, decoded (the reel canvas draws it)
 //   requestIcons(ids, prio)   queue bakes (higher prio first)    whenIcons(ids, ms) resolves when baked
 //   onIcon(fn)                fn(id) after each bake             GOLD_ICON = the anonymous ★ card's id
+//   hdId(id)                  the id of the big picture of an item ('hd:' + id)
+//
+// Two looks (iconBaker.js): the TILE picture for every card (flatter colour, crisp dark outline, no
+// bloom, small: 256 / 192 px) and the HD picture (full studio shading, 512 / 384 px), baked only when
+// something big asks for it (the Locker detail, the 2D reveal card).
 //
 // ids are skin keys ('jacket-tuff-shell:woodland') or GOLD_ICON. Cache: in memory (blob URLs of small
 // webp files, ~15–40 kB each) and IndexedDB ('sendit-icons', key `${ICON_VERSION}|${px}|${id}`), so after
@@ -17,15 +22,19 @@
 // Bakes run one at a time, one per animation frame, only while the lobby has a WebGL renderer
 // (window.__sendit.renderer); without one the SVG art stays.
 import { skin } from '../../profile/rewards.js';
-import { rarityOf } from '../../profile/rarity.js';
 import './icons.css';
 
-export const ICON_VERSION = 1;
+export const ICON_VERSION = 2;
 export const GOLD_ICON = 'gold-star';
 const DB = 'sendit-icons', STORE = 'icons';
 
-/** Icon size in device px (the cards are ~120–230 CSS px wide). */
-export const ICON_PX = (typeof devicePixelRatio !== 'undefined' && devicePixelRatio >= 1.5) ? 384 : 256;
+const HI_DPR = typeof devicePixelRatio !== 'undefined' && devicePixelRatio >= 1.5;
+/** Tile icon size in device px (the picture sits in ~65 % of a 6–14 em card). */
+export const ICON_PX = HI_DPR ? 256 : 192;
+/** The big picture (Locker detail ~11 em, the 2D reveal card 17 em). */
+export const HD_PX = HI_DPR ? 512 : 384;
+const HD = 'hd:';
+export const hdId = (id) => (id == null || String(id).startsWith(HD) ? id : HD + id);
 const prefix = `${ICON_VERSION}|${ICON_PX}|`;
 
 const urls = new Map();          // id → blob URL
@@ -103,9 +112,11 @@ function getBaker() {
 }
 
 function describe(id) {
-  if (id === GOLD_ICON) return { skin: null, rarity: 'gold' };
-  const s = skin(id);
-  return s ? { skin: s, rarity: s.variant.rarity || 'common' } : null;
+  const hd = id.startsWith(HD);
+  const base = hd ? id.slice(HD.length) : id;
+  if (base === GOLD_ICON) return { skin: null, rarity: 'gold', hd };
+  const s = skin(base);
+  return s ? { skin: s, rarity: s.variant.rarity || 'common', hd } : null;
 }
 
 function next() {
@@ -135,7 +146,7 @@ async function pump() {
       if (!d) { failed.add(id); done(id); continue; }
       try {
         const m = await import('./iconBaker.js');
-        const blob = await b.bake(m.describeIcon(d.skin, d.rarity), ICON_PX, rarityOf(d.rarity).color);
+        const blob = await b.bake(m.describeIcon(d.skin, d.rarity), d.hd ? HD_PX : ICON_PX, d.hd ? 'hd' : 'tile');
         if (blob) { urls.set(id, URL.createObjectURL(blob)); store(id, blob); }
       } catch (e) {
         console.warn('[icons] bake failed', id, e);
@@ -207,9 +218,16 @@ const imgHtml = (id, fresh = false) => `<img class="ca-img${fresh ? ' fresh' : '
  * The art block of a card: the baked picture, or `fallback` (the flat SVG) until it is ready.
  * `icon: false` keeps the flat art (silhouettes of skins you do not own).
  */
-export function artHtml(id, fallback, { icon = true, prio = 1, cls = '' } = {}) {
+export function artHtml(id, fallback, { icon = true, prio = 1, cls = '', hd = false } = {}) {
   const c = cls ? `cr-art ${cls}` : 'cr-art';
   if (!icon || disabled || id == null) return `<div class="${c}">${fallback}</div>`;
+  if (hd) {
+    // The big picture; the tile picture (or the flat art) stands in until it is baked.
+    const big = hdId(id);
+    const url = iconUrl(big, prio + 1);
+    const tile = url ? null : iconUrl(id, prio + 2);
+    return `<div class="${c}" data-icon="${esc(big)}">${url ? imgHtml(big) : tile ? imgHtml(id) : fallback}</div>`;
+  }
   const url = iconUrl(id, prio);
   return `<div class="${c}" data-icon="${esc(id)}">${url ? imgHtml(id) : fallback}</div>`;
 }
@@ -217,7 +235,7 @@ export function artHtml(id, fallback, { icon = true, prio = 1, cls = '' } = {}) 
 // Debug / capture hook (scripts/iconsheet.mjs): bake a list and wait, read the URLs.
 if (typeof window !== 'undefined') {
   window.__senditIcons = {
-    version: ICON_VERSION, px: ICON_PX, urls, failed, GOLD_ICON,
+    version: ICON_VERSION, px: ICON_PX, hdPx: HD_PX, hdId, urls, failed, GOLD_ICON,
     request: requestIcons, when: whenIcons,
     pending: () => queue.size + (running ? 1 : 0),
     async clear() { for (const u of urls.values()) URL.revokeObjectURL(u); urls.clear(); images.clear(); const d = await db(); if (d) d.transaction(STORE, 'readwrite').objectStore(STORE).clear(); },

@@ -72,11 +72,17 @@ const COMPOSITE_VERT = /* glsl */`
 varying vec2 vUv;
 void main() { vUv = vec2(uv.x, 1.0 - uv.y); gl_Position = vec4(position.xy, 0.0, 1.0); }`;
 
-// HDR (premultiplied, 2x) → tone-mapped straight-alpha sRGB with bloom, contact shadow and grade glow.
+// HDR (premultiplied, 2x) → tone-mapped straight-alpha sRGB, transparent around the subject. Two looks:
+//  · tile (uFlat 1): the small card picture. Flatter, slightly bolder colour (shading contrast pulled
+//    in, highlights rolled off early so chrome / gloss read as colour, not as white glints), no bloom,
+//    and a crisp dark outline around the silhouette so it pops off the rarity background.
+//  · hd (uFlat 0): the big picture (Locker detail, 2D reveal): the full studio shading with a soft bloom.
+// No grade glow: the card / panel behind the picture carries the rarity colour.
 // The image is flipped (vUv.y) so readPixels returns rows top-down.
 const COMPOSITE_FRAG = /* glsl */`
 uniform sampler2D tHdr; uniform vec2 uTexel; uniform float uExposure;
-uniform vec3 uGlowCol; uniform float uGlowA; uniform vec4 uShadow; uniform float uShadowA;
+uniform vec4 uShadow; uniform float uShadowA;
+uniform float uFlat; uniform float uBloom; uniform float uOutline; uniform vec3 uOutlineCol;
 varying vec2 vUv;
 vec4 hdr(vec2 uv) {
   return 0.25 * (texture2D(tHdr, uv + uTexel * vec2(-0.5, -0.5)) + texture2D(tHdr, uv + uTexel * vec2(0.5, -0.5))
@@ -97,37 +103,56 @@ vec3 neutral(vec3 color) {     // Khronos PBR Neutral, as gfx/post.js
   return mix(color, vec3(newPeak), g);
 }
 vec3 toSRGB(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+float solid(vec2 uv) { return smoothstep(0.35, 0.65, texture2D(tHdr, uv).a); }
 void main() {
   vec4 s = hdr(vUv);
   float a = clamp(s.a, 0.0, 1.0);
   vec3 c = a > 1e-4 ? s.rgb / a : vec3(0.0);
-  c = clamp(neutral(c * uExposure), 0.0, 1.0);
-  // Gentle grade: a touch of contrast and saturation (gfx/post.js does the same after its tone curve).
+  vec3 lin = c * uExposure;
+  // Tile: roll the hot end off before the tone curve (glints and mirror sky become colour, not white).
+  float pk = max(lin.r, max(lin.g, lin.b));
+  float over = max(pk - 0.7, 0.0);
+  lin *= mix(1.0, (pk - over + over / (1.0 + over * 2.5)) / max(pk, 1e-4), uFlat);
+  c = clamp(neutral(lin), 0.0, 1.0);
+  // Grade (in a gamma-ish space): saturation and contrast; the tile pulls shading contrast in and
+  // lifts saturation so the item reads as flat colour blocks at small sizes.
   vec3 g = sqrt(c);
   float l = dot(g, vec3(0.2126, 0.7152, 0.0722));
-  g = mix(vec3(l), g, 1.06);
-  g = clamp((g - 0.5) * 1.08 + 0.5, 0.0, 1.0);
+  float lt = mix(l, 0.5 + (l - 0.48) * 0.78, uFlat);
+  g *= lt / max(l, 1e-4);
+  l = lt;
+  g = mix(vec3(l), g, mix(1.06, 1.2, uFlat));
+  g = clamp((g - 0.5) * mix(1.08, 1.0, uFlat) + 0.5, 0.0, 1.0);
   c = g * g;
-  // Bloom: the hot parts (neon, glints, chrome sparkle) bleed a soft halo.
+  // Bloom (hd only): the hot parts (neon, glints, chrome sparkle) bleed a soft halo.
   vec3 bloom = vec3(0.0);
-  for (int i = 0; i < 12; i++) {
-    float an = float(i) * 0.5236;
-    for (int k = 1; k <= 3; k++) {
-      vec2 o = vec2(cos(an + float(k)), sin(an + float(k))) * float(k) * 7.0 * uTexel;
-      vec4 q = texture2D(tHdr, vUv + o);
-      bloom += max(q.rgb * uExposure - 1.5, 0.0) / float(k);
+  if (uBloom > 0.0) {
+    for (int i = 0; i < 12; i++) {
+      float an = float(i) * 0.5236;
+      for (int k = 1; k <= 3; k++) {
+        vec2 o = vec2(cos(an + float(k)), sin(an + float(k))) * float(k) * 7.0 * uTexel;
+        vec4 q = texture2D(tHdr, vUv + o);
+        bloom += max(q.rgb * uExposure - 1.5, 0.0) / float(k);
+      }
+    }
+    bloom *= 0.03 * uBloom;
+  }
+  vec4 obj = vec4(c * a, a);
+  // Outline: the silhouette grown by uOutline texels (16 taps on two rings), behind the item.
+  float ol = 0.0;
+  if (uOutline > 0.0) {
+    for (int i = 0; i < 16; i++) {
+      float an = float(i) * 0.3927;
+      vec2 d = vec2(cos(an), sin(an)) * uTexel;
+      ol = max(ol, max(solid(vUv + d * uOutline), solid(vUv + d * uOutline * 0.55)));
     }
   }
-  bloom *= 0.03;
-  vec4 obj = vec4(c * a, a);
-  // Backdrop: faint grade-coloured glow behind the subject, then the soft contact shadow.
+  vec4 line = vec4(uOutlineCol * ol, ol) * 0.92;
+  // Soft contact shadow under the item.
   vec2 p = vec2(vUv.x, 1.0 - vUv.y);            // y down, like the framing maths
-  float d = length((p - vec2(0.5, 0.48)) * vec2(1.0, 1.1));
-  float ga = uGlowA * pow(1.0 - smoothstep(0.0, 0.62, d), 1.6);
-  vec4 bg = vec4(uGlowCol * ga, ga);
   float sd = length((p - uShadow.xy) / uShadow.zw);
   float sa = uShadowA * pow(1.0 - smoothstep(0.0, 1.0, sd), 1.8);
-  bg = vec4(0.0, 0.0, 0.0, sa) + bg * (1.0 - sa);
+  vec4 bg = line + vec4(0.0, 0.0, 0.0, sa) * (1.0 - line.a);
   vec4 o = obj + bg * (1.0 - a);
   o.rgb += bloom;
   o.a = clamp(max(o.a, dot(bloom, vec3(0.3, 0.5, 0.2))), 0.0, 1.0);
@@ -180,7 +205,13 @@ export class IconBaker {
     look.fabric.side = THREE.DoubleSide;
     this.others = [];
     rig.traverse((o) => { if (o.isMesh && !Object.values(look.meshes).includes(o)) this.others.push(o); });
-    this.mannequin = toonMaterial({ name: 'iconMannequin', color: 0xd8d3cb, rim: 0.3 });
+    // A matte slate head that fades out above the shoulders (a product-shot bust, not a white torso
+    // competing with the item for attention).
+    this.fade = { uFadeY: { value: new THREE.Vector2(0, 1) } };
+    this.mannequin = toonMaterial({
+      name: 'iconMannequin', color: 0x8b929c, rim: 0.25, transparent: true, uniforms: this.fade,
+      fragPars: 'uniform vec2 uFadeY;', frag: 'diffuseColor.a *= smoothstep(uFadeY.x, uFadeY.y, vW.y);',
+    });
     look.meshes.body.material = this.mannequin;
     this.root = new THREE.Group();
     this.root.add(rig);
@@ -198,7 +229,8 @@ export class IconBaker {
       vertexShader: COMPOSITE_VERT, fragmentShader: COMPOSITE_FRAG, depthTest: false, depthWrite: false,
       uniforms: {
         tHdr: { value: this.hdrRT.texture }, uTexel: { value: new THREE.Vector2() }, uExposure: { value: STUDIO.exposure },
-        uGlowCol: { value: new THREE.Color() }, uGlowA: { value: 0 }, uShadow: { value: new THREE.Vector4(0.5, 0.1, 0.3, 0.05) }, uShadowA: { value: 0.4 },
+        uShadow: { value: new THREE.Vector4(0.5, 0.1, 0.3, 0.05) }, uShadowA: { value: 0.4 },
+        uFlat: { value: 1 }, uBloom: { value: 0 }, uOutline: { value: 0 }, uOutlineCol: { value: new THREE.Color(0x05080c) },
       },
     });
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.composite);
@@ -294,6 +326,11 @@ export class IconBaker {
     }
     this.rig.visible = true;
     this.root.updateMatrixWorld(true);
+    if (head) {
+      // The bust fades out from the chin down to the collar line.
+      const hy = this.bones.Head.getWorldPosition(new THREE.Vector3()).y;
+      this.fade.uFadeY.value.set(hy - 0.13, hy - 0.01);
+    }
     // Points to frame.
     const pts = [];
     if (cloth) {
@@ -372,7 +409,7 @@ export class IconBaker {
 
   // ---------------------------------------------------------------- render
   /** Bake one icon: returns an image Blob (webp, png fallback) `px` square. */
-  async bake(desc, px, glowColor) {
+  async bake(desc, px, style = 'tile') {
     const r = this.renderer;
     let setup;
     try {
@@ -382,10 +419,12 @@ export class IconBaker {
       this.ldrRT.setSize(px, px);
       const U = this.composite.uniforms;
       U.uTexel.value.set(1 / (px * 2), 1 / (px * 2));
-      U.uGlowCol.value.set(glowColor || '#b0c3d9');
-      U.uGlowA.value = desc.rarity === 'gold' ? 0.34 : desc.rarity === 'legendary' ? 0.28 : 0.2;
+      const tile = style !== 'hd';
+      U.uFlat.value = tile ? 1 : 0;
+      U.uBloom.value = tile ? 0 : 0.6;
+      U.uOutline.value = tile ? Math.max(3, px * 2 * 0.011) : 0;   // in HDR texels (2x): ~1.1 % of the icon
       U.uShadow.value.copy(shadow);
-      U.uShadowA.value = desc.kind === 'star' ? 0.25 : 0.42;
+      U.uShadowA.value = desc.kind === 'star' ? 0.2 : tile ? 0.3 : 0.4;
 
       // Studio globals in, render, globals back.
       const keep = {};

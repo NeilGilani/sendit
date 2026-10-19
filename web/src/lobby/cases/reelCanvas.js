@@ -1,7 +1,13 @@
-// The reel drawn on one canvas: every card is rasterised once (an SVG card → a bitmap, during the
-// crate's first second) and each frame only blits the ~10 visible cards. The old DOM strip (60 SVG
-// cards on a 10 000 px layer) made the compositor raster new tiles while it scrolled, which showed as
-// 0.2–0.5 s stalls on integrated GPUs. Same look as the .cr-card CSS (cases.css).
+// The reel drawn on one canvas. Each card is two layers:
+//  · its PLATE (grade field, pattern, name strip, bold grade bar), painted once into a bitmap with
+//    canvas 2D (the lobby's own fonts) in idle time from the Cases tab, and
+//  · its PICTURE, drawn per frame on top: while the reel is fast, a flat SILHOUETTE of the item in a
+//    light tint of its grade (motion-blurred), so at speed you read colour blocks flashing past the
+//    marker; as the reel slows the picture cross-fades to the detailed tile icon (itemIcons.js), which
+//    is what you read in the crawl and at the stop.
+// Each frame blits the ~10 visible cards (plate + picture). The old DOM strip (60 SVG cards on a
+// 10 000 px layer) made the compositor raster new tiles while it scrolled (0.2–0.5 s stalls).
+// Same look as the .cr-card tiles (icons.css).
 import { rarityOf } from '../../profile/rarity.js';
 import { skin, casePool } from '../../profile/rewards.js';
 import { RARITIES } from '../../profile/rarity.js';
@@ -10,51 +16,95 @@ import { iconUrl, iconImage, requestIcons, whenIcons, onIcon, GOLD_ICON } from '
 
 // Card geometry in em (matches cases.css: .cr-strip .cr-card 9.2em wide, gap .45em, strip inset 1.1em).
 export const CARD = { w: 9.2, gap: 0.45, inset: 1.1 };
-const U = 10;   // SVG units per em
-const escX = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-function mix(hex, k, to = 255) {
-  const n = parseInt(hex.slice(1), 16);
-  const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => Math.round(v * k + to * (1 - k)));
-  return `rgb(${c.join(',')})`;
+function rgb(hex) { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+const rgba = (hex, a) => `rgba(${rgb(hex).join(',')},${a})`;
+const mixHex = (hex, k, to = 255) => `rgb(${rgb(hex).map((v) => Math.round(v * k + to * (1 - k))).join(',')})`;
+// Grade colour strength (icons.css --rw / --rg).
+const WASH = { common: [0.3, 0.26], uncommon: [0.56, 0.5], rare: [0.58, 0.52], epic: [0.56, 0.52], legendary: [0.6, 0.56], gold: [0.7, 0.62] };
+
+/** The picture's box inside a w × h card (px): ~2/3 of the width, a little above the middle. */
+function artBox(w, h, em) {
+  const nameH = 2.3 * em;
+  const x = w * 0.17, y = h * 0.07, bw = w - 2 * x, bh = h - y - nameH - 0.2 * em;
+  const side = Math.min(bw, bh);
+  return { x: x + (bw - side) / 2, y: y + (bh - side) / 2, s: side };
 }
 
-/** Where the card's picture sits, in card SVG units (W × H). */
-const artRect = (W, H) => { const h = Math.min(70, H - 34); return { x: 5, y: 4, w: W - 10, h }; };
-
-/** One card as a standalone SVG string, `h` em tall; `art: false` leaves the picture out (drawn on top). */
-function cardSvg(key, rarity, h, { art: withArt = true } = {}) {
+/** Paint a card's plate (no picture) at w × h device px; em in device px. */
+function paintPlate(g, key, rarity, w, h, em) {
   const r = rarityOf(rarity);
   const s = key ? skin(key) : null;
   const gold = rarity === 'gold' || !s;
-  const W = CARD.w * U, H = h * U;
-  const ar = artRect(W, H);
-  const art = !withArt ? '' : (gold ? goldArt() : itemArt(s.item, s.variant)).replace('<svg ', `<svg x="${ar.x}" y="${ar.y}" width="${ar.w}" height="${ar.h}" preserveAspectRatio="xMidYMid meet" `);
+  const col = gold ? '#e4ae39' : r.color;
+  const [wa, ga] = WASH[gold ? 'gold' : r.id] || WASH.common;
+  const R = Math.max(2, 0.12 * em);
+  g.save();
+  g.beginPath(); g.roundRect ? g.roundRect(0, 0, w, h, R) : g.rect(0, 0, w, h); g.clip();
+  // Base plate.
+  let gr = g.createLinearGradient(0, 0, 0, h);
+  if (gold) { gr.addColorStop(0, '#4a3712'); gr.addColorStop(1, '#1d1505'); } else { gr.addColorStop(0, '#172430'); gr.addColorStop(1, '#0b131b'); }
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  // Fine diagonal pattern.
+  g.strokeStyle = gold ? 'rgba(255,240,190,.06)' : 'rgba(255,255,255,.035)';
+  g.lineWidth = Math.max(1, em * 0.05);
+  const step = Math.max(5, em * 0.42);
+  g.beginPath();
+  for (let d = -h; d < w; d += step) { g.moveTo(d, h); g.lineTo(d + h, 0); }
+  g.stroke();
+  // Grade wash rising from the bottom.
+  gr = g.createLinearGradient(0, h, 0, 0);
+  gr.addColorStop(0, rgba(col, wa)); gr.addColorStop(0.48, rgba(col, 0.12)); gr.addColorStop(0.74, rgba(col, 0));
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  // Glow behind the picture.
+  const box = artBox(w, h, em);
+  const cx = w / 2, cy = h * 0.42;
+  g.save();
+  g.translate(cx, cy); g.scale(1, (h * 0.44) / (w * 0.56));
+  gr = g.createRadialGradient(0, 0, 0, 0, 0, w * 0.56);
+  gr.addColorStop(0, gold ? 'rgba(255,222,120,.62)' : rgba(col, ga)); gr.addColorStop(1, rgba(col, 0));
+  g.fillStyle = gr; g.fillRect(-w, -w, 2 * w, 2 * w);
+  g.restore();
+  // Name strip.
+  const nameTop = h - 2.3 * em;
+  gr = g.createLinearGradient(0, nameTop, 0, h);
+  gr.addColorStop(0, 'rgba(6,10,15,0)'); gr.addColorStop(0.4, 'rgba(6,10,15,.58)'); gr.addColorStop(1, 'rgba(6,10,15,.58)');
+  g.fillStyle = gr; g.fillRect(0, nameTop, w, h - nameTop);
   const name = gold ? '★ Rare Special Item' : s.item.name;
   const sub = gold ? 'Exceedingly Rare' : s.variant.name;
-  const bg = gold
-    ? `<radialGradient id="g" cx=".5" cy=".45" r=".65"><stop offset="0" stop-color="rgb(255,220,110)" stop-opacity=".55"/><stop offset="1" stop-color="rgb(255,220,110)" stop-opacity="0"/></radialGradient><linearGradient id="b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a4314"/><stop offset="1" stop-color="#2a1f08"/></linearGradient>`
-    : `<radialGradient id="g" cx=".5" cy=".85" r=".7"><stop offset="0" stop-color="${r.color}" stop-opacity=".4"/><stop offset="1" stop-color="${r.color}" stop-opacity="0"/></radialGradient><linearGradient id="b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b2f3d"/><stop offset="1" stop-color="#1a1c26"/></linearGradient>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
-    <defs>${bg}<clipPath id="c"><rect width="${W}" height="${H}" rx="3.5"/></clipPath></defs>
-    <g clip-path="url(#c)">
-      <rect width="${W}" height="${H}" fill="url(#b)"/><rect width="${W}" height="${H}" fill="url(#g)"/>
-      ${art}
-      <text x="5" y="${H - 15.5}" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="6.4" fill="rgba(255,255,255,.6)">${escX(clip(name, 24))}</text>
-      <text x="5" y="${H - 6.5}" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="7.8" font-weight="800" fill="${gold ? '#ffd76a' : mix(r.color, 0.45)}">${escX(clip(sub, 19))}</text>
-      <rect y="${H - 3.2}" width="${W}" height="3.2" fill="${gold ? '#e4ae39' : r.color}"/>
-      <rect x=".5" y=".5" width="${W - 1}" height="${H - 1}" rx="3.2" fill="none" stroke="${gold ? 'rgba(255,215,0,.5)' : 'rgba(255,255,255,.08)'}"/>
-    </g></svg>`;
+  const pad = 0.5 * em;
+  g.textBaseline = 'alphabetic';
+  g.font = `500 ${(0.6 * em).toFixed(1)}px "IBM Plex Mono", ui-monospace, Menlo, monospace`;
+  g.fillStyle = 'rgba(222,232,240,.66)';
+  g.fillText(clip(name, 26), pad, h - 1.5 * em, w - 2 * pad);
+  if ('fontStretch' in g) g.fontStretch = 'semi-condensed';
+  g.font = `700 ${(0.82 * em).toFixed(1)}px Archivo, "Helvetica Neue", Helvetica, Arial, sans-serif`;
+  g.fillStyle = gold ? '#ffd76a' : '#f2f4f1';
+  g.shadowColor = 'rgba(0,0,0,.55)'; g.shadowBlur = 0.1 * em; g.shadowOffsetY = 0.05 * em;
+  g.fillText(clip(sub.toUpperCase(), 20), pad, h - 0.66 * em, w - 2 * pad);
+  g.shadowColor = 'transparent';
+  // Bold grade bar, hairline frame, a lit top edge for the top grades.
+  g.fillStyle = col; g.fillRect(0, h - 0.42 * em, w, 0.42 * em);
+  if (gold || r.rank >= 3) { g.fillStyle = gold ? '#ffe69a' : mixHex(col, 0.7); g.fillRect(0, 0, w, Math.max(1, 0.1 * em)); }
+  g.restore();
+  g.strokeStyle = gold ? 'rgba(255,215,90,.6)' : rgba(col, r.rank >= 3 ? 0.55 : 0.28);
+  g.lineWidth = 1;
+  g.beginPath(); g.roundRect ? g.roundRect(0.5, 0.5, w - 1, h - 1, R) : g.rect(0.5, 0.5, w - 1, h - 1); g.stroke();
+  return box;
 }
 
-// ------------------------------------------------------------------ the bitmap cache
-// Card bitmaps by size + card, shared by every opening. The Cases tab fills it in idle time
-// (prerasterReel), so an opening only blits; anything missing is rasterised a few per frame.
-const cache = new Map();
+// ------------------------------------------------------------------ bitmap caches
+// Plates by size + card, shared by every opening. The Cases tab fills it in idle time (prerasterReel),
+// so an opening only blits; anything missing is painted a few per frame. Pictures by icon id: the
+// decoded tile icon and its silhouette (half size: it is only seen moving).
+const cache = new Map();       // `${size}|${rarity}|${key}` → plate bitmap
+const pics = new Map();        // icon id → { img, sil } | { flat } (no icon yet)
 const queue = [];
 let pumping = false;
 const cardId = (rarity, key) => `${rarity}|${key ?? ''}`;
+const iconIdOf = (rarity, key) => (rarity === 'gold' || !key ? GOLD_ICON : key);
 
 /** The reel's card size for the current window (cases.css: font-size clamp, 13em band, 1.1em inset). */
 export function reelMetrics() {
@@ -64,55 +114,69 @@ export function reelMetrics() {
   return { em, dpr, w, h, size: `${w}x${h}` };
 }
 
-// Cards rasterised with the flat SVG art because their rendered icon was not baked yet: redone when it is.
-const flat = new Map();   // icon id → Set of cache keys
-const iconIdOf = (rarity, key) => (rarity === 'gold' || !key ? GOLD_ICON : key);
-onIcon((iconId) => {
-  const ks = flat.get(iconId);
-  if (!ks) return;
-  flat.delete(iconId);
-  for (const k of ks) {
-    if (!cache.has(k)) continue;
-    cache.delete(k);
-    const [w, h] = k.split('|')[0].split('x').map(Number);
-    const id = k.slice(k.indexOf('|') + 1);
-    const m = metricsFor.get(`${w}x${h}`);
-    if (m) enqueue([id], m, true);
-  }
-  if (queue.length) pump(true);
-});
-const metricsFor = new Map();   // size → the metrics it was enqueued with
+// A picture that was the flat SVG because its icon was not baked yet is redone when the icon lands.
+onIcon((iconId) => { const p = pics.get(iconId); if (p?.flat) preparePic(p.rarity, p.key, p.side); });
 
-function rasterOne(job) {
+/** The silhouette of an icon: its solid part filled with a light tint of the grade colour. */
+function silhouette(img, color, side) {
+  const n = Math.max(24, Math.round(side / 2));
+  const c = document.createElement('canvas');
+  c.width = c.height = n;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.drawImage(img, 0, 0, n, n);
+  const d = g.getImageData(0, 0, n, n);
+  const [r, gg, b] = rgb(color).map((v) => Math.round(v * 0.55 + 255 * 0.45));
+  const p = d.data;
+  for (let i = 0; i < p.length; i += 4) {
+    const a = p[i + 3];
+    // The outline and body are solid (alpha ≥ ~0.9); the soft contact shadow drops out.
+    const k = a < 140 ? 0 : a > 200 ? 255 : Math.round(((a - 140) / 60) * 255);
+    p[i] = r; p[i + 1] = gg; p[i + 2] = b; p[i + 3] = k;
+  }
+  g.putImageData(d, 0, 0);
+  return c;
+}
+
+/** Make sure the picture of a card is ready (decoded icon + silhouette, or the flat SVG art). */
+function preparePic(rarity, key, side) {
+  const id = iconIdOf(rarity, key);
+  const have = pics.get(id);
+  const baked = !!iconUrl(id, 3);
+  if (have && have.side >= side * 0.9 && (!have.flat || !baked)) return Promise.resolve();
+  const color = rarity === 'gold' || !key ? '#e4ae39' : rarityOf(rarity).color;
+  if (baked) {
+    return iconImage(id).then((img) => {
+      if (!img) return;
+      pics.set(id, { img, sil: silhouette(img, color, side), side, rarity, key });
+    });
+  }
+  if (have?.flat) return Promise.resolve();
+  // No icon yet: the flat SVG art, rasterised once (the silhouette is the art in grade tint).
+  const s = key ? skin(key) : null;
+  const svg = (!s || rarity === 'gold' ? goldArt() : itemArt(s.item, s.variant)).replace('<svg ', `<svg width="${Math.round(side)}" height="${Math.round(side)}" `);
+  const img = new Image();
+  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  return img.decode().then(() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = Math.round(side);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    if (!pics.get(id)?.img || pics.get(id).flat) pics.set(id, { img: c, sil: silhouette(c, color, side), side, flat: true, rarity, key });
+  }, () => {});
+}
+
+function paintOne(job) {
   const k = `${job.size}|${job.id}`;
-  if (cache.has(k)) return Promise.resolve();
   const [rarity, key] = job.id.split('|');
-  const iconId = iconIdOf(rarity, key || null);
-  const hasIcon = !!iconUrl(iconId, 3);
-  return (hasIcon ? iconImage(iconId) : Promise.resolve(null)).then((icon) => {
-    const img = new Image();
-    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(cardSvg(key || null, rarity, job.hEm, { art: !icon }))}`;
-    return img.decode().then(() => {
-      const c = document.createElement('canvas');
-      c.width = job.w; c.height = job.h;
-      const g = c.getContext('2d');
-      g.drawImage(img, 0, 0, job.w, job.h);
-      if (icon) {
-        // The rendered icon (square) fitted into the art box, like preserveAspectRatio="meet".
-        const W = CARD.w * U, H = job.hEm * U, sx = job.w / W, sy = job.h / H;
-        const ar = artRect(W, H);
-        const side = Math.min(ar.w * sx, ar.h * sy);
-        g.imageSmoothingQuality = 'high';
-        g.drawImage(icon, ar.x * sx + (ar.w * sx - side) / 2, ar.y * sy + (ar.h * sy - side) / 2, side, side);
-      } else {
-        if (!flat.has(iconId)) flat.set(iconId, new Set());
-        flat.get(iconId).add(k);
-      }
-      cache.set(k, c);
-      // An ImageBitmap blits faster than a small (software) canvas once it is on the GPU.
-      return globalThis.createImageBitmap?.(c).then((b) => { if (cache.get(k) === c) cache.set(k, b); }, () => {});
-    }, () => cache.set(k, null));
-  });
+  const plate = cache.has(k) ? null : (() => {
+    const c = document.createElement('canvas');
+    c.width = job.w; c.height = job.h;
+    const box = paintPlate(c.getContext('2d'), key || null, rarity, job.w, job.h, job.em * job.dpr);
+    cache.set(k, c);
+    // An ImageBitmap blits faster than a small (software) canvas once it is on the GPU.
+    return globalThis.createImageBitmap?.(c).then((b) => { if (cache.get(k) === c) cache.set(k, b); }, () => {}) ?? box;
+  })();
+  const box = artBox(job.w, job.h, job.em * job.dpr);
+  return Promise.all([plate, preparePic(rarity, key || null, box.s)]);
 }
 
 /** Work through the queue: in idle time (prewarm) or ~4 ms per frame (an opening needs them now). */
@@ -123,7 +187,7 @@ function pump(urgent) {
     const t0 = performance.now();
     const budget = urgent ? 4 : Math.max(2, Math.min(8, deadline?.timeRemaining?.() ?? 4));
     const batch = [];
-    while (queue.length && performance.now() - t0 < budget && batch.length < (urgent ? 3 : 2)) batch.push(rasterOne(queue.shift()));
+    while (queue.length && performance.now() - t0 < budget && batch.length < (urgent ? 3 : 2)) batch.push(paintOne(queue.shift()));
     Promise.all(batch).then(() => {
       if (!queue.length) { pumping = false; return; }
       if (urgent) requestAnimationFrame(() => step());
@@ -134,17 +198,15 @@ function pump(urgent) {
 }
 
 function enqueue(ids, m, front = false) {
-  metricsFor.set(m.size, m);
-  const hEm = m.h / m.dpr / m.em;
-  const jobs = ids.filter((id) => !cache.has(`${m.size}|${id}`) && !queue.some((q) => q.id === id && q.size === m.size)).map((id) => ({ id, size: m.size, w: m.w, h: m.h, hEm }));
+  const jobs = ids.filter((id) => !queue.some((q) => q.id === id && q.size === m.size)).map((id) => ({ id, size: m.size, w: m.w, h: m.h, em: m.em, dpr: m.dpr }));
   if (front) queue.unshift(...jobs); else queue.push(...jobs);
 }
 
-/** Cards still waiting to be rasterised (captures wait for 0). */
+/** Cards still waiting to be painted (captures wait for 0). */
 export const reelPending = () => queue.length + (pumping ? 1 : 0);
 if (typeof window !== 'undefined') window.__senditReelPending = reelPending;
 
-/** Pre-rasterise every card of these case series (and the gold card) in idle time, after their icons are baked. */
+/** Pre-paint every card of these case series (and the gold card) in idle time, after their icons are baked. */
 export function prerasterReel(seriesList) {
   const m = reelMetrics();
   const ids = [cardId('gold', null)];
@@ -152,8 +214,11 @@ export function prerasterReel(seriesList) {
   const uniq = [...new Set(ids)];
   const icons = uniq.map((id) => { const [r, k] = id.split('|'); return iconIdOf(r, k || null); });
   requestIcons(icons, 0);
-  whenIcons(icons, 30000).then(() => { enqueue(uniq, m); pump(false); });
+  const fonts = globalThis.document?.fonts?.load ? Promise.all([document.fonts.load('700 16px Archivo'), document.fonts.load('500 12px "IBM Plex Mono"')]).catch(() => {}) : null;
+  Promise.all([whenIcons(icons, 30000), fonts]).then(() => { enqueue(uniq, m); pump(false); });
 }
+
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export class CanvasReel {
   /** cards: [{ key, rarity }] in reel order. */
@@ -165,7 +230,7 @@ export class CanvasReel {
     this.ready = false;
   }
 
-  /** Size to the reel window (CSS px) and the overlay's em; rasterises the cards (async). */
+  /** Size to the reel window (CSS px) and the overlay's em; paints the cards (async). */
   layout(wCss, hCss, em) {
     const dpr = Math.min(2, devicePixelRatio || 1);
     this.dpr = dpr; this.em = em;
@@ -176,16 +241,19 @@ export class CanvasReel {
     this.ch = h / dpr;
     this.top = (hCss - this.ch) / 2;
     this.size = `${w}x${h}`;
+    const b = artBox(w, h, em * dpr);
+    this.art = { x: b.x / dpr, y: b.y / dpr, s: b.s / dpr };
     // Missing cards go to the front of the queue (the winner and the cards near the start first).
-    const order = this.cards.map((c, i) => [cardId(c.rarity, c.key), i]).sort((a, b) => Math.abs(a[1] - 50) - Math.abs(b[1] - 50)).map(([id]) => id);
-    enqueue([...new Set(order)], { em, dpr, w, h, size: this.size }, true);
+    const order = this.cards.map((c, i) => [cardId(c.rarity, c.key), i]).sort((a, b2) => Math.abs(a[1] - 50) - Math.abs(b2[1] - 50)).map(([id]) => id);
+    const need = [...new Set(order)].filter((id) => { const [r, k] = id.split('|'); return !cache.has(`${this.size}|${id}`) || !pics.get(iconIdOf(r, k || null)); });
+    enqueue(need, { em, dpr, w, h, size: this.size }, true);
     if (queue.length) pump(true);
   }
 
   /**
-   * Before the reel shows: draw the next few distinct cards once (full size, then cleared; the band is still invisible) so their
-   * bitmaps are uploaded to the GPU during the crate's first second, not on the reel's first frames.
-   * Returns true while there is more to warm.
+   * Before the reel shows: draw the next few distinct cards once (full size, then cleared; the band is
+   * still invisible) so their bitmaps are uploaded to the GPU during the crate's first second, not on
+   * the reel's first frames. Returns true while there is more to warm.
    */
   warmStep(n = 6) {
     this.warmIds ||= [...new Set(this.cards.map((c) => cardId(c.rarity, c.key)))];
@@ -193,9 +261,14 @@ export class CanvasReel {
     const g = this.g;
     let done = 0;
     while (this.warmAt < this.warmIds.length && done < n) {
-      const bm = cache.get(`${this.size}|${this.warmIds[this.warmAt]}`);
-      if (!bm) break;   // not rasterised yet: try again next frame
+      const id = this.warmIds[this.warmAt];
+      const bm = cache.get(`${this.size}|${id}`);
+      const [r, k] = id.split('|');
+      const pic = pics.get(iconIdOf(r, k || null));
+      if (!bm || !pic) break;   // not painted yet: try again next frame
       g.drawImage(bm, 0, this.top, this.cw, this.ch);   // full size: the real texture upload
+      g.drawImage(pic.img, 0, 0, this.art.s, this.art.s);
+      g.drawImage(pic.sil, 0, 0, this.art.s, this.art.s);
       this.warmAt++; done++;
     }
     g.setTransform(1, 0, 0, 1, 0, 0);
@@ -204,10 +277,11 @@ export class CanvasReel {
   }
 
   /**
-   * Draw the strip scrolled by x CSS px (the marker sits at the canvas centre). o = { win, landK }:
-   * after the landing the winner pops and glows, the rest dim.
+   * Draw the strip scrolled by x CSS px (the marker sits at the canvas centre). o = { v, win, landK }:
+   * v = reel speed in px/s (picks silhouette vs. detail and the blur); after the landing the winner
+   * pops and glows, the rest dim.
    */
-  draw(x, { win = -1, landK = 0, color = '#fff' } = {}) {
+  draw(x, { v = 0, win = -1, landK = 0, color = '#fff' } = {}) {
     const g = this.g, d = this.dpr;
     g.setTransform(d, 0, 0, d, 0, 0);
     g.clearRect(0, 0, this.cv.width / d, this.cv.height / d);
@@ -215,6 +289,11 @@ export class CanvasReel {
     const first = Math.max(0, Math.floor(x / this.pitch) - 1);
     const last = Math.min(this.cards.length - 1, Math.ceil((x + W) / this.pitch) + 1);
     const dim = Math.min(1, landK * 1.6);
+    // Cards per second → how graphic the pictures are (1 = silhouettes) and the blur length (px).
+    const cps = Math.abs(v) / this.pitch;
+    const still = reduced();
+    this.sil = landK > 0 ? 0 : smooth(7, 20, cps);
+    this.blur = landK > 0 || still ? 0 : Math.min(this.cw * 0.5, Math.abs(v) / 60 * 0.55);
     for (let i = first; i <= last; i++) {
       if (i === win && landK > 0) continue;
       this.card(i, i * this.pitch - x, 1, dim * 0.58);
@@ -241,11 +320,29 @@ export class CanvasReel {
     const bm = cache.get(`${this.size}|${cardId(c.rarity, c.key)}`);
     const w = this.cw * s, h = this.ch * s;
     const top = this.top + (this.ch - h) / 2;
-    if (bm) g.drawImage(bm, left, top, w, h);
-    else {
-      // Not rasterised yet (very first frames on a slow machine): a plain card in its grade colour.
-      g.fillStyle = '#22252f'; g.fillRect(left, top, w, h);
-      g.fillStyle = rarityOf(c.rarity).color; g.fillRect(left, top + h - 0.32 * this.em, w, 0.32 * this.em);
+    const blur = this.blur;
+    if (bm) {
+      g.drawImage(bm, left, top, w, h);
+      if (blur > 2) {
+        // Motion blur: two faint copies trailing along the travel direction.
+        g.globalAlpha = 0.3; g.drawImage(bm, left + blur * 0.5, top, w, h); g.drawImage(bm, left + blur, top, w, h); g.globalAlpha = 1;
+      }
+    } else {
+      // Not painted yet (very first frames on a slow machine): a plain card in its grade colour.
+      g.fillStyle = '#172430'; g.fillRect(left, top, w, h);
+      g.fillStyle = rarityOf(c.rarity).color; g.fillRect(left, top + h - 0.42 * this.em, w, 0.42 * this.em);
+    }
+    const pic = pics.get(iconIdOf(c.rarity, c.key));
+    if (pic) {
+      const a = this.art, ps = a.s * s, px = left + a.x * s, py = top + a.y * s;
+      const sil = this.sil;
+      if (sil < 1) { g.globalAlpha = 1 - sil; g.drawImage(pic.img, px, py, ps, ps); }
+      if (sil > 0) {
+        const n = blur > 2 ? 4 : 1;
+        g.globalAlpha = sil * (n > 1 ? 0.42 : 1);
+        for (let j = 0; j < n; j++) g.drawImage(pic.sil, px + (blur * j) / Math.max(1, n - 1) - blur * 0.15, py, ps, ps);
+      }
+      g.globalAlpha = 1;
     }
     if (dim > 0) { g.fillStyle = `rgba(4,5,12,${dim.toFixed(3)})`; g.fillRect(left, top, w, h); }
   }
