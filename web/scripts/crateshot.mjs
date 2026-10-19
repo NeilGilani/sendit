@@ -33,6 +33,10 @@ try {
   await page.waitForFunction(() => window.__sendit?.stage?.ready && window.__sendit.lobby.visible, null, { timeout: 300000 });
   await page.evaluate(() => window.__sendit.lobby.select('cases'));
   await page.waitForFunction(() => window.__senditCrate?.ready, null, { timeout: 60000 });
+  // Icons bake one per frame on the lobby renderer and the reel cards are painted after them: let both settle
+  // first, so PERF times the opening itself, not first-visit baking.
+  await page.waitForFunction(() => !window.__senditIcons || window.__senditIcons.pending() === 0, null, { timeout: 120000 }).catch(() => console.log('icons still baking'));
+  await page.waitForTimeout(1500);
   await page.waitForFunction(() => window.__senditReelPending?.() === 0, null, { timeout: 60000 }).catch(() => console.log('reel cards still rasterising'));
   console.log("prewarm ms", await page.evaluate(() => Math.round(window.__senditCrate.warmMs) + " " + (window.__senditCrate.warmLog || []).join(", ")));
   const n = (process.env.PERF ? 2 : 1) + (process.env.CHAIN ? 2 : 0);

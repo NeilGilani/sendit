@@ -4,6 +4,7 @@
 //   locker-<slot>.png   the Locker tab (grid + detail) with a spread of owned skins, for a few slots
 // Usage: node scripts/tilesheet.mjs <url> <outDir>      (macOS: Metal; ANGLE=d3d11 elsewhere)
 //   FLAT=1   the old flat SVG art (?noicons)     ONLY=reel,contents,locker   pick sheets
+//   VIEW=390x844   viewport (phone portrait); the Locker sheets also shoot the Gear tab
 // Fails on console errors.
 import { chromium } from '@playwright/test';
 
@@ -16,7 +17,9 @@ const browser = await chromium.launch({ args: ['--use-gl=angle', `--use-angle=${
 const errors = [];
 const icons = (page) => page.waitForFunction(() => !window.__senditIcons || window.__senditIcons.pending() === 0, null, { timeout: 300000, polling: 300 });
 try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
+  const [vw, vh] = (process.env.VIEW || '1440x900').split('x').map(Number);
+  const tag = process.env.VIEW ? `-${process.env.VIEW}` : '';
+  const page = await browser.newPage({ viewport: { width: vw, height: vh }, deviceScaleFactor: 2, isMobile: vw < 760, hasTouch: vw < 760 });
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(`${base}?quality=0`);
@@ -110,16 +113,20 @@ try {
       s.lobby.select('locker');
     });
     await page.waitForTimeout(800);
-    for (const slot of ['jacket', 'helmet', 'goggles', 'skis', 'board', 'gloves']) {
+    for (const slot of (process.env.VIEW ? ['jacket', 'skis', 'board'] : ['jacket', 'helmet', 'goggles', 'skis', 'board', 'gloves'])) {
       await page.evaluate((sl) => document.querySelector(`.lk-slot[data-slot="${sl}"]`)?.click(), slot);
       await page.waitForTimeout(400);
       await page.evaluate(() => document.querySelector('.lk-item:not(.on)')?.click());
       await page.waitForTimeout(400); await icons(page); await page.waitForTimeout(700);
       if (slot !== 'jacket') await page.evaluate(() => document.querySelector('.lk-sel')?.scrollIntoView({ block: 'end' }));
       await page.waitForTimeout(200);
-      await page.screenshot({ path: `${out}/locker-${slot}${flat ? '-flat' : ''}.png` });
-      console.log('wrote', `${out}/locker-${slot}${flat ? '-flat' : ''}.png`);
+      await page.screenshot({ path: `${out}/locker-${slot}${flat ? '-flat' : ''}${tag}.png` });
+      console.log('wrote', `${out}/locker-${slot}${flat ? '-flat' : ''}${tag}.png`);
     }
+    await page.evaluate(() => window.__sendit.lobby.select('equipment'));
+    await page.waitForTimeout(700); await icons(page); await page.waitForTimeout(500);
+    await page.screenshot({ path: `${out}/gear${tag}.png` });
+    console.log('wrote', `${out}/gear${tag}.png`);
   }
 } finally {
   await browser.close();
