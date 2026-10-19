@@ -24,20 +24,21 @@ landings, grinds, lifts, the loading-screen and lobby riders, replays of non-cra
   (`RAGDOLL.tuck`, `tone`) with a strength limit (`toneMaxErr`: far from the target the pull saturates, so limbs
   move into the tuck instead of whip-cracking there). The tone holds at full while the body still moves faster
   than `toneHoldSpeed` (3 m/s), only fades toward `toneEnd` (15 %) over `toneTau` once it slows, and lets go
-  entirely once the body lies still (a resting limb pushed by its tone against snow or bark would jitter). For the
-  first `braceTime` the arms reach toward the snow the body is falling onto (until a hand touches something).
+  entirely once the body lies still (a resting limb pushed by its tone against snow or bark would jitter). The drive
+  targets move at `toneRate` from the crash pose (see *Severity*). For the first `braceTime` the arms reach for the snow
+  the trunk tips onto, a soft-elbowed hand-down within `braceCone` of the trunk's axis (until a hand or the trunk lands).
 - **Damping**: `jointDamping` (60–100 /s) takes out a limb's spin relative to its parent **and its swing**
   (`swingDamping`: the child's centre velocity against where the parent's rigid motion would carry it, an equal and
   opposite impulse at the joint — damping the spin alone did little, the swing lives in the limb's linear
   velocity). Limits are tighter (shoulder cone 75° / twist 50°, elbow 0–135°, neck 35° / 45°, spine 30° / 20°, hip
-  60° / 30°); the hand rides on the forearm (no wrist to flop). A hinge the animated pose left outside its range
+  52° / 30°); the hand rides on the forearm (no wrist to flop). A hinge the animated pose left outside its range
   (elbows, nearly always) is let back in at `limitEase` rad/s instead of being snapped in on the first sub-step —
   that snap was the first-frame arm whip (12–24 rad/s).
 - What real slams look like (tomahawks, yard sales, cartwheels, edge-catch slams): the body mostly tumbles as a
   unit, limbs stay fairly close, arms brace / flail now and then; a hard hit can throw one limb, but nothing
   whips continuously. Measured as limb spin relative to the trunk (arms / head vs the chest, legs vs the pelvis:
   `RagdollController.measure`, `ragdoll.m`), see *Tests*.
-- **Gear**: skis release above `ejectSpeed` (always on a tree / rock / wall hit) and slide as flat bodies with their
+- **Gear**: skis release above the tier's `sev.eject` speed (small crashes: never; always on a tree / rock / wall hit) and slide as flat bodies with their
   brakes out (`muGear`, `ploughGear`); below it they stay on, part of the boot body (with their mass and their
   lever in its inertia). Poles always leave the hands. A snowboard stays strapped on: a 12th body jointed to both
   boots (tight ankle cones), the feet turning with it.
@@ -55,6 +56,75 @@ landings, grinds, lifts, the loading-screen and lobby riders, replays of non-cra
   the crash's own (an energy budget set at the seed).
 - **Snow contacts** for marks and spray: the solver keeps, per body (and per strapped-on ski), the snow contacts
   since the last read; `ragdoll.snowContacts()` hands them to `fx.js` (docs/graphics.md § Tracks and spray).
+
+### Severity: a small mistake looks small (`severity.js`, `RAGDOLL.tiers` / `sev` / `tuckModes` / `tuckLie`)
+
+The riding physics still decides *whether* a landing is a crash (`player.land`, `grind.js`, `collide`, `hitWall`;
+nothing there changed). Once it is one, the ragdoll grades it and shows it accordingly.
+
+**References.** What the reference games and real riders do:
+
+- *STEEP* (Ubisoft Annecy): falls are physics-driven with per-body-part weights, mocap only for tricks; a G-force
+  meter shows how hard the crash was and you retry at once. Small errors mostly stumble or recover in animation, and
+  the ragdoll is kept for real crashes. The bodies read heavy: they tumble as one piece and slide, the limbs don't
+  flail. *Riders Republic* went for comedy instead (loose, floppy ragdolls; reviewers mention "spaghetti" stretching),
+  which is what this game should *not* look like. *SSX* / *Shredders*: mostly animated bails (a sit-down, a hand
+  drag) and a quick reset. *Skate*'s "Hall of Meat" exaggerates on purpose. *Descenders*: full ragdoll, but bails are
+  short and the respawn is immediate.
+- Active / powered ragdolls (Euphoria "catch fall": turn and break the fall with the hands; Unreal physical animation:
+  bodies follow an animated target with motor strength, blended by weight): the muscles follow a *target pose that
+  moves at human speed*, they don't snap there; hands go where the body is about to hit; stiffness stays up until
+  the body rests.
+- Real falls (snowboard injury biomechanics, FIS ACL video studies): most falls are low-energy — a sit-down / slide,
+  a hip-check, the edge catching and a slam onto the back (heel side, the occiput hits: chin in) or the front (toe
+  side, onto the hands / forearms with a bent elbow), "landing back-weighted" onto the tails. Flips and cartwheels
+  only follow big over-rotations or fast falls on steep faces.
+
+**Grade** (0..1, `crashSeverity`): `s = 1 − Π(1 − wᵢ·tᵢ)` over
+- *angle*: how far past the landing limit — pitch: `flipDev` past `flipLandStumble` (0 at the limit, 1 at +110°);
+  yaw: `dev` past `landCrash` (skis) / `landSlide` (board) (1 at +60°). A near miss is ~0.
+- *impact*: normal speed into the slope, smoothstep from 0.64 × `hardLanding` (8 m/s: clean landings reach 12.5) to
+  `crashImpact` + 2 (20 m/s);
+- *spin*: the trunk's rotation left at the crash (2 → 9 rad/s); *speed* (8 → 28 m/s, small weight).
+- Trees / rocks / walls are never small (≥ 0.4, more with speed); a rail bail sideways is at most 0.5.
+- Tiers: **small** < 0.3 ≤ **medium** < 0.62 ≤ **big**. Settings are `[small, medium, big]`, blended smoothly.
+
+**What the grade changes:**
+
+| | small | medium | big |
+|---|---|---|---|
+| trick spin carried into the fall (`spinKeep`, cap) | 25 %, ≤ 2.5 rad/s | 60 %, ≤ 5 | all, ≤ 9 |
+| edges catching the legs (`feetCatch` ×) | 0.3 | 0.7 | 1 |
+| muscle tone × / joint damping × | 2.2 / 1.5 | 1.7 / 1.35 | 1.5 / 1.3 |
+| tumble governor: whole-body rotation cap / total turn | 3.5 rad/s / 110° | 6 / 260° | 9 / 620° |
+| tip over the way the body leans at least (`tip`) | 2.2 rad/s | 2.4 | — |
+| skis release above (`eject`) | never | 9 m/s | 5 m/s (trees / rocks always) |
+| at rest before the fade (`restHold`) | 0.3 s | 0.4 | 0.45 |
+| "at rest" also when the centre of mass is under (`restSpeed`) | 0.45 m/s | 0.3 | — (asleep only) |
+
+- **Tumble governor** (`World.govern`, every 2nd sub-step): the body's rotation as a whole, ω = I⁻¹·L about its
+  centre of mass, is held under the tier's cap, and after the tier's total turn it comes to a crawl. Only that rigid
+  rotation is removed (limbs keep their motion, the slide keeps its speed), so energy only goes down. It stands in
+  for what a capsule body can't do: arms and legs out, edges and hands dug in, self-arrest.
+- **Fall modes** (`fallMode`): from how the trunk is tipped against the snow and the line of travel (plus the trick's
+  leftover pitch): **back** (landed on the tails / too hard: the skis or board shoot on, `backCatch` 0.2, a sit-down
+  onto the back), **front** (onto the hands and knees), **side** (across the line: onto the hip). Each has its own
+  protective pose (`tuckModes`); trees / rocks / rails leave it to the hit. Small and medium falls tip that way at a
+  human rate; a leftover rotation the other way is taken out (an over-rotated backflip by 50° goes onto the back, it
+  does not pitch forward over the legs).
+- **Lying poses** (`tuckLie`): once the trunk is down, hips / knees / spine head for a pose that depends on which way
+  the chest faces: on the back the knees come up so the skis / board lie flat (they are at right angles to the shins:
+  straight legs would stand them on end), face down the legs stretch out, on the side half bent; the legs' tone eases
+  (`lieLegRelax`). A body lying on the snow no longer glides on the bases of skis it still has on (`skiDragDown`).
+- **Muscles that move at human speed** (`toneRate` 5 rad/s): each joint's drive target starts at the animated pose
+  of the crash frame and turns toward the tuck / brace / lying pose at that rate. Before, every target jumped to the
+  tuck on the first sub-step and the drives whipped the arms to 20 rad/s in the first frame.
+- **Hand-down brace**: the arm reaches for the snow the trunk tips onto, within `braceCone` (55°) of the trunk's own
+  down axis, elbow soft (`braceElbow`), and stops once a hand *or the trunk* is down (was: a straight arm flung out
+  ~0.85 m from the trunk until a hand touched).
+- **Edge catch only on the snow**: the legs' slide is only stopped for gear within ~0.1–0.4 m of the snow (a crash that
+  starts in the air flies on instead of being thrown into a flip by an edge that touches nothing).
+- Bones for every tier: hips' cone 60° → 52°, stronger tone and damping (above).
 
 ### How it plugs in
 
@@ -146,7 +216,48 @@ gentle crashes asleep by 3 s (median 2.3 s), ~0.46 ms per 60 Hz frame in Node. I
 awake (Valcrest, Blackspruce, Voltage Park, skis and board), ~0.05 ms asleep, nothing outside crashes.
 `ragdoll-identity.mjs`: 0 difference over 361–365 frames × 851–860 values per run, skis and board.
 
+**Severity tiers** (`ragdoll-fuzz.mjs` prints them and checks them: the 600 random crashes plus 270 aimed ones —
+near misses, medium and big pitch / yaw errors, bumps, rail bails, cliffs, trees — bucketed by the tier the controller
+computes; `--tiers n`, `TIERSONLY=1`, `TDUMP=file`). Flips = full turns of the trunk's long axis (head over heels /
+cartwheel); body spin = the whole body's rotation rate (I⁻¹·L) averaged over 0.1 s, its peak; hand spread = a hand's
+distance from the trunk segment; looseness = mean limb spin relative to the trunk. Before = the same metric code with
+the new behaviour switched off by config (`CFILE=web/scripts/ragdoll-old.json`, also for `ragdoll-sticks.mjs`; it reproduces the old code's flappiness line exactly: 25.4 / 2.09 / 13 vs
+25.2 / 2.05 / 13), seed 1:
+
+| tier (runs) | flips 0 / 1 / 2+ | tumble p90 | body spin peak median / p90 | hand spread p90 | ankles apart p90 | looseness median |
+|---|---|---|---|---|---|---|
+| small (391) before | 311 / 74 / 6 | 421° | 5.6 / 8.6 rad/s | 0.90 m | 0.73 m | 1.92 rad/s |
+| small after | **391 / 0 / 0** | **164°** | **3.4 / 4.1** | **0.74** | 0.62 | **1.25** |
+| medium (201) before | 143 / 52 / 6 | 448° | 6.4 / 9.7 | 0.91 | 0.82 | 1.97 |
+| medium after | **197 / 4 / 0** | **266°** | **5.1 / 6.1** | **0.79** | **0.48** | **1.33** |
+| big (278) before | 160 / 94 / 24 | 657° | 8.1 / 12.7 | 0.91 | 1.19 | 2.29 |
+| big after | 186 / 92 / **0** | **452°** | **6.7 / 8.8** | **0.85** | **0.83** | **1.74** |
+
+CPU after the severity pass: Node, same machine, back to back with the old code, 600 crashes: median 0.86 → 0.90 ms per
+60 Hz frame (+3–5 %: the tumble governor at 240 Hz, the fall-mode / lying goals at 240 Hz; per-group body lists took
+some back). The `--check` CPU limit (p95 ≤ 1 ms) is only met on a quiet machine — with other workers' headless browsers
+running, the old code fails it too (p95 1.4 ms). Browser (`ragdoll-bench.mjs`, loaded machine): 0.7–1.1 ms per frame
+awake, one case 1.5 ms.
+
+Thresholds (`TL` in the fuzz): small — no flip at all, tumble p90 ≤ 180° (at most onto the back / side), body spin
+p90 ≤ 5 rad/s, hands p90 ≤ 0.78 m (a forearm from the trunk, not an arm flung out), looseness median ≤ 1.5; medium —
+≤ 5 % roll over once, tumble p90 ≤ 300°, spin ≤ 7.5, hands ≤ 0.85, looseness ≤ 1.7; big — at most one flip, spin ≤ 11,
+hands ≤ 0.92, looseness ≤ 2.2. Whole set: peak limb spin vs trunk median 25.4 → 19.1 rad/s, mean 2.09 → 1.41, big swings
+per crash 13 → 8.
+
+`ragdoll-sticks.mjs <out.png> [indices] [every] [seconds]` draws aimed fuzz crashes as capsule stick figures (side
+view along the travel and rear view, one row per crash, labelled with tier, severity terms, fall mode and metrics):
+the quickest way to see what a change does to the motion itself. `ragdoll-shots.mjs` has the severity ladder on the
+Valcrest kicker (`nearside` 4–5° past the yaw limit, `overflip1` / `overflip2` a backflip 49° / 80° over, `sidefast`
+70° across at 19 m/s; run-in `JV` m/s, default 11) and `railbail` (a balance bail off a Voltage Park rail); the seed
+line shows `tier`, `sev`, `fall`, `imp` (normal impact) and `dev`.
+
 ### Known limits
+
+- Severity is graded from what the game records at the crash; the fuzz's synthetic crashes pitch the whole rider
+  (skis included) about the feet, so a few mid-pitch ski crashes start with the ski tails buried and end on the back
+  with the skis standing up (the lying pose can't lay them down from there). Not seen in the game's own crashes.
+- The governor is a stand-in for self-arrest: on a > 35° face a big crash still tumbles and slides until the fade.
 
 - The body is capsules: no fingers, the jacket doesn't crumple, the board is two thin edges.
 - A body draped over a rail or a rock may slide off it slowly; on steep faces (> 30°) it keeps tumbling / sliding

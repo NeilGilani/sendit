@@ -17,6 +17,7 @@ import fs from 'node:fs';
 const [base = 'http://localhost:5196/', outDir = '/tmp/ragdoll-shots', equip = 'ski', which = 'all', view = 'tp', W = '640', H = '360'] = process.argv.slice(2);
 fs.mkdirSync(outDir, { recursive: true });
 
+const JV = Number(process.env.JV || 0);   // run-in speed override for the severity ladder (m/s)
 const VAL = 'const k = s.features.kickers[2], ox = k.o.x, oz = k.o.y, fx = k.f.x, fz = k.f.y, L = k.L;';
 const VOLT = `const f = s.course.features.find((f) => f.name === 'Voltage'), la = f.jump.lipA;
   const [x0, z0] = f.world(la - 12), [x1, z1] = f.world(la), ll = Math.hypot(x1 - x0, z1 - z0);
@@ -61,6 +62,27 @@ const TICK = (every = 6, after = 2.4) => `
 const SC = {
   overflip: { q: 'map=valcrest-gully&kicker=2', setup: TICK() + jump(VAL, 13, 'c.brake = 1;') },
   sideways: { q: 'map=valcrest-gully&kicker=2', setup: TICK() + jump(VAL, 13, 'if (tl < 0.12 && !p._sw) { p._sw = 1; p.heading += 1.4; p.orient.multiply(new p.orient.constructor().setFromAxisAngle({ x: 0, y: 1, z: 0 }, 1.4)); }') },
+  // Severity ladder (docs/body.md § Severity): the same Valcrest kicker, the landing error set just before touchdown.
+  // nearside: 4–5° past the crash limit across the line (skis 43°, board 87°); overflip1 / overflip2: a backflip
+  // over-rotated by 49° / 80°; sidefast: 70° (board 95°) across at 19 m/s.
+  nearside: { q: 'map=valcrest-gully&kicker=2', setup: TICK(3, 1.8) + jump(VAL, JV || 11, 'if (tl < 0.12 && !p._sw) { p._sw = 1; const a = p.equipment.type === "ski" ? 0.75 : 1.52; p.heading += a; p.orient.multiply(new p.orient.constructor().setFromAxisAngle({ x: 0, y: 1, z: 0 }, a)); }') },
+  overflip1: { q: 'map=valcrest-gully&kicker=2', setup: TICK(3, 1.8) + jump(VAL, JV || 11, 'if (tl < 0.14 && !p._fl) { p._fl = 1; p.flip = Math.PI * 2 + 0.85; p.flipRate = 3; }') },
+  overflip2: { q: 'map=valcrest-gully&kicker=2', setup: TICK(3, 1.8) + jump(VAL, JV || 11, 'if (tl < 0.14 && !p._fl) { p._fl = 1; p.flip = Math.PI * 2 + 1.4; p.flipRate = 5; }') },
+  sidefast: { q: 'map=valcrest-gully&kicker=2', setup: TICK(3, 1.8) + jump(VAL, 19, 'if (tl < 0.12 && !p._sw) { p._sw = 1; const a = p.equipment.type === "ski" ? 1.22 : 1.66; p.heading += a; p.orient.multiply(new p.orient.constructor().setFromAxisAngle({ x: 0, y: 1, z: 0 }, a)); }') },
+  railbail: {
+    q: 'map=voltage-park',
+    setup: TICK(5, 2.4) + `
+    const rails = s.course.rails || [];
+    const rl = rails.find((r) => r.kind === 'rail' && r.pts.length >= 2) || rails[0];
+    if (!rl) window.__done = true; else {
+      const a = rl.pts[0], b = rl.pts[rl.pts.length - 1];
+      const ux = b[0] - a[0], uz = b[2] - a[2], ul = Math.hypot(ux, uz);
+      pl.place({ x: a[0] + ux / ul * 0.5, z: a[2] + uz / ul * 0.5 }, Math.atan2(-ux / ul, -uz / ul));
+      pl.state = 2; pl.position.y = a[1] + 0.35; pl.velocity.set(ux / ul * 6, -1, uz / ul * 6); pl.snapRender();
+      let gf = 0;
+      pl.script = (c, p) => { tick(p); if (p.grind?.active) { gf++; if (gf === 24) p.grind.bail(); } else if (p.state !== 3 && fr > 90) { p.lastCrash = { reason: 'balance', impact: 0 }; p.crash('rail'); } };
+    }`,
+  },
   cliff: { q: 'map=ravenspire', setup: TICK(6, 2.8) + jump(RAVEN, 18, 'c.brake = 1;', { pop: false, back: 30 }) },
   steep: {
     q: 'map=ravenspire',
