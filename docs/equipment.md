@@ -494,9 +494,9 @@ the butt, hem and thighs went 9–13 cm into the deck. What rider.js does now:
   grab (`skiGrabLift`) with an extra hip / back fold, the board moved up to 11 cm toward the hand in the air
   (`grabGearReach`, frame-to-frame jumps of 4 cm), tweaks easing back (`tweakFit`), arms IK'd to the edge. All
   of that is gone: the gear stays where the pre-clipping rig put it and the arms use the original straight
-  reach. One safeguard remains for board grabs (`handClear`): only where that straight reach would put the mitt
-  into the deck does the elbow bend (blended by how deep, eased out) so the hand closes over the edge at the
-  grab's own station. Ski grabs never reached the skis, so they never needed it.
+  reach. One safeguard remains for board grabs (`handClear`): only where that straight reach brings the wrist
+  within ~15 cm of the deck (the mitt hangs that far past it, so it would go in) does the elbow bend (blended
+  by how close, eased out) so the hand closes over the edge at the grab's own station. Ski grabs never reached the skis, so they never needed it.
 - **Legs never leave the bindings.** If a leg can't reach its binding, the hips come down a little.
 - **Chairlift:** the skis hang from the boots exactly (sole on the plate, tips down with the foot,
   `liftSkiHang`), the board under the soles (they used to hang 10 cm under the ankle bone, inside the boots).

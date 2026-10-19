@@ -759,15 +759,16 @@ export class Rider {
     const fix = this._handFix || (this._handFix = [0, 0]);
     const l1 = this.restLocal.get(B['lowerarm' + s]).p.length(), l2 = this.restLocal.get(B['hand' + s]).p.length();
     const w = sh.clone().addScaledVector(_v2.copy(u).normalize(), l1).addScaledVector(_v3.copy(l).normalize(), l2).applyMatrix4(F.Minv[0]);
-    const row = plankSurfaceAt(this.board, w.z, {});
-    const depth = row && Math.abs(w.x) < row.hw + GRAB_OUT + 0.1 ? row.top + GRAB_UP - w.y : -1;
-    const want = THREE.MathUtils.smoothstep(depth, -0.1, 0);
+    const t = this.board.userData.plank?.geometry.userData.surface;
+    // (a wrist past the nose / tail still counts: the mitt reaches back over the end)
+    const row = t && plankSurfaceAt(this.board, THREE.MathUtils.clamp(w.z, t[0].z, t[t.length - 1].z), {});
+    const depth = row && Math.abs(w.x) < row.hw + GRAB_OUT + 0.1 && Math.abs(w.z) < -t[0].z + 0.15 ? row.top + GRAB_UP - w.y : -1;
+    const want = THREE.MathUtils.smoothstep(depth, -0.16, -0.05);   // (the mitt hangs ~15 cm past the wrist)
     fix[k] = Math.max(want, fix[k] * Math.exp(-10 * (this._dtLast || 1 / 60)));
     if (fix[k] < 0.002) return;
-    const t = this.board.userData.plank?.geometry.userData.surface;
     const z = THREE.MathUtils.clamp(target.clone().applyMatrix4(F.Minv[0]).z, t ? t[0].z + 0.1 : -0.6, t ? t[t.length - 1].z - 0.1 : 0.6);
     const toe = this.equip.stance === 'goofy' ? -1 : 1;
-    const [uI, lI] = this.armReach(side, this.grabPoint(0, z, edge * toe, 0.06), new THREE.Vector3(side, 0.5, edge < 0 ? -0.6 : 0.2));
+    const [uI, lI] = this.armReach(side, this.grabPoint(0, z, edge * toe, 0.1), new THREE.Vector3(side, 0.5, edge < 0 ? -0.6 : 0.2));
     u.normalize().lerp(uI, fix[k]);
     l.normalize().lerp(lI, fix[k]);
   }
