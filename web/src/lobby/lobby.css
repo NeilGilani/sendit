@@ -247,8 +247,8 @@ body.device-touch .lb-key { display: none; }
 
 /* ---------------------------------------------------------------- bottom bar */
 .lb-bottom { grid-column: 1 / -1; grid-row: 3; display: flex; align-items: flex-end; justify-content: space-between; gap: 1em; min-width: 0; }
-.lb-hints { font-size: 0.78em; color: var(--c-snow); text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6); padding: 0.2em 0; }
-.lb-hints kbd { font-size: 0.82em; text-shadow: none; background: rgba(10, 18, 26, 0.7); }
+.lb-hints { font-size: 0.76em; color: var(--c-snow-2); padding: 0.45em 0.7em; border-radius: var(--r1); background: rgba(10, 18, 26, 0.82); border: 1px solid var(--c-line); }
+.lb-hints kbd { font-size: 0.82em; }
 .lb-go { display: flex; align-items: stretch; gap: 0.6em; margin-left: auto; }
 
 /* The selected trail is a trail sign: a snow-white plate, the difficulty symbol, the name in condensed caps. */
@@ -276,15 +276,16 @@ body.device-touch .lb-key { display: none; }
 body.device-touch .lb-ride-key { display: none; }
 
 /* ---------------------------------------------------------------- mode (Zen / Challenge) */
-#lobby .lb-mode { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; gap: 0.35em; }
+#lobby .lb-mode { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; gap: 0; }
 #lobby .lb-mode-seg { display: flex; padding: 0; border-radius: var(--r1); background: rgba(10, 18, 26, 0.9); border: 1px solid var(--c-line-2); }
 #lobby .lb-mode-seg button { flex: 1; padding: 0.5em 0.95em; font-weight: 700; font-stretch: 80%; text-transform: uppercase; letter-spacing: 0.06em; color: var(--c-snow-2); text-align: center; }
 #lobby .lb-mode-seg button + button { border-left: 1px solid var(--c-line-2); }
 #lobby .lb-mode-seg button:hover { color: var(--c-snow); }
 #lobby .lb-mode-seg button[aria-checked="true"] { color: var(--c-paper-ink); background: var(--c-snow); }
 #lobby .lb-mode-seg button:focus-visible { outline: 2px solid var(--c-signal); outline-offset: 2px; }
-.lb-mode-info { font: 500 0.66em/1.2 var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-snow); text-align: center;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); white-space: nowrap; }
+.lb-mode-info { font: 500 0.64em/1.2 var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-snow-2); text-align: center;
+  white-space: nowrap; padding: 0.55em 0.6em 0.5em; background: rgba(10, 18, 26, 0.9); border: 1px solid var(--c-line-2); border-top: 0; border-radius: 0 0 var(--r1) var(--r1); }
+#lobby .lb-mode-seg { border-radius: var(--r1) var(--r1) 0 0; }
 .lb-medal { display: inline-block; width: 0.75em; height: 0.75em; margin-left: 0.3em; border-radius: 50%; vertical-align: -0.05em; box-shadow: 0 0 0 1px rgba(0,0,0,0.4); }
 .lb-medal.gold { background: var(--c-gold); } .lb-medal.silver { background: #c9d1da; } .lb-medal.bronze { background: #c98a52; }
 
@@ -325,7 +326,7 @@ body.device-touch .lb-ride-key { display: none; }
   #lobby .lb-map { flex: 1 1 100%; min-width: 0; max-width: none; padding: 0.35em 0.8em 0.35em 0.35em; }
   .lb-map-thumb { width: 3.6em; }
   #lobby .lb-mode { flex: 1; }
-  #lobby .lb-mode-seg { height: 100%; }
+  #lobby .lb-mode-seg { height: 100%; border-radius: var(--r1); }
   #lobby .lb-ride { font-size: 1.55em; min-width: 0; flex: 1.2; padding: 0.3em 1.3em 0.3em 0.9em; }
   .lb-mode-info { display: none; }
   #lobby .lb-mode-seg button { padding: 0.4em 0.6em; }
