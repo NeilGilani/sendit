@@ -39,7 +39,7 @@ function loop(now) {
   // Thumbnail mode (lobby Highlights): the frozen apex frame, encoded right after it was drawn.
   if (thumbCanvas && scene.frozen >= 8 && !thumbSent) {
     thumbSent = true;
-    thumbCanvas.convertToBlob({ type: 'image/webp', quality: 0.82 }).then((blob) => post('thumb', { blob, info: scene.lastInfo })).catch((e) => post('error', { message: `thumb: ${e.message}` }));
+    thumbCanvas.convertToBlob({ type: 'image/webp', quality: 0.86 }).then((blob) => post('thumb', { blob, info: scene.lastInfo })).catch((e) => post('error', { message: `thumb: ${e.message}` }));
   }
 }
 

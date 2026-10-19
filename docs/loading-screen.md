@@ -486,8 +486,10 @@ have your kicker, so the clip brings its own snow:
 
 - `playClip(canvas, id)` — the lobby's Highlights player: the loading worker in a full-screen canvas,
   looping the clip with a new camera each time (`next` message cuts to the next one).
-- `renderThumb(id, 480, 270)` — the worker in thumb mode on an `OffscreenCanvas`: the hero move, frozen at
-  45 % of the air (`?loadfreeze`), `convertToBlob` WebP; ~15–25 KB, kept in IndexedDB.
+- `renderThumb(id, 640, 360, { cam, freeze })` — the worker in thumb mode on an `OffscreenCanvas`: a camera
+  move frozen part-way through the air (`?loadfreeze`), in a clear light of the clip's mountain (never the
+  storm or night variant), `convertToBlob` WebP, kept in IndexedDB. `scripts/clips-thumbs.mjs` renders the
+  choices side by side.
 
 ### Tests
 

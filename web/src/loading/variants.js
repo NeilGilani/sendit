@@ -149,7 +149,9 @@ export function pickVariant(opts = {}) {
   const clip = opts.clipMeta && typeof opts.clipMeta === 'object' ? opts.clipMeta : null;
   const own = !!hint?.transition;
   const look = clip ? MAP_LOOKS[clip.mapId] || MAP_LOOKS[hint?.mapId] || null : own ? MAP_LOOKS[hint.mapId] : null;
-  const tod = TIMES[opts.tod] ? opts.tod : look ? r.pick(look.tod) : r.weighted(TIMES);
+  // A highlight's thumbnail wants a clear light (a storm or night sky makes a grey or black stamp).
+  const lookTods = look ? (opts.thumb ? look.tod.filter((t) => t !== 'storm' && t !== 'aurora') : look.tod) : null;
+  const tod = TIMES[opts.tod] ? opts.tod : lookTods?.length ? r.pick(lookTods) : opts.thumb ? 'golden' : r.weighted(TIMES);
   const T = TIMES[tod];
   const mtn = MOUNTAINS[opts.mtn] ? opts.mtn : look ? r.pick(look.mtn) : r.pick(Object.keys(MOUNTAINS));
   const M = MOUNTAINS[mtn];

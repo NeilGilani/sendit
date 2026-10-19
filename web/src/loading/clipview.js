@@ -49,7 +49,7 @@ export function playClip(canvas, clipId, { onShot, onReady, onError, quality } =
 }
 
 /** Render one frame of a clip (the hero three-quarter at the top of the air) to a WebP Blob. */
-export function renderThumb(clipId, w = 480, h = 270, timeoutMs = 30000) {
+export function renderThumb(clipId, w = 640, h = 360, { timeoutMs = 30000, cam = 'hero', freeze = 0.45 } = {}) {
   return new Promise((resolve, reject) => {
     let worker;
     const t = setTimeout(() => { try { worker?.terminate(); } catch { /* */ } reject(new Error('thumb timeout')); }, timeoutMs);
@@ -63,7 +63,7 @@ export function renderThumb(clipId, w = 480, h = 270, timeoutMs = 30000) {
         else if (m.type === 'error' || m.type === 'clipFailed') end(reject, new Error(m.message || 'error'));
       };
       worker.onerror = (e) => { e.preventDefault?.(); end(reject, new Error(e.message || 'worker error')); };
-      worker.postMessage({ type: 'init', canvas: off, width: w, height: h, dpr: 1, opts: { clipId, thumb: true, q: 'still', freeze: '0.45', cam: 'hero', cover: false } }, [off]);
+      worker.postMessage({ type: 'init', canvas: off, width: w, height: h, dpr: 1, opts: { clipId, thumb: true, q: 'still', freeze: String(freeze), cam, cover: false } }, [off]);
       worker.postMessage({ type: 'stage', p: 1 });
     } catch (e) { end(reject, e); }
   });
