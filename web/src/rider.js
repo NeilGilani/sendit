@@ -487,13 +487,20 @@ export class Rider {
     this.root.updateMatrixWorld(true);
     const fl = this.visual.worldToLocal(this.bones.foot_l.getWorldPosition(new THREE.Vector3()));
     const fr = this.visual.worldToLocal(this.bones.foot_r.getWorldPosition(new THREE.Vector3()));
-    const drop = 0.1;
-    if (this.skis) {
-      // Armature +X (left foot) is visual −X: left ski under the left boot.
-      for (const [ski, f] of [[this.skis[0], fl], [this.skis[1], fr]]) {
-        ski.position.lerp(new THREE.Vector3(f.x, f.y - drop, f.z - 0.05), w);
-        ski.rotation.x = 0.35 * w;   // tips hang down
-      }
+    // (the boot sole is ~12 cm under the ankle bone; the plank hangs under the sole, seated on its binding)
+    const sole = this.boot ? -(this.boot[1].off.y + this.boot[-1].off.y) / 2 : 0.1;
+    const drop = sole + (this.skis ? SKI_BINDING_SEAT : BOARD_BINDING_SEAT);
+    if (this.skis && this.boot && this.footQ) {
+      // Each ski hangs from its boot exactly: the boot's sole on the binding plate, the ski turned with the
+      // foot (tips down, poseSki). Armature +X (left foot) = ski 0.
+      const F = this.gf;
+      [[this.skis[0], 1, 'foot_l'], [this.skis[1], -1, 'foot_r']].forEach(([ski, side, fb], i) => {
+        const fq = this.footQ[i];
+        const solePt = pos(this.g(this.bones[fb])).add(_v2.copy(this.boot[side].off).applyQuaternion(fq)).applyMatrix4(F.Mva);
+        const q = _q.copy(F.qva).multiply(fq).multiply(F.qav);
+        ski.position.lerp(solePt.sub(_v2.set(0, SKI_BINDING_SEAT, 0).applyQuaternion(q)), w);
+        ski.quaternion.slerp(q, w);
+      });
     } else if (this.board) {
       const mid = fl.clone().add(fr).multiplyScalar(0.5);
       this.board.position.lerp(new THREE.Vector3(mid.x, mid.y - drop, mid.z), w);
@@ -953,7 +960,9 @@ export class Rider {
       // pitch, the plough's wedge, crossed / tweaked skis), so no boot pokes through the ski.
       const fq = new THREE.Quaternion();
       const ankle = this.seatAnkle(side > 0 ? 0 : 1, side, _v1.set(0, SKI_BINDING_SEAT, 0), 0, fq);
-      fq.slerp(_qI, Math.max(p.sit, p.crash));
+      fq.slerp(_qI, p.crash);
+      fq.slerp(_q.setFromAxisAngle(X, ANIM.liftSkiHang), p.sit);   // on the chairlift the boots (and skis) hang tips down
+      (this.footQ || (this.footQ = [new THREE.Quaternion(), new THREE.Quaternion()]))[side > 0 ? 0 : 1].copy(fq);
       this.leg(side, ankle, new THREE.Vector3(side * 0.12, 0, 1), 0, fq);
       this.armSki(side, pl);
     }

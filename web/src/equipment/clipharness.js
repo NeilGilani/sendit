@@ -197,7 +197,8 @@ function snap(rider, views, label, w, h) {
 
 // ------------------------------------------------------------------ rider + poses
 let rider = null, pl = null, meshes = null;
-async function ensureRider(gear, variant, stance) {
+let fitKey = '';
+async function ensureRider(gear, variant, stance, fit = null) {
   if (!rider) {
     pl = new Player(flat, { findObstacle: () => null, nearest: () => null }, null, noInput);
     pl.setEquipment(gear, variant);
@@ -211,6 +212,13 @@ async function ensureRider(gear, variant, stance) {
   pl.setEquipment(gear, variant);
   if (gear === 'snowboard') pl.setStance(stance);
   rider.buildEquipment(pl.equipment.type, pl.equipment.spec, stance);
+  // Outfit fit: [jacket, pants, gloves] garment ids (character/outfits.js), default = the default kit.
+  const k = JSON.stringify(fit);
+  if (k !== fitKey) {
+    fitKey = k;
+    rider.setOutfit(fit ? { jacket: { garment: fit[0] }, pants: { garment: fit[1] }, gloves: { garment: fit[2] } } : {});
+    meshes = classify(rider);
+  }
   return rider;
 }
 
@@ -275,12 +283,13 @@ function gamePoses(type) {
       L.push([`grab ${g} + spin`, grab(g, { spinRate: 6 }), 1.4, false, true]);
     }
   }
+  L.push(['chairlift', (p) => { p.state = State.LIFT; p.liftT = 0.5; p.speed = 0; }, 2.0]);
   L.push(['grind grab', (p) => { p.state = State.GRIND; p.grab = 1; p.grabName = type === 'ski' ? 'Safety' : 'Indy'; p.grindTilt = { pitch: 0.3, roll: 0.3, travel: 0, slide: false }; }, 1.0]);
   return L;
 }
 
-async function runGame({ gear, variant, stance = 'regular', shots = false, views = ['side', 'below', 'front'], w = 240, h = 200, only = null }) {
-  await ensureRider(gear, variant, stance);
+async function runGame({ gear, variant, stance = 'regular', fit = null, shots = false, views = ['side', 'below', 'front'], w = 240, h = 200, only = null }) {
+  await ensureRider(gear, variant, stance, fit);
   const rows = [];
   for (const [name, set, secs, , style] of gamePoses(gear)) {
     if (only && !only.some((o) => name.includes(o))) continue;
@@ -291,7 +300,7 @@ async function runGame({ gear, variant, stance = 'regular', shots = false, views
     const n = Math.max(1, Math.round(secs / DT));
     for (let f = 0; f < n; f++) { set(pl, f * DT, f); rider.update(DT, null); }
     const m = measure(rider, meshes);
-    rows.push({ name, gear: `${gear}/${variant}${gear === 'snowboard' ? '/' + stance : ''}`, ...m, miss: (rider.reachMiss || 0) * 100, worst: Math.max(m.body, m.hand, m.sunk, m.base, m.gap) });
+    rows.push({ name, gear: `${gear}/${variant}${gear === 'snowboard' ? '/' + stance : ''}${fit ? ' ' + fit.join('+') : ''}`, ...m, miss: (rider.reachMiss || 0) * 100, worst: Math.max(m.body, m.hand, m.sunk, m.base, m.gap) });
     if (shots) snap(rider, views, `${gear} ${variant} ${name}  body ${m.body.toFixed(1)} hand ${m.hand.toFixed(1)} sunk ${m.sunk.toFixed(1)} base ${m.base.toFixed(1)} gap ${m.gap.toFixed(1)} cm`, w, h);
   }
   PHYSICS.trickStyle = false;
@@ -299,8 +308,8 @@ async function runGame({ gear, variant, stance = 'regular', shots = false, views
 }
 
 /** The loading screen's hero shots: every trick for the gear, the whole shot, every frame measured. */
-async function runLoading({ gear, variant, stance = 'regular', seeds = [1, 2], shots = false, views = ['side', 'below', 'front'], w = 240, h = 200, tricks = null }) {
-  await ensureRider(gear, variant, stance);
+async function runLoading({ gear, variant, stance = 'regular', fit = null, seeds = [1, 2], shots = false, views = ['side', 'below', 'front'], w = 240, h = 200, tricks = null }) {
+  await ensureRider(gear, variant, stance, fit);
   PHYSICS.trickStyle = true;   // the loading worker turns it on (tweaked grabs)
   const rows = [];
   for (const seed of seeds) {
@@ -335,7 +344,7 @@ async function runLoading({ gear, variant, stance = 'regular', seeds = [1, 2], s
         const m = measure(rider, meshes);
         snap(rider, views, `LOAD ${gear} ${variant} ${stance} ${trick} s${seed} t=${snapAt.toFixed(2)}/${sh.Ta.toFixed(2)}  body ${m.body.toFixed(1)} hand ${m.hand.toFixed(1)} sunk ${m.sunk.toFixed(1)} base ${m.base.toFixed(1)} gap ${m.gap.toFixed(1)}`, w, h);
       }
-      rows.push({ name: `load ${trick} s${seed}`, gear: `${gear}/${variant}${gear === 'snowboard' ? '/' + stance : ''}`, ...worst, worstT, worst: wv, worstAt: wt, Ta: sh.Ta });
+      rows.push({ name: `load ${trick} s${seed}`, gear: `${gear}/${variant}${gear === 'snowboard' ? '/' + stance : ''}${fit ? ' ' + fit.join('+') : ''}`, ...worst, worstT, worst: wv, worstAt: wt, Ta: sh.Ta });
     }
   }
   PHYSICS.trickStyle = false;

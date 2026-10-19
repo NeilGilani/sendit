@@ -6,6 +6,7 @@
 //   --json   write all rows to a file (before / after comparisons)
 //   --check  exit 1 when any pose goes deeper than LIMIT cm (1.0; boots vs the base 0.3)
 //   --quick  fewer variants / seeds
+//   --fits   also every outfit fit (jacket / pants / gloves) on the all-mountain gear
 //   --views side,below,front,side2,chase  --size WxH (sheet cells)
 //   --tricks a,b (loading tricks)
 //   --only a,b   game poses whose name contains a or b; --gear ski|snowboard; --mode game|loading
@@ -35,6 +36,15 @@ for (const v of boardVars) for (const st of quick ? ['regular'] : ['regular', 'g
 for (const v of quick ? ['allmountain'] : ['allmountain', 'park', 'powder']) jobs.push({ mode: 'loading', gear: 'ski', variant: v, seeds: quick ? [1] : [1, 2] });
 for (const v of quick ? ['allmountain'] : ['allmountain', 'freeride', 'park', 'powder']) for (const st of ['regular', 'goofy']) jobs.push({ mode: 'loading', gear: 'snowboard', variant: v, stance: st, seeds: quick ? [1] : [1, 2] });
 
+// --fits all: also every outfit fit (jacket + pants + gloves, character/outfits.js) over the quick set.
+if (args.includes('--fits')) {
+  const FITS = [['storm-shell', 'cargo-pant', 'pipe-glove'], ['retro-suit', 'wide-pant', 'tuff-mitt'], ['ridge-shell', 'tuff-bib', 'pipe-glove'],
+    ['tall-anorak', 'wide-pant', 'tuff-mitt'], ['cloud-puffer', 'cargo-pant', 'tuff-mitt'], ['layer-hoodie', 'wide-pant', 'pipe-glove'], ['tall-anorak', 'cargo-pant', 'pipe-glove']];
+  for (const fit of FITS) {
+    jobs.push({ mode: 'game', gear: 'ski', variant: 'allmountain', fit }, { mode: 'game', gear: 'snowboard', variant: 'allmountain', stance: 'regular', fit });
+    jobs.push({ mode: 'loading', gear: 'ski', variant: 'allmountain', seeds: [1], fit }, { mode: 'loading', gear: 'snowboard', variant: 'allmountain', stance: 'goofy', seeds: [1], fit });
+  }
+}
 // --gear ski|snowboard, --mode game|loading: run a subset (iterating on one thing).
 const gearF = opt('--gear'), modeF = opt('--mode');
 for (let i = jobs.length - 1; i >= 0; i--) if ((gearF && jobs[i].gear !== gearF) || (modeF && jobs[i].mode !== modeF)) jobs.splice(i, 1);
@@ -42,14 +52,14 @@ const all = [];
 let sheetN = 0;
 for (const j of jobs) {
   // Contact sheets only for the first variant of each kind (keeps the sheets readable).
-  const pics = !!shots && (j.variant === 'allmountain') && (j.stance !== 'goofy' || j.mode === 'loading');
+  const pics = !!shots && (j.variant === 'allmountain') && (j.stance !== 'goofy' || j.mode === 'loading') && (!j.fit || args.includes('--fitshots'));
   if (pics) await page.evaluate(() => window.__clip.clearSheet());
   const views = opt('--views')?.split(','), size = opt('--size')?.split('x').map(Number);
   const rows = await page.evaluate((o) => window.__clip.run(o), { ...j, shots: pics, only, ...(views ? { views } : {}), ...(size ? { w: size[0], h: size[1] } : {}), ...(opt('--tricks') ? { tricks: opt('--tricks').split(',') } : {}) });
   all.push(...rows);
   if (pics) {
     fs.mkdirSync(shots, { recursive: true });
-    const f = `${shots}/${String(++sheetN).padStart(2, '0')}_${j.mode}_${j.gear}_${j.variant}_${j.stance || ''}.png`;
+    const f = `${shots}/${String(++sheetN).padStart(2, '0')}_${j.mode}_${j.gear}_${j.variant}_${j.stance || ''}${j.fit ? '_' + j.fit[0] : ''}.png`;
     await page.locator('#sheet').screenshot({ path: f });
     console.log(`sheet ${f}`);
   }
@@ -58,7 +68,7 @@ await browser.close();
 
 const f1 = (x) => (x >= 0.05 ? x.toFixed(1) : '0').padStart(5);
 console.log(`\n${'pose'.padEnd(28)} ${'gear'.padEnd(26)}  body  hand  sunk  base   gap  (cm)`);
-for (const r of all) console.log(`${r.name.padEnd(28)} ${r.gear.padEnd(26)} ${f1(r.body)} ${f1(r.hand)} ${f1(r.sunk)} ${f1(r.base)} ${f1(r.gap)}${r.miss > 0.5 ? `  (hand ${r.miss.toFixed(0)} cm short of the grab)` : ''}${r.worstAt != null ? `   worst at t=${r.worstAt.toFixed(2)} (land ${r.Ta.toFixed(2)})${r.iters ? `  max ${r.iters} pose passes` : ''}` : ''}`);
+for (const r of all) console.log(`${r.name.padEnd(28)} ${r.gear.padEnd(40)} ${f1(r.body)} ${f1(r.hand)} ${f1(r.sunk)} ${f1(r.base)} ${f1(r.gap)}${r.miss > 0.5 ? `  (hand ${r.miss.toFixed(0)} cm short of the grab)` : ''}${r.worstAt != null ? `   worst at t=${r.worstAt.toFixed(2)} (land ${r.Ta.toFixed(2)})${r.iters ? `  max ${r.iters} pose passes` : ''}` : ''}`);
 const max = { body: 0, hand: 0, sunk: 0, base: 0, gap: 0 };
 for (const r of all) for (const k of Object.keys(max)) max[k] = Math.max(max[k], r[k]);
 console.log(`\nmax  body ${max.body.toFixed(2)}  hand ${max.hand.toFixed(2)}  sunk ${max.sunk.toFixed(2)}  base ${max.base.toFixed(2)}  gap ${max.gap.toFixed(2)} cm over ${all.length} poses`);
