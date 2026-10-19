@@ -10,7 +10,7 @@
 import { registerLobbyTab } from '../tabs.js';
 import { ICONS } from '../icons.js';
 import { esc } from './common.js';
-import { listMountains, getMountain, getTrail, needsReload, trailBoardId, DIFFICULTIES, DIFFICULTY_IDS } from '../../maps/registry.js';
+import { listMountains, getMountain, getTrail, needsReload, trailBoardId, DIFFICULTIES, DIFFICULTY_IDS, mapShot } from '../../maps/registry.js';
 import { difficultyBadge, trailStats } from '../../maps/badges.js';
 import { storage } from '../../services/storage.js';
 import { pisteMap } from './pistemap.js';
@@ -29,6 +29,9 @@ function spreadHtml(m, { bar = true } = {}) {
   return `${bar ? `<div class="mt-bar" aria-hidden="true">${segs.map((d) => `<i class="d-${d}" style="flex:${m.spread[d] / total}"></i>`).join('')}</div>` : ''}
     <div class="mt-spread">${segs.map((d) => `<span title="${esc(DIFFICULTIES[d].label)}">${difficultyBadge(d, 15)}<b>${m.spread[d]}</b></span>`).join('')}</div>`;
 }
+
+/** The mountain's rendered picture as an <img> over the painted --art fallback (removed if the file is missing). */
+const shotImg = (m) => (m.maps?.[0] ? `<img class="mt-shot" src="${esc(mapShot(m.maps[0].id))}" alt="" decoding="async" draggable="false" onerror="this.remove()">` : '');
 
 /** CSS custom properties for a mountain: accent + art. `attr` = escaped for an HTML attribute. */
 const thumbStyle = (m, attr = true) => {
@@ -73,7 +76,7 @@ registerLobbyTab({
         if (here) b.dataset.autofocus = '';
         b.style.cssText = thumbStyle(m, false);
         b.innerHTML = `
-          <span class="mt-art"><span class="mt-region">${esc(m.region)}</span>${here ? '<span class="mt-here">You are here</span>' : ''}${m.experimental ? '<span class="mt-exp">Real data</span>' : ''}</span>
+          <span class="mt-art">${shotImg(m)}<span class="mt-region">${esc(m.region)}</span>${here ? '<span class="mt-here">You are here</span>' : ''}${m.experimental ? '<span class="mt-exp">Real data</span>' : ''}</span>
           <span class="mt-body">
             <span class="mt-name">${esc(m.name)}</span>
             <span class="mt-blurb">${esc(m.blurb)}</span>
@@ -92,7 +95,7 @@ registerLobbyTab({
       const segs = DIFFICULTY_IDS.filter((d) => m.spread[d]);
       if (filter !== 'all' && !m.spread[filter]) filter = 'all';
       el.innerHTML = `
-        <div class="mt-head" style="${thumbStyle(m)}">
+        <div class="mt-head" style="${thumbStyle(m)}">${shotImg(m)}
           <button type="button" class="mt-back" aria-label="All mountains">${BACK}<span>Mountains</span><span class="g-kb"><kbd>Esc</kbd></span><span class="g-pad"><kbd>B</kbd></span></button>
           <div class="mt-hero">
             <small>${esc(m.region)}</small>

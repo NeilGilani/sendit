@@ -19,6 +19,7 @@ import { skin, CASE_XP, seeded, rollCase, caseOdds, casePool, PITY } from '../..
 import { SERIES } from '../../profile/items.js';
 import { SLOTS, STATS } from '../../profile/catalog.js';
 import { itemArt, goldArt } from './art.js';
+import { artHtml, GOLD_ICON } from './itemIcons.js';
 import { caseArt } from './caseArt.js';
 import { caseSfx } from './sfx.js';
 import { crateSfx } from '../../audio/crate.js';
@@ -38,16 +39,20 @@ export const quickOpen = {
   set(v) { try { localStorage.setItem(QUICK_KEY, v ? '1' : '0'); } catch { /* private mode */ } },
 };
 
-/** A reel / grid card for a skin key (or the anonymous gold card). */
-export function cardHtml(key, rarity, { big = false, label = true } = {}) {
+/**
+ * A reel / grid card for a skin key, with the item's rendered icon (itemIcons.js). `anon` shows a gold
+ * item as the anonymous "★ Rare Special Item" (the reel); no key = that card too (case contents,
+ * missing gold in the Locker). `icon: false` keeps the flat SVG art (silhouettes of missing skins).
+ */
+export function cardHtml(key, rarity, { big = false, label = true, anon = false, icon = true } = {}) {
   const r = rarityOf(rarity);
   const s = key ? skin(key) : null;
-  const gold = rarity === 'gold' && !big;
-  const art = gold || !s ? goldArt() : itemArt(s.item, s.variant);
-  const name = gold || !s ? '★ Rare Special Item' : s.item.name;
-  const sub = gold || !s ? 'Exceedingly Rare' : s.variant.name;
+  const gold = !s || (rarity === 'gold' && anon);
+  const art = gold ? artHtml(GOLD_ICON, goldArt(), { icon }) : artHtml(key, itemArt(s.item, s.variant), { icon });
+  const name = gold ? '★ Rare Special Item' : s.item.name;
+  const sub = gold ? 'Exceedingly Rare' : s.variant.name;
   return `<div class="cr-card r-${r.id}${big ? ' big' : ''}" style="--rc:${r.color}">
-    <div class="cr-art">${art}</div>
+    ${art}
     ${label ? `<div class="cr-name"><small>${esc(name)}</small><b>${esc(sub)}</b></div>` : ''}
   </div>`;
 }
@@ -162,7 +167,7 @@ class Opener {
       <div class="cr-head"><small>${this.chain ? `Opening all · ${this.chain.pulls.length} of ${this.chain.pulls.length + profileStore.unopened.length}` : 'Unlocking'}</small><b>${esc(this.series.name)}</b></div>
       ${this.d3 ? '' : `<div class="cr-case">${caseArt(this.result.case.series)}<div class="cr-light"></div></div>`}
       <div class="cr-reel" aria-hidden="true">
-        <div class="cr-window"><div class="cr-strip">${reel.cards.map((c) => cardHtml(c.key, c.rarity)).join('')}</div></div>
+        <div class="cr-window"><div class="cr-strip">${reel.cards.map((c) => cardHtml(c.key, c.rarity, { anon: true })).join('')}</div></div>
         <div class="cr-streaks"></div>
         <div class="cr-marker"><i></i></div>
       </div>

@@ -3,7 +3,9 @@
 // Shows the equipped item for the chosen type from the catalog: name, stats, colourway, parts.
 import { registerLobbyTab } from '../tabs.js';
 import { ICONS } from '../icons.js';
-import { EQUIPMENT_TYPES, STATS, SLOTS } from '../../profile/catalog.js';
+import { EQUIPMENT_TYPES, STATS, SLOTS, ownKey } from '../../profile/catalog.js';
+import { artHtml } from '../cases/itemIcons.js';
+import { itemArt } from '../cases/art.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 
@@ -55,6 +57,7 @@ registerLobbyTab({
       if (!item) { card.innerHTML = '<p class="lp-sub">No item equipped.</p>'; return; }
       const colors = Object.values(main.variant?.colors || {});
       card.innerHTML = `
+        ${main.variant ? artHtml(ownKey(item.id, main.variant.id), itemArt(item, main.variant), { cls: 'eq-icon', prio: 2 }) : ''}
         <div class="eq-card-head">
           <span class="eq-slot">${esc(SLOTS[item.slot].label)}</span>
         </div>

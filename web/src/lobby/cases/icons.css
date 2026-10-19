@@ -1,0 +1,10 @@
+/* Rendered item icons (itemIcons.js): only the picture's box. Card, panel and colour styling live in
+   cases.css / lobby.css. */
+.cr-card .ca-img { display: block; width: 100%; height: 100%; max-height: 7em; object-fit: contain; aspect-ratio: 1; image-rendering: auto; pointer-events: none; user-select: none; }
+.cr-card.big .ca-img { max-height: 14.5em; }
+.ca-img.fresh { animation: ca-img-in .28s ease-out both; }
+@keyframes ca-img-in { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ca-img.fresh { animation: none; } }
+/* Locker detail and the Equipment card: a picture box next to the text. */
+.lk-sel-icon, .eq-icon { float: right; width: 6.5em; height: 6.5em; margin: -.2em -.2em .2em .6em; padding: 0; display: grid; place-items: center; }
+.lk-sel-icon .ca-img, .eq-icon .ca-img, .lk-sel-icon .ca-svg, .eq-icon .ca-svg { width: 100%; height: 100%; max-height: none; object-fit: contain; }
