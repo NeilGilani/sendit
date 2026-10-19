@@ -26,6 +26,8 @@ export function lastGains() {
 function show(html, cls = '', ms = 4200) {
   if (typeof document === 'undefined') return;
   if (!stack) { stack = document.createElement('div'); stack.className = 'cn-stack'; stack.setAttribute('aria-live', 'polite'); document.body.appendChild(stack); }
+  // In a ride the top right belongs to the score and the snowflake counter: cards go to the left edge.
+  stack.classList.toggle('ride', game.mode !== Mode.MENU);
   const n = document.createElement('div');
   n.className = `cn ${cls}`;
   n.innerHTML = html;

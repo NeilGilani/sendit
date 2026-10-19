@@ -17,6 +17,7 @@ node web/scripts/cases-timing.mjs                  the opening at 60 fps: reel p
 node web/scripts/rewards-table.mjs                 the case contents as markdown (the Items section below)
 node web/scripts/iconsheet.mjs <url> <dir>          contact sheet of every item icon by series and grade (DUMP=1 raw icons, FLAT=1 old art, ONLY=jacket-,skis)
 node web/scripts/iconflow.mjs <url> <dir>           icons in the flow: Cases tab, contents, reel, gold reveal, Locker, Equipment
+node web/scripts/tilesheet.mjs <url> <dir>          item tiles: the reel at four speeds per case, contents grids, Locker per slot (FLAT=1 old art)
 node web/scripts/crateshot.mjs <url> <dir>         frame sequence of the 3D opening per case / grade + a contact sheet
                                                    (SERIES=night-park RARITY=gold ITEM=board- PERF=1 QUICK=1, see the file;
                                                    MATRIX=1 every case x grade, CHAIN=1 "Open all", FLOW=2 with ?caseforce)
@@ -299,7 +300,67 @@ Each gold item has its base model's shape and handling.
 Every skin has a rendered 3D picture, the same in the Cases tab (contents, best and recent pulls), the
 reel, the 2D reveal card, the "Open all" summary, the Locker grid and detail, and the Equipment card.
 Owned gold items show their own skis / board (they used to share the ★); the anonymous ★ card itself is
-a rendered gold star.
+a rendered gold star, and the reel and case contents keep it by design (CS:GO's knife rule).
+
+### Rarity first, item second (research, October 2026)
+
+The first rendered icons (v1) were big, detailed renders filling the card: the item won over the grade
+colour, and in the spin the cards read as a stream of clothing instead of a stream of colours. What the
+reference games do (from their UIs and the CS2 colour data; sizes are estimates from screenshots):
+
+- **CS:GO / CS2.** Dark neutral plate, a rarity-coloured gradient rising from the bottom (~30–50 % of
+  the card), a solid rarity bar along the bottom (~5 % of the card height), the item at one fixed angle
+  per category (flat side profile for every gun) with a soft shadow, two text lines (weapon, then the
+  finish), wear and the orange StatTrak tag as small text. At speed you cannot read any item: you see
+  the bars and washes flash past the marker, so hue is the signal; the item becomes readable only in the
+  crawl. The ★ knife / glove hides behind a generic gold card until the reveal.
+- **Case-opening sites** (CS skins): even more colour: the item at ~60–70 % of the card width with a
+  radial glow in the grade colour behind it, the winning card scales up and pulses.
+- **Fortnite** (shop / locker, before v29.20 retired the rarity colours): the grade *is* the background
+  (radial gradient, series pattern), the item is a cut-out with a dark outline so it pops off the colour.
+- **Rocket League / Valorant / Apex / Overwatch.** Tile tinted by grade or a tier chip, item centred
+  smaller; Apex lets the pack beam take the best item's colour; Overwatch puts the grade on the edge glow.
+- **Why it works.** Area share: the grade colour must own a big part of the tile (field + bar), with the
+  item less saturated or separated by an outline. Small sizes punish detail: fine shading and specular
+  glints become noise, flat colour blocks and a crisp silhouette survive. One framing per category means
+  the eye compares only colour while scanning. During the spin the excitement is the colour stream past
+  the marker, the slowing ticks, and the rare colours brushing past (near misses; note the research on
+  near misses is mixed, ours never change the outcome and the odds are shown).
+
+### What we built (v2)
+
+- **Tiles** (`icons.css`, the reel draws the same in `reelCanvas.js`): dark plate → fine diagonal
+  pattern → a grade wash rising from the bottom → a radial grade glow behind the item → the picture at
+  ~2/3 of the card width, a little above centre → a darker name strip (item in mono caps, finish in the
+  display cut) → a **bold grade bar** (0.42 em, was 0.28). Grade strength rises with rarity (grey is
+  light so it gets less wash); pink and red add a lit top edge; ★ gold gets a gold field and a slow
+  shimmer sweep (off with `prefers-reduced-motion`).
+- **Tile pictures** (iconBaker `style: 'tile'`): the same real models and shaders, but graded flatter for
+  small sizes: highlights rolled off before the tone curve (chrome and gloss read as colour, not white
+  glints), shading contrast pulled in and saturation up a little, no bloom, and a crisp dark outline
+  (~1.1 % of the icon) around the silhouette. Helmets and goggles are shot on their own (no white
+  mannequin bust competing with them); face pieces keep a slate head that fades out under the gaiter.
+  Framing per category: skis / boards diagonal, garments front 3/4, gloves upright pair, headwear 3/4.
+  No grade glow in the picture any more: the tile carries the colour.
+- **HD pictures** (`style: 'hd'`, `hdId(id)`): the full studio shading with a soft bloom at 512 / 384 px,
+  baked only when something big shows the item: the Locker detail (now a 9.5 em grade stage) and the 2D
+  reveal card. The tile picture stands in until it is ready.
+- **The reel**: plates are painted once with canvas 2D (the lobby's own fonts); the picture is drawn per
+  frame on top. While the reel is fast the picture is a **silhouette in a light tint of the grade**,
+  smeared along the travel (6 faint copies over up to 1/5 of a card above ~14 cards/s), so the start of
+  the spin is pure colour blocks; between ~20 and ~7 cards/s it cross-fades to the detailed tile icon,
+  which is what you read in the crawl, at the near misses and at the stop. Speed comes from the reel
+  curve itself, so captures that freeze the clock show the right look.
+
+| | v1 (detailed renders) | v2 (tiles) |
+|---|---|---|
+| picture in a card | ~95 % of the width, grade glow baked in | ~66 %, outline, flat grade, grade field from the tile |
+| grade bar | 0.28 em | 0.42 em + wash + glow behind the item |
+| reel at speed | detailed renders under speed streaks | grade-tinted silhouettes, motion-blurred |
+| tile icon size | 384 / 256 px | 256 / 192 px (HD 512 / 384 on demand) |
+
+Check them with `node web/scripts/tilesheet.mjs <url> <dir>` (reel at four speeds per case, the
+contents grids, the Locker per slot; `FLAT=1` for the old flat art) and `iconsheet.mjs` (every icon).
 
 **How they are made** (`lobby/cases/iconBaker.js`): the lobby's own WebGL renderer draws each item
 into an off-screen target, so the game's real models and shaders make the picture:
@@ -310,8 +371,8 @@ into an off-screen target, so the game's real models and shaders make the pictur
   chrome, holographic, reflective, neon), panels and zips are the real shader. Only the slot's pieces of
   the outfit mesh are drawn (an index subset by piece id: jacket + sleeves + collar + hood, pant legs,
   mitts + gauntlets, gaiter), double-sided so openings show the lining; a one-piece also draws the legs.
-- **Helmets, goggles, face pieces** sit on a matte off-white mannequin bust; goggles and face pieces get
-  a neutral dark helmet so the lens / print is the subject.
+- **Helmets and goggles** are drawn alone (goggles on a neutral dark helmet so the lens is the subject);
+  **face pieces** sit on a slate head that fades out below the gaiter.
 - **Skis and boards** are `equipment/models.js` planks with their real topsheet (legendary gold leaf,
   chrome, holo, inferno, galaxy, aurora), laid diagonally with a quarter turn; tilted so a mirror
   topsheet catches the horizon line.
@@ -319,21 +380,22 @@ into an off-screen target, so the game's real models and shaders make the pictur
   fill, rim colour, time, sun-mask off) are switched to a fixed studio set for the bake and restored
   right after, so icons never depend on the map. Warm key from the upper left with a soft shadow map,
   cool fill, Fresnel rim; camera fitted to the item's skinned vertices from a 3/4 angle per slot.
-- **Composite**: rendered at 2x in half float, then one pass: the game's neutral tone curve, a soft
-  bloom for hot spots (neon, glints), a contact shadow under the item and a faint glow in the grade
-  colour, transparent elsewhere. Read back asynchronously, stored as webp (~20 kB at 256 px).
+- **Composite**: rendered at 2x in half float, then one pass: the game's neutral tone curve, the tile or
+  HD look (above) and a soft contact shadow, transparent elsewhere. Read back asynchronously, stored as
+  webp.
 
-**Size and cache** (`lobby/cases/itemIcons.js`): 384 px on screens with devicePixelRatio ≥ 1.5, else
-256 px. Pictures are kept as blob URLs in memory (~3 MB for all 148) and in IndexedDB
-(`sendit-icons`, key `${ICON_VERSION}|${px}|${skin key}`), so after the first visit every card has
+**Size and cache** (`lobby/cases/itemIcons.js`): tile pictures 256 px on screens with devicePixelRatio
+≥ 1.5, else 192 px (were 384 / 256: a tile shows the picture at ~100–190 device px); HD 512 / 384 px.
+Pictures are kept as blob URLs in memory and in IndexedDB (`sendit-icons`, key
+`${ICON_VERSION}|${px}|${id}`, HD ids are `hd:<skin key>`), so after the first visit every card has
 its picture at once. Bakes are lazy: any card that is drawn queues its icon (visible cards first);
-the Cases tab queues every icon of the cases you hold before it pre-rasterises the reel cards. One
-bake per animation frame; a card shows the flat SVG until its icon is ready and swaps in place. All
-148 icons take ~9–30 s on the shared MacBook Air the first time, then load from IndexedDB.
-Debug: `?noicons` (flat art), `?iconrebake` (ignore the cache), `window.__senditIcons`.
+the Cases tab queues every icon of the cases you hold before it pre-paints the reel cards. One
+bake per animation frame; a card shows the flat SVG until its icon is ready and swaps in place.
+Debug: `?noicons` (flat art), `?iconrebake` (ignore the cache), `window.__senditIcons`,
+`window.__senditReel` (the reel's plate and picture caches).
 
 **Versioning**: bump `ICON_VERSION` in itemIcons.js whenever the look of the icons changes (studio,
-framing, or a model / shader they use); older entries are deleted on the next load.
+framing, or a model / shader they use: e.g. reshaped garments); older entries are deleted on the next load.
 
 **A new item's icon** needs nothing extra: a clothing variant (colours, print, finish) or a gear model
 is pictured from its data. A new slot needs a line in `PIECES` (which outfit pieces to draw) and `VIEW`

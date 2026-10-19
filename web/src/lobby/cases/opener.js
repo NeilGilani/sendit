@@ -48,7 +48,7 @@ export function cardHtml(key, rarity, { big = false, label = true, anon = false,
   const r = rarityOf(rarity);
   const s = key ? skin(key) : null;
   const gold = !s || (rarity === 'gold' && anon);
-  const art = gold ? artHtml(GOLD_ICON, goldArt(), { icon }) : artHtml(key, itemArt(s.item, s.variant), { icon });
+  const art = gold ? artHtml(GOLD_ICON, goldArt(), { icon, hd: big }) : artHtml(key, itemArt(s.item, s.variant), { icon, hd: big });
   const name = gold ? '★ Rare Special Item' : s.item.name;
   const sub = gold ? 'Exceedingly Rare' : s.variant.name;
   return `<div class="cr-card r-${r.id}${big ? ' big' : ''}" style="--rc:${r.color}">
@@ -255,7 +255,10 @@ class Opener {
       const x = this.x0 + (this.x1 - this.x0) * e;
       const prev = this.trace.at(-1);
       const v = prev ? (x - prev.x) / Math.max(1e-3, t - prev.t) : 0;
-      this.reel.draw(x);
+      // Reel speed from the curve itself (exact even when a capture freezes the clock): picks
+      // silhouettes vs. detailed pictures and the motion blur on the canvas.
+      const dk = 0.004, vCurve = (this.x1 - this.x0) * (cubicBezier(REEL_EASE, Math.min(1, k + dk)) - cubicBezier(REEL_EASE, Math.max(0, k - dk))) / ((Math.min(1, k + dk) - Math.max(0, k - dk)) * T.spinDur);
+      this.reel.draw(x, { v: t < T.spin ? 0 : vCurve });
       this.x = x;
       // Speed streaks while fast (they fade as the reel slows and the cards sharpen into view).
       const spd = Math.min(1, Math.abs(v) / 5000);

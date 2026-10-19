@@ -141,7 +141,7 @@ registerLobbyTab({
           <div class="gr-sel-foot">${isEq ? '<span>You ride this</span>' : `<span>vs ${esc(eq ? eq.name : 'riding')}</span>${sel.missing ? '' : `<button type="button" class="gr-sel-cmp" data-gr-cmp-go="${esc(sel.key)}">${GEAR_ICONS.compare}Compare</button>`}`}</div>
         </div>`;
       }
-      return `<div class="lk-sel" style="--rc:${r.color}">${sel.missing ? '' : artHtml(sel.key, itemArt(sel.item, sel.variant), { cls: 'lk-sel-icon', prio: 2 })}
+      return `<div class="lk-sel" style="--rc:${r.color}">${sel.missing ? '' : artHtml(sel.key, itemArt(sel.item, sel.variant), { cls: 'lk-sel-icon', prio: 2, hd: true })}
           <span class="lk-grade">${esc(sel.variant.starter ? 'Starter' : r.name)}${sel.missing ? ' · not owned yet' : ''}</span>
           <b>${esc(sel.variant.rarity === 'gold' && sel.missing ? '★ ??? ' : `${sel.item.name} | ${sel.variant.name}`)}</b>
           <p>${esc(sel.missing ? dropInfo(sel.variant, sel.key) : sel.item.description || '')}</p>${sel.variant.rarity === 'gold' && sel.missing ? '' : extra}</div>`;
