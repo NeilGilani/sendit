@@ -314,6 +314,72 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await ctx.close();
 }
 
+// ---------------------------------------------------------------- 6d: gear stats in the Locker (docs/equipment.md)
+// ?casegrant gives cases; the pulls are random, so the owned skis / boards are added straight to the
+// inventory (the same entries opening a case writes).
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const page = await newPage(ctx);
+  await page.goto(`${base}?casegrant=2`);
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await lobbyReady(page);
+  await page.evaluate(() => { window.__sendit.profile.setEquipment('skis'); window.__sendit.lobby.select('equipment'); });
+  await page.waitForTimeout(300);
+  const one = await page.evaluate(() => ({ cards: document.querySelectorAll('.gr-card').length, none: !!document.querySelector('.gr-pick.none'), pick: !!document.querySelector('.gr-badge.pick'), bars: document.querySelectorAll('.gr-card .gr-row').length }));
+  ok(one.cards === 1 && one.bars === 5 && one.none && !one.pick, `one ski owned: its card shows 5 stat bars and no pick (${JSON.stringify(one)})`);
+  await page.evaluate(() => {
+    const P = window.__sendit.profile;
+    P.update((p) => { for (const k of ['skis-valcrest-sl:stock', 'skis-driftline-float:stock', 'skis-jibworks-twin:stock', 'skis-valcrest-gs:stock', 'board-jibworks-butter:stock']) p.inventory.items[k] = { at: 1, n: 1, seen: true }; });
+    window.__sendit.lobby.select('home'); window.__sendit.lobby.select('equipment');
+  });
+  await page.waitForTimeout(300);
+  const before = await page.evaluate(() => JSON.stringify(window.__sendit.profile.profile.loadout));
+  const g = await page.evaluate(() => ({
+    cards: document.querySelectorAll('.gr-card').length,
+    withBars: [...document.querySelectorAll('.gr-card')].filter((c) => c.querySelectorAll('.gr-row .gr-bar').length === 5).length,
+    picks: document.querySelectorAll('.gr-card .gr-badge.pick').length,
+    badges: document.querySelectorAll('.gr-card .gr-badge:not(.pick)').length,
+    reason: document.querySelector('.gr-pick-main em')?.textContent || '',
+    map: document.querySelector('.gr-mappick')?.textContent.replace(/\s+/g, ' ').trim() || '',
+  }));
+  ok(g.cards === 5 && g.withBars === 5, `Gear: every owned ski card shows its 5 stat bars (${g.withBars}/${g.cards})`);
+  ok(g.picks === 1 && /→/.test(g.reason), `Gear: one ★ recommended ski with a reason ("${g.reason}")`);
+  ok(g.badges >= 4, `Gear: best-at badges among owned skis (${g.badges})`);
+  ok(/^Best for /.test(g.map), `Gear: the loaded mountain's pick ("${g.map}")`);
+  await page.hover('.gr-card:not(.on) .gr-card-main');
+  await page.waitForTimeout(250);
+  const d = await page.evaluate(() => { const c = document.querySelector('.gr-card:not(.on)'); const e = c.querySelector('.gr-d'); return { n: c.querySelectorAll('.gr-d.up, .gr-d.down').length, op: getComputedStyle(e).opacity }; });
+  ok(d.n >= 3 && Number(d.op) > 0.9, `hovering a card shows deltas vs the equipped ski (${d.n} ▲/▼)`);
+  await page.click('.gr-card:not(.on) .gr-cmpbtn');
+  await page.waitForTimeout(250);
+  const c = await page.evaluate(() => ({ rows: document.querySelectorAll('.gr-cmp .gr-cmp-row').length, sides: document.querySelectorAll('.gr-cmp .gr-cmp-side').length, loadout: JSON.stringify(window.__sendit.profile.profile.loadout) }));
+  ok(c.rows === 5 && c.sides === 2, 'Compare with equipped: side-by-side bars');
+  ok(c.loadout === before, 'comparing does not change what you ride');
+  await page.click('.gr-card:not(.on):not(.cmp) .gr-cmpbtn');
+  await page.waitForTimeout(250);
+  ok(await page.evaluate(() => document.querySelectorAll('.gr-card.cmp').length === 2 && !!document.querySelector('.gr-cmp')), 'Compare two picked skis');
+  await page.click('.gr-cmp [data-gr-wear]');
+  await page.waitForTimeout(250);
+  ok(await page.evaluate((b) => JSON.stringify(window.__sendit.profile.profile.loadout) !== b, before), '"Ride this" in the compare equips that ski');
+  // Snowboard: two boards owned → stats and a pick there too.
+  await page.click('.eq-opt[data-type=snowboard]');
+  await page.waitForTimeout(300);
+  ok(await page.evaluate(() => document.querySelectorAll('.gr-card').length === 2 && document.querySelectorAll('.gr-card .gr-badge.pick').length === 1), 'Gear: boards show stats and a ★ pick');
+  // Skins: the skis slot carries stats on every tile and the detail plate shows them vs riding.
+  await page.evaluate(() => { window.__sendit.profile.setEquipment('skis'); window.__sendit.lobby.select('locker'); });
+  await page.waitForTimeout(200);
+  await page.click('.lk-slot[data-slot=skis]');
+  await page.waitForTimeout(300);
+  const sk = await page.evaluate(() => ({ items: document.querySelectorAll('.lk-item').length, tiles: document.querySelectorAll('.lk-item .gr-tile .gr-bars').length, pick: document.querySelectorAll('.lk-item .gr-badge.pick').length, sel: document.querySelectorAll('.lk-sel .gr-row').length }));
+  ok(sk.items === 5 && sk.tiles === 5 && sk.pick === 1 && sk.sel === 5, `Skins → Skis: stats on every tile, a ★ pick, stats in the detail (${JSON.stringify(sk)})`);
+  await page.hover('.lk-item:not(.on)');
+  await page.waitForTimeout(200);
+  ok(await page.evaluate(() => document.querySelectorAll('.lk-sel .gr-d.up, .lk-sel .gr-d.down').length >= 3), 'hovering a ski tile previews its deltas vs riding');
+  await shot(page, 't6_gear_skins');
+  await ctx.close();
+}
+
 // ---------------------------------------------------------------- 7: migration from pre-lobby storage
 {
   const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
