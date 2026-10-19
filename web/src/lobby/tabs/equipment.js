@@ -13,6 +13,13 @@ import { esc } from './common.js';
 import { shortName } from '../gearAdvisor.js';
 import { gearAdvice, statBars, badgeChips, pickHtml, compareHtml, compareState, TYPE_SLOT, GEAR_ICONS } from '../gearUi.js';
 
+/** Card order: what you ride, then the ★ pick, then the rarest. */
+function order(adv) {
+  const rank = (it) => (it.equipped ? 0 : adv.rec?.key === it.key ? 1 : 2);
+  const rar = { gold: 0, legendary: 1, epic: 2, rare: 3, uncommon: 4, common: 5 };
+  return adv.items.slice().sort((a, b) => rank(a) - rank(b) || (rar[a.variant.rarity] ?? 6) - (rar[b.variant.rarity] ?? 6) || a.name.localeCompare(b.name));
+}
+
 function toggle(ctx) {
   const p = ctx.profile;
   p.setEquipment(p.equipment === 'skis' ? 'snowboard' : 'skis');
@@ -77,7 +84,7 @@ registerLobbyTab({
             ${compareHtml(pair[0], pair[1])}
           </section>` : compareState.picks.length === 1 ? '<p class="gr-cmp-hint">Pick another one to compare with.</p>' : ''}
         <div class="gr-head"><span class="lp-h3">Your ${noun} · ${adv.items.length}</span><span class="gr-legend">${eq ? 'vs riding: <i class="up">▲</i> better <i class="down">▼</i> worse' : ''}</span></div>
-        <div class="gr-list" role="list">${adv.items.map((it) => {
+        <div class="gr-list" role="list">${order(adv).map((it) => {
           const pick = adv.rec?.key === it.key;
           const cmpOn = compareState.picks.includes(it.key);
           return `<div class="gr-card${it.equipped ? ' on' : ''}${pick ? ' pick' : ''}${cmpOn ? ' cmp' : ''}" role="listitem" data-key="${esc(it.key)}">

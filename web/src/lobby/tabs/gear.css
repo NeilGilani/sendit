@@ -81,7 +81,7 @@
 .gr-list { display: grid; gap: calc(0.45em + var(--lip)); padding-bottom: var(--lip); }
 .gr-card { position: relative; }
 #lobby .gr-card-main { display: grid; grid-template-columns: 4.6em minmax(0, 1fr); gap: 0.75em; align-items: center; width: 100%; text-align: left;
-  padding: 0.55em 4.1em 0.65em 0.55em; border-radius: var(--r2); color: var(--c-snow); background: var(--c-ink-2); border: 1px solid var(--c-line);
+  padding: 0.55em 0.7em 0.65em 0.55em; border-radius: var(--r2); color: var(--c-snow); background: var(--c-ink-2); border: 1px solid var(--c-line);
   --lipc: var(--c-ink-lip); box-shadow: 0 var(--lip) 0 var(--lipc); transition: transform var(--t1) var(--e-out), box-shadow var(--t1) var(--e-out), background var(--t1); }
 #lobby .gr-card-main:hover { transform: translateY(-2px); box-shadow: 0 calc(var(--lip) + 2px) 0 var(--lipc); background: var(--c-ink-3); }
 #lobby .gr-card-main:active { transform: translateY(calc(var(--lip) - 1px)); box-shadow: 0 1px 0 var(--lipc); transition-duration: 40ms; }
@@ -92,12 +92,12 @@
 .gr-art { width: 4.6em; height: 4.6em; border-radius: var(--r1); overflow: hidden; background: rgba(0, 0, 0, 0.25); display: grid; place-items: center; }
 .gr-art img, .gr-art svg { width: 100%; height: 100%; object-fit: contain; }
 .gr-card-body { display: grid; gap: 0.4em; min-width: 0; }
-.gr-card-top { display: flex; align-items: center; gap: 0.5em; min-width: 0; }
+.gr-card-top { display: flex; align-items: center; gap: 0.5em; min-width: 0; min-height: 1.6em; padding-right: 5.6em; }
 .gr-name { font-size: 1.05em; font-weight: 900; font-stretch: 72%; text-transform: uppercase; letter-spacing: 0.01em; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#lobby .gr-cmpbtn { position: absolute; top: 0.5em; right: 0.5em; display: grid; justify-items: center; gap: 0.2em; width: 3.2em; padding: 0.35em 0.2em 0.3em;
+#lobby .gr-cmpbtn { position: absolute; top: 0.55em; right: 0.6em; display: inline-flex; align-items: center; gap: 0.35em; padding: 0.45em 0.6em 0.45em 0.45em;
   border-radius: var(--r1); color: var(--c-snow-2); background: rgba(0, 0, 0, 0.25); box-shadow: inset 0 0 0 1px var(--c-line-2);
-  font: 600 0.56em/1 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; transition: background var(--t1), color var(--t1); }
-#lobby .gr-cmpbtn svg { width: 1.9em; height: 1.9em; }
+  font: 600 0.6em/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; transition: background var(--t1), color var(--t1); }
+#lobby .gr-cmpbtn svg { width: 1.4em; height: 1.4em; }
 #lobby .gr-cmpbtn:hover { color: var(--c-snow); background: var(--c-ink-4); }
 #lobby .gr-cmpbtn.on { color: var(--c-paper-ink); background: var(--c-ice); box-shadow: none; }
 #lobby .gr-cmpbtn:focus-visible { box-shadow: 0 0 0 2px var(--c-snow), 0 0 0 5px rgba(255, 90, 31, 0.55); }
@@ -164,9 +164,10 @@
   #lobby .eq-opt .eq-ico svg { width: 1.6em; height: 1.6em; }
   #lobby .eq-opt .eq-check { top: 50%; transform: translateY(-50%); }
   .gr-pick { margin-top: 0.6em; }
-  #lobby .gr-card-main { grid-template-columns: 3.6em minmax(0, 1fr); padding-right: 3.6em; }
+  #lobby .gr-card-main { grid-template-columns: 3.6em minmax(0, 1fr); }
+  .gr-card-top { padding-right: 2.4em; }
   .gr-art { width: 3.6em; height: 3.6em; }
-  #lobby .gr-cmpbtn { width: 2.8em; }
+  #lobby .gr-cmpbtn { padding: 0.4em; }
   #lobby .gr-cmpbtn span { display: none; }
   .gr-cmp-row { grid-template-columns: 1.8em minmax(0, 1fr) 5.2em minmax(0, 1fr) 1.8em; }
   .gr-cmp-lab svg { display: none; }
