@@ -1,6 +1,6 @@
 // End-to-end check of the lobby flow in headless Chromium (software WebGL). Exits 1 on failure.
 // Usage: node scripts/lobbytest.mjs [baseUrl] [shotDir]
-//   1. boots into the lobby (default first screen)
+//   1. boots into the lobby (default first screen, on Home; Locker → Gear holds Equipment, Esc goes Home)
 //   2. toggles Skis → Snowboard, reloads, checks it persisted (profile v2 in localStorage)
 //   3. keyboard: Q/E switch tabs, arrows move focus
 //   4. mocked gamepad: RB switches tabs, Y swaps gear, d-pad + A activate, Start rides
