@@ -221,7 +221,7 @@ near misses, medium and big pitch / yaw errors, bumps, rail bails, cliffs, trees
 computes; `--tiers n`, `TIERSONLY=1`, `TDUMP=file`). Flips = full turns of the trunk's long axis (head over heels /
 cartwheel); body spin = the whole body's rotation rate (I⁻¹·L) averaged over 0.1 s, its peak; hand spread = a hand's
 distance from the trunk segment; looseness = mean limb spin relative to the trunk. Before = the same metric code with
-the new behaviour switched off by config (it reproduces the old code's flappiness line exactly: 25.4 / 2.09 / 13 vs
+the new behaviour switched off by config (`CFILE=web/scripts/ragdoll-old.json`, also for `ragdoll-sticks.mjs`; it reproduces the old code's flappiness line exactly: 25.4 / 2.09 / 13 vs
 25.2 / 2.05 / 13), seed 1:
 
 | tier (runs) | flips 0 / 1 / 2+ | tumble p90 | body spin peak median / p90 | hand spread p90 | ankles apart p90 | looseness median |

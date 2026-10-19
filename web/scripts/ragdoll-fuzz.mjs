@@ -23,6 +23,8 @@ const args = process.argv.slice(2);
 const CHECK = args.includes('--check'), VERBOSE = args.includes('--verbose');
 const arg = (k, d) => { const i = args.indexOf(k); return i >= 0 ? Number(args[i + 1]) : d; };
 const N = arg('--n', 600), SEED = arg('--seed', 1);
+// Config overrides: C='{json}' or CFILE=path (e.g. the old behaviour, for before / after numbers).
+const CFG = process.env.C || process.env.CFILE ? { ...RAGDOLL, ...JSON.parse(process.env.C || (await import('node:fs')).readFileSync(process.env.CFILE, 'utf8')) } : RAGDOLL;
 const LIM = { stretch: 0.02, below: 0.03, energy: 1.0, limitDeg: 8, attach: 0.03, sleep: 3.0, sleepShare: 0.93, sleepAll: 4.0, sleepAllShare: 0.98, sleepSlope: 20, sleepSpeed: 15, msFrame: 1.0 };
 
 function rng(seed) {
@@ -143,7 +145,7 @@ export function setup(sc, overrides = {}) {
       return c;
     })(), groundNormal: new THREE.Vector3(0, 1, 0), renderPos: new THREE.Vector3(),
   };
-  const ctl = new RagdollController({ player: pl, rider: r, scatter: env.scatter, course: T.course, C: process.env.C ? { ...RAGDOLL, ...JSON.parse(process.env.C) } : RAGDOLL });
+  const ctl = new RagdollController({ player: pl, rider: r, scatter: env.scatter, course: T.course, C: CFG });
   place(1 / 60); ctl.track(); pl.simTime += 1 / 60; place(0); ctl.track();
   pl.state = 3; emit('crashed', kind);
   pl.renderPos.copy(pl.position);
