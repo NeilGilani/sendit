@@ -66,7 +66,7 @@ registerLobbyTab({
       const r = sel ? rarityOf(sel.variant.rarity || 'common') : null;
       const missing = total(slot) - owned.length;
       root.innerHTML = `
-        <h2 class="lp-title">Locker <span class="lp-pill" style="background:#ffe36a">${Math.round(col.pct * 100)} % collected</span></h2>
+        <h2 class="lp-title">Locker <span class="lp-pill gold">${Math.round(col.pct * 100)} % collected</span></h2>
         <p class="lp-sub">Wear anything you own. It shows on your rider here and in every ride.</p>
         <div class="lk-slots" role="tablist" aria-label="Slot">${SLOTS.map(([s, label]) => `
           <button type="button" role="tab" class="lk-slot${s === slot ? ' on' : ''}" data-slot="${s}" aria-selected="${s === slot}">${esc(label)}${P.newSkins(s).length ? '<i class="lk-dot"></i>' : ''}</button>`).join('')}</div>

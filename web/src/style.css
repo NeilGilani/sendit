@@ -1,9 +1,30 @@
 :root {
-  --ink: #faf8f3;
-  --dim: rgba(250, 248, 243, 0.62);
-  --accent: #ffcc94;
-  --glass: rgba(14, 18, 28, 0.45);
-  --font: "Inter", "SF Pro Display", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* ---- Sendit design tokens ("lift ticket & trail sign", docs/lobby.md → Design system) ---- */
+  --font: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;           /* one variable family: wdth 62–125, wght 100–900 */
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace; /* serials, keys, small data */
+  --c-night: #0a121a;      /* deepest: top bar, scrims */
+  --c-ink: #0f1a24;        /* panels */
+  --c-ink-2: #16232f;      /* raised rows / cards */
+  --c-ink-3: #20303f;      /* hover */
+  --c-line: rgba(214, 228, 240, 0.14);   /* hairlines */
+  --c-line-2: rgba(214, 228, 240, 0.3);
+  --c-snow: #f2f4f1;       /* primary text, sign plates, tickets */
+  --c-snow-2: #b3bfca;     /* secondary text (8.9:1 on ink) */
+  --c-snow-3: #8a97a4;     /* tertiary text / captions (5.6:1 on ink) */
+  --c-paper-ink: #0f1a24;  /* text on snow plates */
+  --c-paper-dim: #4d5a66;  /* secondary text on snow plates (6.6:1) */
+  --c-signal: #ff5a1f;     /* ski-patrol orange: the one accent (CTA, active, focus) */
+  --c-signal-2: #ff7a45;   /* hover */
+  --c-ice: #8fd0ee;        /* glacier blue: progress / data fill */
+  --c-pine: #2f9d5c;       /* success, owned */
+  --c-gold: #f3c14b;       /* medals, personal bests */
+  --c-alert: #e5382b;      /* patrol red: new / badges */
+  --r1: 2px;               /* radii: 0 for strips, 2px for controls, 4px for panels. Circles only where the thing is a circle. */
+  --r2: 4px;
+  --ink: var(--c-snow);
+  --dim: var(--c-snow-2);
+  --accent: var(--c-signal);
+  --glass: rgba(10, 18, 26, 0.9);
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d12; color: var(--ink); font-family: var(--font); }
@@ -167,3 +188,36 @@ body { --fp-rush: 0; --fp-lens: 1; }
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04); }
 body.fp #goggles { display: block; }
 body.fp #speed { left: auto; right: 44px; bottom: 30px; transform: none; }
+
+/* ---------- design system: shared screens (pause, settings, results, credits) + HUD type ----------
+   Same tokens as the lobby (docs/lobby.md → Design system). The HUD keeps its layout; only the type
+   family changes from Arial Black to Archivo's condensed black cut. */
+body { font-family: var(--font); font-synthesis: none; -webkit-font-smoothing: antialiased; }
+.title { font-family: var(--font); font-stretch: 125%; font-weight: 900; font-style: normal; letter-spacing: -0.01em; text-transform: uppercase;
+  background: none; color: var(--c-snow); -webkit-text-fill-color: currentColor; filter: drop-shadow(0 2px 14px rgba(0, 0, 0, 0.35)); }
+.title.small { font-size: 44px; font-stretch: 100%; letter-spacing: 0.02em; }
+.vignette.dim { background: rgba(6, 11, 16, 0.55); backdrop-filter: none; }
+.vignette { background: linear-gradient(90deg, rgba(6, 11, 16, 0.78) 0%, rgba(6, 11, 16, 0.35) 40%, rgba(6, 11, 16, 0) 64%); }
+nav { gap: 0; }
+button { font-family: var(--font); font-style: normal; font-weight: 700; font-stretch: 80%; text-transform: uppercase; letter-spacing: 0.04em;
+  border-radius: var(--r1); color: var(--c-snow-2); }
+button:hover, button:focus-visible { transform: none; color: var(--c-snow); background: rgba(255, 255, 255, 0.07); box-shadow: inset 3px 0 0 var(--c-signal); }
+button.primary { color: var(--c-snow); border-left: 0; border-radius: var(--r1); box-shadow: inset 3px 0 0 var(--c-signal); }
+.panel-left nav button { min-width: 11em; text-align: left; }
+.sub { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; }
+.card { background: var(--glass); backdrop-filter: none; border-radius: var(--r2); border: 1px solid var(--c-line); border-top: 3px solid var(--c-signal); }
+.card h2, #creditsText h1 { font-weight: 800; font-stretch: 75%; text-transform: uppercase; letter-spacing: 0.02em; }
+#creditsText h2 { font-weight: 700; color: var(--c-signal-2); }
+#creditsText a { color: var(--c-ice); }
+.seg button { border-radius: var(--r1); font-size: 14px; }
+.seg button:hover, .seg button:focus-visible { box-shadow: none; }
+.seg button.on { color: var(--c-paper-ink); background: var(--c-snow); border-color: var(--c-snow); }
+input[type=range], input[type=checkbox] { accent-color: var(--c-signal); }
+button.pad-focus { color: var(--c-snow); background: rgba(255, 255, 255, 0.1); outline: 2px solid var(--c-signal); }
+input.pad-focus { outline: 2px solid var(--c-signal); }
+#speed { --arcade: var(--font); }
+#speed span, #speed small, #timer, #comboHud, .res-time, .medal { font-family: var(--font); font-stretch: 75%; }
+.m-runs button:hover { border-color: var(--c-signal); }
+.mountain { border-radius: var(--r2); }
+.res-rows .v { font-style: normal; font-variant-numeric: tabular-nums; }
+.res-rows .v.new { color: var(--c-ice); }

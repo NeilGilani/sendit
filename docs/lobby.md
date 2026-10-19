@@ -214,6 +214,121 @@ says the board preview is unavailable (`gearMode = 'unsupported'`).
 The earlier placeholder board and `createEquipmentModel` auto-discovery were removed once the real
 snowboard landed.
 
+## Design system: "lift ticket & trail sign"
+
+The lobby, the case overlay, the pause / settings / results screens, the loading-screen type and the
+HUD's type all follow one system. Keep new UI on it, and don't invent new colours, radii or fonts.
+
+### Why (the audit, October 2026)
+
+The first lobby looked machine-made: Inter / system sans everywhere, heavy italic on every label,
+gradient text on the logo, cyan → pink → violet gradients, glass panels (backdrop blur) on every
+surface, pill shapes (`999px`) on tabs, chips, buttons, tags and the toast, 0.6–1.2 em radii on
+everything, soft glows, emoji icons (🥇, 🌲, 📚 in achievements and medals), identical rounded cards
+and low-contrast grey text over bright snow. Nothing said "ski season".
+
+### Direction
+
+References: trail-map signage at real resorts (enamel sign plates, the green circle / blue square /
+black diamond, bold condensed caps), paper lift tickets (die-cut notches, perforations, printed serials,
+one colour band), the restraint of outdoor brands such as Arc'teryx, Burton, Salomon and Black Crows
+(mostly black and white plus one accent, condensed uppercase headings, lots of hairlines),
+TGR / Warren Miller posters (big condensed headline over a photo), and the flat menus of Steep and
+Riders Republic (solid dark panels, a strong active-tab state). SSX Tricky is the energy, used for
+one thing only, the Ride button. Nothing is copied: no logos, no brand typefaces.
+
+What this means on screen:
+- **Sign plates.** The active tab, the selected trail (bottom right), the Zen / Challenge choice and
+  the trail difficulty symbols sit on snow-white plates with dark text, as on a trail sign.
+- **The lift ticket.** The profile chip is a paper ticket: notched edges (CSS mask), a dashed
+  perforation, the name in condensed caps, a mono meta line, the level tag and an XP strip.
+- **One accent.** Ski-patrol orange marks the action (Ride, the row's Ride column), the current
+  selection (a 3 px orange edge), the active tab's top rule and keyboard focus. The rest is navy,
+  snow and hairlines. Gold is kept for medals / bests / case opening, rarity colours for items.
+- **Flat surfaces.** Panels are solid night navy at ~92 % with a 1 px hairline. No backdrop blur
+  (also cheaper on the GPU), no gradients on UI chrome, shadows only to lift a plate off the scene.
+- **Real symbols, not emoji.** Trail difficulty uses the trail-sign shapes (`maps/badges.js`: square
+  corners on the blue square, a rectangle for the park). Medals are coloured discs. Achievement
+  badges draw colour emoji as line icons and other glyphs as text glyphs (`progression/lobby.js`).
+
+### Type
+
+Two families, loaded from Google Fonts in `index.html` without blocking the first paint
+(`media="print" onload`); the fallback is Helvetica / Arial, so nothing breaks offline.
+
+| role | family / setting | used for |
+|---|---|---|
+| display | Archivo 800–900, `font-stretch: 70–75%`, uppercase, `letter-spacing: 0.01em` | panel titles, card / trail / item names, Ride, mountain hero |
+| wordmark | Archivo 900, `font-stretch: 125%` (expanded), the I in orange | `SENDIT` in the top bar, `.title` on shared screens |
+| UI | Archivo 400–700 at normal width | body text, descriptions, list rows |
+| caps label | Archivo 600, 0.72 em, uppercase, `letter-spacing: 0.14em` | section heads (`.lp-h3`, `.pg-h`, `.tr-group`), stat names |
+| data | IBM Plex Mono 500–600 | serials, keys (`kbd`), XP / km / counts, tags, meta lines, the season |
+
+`#lobby` sets `font-variant-numeric: tabular-nums` so XP, timers and stats line up. Sizes stay in
+em off `#lobby`'s fluid size. Scale: 0.62–0.72 (micro / caps), 0.78–0.84 (small), 1 (body),
+1.15–1.4 (names), 1.7 (panel title), 2–2.2 (mountain hero, Ride).
+
+### Colour tokens (`:root` in `web/src/style.css`)
+
+| token | value | use |
+|---|---|---|
+| `--c-night` | `#0a121a` | top bar, scrims |
+| `--c-ink` | `#0f1a24` | panels (used at ~0.92 alpha) |
+| `--c-ink-2` / `--c-ink-3` | `#16232f` / `#20303f` | raised cards and rows / hover |
+| `--c-line` / `--c-line-2` | snow at 14 % / 30 % | hairlines / control borders |
+| `--c-snow` | `#f2f4f1` | primary text, sign plates, the ticket |
+| `--c-snow-2` | `#b3bfca` | secondary text (8.9:1 on ink) |
+| `--c-snow-3` | `#8a97a4` | captions, section heads (5.6:1 on ink) |
+| `--c-paper-ink` / `--c-paper-dim` | `#0f1a24` / `#4d5a66` | text on snow plates (6.6:1 for the dim one) |
+| `--c-signal` / `--c-signal-2` | `#ff5a1f` / `#ff7a45` | the accent: Ride, selection edge, active rule, focus |
+| `--c-ice` | `#8fd0ee` | progress fills, data |
+| `--c-pine` | `#2f9d5c` | done / owned / online |
+| `--c-gold` | `#f3c14b` | medals, personal bests, Open case |
+| `--c-alert` | `#e5382b` | NEW and count badges |
+| trail colours | green `#1f9d55`, blue `#1f66d6`, black `#0b0f14`, park `#f47b20` | difficulty only |
+
+The old `--lb-*` names still exist on `#lobby` and point at these tokens, for code outside the lobby
+files that uses them. New code should use `--c-*`. The 3D plinth rim (`lobby/config.js` `STAGE.neon`)
+uses the same orange.
+
+### Radii, lines, states
+
+- **Radii:** `--r1` = 2 px for controls, cards, rows and tags; `--r2` = 4 px for panels and the case
+  reveal card; 0 for strips (top bar, segmented controls inside, bars and gauges). The only round
+  things are things that are round: the green-circle symbol, medals, the collection dial and the
+  piste-map dots.
+- **Hairlines** separate list rows (leaderboard, challenges, map mastery, slots) instead of a card
+  per row. Section heads end in a hairline (`::after`).
+- **Selected** = snow 1 px border + a 3 px orange inner edge on the left (`box-shadow: inset 3px 0 0`)
+  (equipment option, trail row, ticket-sheet rows). **Active tab** = snow plate + 3 px orange top
+  rule. **Focus** = 2 px orange outline (`:focus-visible`), inset on tabs and rows; Ride shows a dark
+  bar along its bottom edge because the arrow shape (clip-path) would cut an outline.
+- **Bars:** square, 4 px (XP, challenges) or a ten-segment gauge (equipment stats, `.eq-bar` mask).
+
+### Components
+
+| component | classes | notes |
+|---|---|---|
+| top bar | `.lb-top .lb-brand .lb-tabs .lb-tab .lb-key` | full-bleed strip; words on wide screens, icons + the active word ≤ 1240 px |
+| lift ticket | `.lb-chip .lb-avatar .lb-chip-text` (+ `.pg-badge .pg-chipbar`) | notched with a CSS mask |
+| panel | `.lb-panel .lp-title .lp-sub .lp-h3 .lp-hint` | `.lp-sub` carries the hairline under the header |
+| tag | `.lp-pill` (`.on`, `.subtle`, `.gold`) | mono caps, 2 px, no pills any more (the class name stayed) |
+| button | `.lp-btn` (`.small`, `.ghost`) | condensed caps; primary actions are plates (Ride orange, Open case gold) |
+| trail sign | `.lb-map` | snow plate, difficulty symbol, mountain accent as the bottom band |
+| Ride | `.lb-ride` | orange, arrow end (`clip-path`), condensed 900 caps |
+| mode switch | `.lb-mode-seg .lb-mode-info` | segmented, caption plate below |
+| toast | `.lb-toast`, `.cn` (case notes), `#juiceHud .tt` | navy plate, coloured inner left edge |
+| item frame | `.cr-card`, `.lk-item`, `.cs-grid` | flat plate, grade colour as the bottom band; the item pictures are not styled here |
+
+Mountain cards (`.mt-art`) and the trail-view header (`.mt-head`) are framed for full-bleed
+photographic art (~16:10): the picture may come as the `--art` background or as an `<img>` child, both
+`cover`ed; a top scrim carries the tags, a deeper bottom scrim the region caption, and the mountain's
+accent is a 3 px band under the picture. The art itself belongs to the map-image code, not this CSS.
+
+Cases and Locker overrides are appended at the end of `lobby/cases/cases.css` (so the item-art code
+above merges cleanly); the Progress tab's CSS is the `CSS` string in `progression/lobby.js`; the
+Maps tab is `lobby/tabs/maps.css`.
+
 ## Controls in the lobby
 
 | | keyboard / mouse | gamepad | touch |
