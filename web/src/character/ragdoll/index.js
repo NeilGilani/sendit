@@ -219,7 +219,18 @@ export class RagdollController {
 
   /** Time for the respawn fade? (player.crashStep asks once the ragdoll ran) */
   doneAt(crashT) {
-    return (crashT > PHYSICS.tumbleTime && this.restT > this.C.restHold) || crashT > this.C.maxTumble || this.H?.world.failed;
+    const C = this.C;
+    if ((crashT > PHYSICS.tumbleTime && this.restT > C.restHold) || crashT > C.maxTumble || this.H?.world.failed) return true;
+    // Still going after the tumble: on a steep face (a body keeps sliding there) or once it has slid far enough,
+    // the fade starts instead of showing a long slide.
+    if (crashT > C.slideFadeTime && this.H) {
+      if (this.m.dist > C.slideFadeDist) return true;
+      if (this.player.speed > C.steepFadeSpeed) {
+        const n = this.player.groundNormal;
+        if (n && n.y < Math.cos(C.steepFadeDeg * Math.PI / 180)) return true;
+      }
+    }
+    return false;
   }
 
   /** Before every sub-step: obstacles nearby, bracing, muscle tone (all on the sub-step clock). */
@@ -256,6 +267,7 @@ export class RagdollController {
     if (!mot) mot = { v: pl.velocity.clone(), w: new THREE.Vector3() };
     if (this.kind === 'rail' && reason === 'balance') mot.v.copy(pl.velocity);
     const sp = mot.v.length();
+    seed.powder = pl.powder || 0;
     seed.eject = seed.type === 'ski' && (sp > C.ejectSpeed || /tree|rock|tower|post|wall|fence/.test(this.kind || ''));
     this.env.obstacles.length = 0;
     this.env.refresh(seed.bones.pelvis.p, 4);

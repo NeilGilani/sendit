@@ -451,11 +451,16 @@ export const RAGDOLL = {
     ankle: { cone: 22, twist: 12 },   // snowboard: boots in the bindings
   },
   // Snow and obstacles
-  muSnow: 0.45, muStaticSnow: 0.9,    // body on snow (dynamic: sliding on the jacket / static: dug in)
-  plough: 2,                   // 1/s tangential drag while touching the snow (ploughing through it)
+  // Body on snow: a jacket sliding on hardpack μ ≈ 0.3 (static, dug in: more); powder adds grip and drag
+  muSnow: 0.32, muStaticSnow: 0.65, muPowder: 0.2,
+  slowGrip: 1.5,               // m/s: slower slides grip more, up to muStaticSnow at a crawl (Stribeck-like)
+  muSkiOn: 0.12,               // skis still on: the bases slide (a crash with the skis on carries further)
+  plough: 3,                 // 1/s tangential drag while touching the snow (ploughing through it) …
+  ploughPowder: 1,             // … × (1 + this · powder)
+  ploughDig: 0.6, digMax: 12, digDecay: 1.5,   // + this × the approach speed (m/s, ≤ digMax) of the last hit: the hole it dug; fades at digDecay 1/s
   ploughSpin: 5,               // 1/s angular drag while touching (a body sinks in: it doesn't roll like a log)
   restitution: 0.08,
-  impactGrip: 3,               // m/s: a slam into the snow grips as if it were at most this hard (it gives way)
+  impactGrip: 6,               // m/s: a slam into the snow grips as if it were at most this hard (it gives way)
   muGear: 0.3, ploughGear: 2, // released skis (brakes out) / poles
   muBark: 0.6,
   airDrag: 0.02,               // 1/s
@@ -485,7 +490,10 @@ export const RAGDOLL = {
   sleepSpeed: 0.3, sleepSpin: 1.5, sleepTime: 0.25,
   settleSpeed: 0.5, settleRate: 10,  // centre of mass slower than this (touching): what's left dies at this rate (1/s)
   restHold: 0.45,              // s asleep before the respawn fade (never before PHYSICS.tumbleTime)
-  maxTumble: 3.0,              // s: respawn fade starts at the latest here
+  maxTumble: 2.6,              // s: respawn fade starts at the latest here
+  slideFadeTime: 1.6,          // s: after this the fade also starts when the body has slid slideFadeDist m …
+  slideFadeDist: 9,
+  steepFadeDeg: 30, steepFadeSpeed: 2.5,   // … or is still sliding (m/s) on a face steeper than this
   maxSpeed: 50, maxSpin: 30,   // safety clamps
   impactSpeed: 3.2,            // m/s into the snow / a tree for an impact event (audio, camera)
 };

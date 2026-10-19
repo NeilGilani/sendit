@@ -252,11 +252,15 @@ export class World {
     // --- velocity pass: friction, restitution, snow drag, joint damping
     for (let i = 0; i < this.nc; i++) this.contactVel(this.contacts[i], h);
     for (let i = 0; i < this.np; i++) this.pairVel(this.pc[i]);
+    const digDecay = Math.exp(-(C.digDecay ?? 0) * h);
     for (const b of this.bodies) {
-      if (!b.touch || b.G.asleep) continue;
+      if (b.G.asleep) continue;
+      b.dig = (b.dig || 0) * digDecay;
+      if (!b.touch) continue;
       const n = _n.copy(b.touchN).normalize();
       const vn = b.v.dot(n);
-      const k = Math.min(1, b.plough * h);
+      // Snow drag while touching: ploughing, plus the hole a hard hit dug (b.dig, from the approach speeds).
+      const k = Math.min(1, (b.plough + (C.ploughDig || 0) * Math.min(b.dig, C.digMax ?? 1e9)) * h);
       b.v.addScaledVector(_a.copy(b.v).addScaledVector(n, -vn), -k);
       b.w.multiplyScalar(Math.max(0, 1 - b.ploughSpin * h));
     }
@@ -510,7 +514,7 @@ export class World {
             // Back where it came from: whatever is still under the snow there is an ordinary contact.
             b.point(s.p, _p0);
             const H2 = env.height(_p0.x, _p0.z), pen2 = r - (_p0.y - H2) * s.ny;
-            if (pen2 > 0 && pen2 <= C.wallPen) this.contact(b, _p0, _n.set(s.nx, s.ny, s.nz), r, pen2, b.mu, b.muS, b.e, h, s);
+            if (pen2 > 0 && pen2 <= C.wallPen) this.contact(b, _p0, _n.set(s.nx, s.ny, s.nz), r, pen2, s.mu ?? b.mu, s.muS ?? b.muS, b.e, h, s);
             continue;
           }
           // Already deep (started underground): ease out without gaining speed.
@@ -518,7 +522,7 @@ export class World {
           b.x.y += lift; b.xp.y += lift;
           continue;
         }
-        this.contact(b, _p0, _n.set(s.nx, s.ny, s.nz), r, pen, b.mu, b.muS, b.e, h, s);
+        this.contact(b, _p0, _n.set(s.nx, s.ny, s.nz), r, pen, s.mu ?? b.mu, s.muS ?? b.muS, b.e, h, s);
       }
       // Obstacles: trunks / posts are vertical cylinders from the snow to their top; rocks are domes (a sphere of
       // the rock's radius whose top is the rock's top: smooth, no corner for a limb to rattle on).
@@ -573,9 +577,11 @@ export class World {
       const c = this.contacts[this.nc] ||= { r: new THREE.Vector3(), n: new THREE.Vector3() };
       this.nc++;
       c.b = b; c.r.copy(loc).applyQuaternion(b.q); c.n.copy(nn); c.lam = lam; c.vn = vn; c.mu = mu; c.e = e;
+      c.ax = smp?.axis || null; c.muA = smp?.muAlong ?? mu; c.muS = smp ? muS : mu;
       if (smp) { smp.cTick = this.ticks; smp.cRec = c; }
     }
     if (b.group === 0 && -vn > this.impact) { this.impact = -vn; this.impactAt.copy(p); }
+    if (smp && -vn > (b.dig || 0)) b.dig = -vn;
     if (b.isHand) this.handTouch = true;
   }
 
@@ -592,7 +598,15 @@ export class World {
     // impactGrip m/s into the snow: the snow gives way, the body doesn't stop dead on its first hit.
     if (vtl > 1e-9) {
       const wt = b.wPos(c.r, _d.copy(vt).divideScalar(vtl));
-      dv.addScaledVector(vt, -Math.min(c.mu * Math.min(Math.abs(c.lam) * wt / h, this.C.impactGrip ?? 1e9), vtl) / vtl);
+      // Slow slides grip more (the body settles into the snow): μ rises toward the static μ under slowGrip m/s.
+      const sg = this.C.slowGrip || 0;
+      let mu = sg > 0 && vtl < sg ? c.muS + (c.mu - c.muS) * (vtl / sg) * (2 - vtl / sg) : c.mu;
+      if (c.ax) {
+        // A ski base: slides along its length (muA), its edge bites across it (mu).
+        const ca = _e.copy(c.ax).applyQuaternion(b.q).dot(_d), c2 = ca * ca;
+        mu = c.muA * c2 + mu * (1 - c2);
+      }
+      dv.addScaledVector(vt, -Math.min(mu * Math.min(Math.abs(c.lam) * wt / h, this.C.impactGrip ?? 1e9), vtl) / vtl);
     }
     const target = c.vn < -2 * this.g * h ? Math.max(-c.e * c.vn, 0) : 0;
     dv.addScaledVector(c.n, target - vn);
