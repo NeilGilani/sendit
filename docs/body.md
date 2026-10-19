@@ -135,7 +135,9 @@ is short.) In the real game (`ragdoll-shots.mjs`, skis, chase cam): Valcrest ove
 6.0 → 2.9, swings 12 → 9, travel 2.8 → 0.9 m; sideways 47.4 → 42.2 / 6.2 → 3.6 / 13 → 9; Ravenspire cliff mean
 8.2 → 5.0, swings 25 → 17, travel 33.9 → 22.9 m, fade at 1.4 s (before: none within 2.8 s); steep face mean
 3.5 → 1.7, swings 25 → 7, travel 14.7 → 8.5 m; Blackspruce tree mean 5.9 → 3.1; Voltage rail 6.4 → 3.2. Ghost
-stamps under an airborne body / on raised meshes in those runs: 5–172 per scenario before, 0 after.
+stamps under an airborne body / on raised meshes in those runs: 5–172 per scenario before, 0 after. CPU in Node
+went from ~0.45 to ~0.6–0.65 ms per 60 Hz frame median (p95 0.56 → 0.77–0.89; the fuzz limit is 1 ms; on a loaded
+machine both the old and new code measure higher — rerun the check on a quiet one).
 
 Earlier numbers (MacBook Air M-series, 8 GB, before the wipeout pass): fuzz seed 1 — stretch ≤ 0.41 cm, ≤ 1.8 cm under the
 snow, energy never above the crash's, joints ≤ 5.5° past a limit, drawn rig ≤ 0.17 cm off the bodies, 154 / 162
