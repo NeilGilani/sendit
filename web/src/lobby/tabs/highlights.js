@@ -3,8 +3,10 @@
 // delete. Play opens a full-screen player: the loading scene's worker replaying the trick on its own snow
 // with the hero cameras (loading/clipview.js); thumbnails are rendered the same way, once, and kept.
 // Self-contained: its CSS is the CSS string below, on the lobby's shared tokens (docs/lobby.md "Design system").
-import { registerLobbyTab } from '../tabs.js';
-import { listClips, removeClip, setFavourite, setThumb, syncIndex, HIGHLIGHTS } from '../../thrill/clipstore.js';
+import { registerLobbyTab, setLobbyBadge } from '../tabs.js';
+import { listClips, removeClip, setFavourite, setThumb, syncIndex, readIndex, getClipMeta, HIGHLIGHTS } from '../../thrill/clipstore.js';
+import { ICONS } from '../icons.js';
+import { on } from '../../state.js';
 import { playClip, renderThumb, canPlayClips } from '../../loading/clipview.js';
 
 const ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor"/></svg>';
@@ -30,7 +32,9 @@ const STYLE = `
 #lobby .hl-seg button { padding: 0.45em 0.9em; background: transparent; border: 0; border-radius: 0; color: var(--c-snow-2); font-size: 0.74em; letter-spacing: 0.12em; cursor: pointer; }
 #lobby .hl-seg button.on { background: var(--c-snow); color: var(--c-paper-ink); box-shadow: inset 0 -3px 0 var(--c-signal); }
 #lobby .hl-grid { display: flex; flex-direction: column; gap: 0.55em; }
-#lobby .hl-card { position: relative; display: grid; grid-template-columns: minmax(8.5em, 44%) 1fr; grid-template-rows: 1fr auto; background: var(--c-ink-2); border: 1px solid var(--c-line); border-radius: var(--r1); overflow: hidden; }
+#lobby .hl-grid { padding-bottom: var(--lip, 4px); }
+#lobby .hl-card { position: relative; display: grid; grid-template-columns: minmax(8.5em, 44%) 1fr; grid-template-rows: 1fr auto; background: var(--c-ink-2); border: 1px solid var(--c-line);
+  border-top-color: var(--c-line-2); border-radius: var(--r2); overflow: hidden; box-shadow: 0 var(--lip, 4px) 0 var(--c-ink-lip, #04080c); }
 #lobby .hl-card .hl-thumb { grid-row: 1 / 3; height: 100%; min-height: 5.6em; aspect-ratio: auto; }
 #lobby .hl-card:hover { background: var(--c-ink-3); }
 #lobby .hl-card.fav { box-shadow: inset 3px 0 0 var(--c-gold); }
@@ -39,10 +43,11 @@ const STYLE = `
 #lobby .hl-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .5s; }
 #lobby .hl-thumb img.on { opacity: 1; }
 #lobby .hl-thumb::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10,18,26,0) 55%, rgba(10,18,26,.75)); }
-#lobby .hl-thumb .pl { position: absolute; z-index: 1; left: 0.55em; bottom: 0.5em; display: flex; align-items: center; justify-content: center; width: 2.1em; height: 2.1em;
-  color: var(--c-paper-ink); background: var(--c-snow); border-radius: var(--r1); }
+#lobby .hl-thumb .pl { position: absolute; z-index: 1; left: 0.55em; bottom: 0.6em; display: flex; align-items: center; justify-content: center; width: 2.1em; height: 2.1em;
+  color: var(--c-paper-ink); background: var(--c-snow); border-radius: var(--r2); box-shadow: 0 3px 0 var(--c-snow-lip, #9aabbb); transition: transform var(--t1, .11s); }
+#lobby .hl-thumb:hover .pl { transform: translateY(-2px); }
 #lobby .hl-thumb .pl svg { width: 1.1em; height: 1.1em; }
-#lobby .hl-thumb:hover .pl, #lobby .hl-thumb:focus-visible .pl { background: var(--c-signal); }
+#lobby .hl-thumb:hover .pl, #lobby .hl-thumb:focus-visible .pl { background: var(--c-signal); box-shadow: 0 3px 0 var(--c-signal-lip, #a8360c); }
 #lobby .hl-thumb .len { position: absolute; z-index: 1; right: 0.55em; bottom: 0.65em; font: 600 0.66em/1 var(--font-mono); color: var(--c-snow); letter-spacing: 0.06em; }
 #lobby .hl-thumb .gen { position: absolute; z-index: 1; left: 0.6em; top: 0.55em; font: 500 0.6em/1 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--c-snow-2); }
 #lobby .hl-thumb .new { position: absolute; z-index: 1; right: 0.5em; top: 0.5em; font: 600 0.58em/1 var(--font-mono); letter-spacing: 0.1em; padding: 0.35em 0.5em; color: #fff; background: var(--c-alert); border-radius: var(--r1); }
@@ -52,8 +57,12 @@ const STYLE = `
 #lobby .hl-meta { margin-top: 0.35em; font: 500 0.68em/1.35 var(--font-mono); color: var(--c-snow-3); letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #lobby .hl-meta b { color: var(--c-ice); font-weight: 600; }
 #lobby .hl-acts { display: flex; gap: 0.3em; padding: 0 0.6em 0.55em 0.7em; }
-#lobby .hl-acts button { display: inline-flex; align-items: center; justify-content: center; width: 2.1em; height: 2.1em; padding: 0; background: transparent;
-  border: 1px solid var(--c-line); border-radius: var(--r1); color: var(--c-snow-2); cursor: pointer; }
+#lobby .hl-acts button { display: inline-flex; align-items: center; justify-content: center; width: 2.1em; height: 2.1em; padding: 0; background: var(--c-ink-3);
+  border: 1px solid var(--c-line-2); border-radius: var(--r2); color: var(--c-snow-2); cursor: pointer; box-shadow: 0 3px 0 var(--c-ink-lip, #04080c);
+  transition: transform var(--t1, .11s), box-shadow var(--t1, .11s), color var(--t1, .11s); }
+#lobby .hl-acts button:hover { transform: translateY(-2px); box-shadow: 0 5px 0 var(--c-ink-lip, #04080c); }
+#lobby .hl-acts button:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--c-ink-lip, #04080c); transition-duration: 40ms; }
+#lobby .hl-acts { padding-bottom: calc(0.55em + 3px) !important; }
 #lobby .hl-acts button svg { width: 1.05em; height: 1.05em; }
 #lobby .hl-acts button:hover { color: var(--c-snow); border-color: var(--c-line-2); }
 #lobby .hl-acts button.fav.on { color: var(--c-gold); border-color: var(--c-gold); }
@@ -66,6 +75,18 @@ const STYLE = `
   border: 1px solid var(--c-line-2); border-radius: var(--r1); box-shadow: inset 3px 0 0 var(--c-signal); font-weight: 700; font-size: 0.78em; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-snow); }
 #lobby .hl-demo i { width: 0.6em; height: 0.6em; background: var(--c-signal); transform: rotate(45deg); }
 #lobby .hl-foot { margin-top: 0.9em; font-size: 0.8em; color: var(--c-snow-3); line-height: 1.45; }
+/* Home tile (lobby/tabs/home.js "homeTiles") */
+#lobby .hm-hl { grid-template-columns: 5.6em 1fr auto; align-items: center; gap: 0.85em; padding: 0.6em 0.85em 0.65em 0.6em; }
+#lobby .hm-hl-pic { position: relative; width: 5.6em; aspect-ratio: 16 / 10; border-radius: var(--r1); overflow: hidden; background: var(--c-night) var(--art, none) center / cover no-repeat; }
+#lobby .hm-hl-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .4s; }
+#lobby .hm-hl-pic img.on { opacity: 1; }
+#lobby .hm-hl-pic i { position: absolute; left: 0.3em; bottom: 0.3em; width: 1.35em; height: 1.35em; display: grid; place-items: center; color: var(--c-paper-ink); background: var(--c-snow); border-radius: var(--r1); }
+#lobby .hm-hl-pic i svg { width: 0.8em; height: 0.8em; }
+#lobby .hm-hl:hover .hm-hl-pic i { background: var(--c-signal); }
+#lobby .hm-hl-t { display: flex; flex-direction: column; min-width: 0; line-height: 1; }
+#lobby .hm-hl-t small { font: 600 0.62em/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-signal-2); }
+#lobby .hm-hl-t b { margin-top: 0.25em; font-size: 1.3em; font-weight: 900; font-stretch: 70%; text-transform: uppercase; letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#lobby .hm-hl-t em { margin-top: 0.35em; font: 500 0.64em/1.2 var(--font-mono); font-style: normal; color: var(--c-snow-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #hl-player { position: fixed; inset: 0; z-index: 60; background: #05090d; display: flex; flex-direction: column; font-family: var(--font); color: var(--c-snow); }
 #hl-player canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 #hl-player .bar { position: absolute; left: 0; right: 0; height: 8vh; background: #000; pointer-events: none; }
@@ -77,11 +98,14 @@ const STYLE = `
 #hl-player .cap span { display: block; margin-top: 8px; font: 500 12px/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: rgba(242,244,241,.78); text-shadow: 0 1px 10px rgba(0,0,0,.6); }
 #hl-player .camname { font: 500 11px/1 var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: rgba(242,244,241,.7); text-align: right; }
 #hl-player .ctrl { position: absolute; left: 50%; bottom: calc(8vh + 18px); transform: translateX(-50%); display: flex; gap: 8px; }
-#hl-player .ctrl button { display: inline-flex; align-items: center; gap: 8px; padding: 9px 13px; background: rgba(10,18,26,.88); border: 1px solid var(--c-line-2); border-radius: var(--r1);
-  color: var(--c-snow); font-size: 12px; letter-spacing: .12em; cursor: pointer; white-space: nowrap; }
+#hl-player .ctrl button { display: inline-flex; align-items: center; gap: 8px; padding: 9px 13px; background: var(--c-ink-2); border: 1px solid var(--c-line-2); border-radius: var(--r2);
+  color: var(--c-snow); font-size: 12px; letter-spacing: .12em; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 0 var(--c-ink-lip, #04080c);
+  transition: transform .11s, box-shadow .11s; }
+#hl-player .ctrl button:hover { transform: translateY(-2px); box-shadow: 0 6px 0 var(--c-ink-lip, #04080c); }
+#hl-player .ctrl button:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--c-ink-lip, #04080c); transition-duration: 40ms; }
 #hl-player .ctrl button svg { width: 15px; height: 15px; }
 #hl-player .ctrl button:hover, #hl-player .ctrl button:focus-visible { border-color: var(--c-snow); outline: none; }
-#hl-player .ctrl button:focus-visible { box-shadow: 0 0 0 2px var(--c-signal); }
+#hl-player .ctrl button:focus-visible { box-shadow: 0 4px 0 var(--c-ink-lip, #04080c), 0 0 0 5px rgba(255, 90, 31, 0.55); }
 #hl-player .ctrl button.on { color: var(--c-gold); }
 #hl-player .ctrl button.rec { color: #fff; background: var(--c-alert); border-color: var(--c-alert); }
 #hl-player .ctrl kbd { font: 500 10px/1 var(--font-mono); padding: 3px 5px; border: 1px solid var(--c-line-2); border-radius: var(--r1); color: var(--c-snow-2); }
@@ -111,9 +135,51 @@ const SEEN_KEY = 'sendit.highlights.seen';
 const readSeen = () => { try { return Number(localStorage.getItem(SEEN_KEY) || 0); } catch { return 0; } };
 const writeSeen = (t) => { try { localStorage.setItem(SEEN_KEY, String(t)); } catch { /* */ } };
 
+// New clips since the Highlights screen was last opened: a count on its destination (docs/lobby.md "Badges").
+const newCount = () => { const seen = readSeen(); return readIndex().clips.filter((c) => (c.at || 0) > seen).length; };
+const updateBadge = () => setLobbyBadge('highlights', newCount());
+updateBadge();
+on('highlightSaved', updateBadge);
+
+// Home: a tile for the latest highlight (after Level / Daily / Cases), one click into the player.
+on('homeTiles', ({ el, ctx, i = 3 }) => {
+  if (!el) return;
+  mountCss();
+  const clips = readIndex().clips.slice().sort((a, b) => (b.at || 0) - (a.at || 0));
+  const c = clips[0];
+  if (!c) return;
+  const n = clips.length, fresh = newCount();
+  const t = document.createElement('button');
+  t.type = 'button';
+  t.className = 'hm-tile hm-hl';
+  t.style.setProperty('--i', i);
+  const art = mapArt(c.mapId);
+  t.innerHTML = `
+    <span class="hm-hl-pic" style="${art ? `--art:url('${art}')` : ''}"><img alt=""><i>${I.play}</i></span>
+    <span class="hm-hl-t"><small>${fresh ? `${fresh} new highlight${fresh > 1 ? 's' : ''}` : 'Latest highlight'}</small><b>${esc(c.trick || 'Trick')}</b>
+      <em>${n} saved · plays on your loading screens</em></span>
+    <span class="hm-go">${ICONS.arrow || ''}</span>`;
+  t.setAttribute('aria-label', `Latest highlight: ${c.trick}. Open Highlights`);
+  t.addEventListener('click', () => { ctx.sfx?.('ui_click', 0.3, 1); pendingPlay = c.id; ctx.select('highlights'); });
+  el.appendChild(t);
+  getClipMeta(c.id).then((m) => {
+    if (!m?.thumb || !t.isConnected) return;
+    const img = t.querySelector('img');
+    img.src = thumbUrl(m);
+    img.onload = () => img.classList.add('on');
+    const meta = t.querySelector('em');
+    if (meta && m.meta?.points) meta.textContent = `${fmtPts(m.meta.points)} · ${m.meta.mountain || ''}`;
+  }).catch(() => {});
+});
+let pendingPlay = null;   // the Home tile opens the player on this clip
+
 registerLobbyTab({
   id: 'highlights',
   label: 'Highlights',
+  short: 'Highlights',
+  // In Career (Progress · Highlights · Rankings · Profile): a sixth destination pushed Career off the top
+  // bar at 1280 px. Home's "Latest highlight" tile and the Career badge keep it one click away.
+  group: 'career',
   order: 47,
   icon: ICON,
   shot: 'full',
@@ -182,6 +248,8 @@ registerLobbyTab({
       }
       render();
       if (list.length) writeSeen(Math.max(...list.map((c) => c.at || 0)));
+      setLobbyBadge('highlights', 0);
+      if (pendingPlay) { const c = list.find((x) => x.id === pendingPlay); pendingPlay = null; if (c) openPlayer(c); }
       pumpThumbs();
     };
 

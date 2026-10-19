@@ -10,6 +10,7 @@ import { CASE_XP } from '../../profile/rewards.js';
 import { SERIES, SERIES_ORDER } from '../../profile/items.js';
 import { progression, rankEmblem } from '../../progression/index.js';
 import { tickNumbers } from '../motion.js';
+import { emit } from '../../state.js';
 
 const n = (v) => Math.round(v).toLocaleString('en-US');
 
@@ -87,6 +88,8 @@ registerLobbyTab({
         ctx.select('cases');
         getLobbyTab('cases')?._open?.();     // straight into the opening show: one click from Home
       });
+      // Other features add their own tile here (Highlights: thrill → lobby/tabs/highlights.js).
+      emit('homeTiles', { el: el.querySelector('.hm-tiles'), ctx, i: 3 });
       if (first) { tickNumbers(el); first = false; }
     };
     render();

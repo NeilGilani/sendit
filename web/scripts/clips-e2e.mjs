@@ -88,7 +88,12 @@ check('caption says "Your highlight"', /Your highlight/.test(cap), cap);
 await boot('map=valcrest-gully&loadclip=0');
 await page.waitForFunction(() => window.__sendit?.lobby?.visible && document.querySelector('[data-tab=highlights]'), null, { timeout: 400000 }).catch(() => {});
 await wait(1500);
-await page.click('[data-tab=highlights]').catch(() => {});
+const home = await page.evaluate(() => ({ tile: document.querySelector('.hm-hl b')?.textContent || null, badge: document.querySelector('[data-tab=career] .lb-badge')?.textContent || null }));
+check('Home shows the latest highlight, Career a NEW badge', !!home.tile && !!home.badge, JSON.stringify(home));
+await shot('4a-home');
+await page.click('[data-tab=career]').catch(() => {});
+await wait(600);
+await page.click('.lb-sub[data-tab=highlights]').catch(() => {});
 await page.waitForSelector('.hl-card', { timeout: 20000 }).catch(() => {});
 const cards = await page.evaluate(() => document.querySelectorAll('.hl-card').length);
 check('the Highlights tab lists the clip', cards === 1, String(cards));
@@ -116,6 +121,14 @@ await shot('6-player-next');
 await page.keyboard.press('Escape');
 await wait(500);
 check('Esc closes the player', !(await page.evaluate(() => !!document.getElementById('hl-player'))));
+// Home's tile opens the player straight on that clip.
+await page.evaluate(() => window.__sendit.lobby.select?.('home') ?? window.__sendit.lobby.openGroup?.('home'));
+await wait(1200);
+await page.click('.hm-hl').catch(() => {});
+await page.waitForFunction(() => document.querySelector('#hl-player'), null, { timeout: 15000 }).catch(() => {});
+check('the Home tile opens the player', await page.evaluate(() => !!document.getElementById('hl-player')));
+await page.keyboard.press('Escape');
+await wait(400);
 
 // ---------------------------------------------------------------- robustness: a corrupt clip, a missing one
 const badId = await page.evaluate(async () => {

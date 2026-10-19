@@ -756,8 +756,12 @@ worker (`thrill/clipworker.js`) that resamples, quantises, gzips and writes Inde
 Event: `highlightSaved {id, trick, points, mapId, bytes}`. Tunables: `CLIPS` in `thrill/highlights.js`,
 `HIGHLIGHTS.cap` in `thrill/clipstore.js`.
 
-**The lobby's Highlights tab** (`lobby/tabs/highlights.js`, its CSS in the same file, on the lobby's
-tokens). A list of cards: the thumbnail (rendered once by the loading scene's worker at the top of the air,
+**In the lobby** (`lobby/tabs/highlights.js`, its CSS in the same file, on the lobby's v2 tokens and lip
+recipe). **Highlights** is a sub-tab of Career (Progress · Highlights · Rankings · Profile; as a sixth
+destination it pushed Career off the top bar at 1280 px), with a count badge (`setLobbyBadge`, shown on
+Career too) for clips saved since you last opened it. **Home** gets a fourth tile under Level / Daily / Cases once you have a clip: the latest
+highlight's thumbnail, trick and points; clicking it opens the player on that clip (home.js emits
+`homeTiles` after each render and the Highlights code appends its tile). The screen itself is a list of cards: the thumbnail (rendered once by the loading scene's worker at the top of the air,
 then kept in IndexedDB; the mountain's picture until then), the trick, points, mountain and trail, date
 and gear, a NEW tag for clips saved since the last visit, and buttons: **play**, **favourite** (kept
 forever, shown more often on loading screens), **download video** and **delete** (asks once). Filters:
