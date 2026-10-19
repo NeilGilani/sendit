@@ -4,7 +4,7 @@
 // thumbnail rendered) and play it in the player. Screenshots of each step go to <outDir>. Exit 1 on failure.
 // Usage: MAC=1 node web/scripts/clips-e2e.mjs <baseUrl> <outDir> [scenario=spin360]   (GPU=1 on Windows)
 import { chromium } from '@playwright/test';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { SCENARIOS } from './camscenarios.mjs';
 
 const [base = 'http://localhost:5205/', out = '/tmp/clips-e2e', scen = 'spin360'] = process.argv.slice(2);
@@ -30,29 +30,35 @@ async function boot(query) {
 }
 
 // ---------------------------------------------------------------- clean slate
-await boot('map=valcrest-gully&kicker=2&ride');
+const Q = SCENARIOS[scen].query || 'map=valcrest-gully&kicker=2';
+await boot(`${Q}&ride`);
 await page.evaluate(() => new Promise((res) => { localStorage.removeItem('sendit.highlights'); localStorage.removeItem('sendit.highlights.seen'); const r = indexedDB.deleteDatabase('sendit-highlights'); r.onsuccess = r.onerror = r.onblocked = () => res(); }));
-await boot('map=valcrest-gully&kicker=2&ride');
+await boot(`${Q}&ride`);
 await page.waitForFunction(() => window.__sendit.game.mode === 1, null, { timeout: 400000 });
 await page.evaluate(() => { window.__keep = setInterval(() => { if (window.__sendit.game.mode === 2) window.__sendit.ui.h.resume(); }, 50); });
 await wait(2500);
 
 // ---------------------------------------------------------------- land a trick, save it
 await page.evaluate((src) => { window.__done = false; const s = window.__sendit, pl = s.player, snap = () => {}; new Function('s', 'pl', 'snap', src)(s, pl, snap); }, SCENARIOS[scen].setup);
-await page.waitForFunction(() => window.__done || window.__thrill.highlights.debug().pending, null, { timeout: 60000 }).catch(() => {});
+await page.waitForFunction(() => window.__done, null, { timeout: 60000 }).catch(() => {});
 await page.waitForFunction(() => window.__thrill.highlights.debug().pending || window.__thrill.highlights.debug().cand, null, { timeout: 20000 }).catch(() => {});
 const dbg = await page.evaluate(() => window.__thrill.highlights.debug());
 const pill = await page.evaluate(() => document.getElementById('thrill-save')?.classList.contains('on'));
 check('a landed trick shows the SAVE CLIP pill', pill && !!(dbg.pending || dbg.cand), JSON.stringify(dbg));
 await shot('1-save-pill');
+await page.evaluate(() => { window.__sendit.player.script = (c) => { c.brake = 1; }; });   // stop: no more airs
 await page.keyboard.press('KeyF');
 await page.waitForFunction(() => window.__thrill.highlights.stats.lastSave, null, { timeout: 20000 }).catch(() => {});
 const st = await page.evaluate(() => window.__thrill.highlights.stats);
 check('F saves the clip to IndexedDB', !!st.lastSave?.id, JSON.stringify(st));
 await wait(400);
 await shot('2-saved-toast');
-const toast = await page.evaluate(() => document.getElementById('thrill-toast')?.textContent || '');
-check('confirmation toast names the trick', /saved/i.test(toast), toast);
+const toast = await page.evaluate(() => {
+  const t = document.getElementById('thrill-toast'), r = t?.getBoundingClientRect();
+  const top = r && document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+  return { text: t?.textContent || '', on: t?.classList.contains('on'), opacity: t && getComputedStyle(t).opacity, visible: !!top && (top === t || t.contains(top)), top: top?.id || top?.className };
+});
+check('confirmation toast names the trick', /saved/i.test(toast.text) && toast.on && toast.opacity === '1', JSON.stringify(toast));
 const idx = await page.evaluate(() => JSON.parse(localStorage.getItem('sendit.highlights') || 'null'));
 check('the loading-screen index lists it', idx?.clips?.length === 1 && idx.clips[0].id === st.lastSave?.id, JSON.stringify(idx));
 await page.keyboard.press('KeyF');
@@ -60,6 +66,14 @@ await wait(300);
 const again = await page.evaluate(() => document.getElementById('thrill-toast')?.textContent || '');
 check('pressing F again does not save a duplicate', /Already/.test(again), again);
 const id = st.lastSave?.id;
+// Keep the clip (scripts/clips-cams.mjs replays it under every camera move).
+const dump = await page.evaluate(async (id) => {
+  const { getClipBytes, getClipMeta } = await import('/src/thrill/clipstore.js');
+  const b = new Uint8Array(await getClipBytes(id)); let s = '';
+  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+  return { b64: btoa(s), meta: (await getClipMeta(id)).meta };
+}, id).catch(() => null);
+if (dump) { writeFileSync(`${out}/clip-${scen}.bin`, Buffer.from(dump.b64, 'base64')); writeFileSync(`${out}/clip-${scen}.json`, JSON.stringify(dump.meta, null, 1)); }
 
 // ---------------------------------------------------------------- the loading screen plays it
 await page.goto(url(`loadclip=${id}&loadhold&loadnohold`), { timeout: 300000, waitUntil: 'domcontentloaded' });

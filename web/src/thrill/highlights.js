@@ -10,8 +10,9 @@
 // sample the snow around the line (in slices across frames), quantise + gzip (thrill/clipcodec.js), and
 // write to IndexedDB (thrill/clipstore.js) — spread over ~10 frames, measured in highlights.stats.
 import { on, emit, game, Mode } from '../state.js';
-import { packClip, CLIP_FPS, CLIP_VERSION, NODE_STRIDE, hemisphere } from './clipcodec.js';
-import { addClip, HIGHLIGHTS } from './clipstore.js';
+import { CLIP_VERSION } from './clipcodec.js';
+import { buildClip } from './clipbuild.js';
+import { syncIndex, HIGHLIGHTS } from './clipstore.js';
 import { pillRow } from './replay.js';
 import { outfitSlotsFromProfile } from '../character/profile.js';
 import { getMap, getTrail } from '../maps/registry.js';
@@ -24,7 +25,7 @@ export const CLIPS = {
   patchMargin: 26,      // m of snow kept around the line
   patchStep: 0.75,      // m between height samples …
   patchMax: 40000,      // … at most this many samples (the step grows for very long lines)
-  samplesPerSlice: 3500,
+  samplesPerSlice: 1500, // getHeight calls per frame (~1–2 ms)
 };
 const PAD_LB = 4;
 
@@ -33,6 +34,7 @@ export function installHighlights({ player, rider, terrain, input, activities, r
   let pending = null;     // a landed trick waiting for its ride-out to be recorded
   let cand = null;        // the last trick, copied out of the ring: { times, data, count, stride, keys, info, saved }
   let buf = null;         // the copy-out buffer (sized like the ring)
+  let noWorker = false;
   let saving = null;
   let takeoffAt = null;
   const stats = { copies: 0, copyMs: 0, saves: 0, lastSave: null };
@@ -105,37 +107,10 @@ export function installHighlights({ player, rider, terrain, input, activities, r
     };
   }
 
-  /** Resample the candidate to CLIP_FPS: per node pos / quat (slerp) / scale, plus the air flags. */
-  function resampleCand(c) {
-    const fps = CLIP_FPS, S = c.nodes * NODE_STRIDE, RS = c.stride, NS = c.ns;
-    const t0 = c.times[0], t1 = c.times[c.count - 1];
-    const n = Math.max(2, Math.floor((t1 - t0) * fps) + 1);
-    const frames = new Float32Array(n * S), air = new Uint8Array(n);
-    let j = 0;
-    for (let i = 0; i < n; i++) {
-      const t = t0 + i / fps;
-      while (j < c.count - 2 && c.times[j + 1] <= t) j++;
-      const ta = c.times[j], tb = c.times[j + 1] ?? ta;
-      const k = tb > ta ? Math.min(1, Math.max(0, (t - ta) / (tb - ta))) : 0;
-      const A = j * RS, B = Math.min(j + 1, c.count - 1) * RS, O = i * S;
-      for (let nd = 0; nd < c.nodes; nd++) {
-        const a = A + nd * NS, b = B + nd * NS, o = O + nd * NODE_STRIDE;
-        const D = c.data;
-        for (let q = 0; q < 3; q++) frames[o + q] = D[a + q] + (D[b + q] - D[a + q]) * k;
-        slerp(D, a + 3, b + 3, k, frames, o + 3);
-        for (let q = 7; q < 10; q++) frames[o + q] = D[a + q] + (D[b + q] - D[a + q]) * k;
-      }
-      air[i] = c.data[(k < 0.5 ? A : B) + c.nodes * NS + 3] > 0.5 ? 1 : 0;
-    }
-    hemisphere(frames, n, c.nodes);
-    return { frames, air, n, t0 };
-  }
-
-  /** The snow under and around the line, sampled from the real terrain in slices (yields between). */
-  async function samplePatch(frames, n, nodes) {
+  /** The snow under and around the line (root positions of the raw frames), sampled from the real terrain in slices. */
+  async function samplePatch(c) {
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-    const S = nodes * NODE_STRIDE;
-    for (let i = 0; i < n; i++) { const x = frames[i * S], z = frames[i * S + 2]; x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    for (let i = 0; i < c.count; i++) { const x = c.data[i * c.stride], z = c.data[i * c.stride + 2]; x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
     const M = CLIPS.patchMargin;
     x0 -= M; x1 += M; z0 -= M; z1 += M;
     let step = CLIPS.patchStep;
@@ -151,8 +126,8 @@ export function installHighlights({ player, rider, terrain, input, activities, r
     // Trees and rocks near the line (the real ones, so the replay rides past the same trunks).
     const trees = [], seen = new Set(), sc = player.scatter;
     if (sc?.obstaclesNear) {
-      for (let i = 0; i < n; i += 6) {
-        for (const o of sc.obstaclesNear({ x: frames[i * S], z: frames[i * S + 2] }, M)) {
+      for (let i = 0; i < c.count; i += 12) {
+        for (const o of sc.obstaclesNear({ x: c.data[i * c.stride], z: c.data[i * c.stride + 2] }, M)) {
           const key = `${o[0].toFixed(2)},${o[1].toFixed(2)}`;
           if (seen.has(key) || o[0] < x0 || o[0] > x1 || o[1] < z0 || o[1] > z1) continue;
           seen.add(key);
@@ -161,6 +136,23 @@ export function installHighlights({ player, rider, terrain, input, activities, r
       }
     }
     return { patch: { x0, z0, step, nx, nz, h }, trees };
+  }
+
+  /** Resample + quantise + gzip + IndexedDB: in a worker (thrill/clipworker.js), or here if workers are out. */
+  function build(job) {
+    if (typeof Worker !== 'undefined' && !noWorker) {
+      return new Promise((res, rej) => {
+        let w;
+        try { w = new Worker(new URL('./clipworker.js', import.meta.url), { type: 'module', name: 'sendit-clipsave' }); } catch (e) { noWorker = true; build(job).then(res, rej); return; }
+        const t = setTimeout(() => { w.terminate(); rej(new Error('save timeout')); }, 30000);
+        w.onmessage = (e) => { clearTimeout(t); w.terminate(); if (e.data.ok) res(e.data); else rej(Object.assign(new Error(e.data.message), { code: e.data.code })); };
+        // The buffers went to the worker (transferred): a broken worker means this save is lost; the next
+        // one runs on the main thread.
+        w.onerror = (e) => { e.preventDefault?.(); clearTimeout(t); w.terminate(); noWorker = true; rej(new Error(e.message || 'save worker failed')); };
+        w.postMessage(job, [job.raw.data.buffer, job.raw.times.buffer, job.patch.h.buffer]);
+      });
+    }
+    return buildClip(job);
   }
 
   async function save() {
@@ -177,30 +169,22 @@ export function installHighlights({ player, rider, terrain, input, activities, r
     ui?.prompt(true, c.info.trick, 'saving');
     const T = { start: performance.now() };
     try {
-      const r = resampleCand(c);
-      T.resample = performance.now() - T.start;
-      await nextFrame();
+      const { patch, trees } = await samplePatch(c);
+      T.patch = performance.now() - T.start;
+      const t0 = c.times[0];
+      const meta = { v: CLIP_VERSION, ...c.ctx, ...c.info, takeoff: Math.max(0, c.takeoff - t0), land: Math.max(0, c.land - t0), date: Date.now() };
       const t1 = performance.now();
-      const { patch, trees } = await samplePatch(r.frames, r.n, c.nodes);
-      T.patch = performance.now() - t1;
-      const fps = CLIP_FPS;
-      const meta = {
-        v: CLIP_VERSION, ...c.ctx, ...c.info,
-        takeoff: Math.max(0, c.takeoff - r.t0), land: Math.max(0, c.land - r.t0), length: (r.n - 1) / fps,
-        date: Date.now(), rider: c.ctx.rider,
-      };
-      const t2 = performance.now();
-      const bytes = await packClip({ meta, keys: c.keys, n: r.n, fps, frames: r.frames, air: r.air, patch, trees });
-      T.pack = performance.now() - t2;
-      const t3 = performance.now();
-      const res = await addClip(meta, bytes);
-      T.store = performance.now() - t3;
+      const raw = { data: c.data.slice(0, c.count * c.stride), times: c.times.slice(0, c.count), count: c.count, stride: c.stride, ns: c.ns, nodes: c.nodes };
+      T.copy = performance.now() - t1;
+      const res = await build({ raw, keys: c.keys, meta, patch, trees });
+      T.build = res.ms;
+      await syncIndex().catch(() => {});   // the loading screens' localStorage mirror (workers have no localStorage)
       T.total = performance.now() - T.start;
       stats.saves++;
-      stats.lastSave = { id: res.id, bytes: bytes.byteLength, frames: r.n, nodes: c.nodes, patch: `${patch.nx}x${patch.nz}`, trees: trees.length, ms: Object.fromEntries(Object.entries(T).filter(([k]) => k !== 'start').map(([k, v]) => [k, +v.toFixed(1)])) };
+      stats.lastSave = { id: res.id, bytes: res.bytes, frames: res.frames, nodes: c.nodes, patch: `${patch.nx}x${patch.nz}`, trees: trees.length, ms: Object.fromEntries(Object.entries(T).filter(([k]) => k !== 'start').map(([k, v]) => [k, typeof v === 'number' ? +v.toFixed(1) : v])) };
       ui?.prompt(true, c.info.trick, 'saved');
       ui?.toast('Highlight saved', `${c.info.trick}${c.info.points ? ` · ${c.info.points.toLocaleString()} pts` : ''} · ${c.ctx.mountain}`, '', res.dropped.length ? 'Oldest highlight replaced · Lobby › Highlights' : 'Lobby › Highlights · plays on your loading screens');
-      emit('highlightSaved', { id: res.id, trick: c.info.trick, points: c.info.points, mapId: c.ctx.mapId, bytes: bytes.byteLength });
+      emit('highlightSaved', { id: res.id, trick: c.info.trick, points: c.info.points, mapId: c.ctx.mapId, bytes: res.bytes });
     } catch (e) {
       c.saved = false;
       console.warn('[highlights] save failed', e);
@@ -226,19 +210,6 @@ export function installHighlights({ player, rider, terrain, input, activities, r
 }
 
 const nextFrame = () => new Promise((res) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => res()) : setTimeout(res, 16)));
-
-/** Slerp between quaternions at D[a..a+3] and D[b..b+3] into out[o..o+3] (shortest path). */
-function slerp(D, a, b, t, out, o) {
-  let ax = D[a], ay = D[a + 1], az = D[a + 2], aw = D[a + 3];
-  let bx = D[b], by = D[b + 1], bz = D[b + 2], bw = D[b + 3];
-  let cos = ax * bx + ay * by + az * bz + aw * bw;
-  if (cos < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; cos = -cos; }
-  let ka = 1 - t, kb = t;
-  if (cos < 0.9995) { const th = Math.acos(cos), s = Math.sin(th); ka = Math.sin((1 - t) * th) / s; kb = Math.sin(t * th) / s; }
-  let x = ax * ka + bx * kb, y = ay * ka + by * kb, z = az * ka + bz * kb, w = aw * ka + bw * kb;
-  const l = Math.hypot(x, y, z, w) || 1;
-  out[o] = x / l; out[o + 1] = y / l; out[o + 2] = z / l; out[o + 3] = w / l;
-}
 
 function mountUi() {
   const st = document.createElement('style');

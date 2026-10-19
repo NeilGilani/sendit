@@ -14,6 +14,7 @@ self.addEventListener('unhandledrejection', (e) => post('error', { message: e.re
 function loop(now) {
   if (!running) return;
   self.requestAnimationFrame(loop);
+  if (!scene?.ready) return;   // (re)building
   if (!visible) { last = now; return; }
   // ~60 fps cap: a 120 Hz display would otherwise double the GPU load while the game boots. A due-time
   // budget (not a fixed gate) keeps 75 / 90 / 144 Hz displays near 60 too.
@@ -67,21 +68,48 @@ function prefetch() {
   fetch(new URL('/textures/web/rock_face_03_packed_1k.jpg', self.location.href)).then((r) => r.arrayBuffer()).catch(() => {});
 }
 
+let initMsg = null, SceneClass = null;
+
+/** Build and run the scene. A saved highlight that can't be built falls back to a made-up shot (once). */
+async function start(opts) {
+  try {
+    scene = new SceneClass(initMsg.canvas, { ...initMsg, opts }, post);
+    if (opts.clip) scene.onClipFail = (message) => fallback(message);
+    await scene.init();
+    if (!running) { running = true; self.requestAnimationFrame(loop); }
+  } catch (err) {
+    if (!opts.clip) throw err;
+    await fallback(err.message);
+  }
+}
+
+async function fallback(message) {
+  const opts = initMsg.opts;
+  if (!opts.clip) return;
+  post('clipFailed', { id: opts.clipId, message: `scene: ${message}` });
+  const old = scene;
+  scene = null;
+  try { old?.dispose?.(); } catch { /* best effort */ }
+  delete opts.clip; delete opts.clipId;
+  if (opts.thumb) { post('error', { message: `thumb: ${message}` }); return; }
+  await start(opts);
+}
+
 self.onmessage = async (e) => {
   const m = e.data;
   if (m.type === 'init') {
     prefetch();
+    initMsg = m;
     try {
       const ti = performance.now();
       const clipP = m.opts?.clipId ? loadClip(m.opts.clipId) : null;
       if (m.opts?.thumb) thumbCanvas = m.canvas;
       const { LoadingScene } = await import('./scene.js');
+      SceneClass = LoadingScene;
       if (clipP) { const clip = await clipP; if (clip) m.opts.clip = clip; }
       post('modules');   // the page starts the game's own download now (loading/index.js whenStarted)
-      scene = new LoadingScene(m.canvas, { ...m, opts: { ...m.opts, modulesMs: Math.round(performance.now() - ti) } }, post);
-      await scene.init();
-      running = true;
-      self.requestAnimationFrame(loop);
+      m.opts.modulesMs = Math.round(performance.now() - ti);
+      await start(m.opts);
     } catch (err) {
       post('error', { message: `init: ${err.message}` });
     }

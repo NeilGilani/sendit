@@ -271,7 +271,7 @@ function mountUi() {
   #thrill-replay .rate{position:absolute;top:calc(9vh + 14px);right:22px;font-weight:700;letter-spacing:.12em;font-size:14px;opacity:.85}
   #thrill-replay .hint{position:absolute;bottom:calc(9vh + 14px);left:50%;transform:translateX(-50%);font-size:12px;letter-spacing:.14em;opacity:.75;white-space:nowrap}
   #thrill-replay .prog{position:absolute;bottom:9vh;left:0;height:3px;background:#2ff5d6;width:0}
-  #thrill-pills{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);display:flex;gap:10px;align-items:center;pointer-events:none;z-index:6}
+  #thrill-pills{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);display:flex;gap:10px;align-items:center;pointer-events:none;z-index:6}
   #thrill-rp{transform:translateY(10px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;white-space:nowrap;
     background:rgba(8,14,28,.72);border:1px solid rgba(47,245,214,.55);border-radius:999px;padding:7px 16px;font-size:13px;font-weight:700;letter-spacing:.16em;color:#dffcf7}
   #thrill-rp:not(.on){position:absolute;visibility:hidden}

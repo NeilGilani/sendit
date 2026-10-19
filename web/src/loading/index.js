@@ -111,7 +111,7 @@ class LoadingScreen {
       opts.cover = this.hasStill();
       // The worker redraws the still (loading/still.js) in step with the CSS drift, then dissolves it.
       if (opts.cover) opts.still = this.stillInfo(still);
-      for (const k of ['loadseed', 'loadtrick', 'loadcam', 'loadtod', 'loadgear', 'loadmtn', 'loaddebug', 'loadq', 'loadfreeze']) if (params.has(k)) opts[k.slice(4)] = params.get(k);
+      for (const k of ['loadseed', 'loadtrick', 'loadcam', 'loadtod', 'loadgear', 'loadmtn', 'loaddebug', 'loadq', 'loadfreeze', 'loadtrees']) if (params.has(k)) opts[k.slice(4)] = params.get(k);
       this.worker.postMessage({ type: 'init', canvas: off, ...this.size(), opts }, [off]);
       addEventListener('resize', () => this.worker?.postMessage({ type: 'resize', ...this.size() }));
       document.addEventListener('visibilitychange', () => this.worker?.postMessage({ type: 'visible', visible: !document.hidden }));

@@ -128,7 +128,9 @@ export function makeHeight(v) {
   // Value of the regional function at the lip, so the local line sits at y ≈ 0.
   const R0 = regional(0, 0);
   const clipG = v.clipPrep || null;
-  const clipDetail = (x, z) => fbm(x / 16 + 4.4, z / 16 + 2.2, 3) * 0.9 + fbm(x / 55, z / 55 + 8.1, 3) * 3.0 + fbm(x / 26 + 1.3, z / 26 + 7.7, 4) * 2.2;
+  // Only broad rolls (≥ ~40 m) beyond a clip's patch: the near grid is dense in strips there (its core follows the
+  // line), and fine relief resolved in those strips but not beside them reads as bands of rock.
+  const clipDetail = (x, z) => fbm(x / 70 + 4.4, z / 70 + 2.2, 2) * 4.0 + fbm(x / 180, z / 180 + 8.1, 2) * 8.0;
   const H = (x, z) => {
     const rr = Math.hypot(x, z * 0.8);
     const w = 1 - smooth(160, 520, rr);
@@ -269,6 +271,17 @@ export function buildTerrain(height, sunDir, material, farMaterial) {
     g.computeVertexNormals();
     const nor = g.attributes.normal.array;
     for (const i of seam) fdNormal(pos[i * 3], pos[i * 3 + 2], nor, i * 3);
+    // A clip's grid is dense one way and coarse the other in long strips (0.6 m × 10 m cells): face normals
+    // of those slivers alias the fine relief into hatching. Normals from H at the cell's own scale instead.
+    if (gridW && height.mesh) {
+      const rows = pos.length / 3 / gridW;
+      for (let j = 0; j < rows; j++) for (let i = 0; i < gridW; i++) {
+        const ex = (ax[Math.min(gridW - 1, i + 1)] - ax[Math.max(0, i - 1)]) / 2, ez = (az[Math.min(rows - 1, j + 1)] - az[Math.max(0, j - 1)]) / 2;
+        const e = Math.max(0.15, Math.max(ex, ez) * 0.6), k = (j * gridW + i) * 3, x = pos[k], z = pos[k + 2];
+        const nx = -(H(x + e, z) - H(x - e, z)), ny = 2 * e, nz = -(H(x, z + e) - H(x, z - e)), l = Math.hypot(nx, ny, nz);
+        nor[k] = nx / l; nor[k + 1] = ny / l; nor[k + 2] = nz / l;
+      }
+    }
     const n = pos.length / 3;
     const vis = new Float32Array(n * 2);
     const sx = sunDir.x, sy = sunDir.y, sz = sunDir.z;

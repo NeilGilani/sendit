@@ -67,17 +67,29 @@ export function prepareClip(clip) {
   const lbox = { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity };
   for (const p of line) { lbox.x0 = Math.min(lbox.x0, p.x); lbox.x1 = Math.max(lbox.x1, p.x); lbox.z0 = Math.min(lbox.z0, p.z); lbox.z1 = Math.max(lbox.z1, p.z); }
   const FADE = Math.min(16, P.step * (Math.min(P.nx, P.nz) - 1) * 0.3);
-  const planeY = (x, z) => plane[0] * x + plane[1] * z + plane[2];
-  /** Scene ground near the line: the patch inside, eased into the fitted plane over its last FADE m. */
+  // A smoothed copy of the patch (10 m box blur): the edge heights the slope continues from outside it,
+  // without extruding every bump at the edge into a streak.
+  const Ps = { ...P, h: blur(P.h, P.nx, P.nz, Math.max(2, Math.round(10 / P.step))) };
+  const slopeZ = Math.min(0.6, Math.max(0.08, plane[1]));
+  const _e = new THREE.Vector3();
+  /**
+   * Scene ground near the line: the real snow inside the patch (eased into its smoothed copy over the last
+   * FADE m); outside, the smoothed edge height carried on: falling downhill at the patch's own slope (at
+   * most ~35°), rounding into a crest uphill, falling away gently to the sides, with the scene's rolls.
+   */
   const local = (x, z, detail) => {
     const [mx, mz] = xf.toMap(x, z);
     const e = edge(mx, mz);
-    const pl = planeY(x, z);
-    // Outside: the plane, rolling a little (the scene's own detail noise), falling gently away to the sides.
-    const out = pl + (detail ? detail(x, z) : 0) * smooth(0, 30, -e) - 0.12 * Math.max(0, -e - 25);
-    if (e <= 0) return out;
-    const w = smooth(0, FADE, e);
-    return out + (patchHeight(P, mx, mz) - o.y - out) * w;
+    const cmx = Math.min(px1, Math.max(P.x0, mx)), cmz = Math.min(pz1, Math.max(P.z0, mz));
+    let out = patchHeight(Ps, cmx, cmz) - o.y;
+    if (e < 0) {
+      const cs = xf.toScene(cmx, 0, cmz, _e), dx = Math.abs(x - cs.x), dz = z - cs.z;
+      out += dz > 0 ? slopeZ * 40 * Math.tanh(dz / 40) - 0.0008 * dz * dz * smooth(0, 60, dz) : slopeZ * dz;
+      out -= 0.25 * dx * smooth(0, 40, dx);
+      if (detail) out += detail(x, z) * smooth(0, 30, -e);
+      return out;
+    }
+    return out + (patchHeight(P, mx, mz) - o.y - out) * smooth(0, FADE, e);
   };
   /** Horizontal distance to the ridden line (keeps the made-up trees off it). */
   const clear = (x, z) => { let d = Infinity; for (const p of line) d = Math.min(d, (p.x - x) ** 2 + (p.z - z) ** 2); return Math.sqrt(d); };
@@ -86,6 +98,24 @@ export function prepareClip(clip) {
   const core = { x0: Math.max(-60, lbox.x0 - 22), x1: Math.min(60, lbox.x1 + 22), z0: Math.max(-140, lbox.z0 - 18), z1: Math.min(90, lbox.z1 + 18) };
   const trees = (clip.trees || []).filter((t) => t[3] === 'tree').map((t) => { const p = xf.toScene(t[0], 0, t[1], new THREE.Vector3()); return [p.x, p.z, t[2]]; });
   return { xf, local, clear, inPatch, box, lbox, core, plane, trees, span, i0, i1 };
+}
+
+/** Separable box blur (two passes) of an nx × nz grid, radius r cells, edges clamped. */
+function blur(h, nx, nz, r) {
+  let a = Float32Array.from(h), b = new Float32Array(h.length);
+  for (let pass = 0; pass < 2; pass++) {
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      let s = 0;
+      for (let k = -r; k <= r; k++) s += a[j * nx + Math.min(nx - 1, Math.max(0, i + k))];
+      b[j * nx + i] = s / (2 * r + 1);
+    }
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      let s = 0;
+      for (let k = -r; k <= r; k++) s += b[Math.min(nz - 1, Math.max(0, j + k)) * nx + i];
+      a[j * nx + i] = s / (2 * r + 1);
+    }
+  }
+  return a;
 }
 
 function solve3(A, b) {
@@ -242,4 +272,41 @@ export class ClipShot {
 
   /** Before each shot (nextClipShot trims tStart / tEnd per camera move). */
   reset() { this.emitted = {}; this.tStart = this.base.tStart; this.tEnd = this.base.tEnd; }
+}
+
+/**
+ * How badly trees spoil a planned camera move (0 = clean): the camera inside a tree's crown, or crowns
+ * between the camera and the rider, sampled over the move. trees: [[x, y, z, scale]] (scene coordinates;
+ * a spruce of scale 1 is ~12 m tall with a ~2.4 m crown at the base).
+ */
+export function scoreMove(m, shot, trees) {
+  const t0 = shot.tStart, t1 = shot.tEnd;
+  // Only trees near the action matter.
+  const near = [];
+  const c0 = shot.com(0, new THREE.Vector3());
+  for (const t of trees) if (Math.abs(t[0] - c0.x) < 90 && Math.abs(t[2] - c0.z) < 140) near.push(t);
+  let score = 0;
+  const com = new THREE.Vector3(), q = new THREE.Vector3();
+  for (let i = 0; i <= 12; i++) {
+    const s = i / 12, t = t0 + (t1 - t0) * s;
+    shot.com(t, com);
+    const p = m.pos(s, com, t);
+    for (const tr of near) {
+      const sc = tr[3], hgt = 12 * sc;
+      const dh = Math.hypot(p.x - tr[0], p.z - tr[2]);
+      if (dh < 2.8 * sc + 0.6 && p.y < tr[1] + hgt) { score += 3; break; }
+    }
+    for (let k = 1; k < 9; k++) {
+      q.copy(p).lerp(com, k / 9);
+      let hit = false;
+      for (const tr of near) {
+        const sc = tr[3], hgt = 12 * sc, u = (q.y - tr[1]) / hgt;
+        if (u < 0 || u > 1) continue;
+        const rad = 2.4 * sc * (1 - u) + 0.25;
+        if ((q.x - tr[0]) ** 2 + (q.z - tr[2]) ** 2 < rad * rad) { hit = true; break; }
+      }
+      if (hit) { score += 1; break; }
+    }
+  }
+  return score;
 }

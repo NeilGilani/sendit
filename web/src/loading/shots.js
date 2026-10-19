@@ -123,6 +123,23 @@ export function planMove(kind, shot, sun, r, H) {
       m.targets = [A, M, shot.com(shot.Ta * 0.25, V(0, 0, 0))];
       break;
     }
+    case 'filmer': {
+      // The snowboard-video filmer (the instant replay's tripod, thrill/replay.js): a tripod beside the
+      // take-off and a little ahead, 1.4 m up, a long lens panning with the rider and zooming to keep about
+      // 3.4 m of scene in frame. Reads well for any size of air (a cliff move makes a small kicker a speck).
+      const lipF = shot.feet ? shot.feet(Math.min(shot.Ta * 0.35, 0.5), V(0, 0, 0)) : lip.clone();
+      const d = r.range(9, 12.5), ahead = r.range(2, 6);
+      m.a = V(lipF.x + side * d, 0, lipF.z - ahead);
+      m.a.y = Math.max(H(m.a.x, m.a.z), lipF.y - 6) + 1.4;
+      m.pos = () => m.a.clone();
+      m.look = (s, com) => com.clone().add(V(0, 0.2, 0));
+      m.fovFn = (dist) => Math.max(14, Math.min(50, (2 * Math.atan(3.4 / Math.max(dist, 1)) * 180) / Math.PI));
+      m.fov = 30; m.lag = 5; m.sway = 0.03; m.free = true;
+      m.t0 = -1.6;
+      m.endAfterLanding = 1.6;
+      m.targets = [A, M, Lp.clone().add(V(0, 0.5, 0))];
+      break;
+    }
     case 'follow': {
       // Behind the rider on the in-run, then drifts out over the cliff (like a drone that keeps flying).
       m.fov = 56;
@@ -178,6 +195,7 @@ export class CameraRig {
 
   start(move, com) {
     this.m = move;
+    this.snapLens = true;
     this.look.copy(move.look(0, com));
     this.snap = true;
   }
@@ -206,7 +224,8 @@ export class CameraRig {
       const L = Math.min(minP, pr + 0.24 * cam.fov * Math.PI / 180);
       if (L > pitch) cam.lookAt(cam.position.clone().add(V(dir.x, Math.tan(L) * Math.hypot(dir.x, dir.z), dir.z)));
     }
-    let fov = m.fov1 ? m.fov + (m.fov1 - m.fov) * ease(s) : m.fov;
+    let fov = m.fovFn ? m.fovFn(cam.position.distanceTo(com)) : m.fov1 ? m.fov + (m.fov1 - m.fov) * ease(s) : m.fov;
+    if (m.fovFn) { this.lens = this.lens === undefined || this.snapLens ? fov : this.lens + (fov - this.lens) * (1 - Math.exp(-3 * dt)); this.snapLens = false; fov = this.lens; }
     // Portrait screens: widen the vertical FOV so the horizontal framing survives (rider + range).
     if (cam.aspect < 1.2) fov = (2 * Math.atan(Math.tan((fov * Math.PI) / 360) * Math.min(2.2, 1.2 / cam.aspect)) * 180) / Math.PI;
     if (Math.abs(cam.fov - fov) > 1e-3) { cam.fov = fov; cam.updateProjectionMatrix(); }

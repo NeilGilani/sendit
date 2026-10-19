@@ -24,11 +24,12 @@ import { Shot } from './choreo.js';
 import { planMove, CameraRig } from './shots.js';
 import { TreeSystem } from '../gfx/trees.js';
 import { StillOverlay } from './still.js';
-import { prepareClip, mapNodes, ClipShot } from './clip.js';
+import { prepareClip, mapNodes, ClipShot, scoreMove } from './clip.js';
 import { nodeKeys } from '../thrill/clipcodec.js';
 
 // Camera moves for a saved highlight (the made-up shots' weights, minus the ones built around a big cliff).
-const CLIP_CAMS = { hero: { w: 3 }, close: { w: 3.5 }, dolly: { w: 3 }, orbit: { w: 2 }, follow: { w: 1.4 }, low: { w: 1 }, reveal: { w: 1.2 }, tele: { w: 0.5 } };
+const CLIP_CAMS = { hero: { w: 3 }, close: { w: 3.5 }, filmer: { w: 3 }, dolly: { w: 2.5 }, orbit: { w: 2 }, follow: { w: 1.4 }, low: { w: 0.8 }, reveal: { w: 1 } };   // no long lens: from 100 m up the slope a kicker air is a speck
+const CAM_NAMES = { filmer: 'Tripod filmer' };
 
 // Max rendered pixels (CSS px × ratio²). A 1440×900 @2× laptop would ask for 5.2 MP; ~3.2 MP + SMAA is
 // crisp on a 13'' panel and still holds 30–60 fps next to the booting game (the scaler trims it if not).
@@ -145,7 +146,7 @@ export class LoadingScene {
     this.rig = new CameraRig(camera);
     this.establishing();
     // The rider loads in the background; the first trick shot starts once it's dressed.
-    this.loadRider().catch((e) => this.post('log', { message: `rider failed: ${e.message}` }));
+    this.loadRider().catch((e) => { this.post('log', { message: `rider failed: ${e.message}` }); if (this.clip) this.onClipFail?.(e.message); });
     // Compile every program on the driver's worker threads (KHR_parallel_shader_compile) before the
     // first frame, so this thread never stalls on a link; the painted backdrop covers the wait.
     this.frame(0, true);
@@ -162,6 +163,7 @@ export class LoadingScene {
     await compiling;
     this.stats = { build: Math.round(tc - t0), compile: Math.round(performance.now() - tc) };
     this.checkPrograms();
+    this.ready = true;
 
   }
 
@@ -176,7 +178,8 @@ export class LoadingScene {
     const ts = this.trees = new TreeSystem(new THREE.Group());
     ts.group.name = 'loadingTrees';
     let n = 0;
-    for (let i = 0; i < 9000 && n < 1400; i++) {
+    const cap = this.clip ? 800 : 1400;   // a highlight: its own trees by the line, fewer made-up ones around
+    for (let i = 0; i < 9000 && n < cap; i++) {
       const z = -55 - Math.pow(r(), 0.8) * 620, x = (r() * 2 - 1) * (40 + 520 * Math.min(1, -z / 500));
       // Clear of the landing and ride-out (a corridor that widens downhill) and the arete above. A clip:
       // clear of its ridden line, and none on its patch (its own trees stand there, below).
@@ -192,13 +195,16 @@ export class LoadingScene {
       const sc = (0.55 + r() * 0.45) * (0.6 + 0.5 * Math.min(1, (-z - 40) / 300));   // stunted higher up
       const kind = r() < 0.3 ? 1 : 0;
       const w = kind ? 1.05 + r() * 0.2 : 0.85 + r() * 0.25;
-      ts.add(x, y - 0.3, z, r() * Math.PI * 2, sc * w, sc * (0.85 + r() * 0.3), sc * w, kind);
+      const sy = sc * (0.85 + r() * 0.3);
+      ts.add(x, y - 0.3, z, r() * Math.PI * 2, sc * w, sy, sc * w, kind);
+      (this.treePts || (this.treePts = [])).push([x, y, z, sy]);
       n++;
     }
     // The real trees beside a highlight's line (recorded with the clip), where they stood on the mountain.
     if (this.clip) for (const [x, z, rad] of this.clipPrep.trees) {
-      const sc = Math.min(1.6, Math.max(0.5, rad / 0.4)) * 0.85;
-      ts.add(x, H(x, z) - 0.3, z, r() * Math.PI * 2, sc, sc * (0.9 + r() * 0.2), sc, r() < 0.3 ? 1 : 0);
+      const sc = Math.min(1.8, Math.max(0.4, rad / 0.4)), sy = sc * (0.9 + r() * 0.2);
+      ts.add(x, H(x, z) - 0.3, z, r() * Math.PI * 2, sc, sy, sc, r() < 0.3 ? 1 : 0);
+      (this.treePts || (this.treePts = [])).push([x, H(x, z), z, sy]);
       n++;
     }
     ts.build();
@@ -428,10 +434,23 @@ export class LoadingScene {
     shot.reset();
     const first = !this.shotCount;
     this.shotCount = (this.shotCount || 0) + 1;
-    let cam = v.cam || (first ? r.pick(['hero', 'hero', 'close', 'dolly']) : r.weighted(CLIP_CAMS, 'w'));
+    let cam = v.cam || (first ? r.pick(['hero', 'hero', 'close', 'filmer']) : r.weighted(CLIP_CAMS, 'w'));
     for (let k = 0; k < 4 && !v.cam && cam === this.lastCam; k++) cam = r.weighted(CLIP_CAMS, 'w');
+    // The real trees stand close to a real line: plan a few moves and keep the one with the fewest
+    // crowns in the lens (the first pick wins ties).
+    let best = null;
+    for (let k = 0; k < (v.cam ? 3 : 8); k++) {
+      const kind = k === 0 || v.cam ? cam : r.weighted(CLIP_CAMS, 'w');
+      if (k > 0 && !v.cam && kind === this.lastCam) continue;
+      const m = planMove(kind, shot, this.sunDir, r, this.height.H);
+      const sc = scoreMove(m, shot, this.treePts || []);
+      if (!best || sc < best.sc) best = { m, sc, kind };
+      if (sc === 0) break;
+    }
+    cam = best.kind;
     this.lastCam = cam;
-    this.move = planMove(cam, shot, this.sunDir, r, this.height.H);
+    this.move = best.m;
+    this.moveScore = best.sc;
     if (this.move.t0 != null) shot.tStart = Math.max(shot.tStart, this.move.t0 - 0.6);
     shot.tStart = Math.max(shot.tStart, first ? -1.4 : -2.2);
     if (this.move.endAfterLanding != null) shot.tEnd = Math.min(shot.tEnd, shot.Ta + this.move.endAfterLanding + 0.4);
@@ -446,7 +465,7 @@ export class LoadingScene {
     this.mode = 'shot';
     this.dip = this.stillFadeT && this.stillFadeT < 0.1 ? 0 : 0.6;
     const M = this.clip.meta || {};
-    this.lastInfo = { trick: M.trick || 'Highlight', trickId: 'clip', cam, camera: CAMERAS[cam].name, place: v.place, time: TIMES[v.tod].name, tod: v.tod, mtn: v.mtn, gear: v.gear, seed: v.seed, own: true, highlight: true, clipId: this.opts.clipId || null, points: M.points || 0, mountain: M.mountain || '', rider: 'Your highlight' };
+    this.lastInfo = { trick: M.trick || 'Highlight', trickId: 'clip', cam, camera: CAMERAS[cam]?.name || CAM_NAMES[cam] || cam, treeScore: this.moveScore, place: v.place, time: TIMES[v.tod].name, tod: v.tod, mtn: v.mtn, gear: v.gear, seed: v.seed, own: true, highlight: true, clipId: this.opts.clipId || null, points: M.points || 0, mountain: M.mountain || '', rider: 'Your highlight' };
     this.post('shot', { info: this.lastInfo });
   }
 
@@ -554,6 +573,14 @@ export class LoadingScene {
     if (!hidden || this.frames % 8 === 0) this.composer.render(dt);
     if (ov) { ov.render(this.renderer, this.size.width, this.size.height); if (ov.alpha <= 0) this.stillOv = null; }
     this.frames++;
+  }
+
+  /** Free the GPU side before a rebuild on the same canvas (a highlight that failed: worker.js fallback). */
+  dispose() {
+    this.ready = false;
+    this.scene?.traverse((o) => { o.geometry?.dispose?.(); const m = o.material; if (m) (Array.isArray(m) ? m : [m]).forEach((x) => x.dispose?.()); });
+    this.composer?.dispose?.();
+    this.renderer?.dispose?.();
   }
 
   /** Adaptive resolution: hold ~60 fps while the game loads on the same GPU. */
