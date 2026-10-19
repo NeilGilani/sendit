@@ -121,7 +121,7 @@ button.primary { border-left: 4px solid #2ff5d6; }
 }
 /* Phones (portrait): hints wrap inside the screen, below the score and the trail sign. */
 @media (max-width: 600px) {
-  #hint { top: 204px; font-size: 13px; white-space: normal; width: max-content; max-width: calc(100vw - 32px); text-align: center; }
+  #hint { top: 150px; font-size: 13px; white-space: normal; width: max-content; max-width: calc(100vw - 32px); text-align: center; }
 }
 #speed.tier1 span { color: #7ff9ea; }
 #speed.tier2 span { color: #ffd34d; }
