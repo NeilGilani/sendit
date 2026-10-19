@@ -158,7 +158,14 @@ export class FXManager {
     const T = this.player.terrain;
     const h = T.getHeight(p.x, p.z);
     if (!(Math.abs(p.y - h) <= tol)) return false;
-    return T.trackable ? T.trackable(p.x, p.z, h) : true;
+    // Raised surfaces (kickers, roofs, decks, Voltage Park's features) come from features.heightAt, are their own
+    // meshes and never show tracks; the heightfield (terrain mesh: rollers, drifts, drops) is terrain.baseHeight.
+    if (T.baseHeight && h - T.baseHeight(p.x, p.z) > 0.02) return false;
+    // Under water (Fjordline's fjord: the seabed) or sinking after a splash.
+    const sea = T.course?.sea;
+    if (sea !== undefined && h < sea - 0.05) return false;
+    if (this.player._fjordSplash > 0) return false;
+    return true;
   }
 
   /**
