@@ -119,8 +119,8 @@
 .gr-cmp-side:last-child { justify-items: end; text-align: right; }
 .gr-cmp-side b { font-size: 1em; font-weight: 900; font-stretch: 72%; text-transform: uppercase; line-height: 1.05; }
 .gr-cmp-vs { font: 600 0.62em/1 var(--font-mono); color: var(--c-snow-3); text-transform: uppercase; padding-top: 0.5em; }
-#lobby .gr-ride { padding: 0.4em 0.7em; font-size: 0.72em; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; border-radius: var(--r1);
-  color: var(--c-paper-ink); background: var(--c-snow); --lipc: var(--c-snow-lip); }
+#lobby .gr-cmp .gr-ride { padding: 0.45em 0.75em; font-size: 0.74em; border-radius: var(--r1); color: var(--c-paper-ink); background: var(--c-snow); --lipc: var(--c-snow-lip); }
+#lobby .gr-cmp .gr-ride:hover { background: #fff; }
 .gr-cmp-rows { display: grid; gap: 0.35em; }
 .gr-cmp-row { display: grid; grid-template-columns: 1.8em minmax(0, 1fr) 6.4em minmax(0, 1fr) 1.8em; align-items: center; gap: 0.4em; }
 .gr-cmp-v { font: 600 0.72em/1 var(--font-mono); color: var(--c-snow-2); }
@@ -128,11 +128,12 @@
 .gr-cmp-lab { display: flex; align-items: center; justify-content: center; gap: 0.35em; font: 600 0.62em/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--c-snow-3); }
 .gr-cmp-lab svg { width: 1.3em; height: 1.3em; flex: none; }
 .gr-cmp-bar { position: relative; height: 0.5em; background: rgba(255, 255, 255, 0.1); }
-.gr-cmp-bar i { position: absolute; top: 0; bottom: 0; width: calc(var(--v) * 100%); background: var(--c-snow-3); animation: grBar .5s var(--e-out) both; }
+.gr-cmp-bar i { position: absolute; top: 0; bottom: 0; width: calc(var(--v) * 100%); background: var(--c-snow-3); opacity: 0.55; animation: grBar .5s var(--e-out) both; }
 .gr-cmp-bar.a i { right: 0; transform-origin: right; animation-name: grBarR; }
 .gr-cmp-bar.b i { left: 0; }
 @keyframes grBarR { from { transform: scaleX(0); } to { transform: none; } }
-.gr-cmp-row.win-a .gr-cmp-bar.a i, .gr-cmp-row.win-b .gr-cmp-bar.b i { background: var(--c-snow); }
+.gr-cmp-row.win-a .gr-cmp-bar.a i, .gr-cmp-row.win-b .gr-cmp-bar.b i { background: var(--c-snow); opacity: 1; }
+.gr-cmp-row:not(.win-a):not(.win-b) .gr-cmp-bar i { opacity: 0.85; }
 .gr-cmp-row.win-a .gr-cmp-v.a, .gr-cmp-row.win-b .gr-cmp-v.b { color: var(--gr-up); font-weight: 700; }
 .gr-det { margin-top: 0.7em; font-size: 0.8em; }
 .gr-det summary { cursor: pointer; color: var(--c-snow-2); font: 600 0.8em/1.4 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; }
@@ -150,6 +151,8 @@
 .gr-tile { display: grid; gap: 0.25em; padding: 0 0.15em 0.2em; min-width: 0; }
 .gr-tile .gr-badges { min-height: 1.45em; }
 .lk-sel .gr-sel-gear { display: grid; gap: 0.5em; margin-top: 0.6em; }
+/* The Skins detail plate styles its <b> as the item name; keep the bar numbers as data. */
+#lobby .lk-sel .gr-bars b.gr-val { display: block; font: 600 0.72em/1 var(--font-mono); font-stretch: 100%; font-style: normal; text-transform: none; letter-spacing: 0; }
 .lk-sel .gr-sel-why { margin: 0; font-size: 0.78em; color: var(--c-gold); line-height: 1.35; }
 .lk-sel .gr-sel-foot { display: flex; align-items: center; gap: 0.8em; flex-wrap: wrap; font-size: 0.78em; color: var(--c-snow-3); }
 #lobby .lk-sel .gr-sel-cmp { display: inline-flex; align-items: center; gap: 0.35em; color: var(--c-snow); font-weight: 700; background: none; padding: 0;
@@ -159,8 +162,8 @@
 /* ------------------------------------------------------------- small screens */
 @media (max-width: 760px), (max-aspect-ratio: 4/5) {
   .eq-choice { gap: 0.4em; }
-  #lobby .eq-opt { flex-direction: row; align-items: center; padding: 0.55em 0.7em; gap: 0.5em; }
-  #lobby .eq-opt .eq-txt small { display: none; }
+  #lobby .eq-opt { flex-direction: row; align-items: center; padding: 0.4em 0.6em; gap: 0.45em; }
+  #lobby .eq-opt .eq-txt b { font-size: 1.1em; }  #lobby .eq-opt .eq-txt small { display: none; }
   #lobby .eq-opt .eq-ico svg { width: 1.6em; height: 1.6em; }
   #lobby .eq-opt .eq-check { top: 50%; transform: translateY(-50%); }
   .gr-pick { margin-top: 0.6em; }

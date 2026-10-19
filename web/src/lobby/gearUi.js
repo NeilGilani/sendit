@@ -127,7 +127,7 @@ export function compareHtml(a, b) {
   const da = gearDetails(a.type, a.spec), db = gearDetails(b.type, b.spec);
   const side = (it) => `<div class="gr-cmp-side">
       <b>${esc(shortName(it.name))}</b>
-      ${it.equipped ? '<span class="gr-tag on">Riding</span>' : `<button type="button" class="lp-btn gr-ride" data-gr-wear="${esc(it.key)}">Ride this</button>`}
+      ${it.equipped ? '<span class="gr-tag on">Riding</span>' : `<button type="button" class="lb-btn3 gr-ride" data-gr-wear="${esc(it.key)}">Ride this</button>`}
     </div>`;
   const rows = GEAR_STATS.map((s) => {
     const va = a.stats[s.id], vb = b.stats[s.id];
