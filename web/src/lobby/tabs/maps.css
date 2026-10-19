@@ -4,7 +4,7 @@
    ===================================================================================== */
 
 /* A wider panel while the browser is open (the rider moves right; Lobby.layout() reframes). */
-#lobby:has(> .lb-panel.mt-panel) { grid-template-columns: minmax(20em, 36em) 1fr; }
+#lobby:has(.lb-panel.mt-panel) { grid-template-columns: minmax(20em, 36em) 1fr; }
 .lb-panel.mt-panel { padding-top: 1.2em; }
 .lb-panel.mt-enter > * { animation: mtIn .34s cubic-bezier(.2, .9, .3, 1) both; }
 .lb-panel.mt-enter > *:nth-child(2) { animation-delay: .03s; }
@@ -147,7 +147,7 @@
 
 /* ---------------------------------------------------------------- small screens */
 @media (max-width: 760px), (max-aspect-ratio: 4/5) {
-  #lobby:has(> .lb-panel.mt-panel) { grid-template-columns: minmax(0, 1fr); }
+  #lobby:has(.lb-panel.mt-panel) { grid-template-columns: minmax(0, 1fr); }
   .lb-panel.mt-panel { max-height: 52vh; }
   .mt-grid { grid-template-columns: repeat(auto-fill, minmax(12em, 1fr)); }
   .mt-feat, .mt-blurb { display: none; }
