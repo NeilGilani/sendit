@@ -17,7 +17,7 @@ const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, a
 const page = await ctx.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
-page.on('console', (m) => { const t = m.text(); if (m.type() === 'error') errors.push(t.slice(0, 240)); if (/\[loading\]|\[highlights\]/.test(t)) console.log('   ', t.slice(0, 200)); });
+page.on('console', (m) => { const t = m.text(); if (m.type() === 'error' || /live scene unavailable/.test(t)) errors.push(t.slice(0, 240)); if (/\[loading\]|\[highlights\]/.test(t)) console.log('   ', t.slice(0, 200)); });
 let failed = 0;
 const check = (name, ok, info = '') => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${info ? `  (${info})` : ''}`); if (!ok) failed++; };
 const shot = (name) => page.screenshot({ path: `${out}/${name}.png` });
@@ -95,6 +95,14 @@ check('the Highlights tab lists the clip', cards === 1, String(cards));
 await page.waitForFunction(() => document.querySelector('.hl-card .hl-thumb img.on'), null, { timeout: 60000 }).catch(() => {});
 const thumb = await page.evaluate(() => !!document.querySelector('.hl-card .hl-thumb img.on'));
 check('a thumbnail was rendered', thumb);
+const tb = await page.evaluate(async () => {
+  const img = document.querySelector('.hl-card .hl-thumb img.on');
+  if (!img?.src) return null;
+  const b = new Uint8Array(await (await fetch(img.src)).arrayBuffer()); let s = '';
+  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+  return btoa(s);
+}).catch(() => null);
+if (tb) { writeFileSync(`${out}/thumb.webp`, Buffer.from(tb, 'base64')); console.log(`   thumbnail ${Math.round(tb.length * 0.75 / 1024)} KB`); }
 await shot('4-lobby-highlights');
 await page.click('.hl-card .hl-thumb');
 await page.waitForFunction(() => document.querySelector('#hl-player .wait.off'), null, { timeout: 60000 }).catch(() => {});
@@ -109,7 +117,25 @@ await page.keyboard.press('Escape');
 await wait(500);
 check('Esc closes the player', !(await page.evaluate(() => !!document.getElementById('hl-player'))));
 
-const errs = errors.filter((e) => !/favicon|404|Failed to load resource/.test(e));
+// ---------------------------------------------------------------- robustness: a corrupt clip, a missing one
+const badId = await page.evaluate(async () => {
+  const { addClip } = await import('/src/thrill/clipstore.js');
+  const junk = new Uint8Array(4000); for (let i = 0; i < junk.length; i++) junk[i] = (i * 7919) & 255;
+  junk.set([83, 67, 76, 49, 1], 0);   // right magic, garbage gzip
+  return (await addClip({ trick: 'Junk', mapId: 'valcrest-gully' }, junk)).id;
+});
+await page.goto(url(`loadclip=${badId}&loadhold&loadnohold`), { timeout: 300000, waitUntil: 'domcontentloaded' });
+await page.waitForFunction(() => window.__loading?.stats?.().shot, null, { timeout: 120000 }).catch(() => {});
+const bad = await page.evaluate(() => ({ s: window.__loading.stats(), idx: JSON.parse(localStorage.getItem('sendit.highlights') || '{}') }));
+check('a corrupt clip falls back to a made-up trick and leaves the rotation', !!bad.s.shot && !bad.s.shot.highlight && !!bad.s.clipFailed && !bad.idx.clips.some((c) => c.id === badId), JSON.stringify({ shot: bad.s.shot?.trick, failed: bad.s.clipFailed }));
+await page.goto(url('loadclip=nope&loadhold&loadnohold'), { timeout: 300000, waitUntil: 'domcontentloaded' });
+await page.waitForFunction(() => window.__loading?.stats?.().shot, null, { timeout: 120000 }).catch(() => {});
+const miss = await page.evaluate(() => window.__loading.stats());
+check('a missing clip falls back to a made-up trick', !!miss.shot && !miss.shot.highlight, JSON.stringify({ shot: miss.shot?.trick, failed: miss.clipFailed }));
+const warns = errors.filter((e) => /unavailable/.test(e));
+check('the live scene never gave up', !warns.length, warns.join(' | '));
+
+const errs = errors.filter((e) => !/favicon|404|Failed to load resource|unavailable|saved highlight skipped/.test(e));
 check('no console errors', errs.length === 0, errs.slice(0, 5).join(' | '));
 await browser.close();
 console.log(failed ? `${failed} FAILED` : 'all passed');

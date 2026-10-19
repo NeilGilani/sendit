@@ -14,7 +14,7 @@ const browser = await chromium.launch({ args });
 const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); if (/\[loading\]/.test(m.text())) console.log('   ', m.text().slice(0, 180)); });
+page.on('console', (m) => { if (m.type() === 'error' || /unavailable|skipped/.test(m.text())) errors.push(m.text().slice(0, 200)); if (/\[loading\]/.test(m.text())) console.log('   ', m.text().slice(0, 180)); });
 const b64 = readFileSync(file).toString('base64');
 const meta = JSON.parse(readFileSync(file.replace(/\.bin$/, '.json'), 'utf8'));
 await page.goto(`${base}loading.html?loadclip=0&loadhold`, { waitUntil: 'domcontentloaded' });
@@ -26,8 +26,8 @@ const id = await page.evaluate(async ({ b64, meta }) => {
 }, { b64, meta });
 const shots = [];
 for (const cam of moves) {
-  await page.goto(`${base}loading.html?loadclip=${id}&${cam.startsWith('cam:') ? `loaddebug=${cam}` : `loadcam=${cam}`}&loadhold&loadseed=7${process.env.EXTRA || ''}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => window.__loading?.stats?.().shot?.highlight, null, { timeout: 90000 }).catch(() => {});
+  await page.goto(`${base}loading.html?loadclip=${process.env.NOCLIP ? 0 : id}&${cam.startsWith('cam:') ? `loaddebug=${cam}` : `loadcam=${cam}`}&loadhold&loadseed=7${process.env.EXTRA || ''}`, { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction((any) => window.__loading?.stats?.().shot?.highlight || (any && window.__loading?.stats?.().shot), !!process.env.NOCLIP, { timeout: 90000 }).catch(() => {});
   const info = await page.evaluate(() => window.__loading.stats().shot);
   const t0 = Date.now();
   const imgs = [];

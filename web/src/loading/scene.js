@@ -78,7 +78,7 @@ export class LoadingScene {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.debug.checkShaderErrors = !!this.opts.debug;
-    if (typeof this.opts.debug === 'string' && this.opts.debug.startsWith('view')) self.__loadDebugView = Number(this.opts.debug.slice(4));
+    if (typeof this.opts.debug === 'string' && /(^|;)view(\d)/.test(this.opts.debug)) self.__loadDebugView = Number(/(^|;)view(\d)/.exec(this.opts.debug)[2]);   // 'view1' or 'cam:…;view1'
     PHYSICS.trickStyle = true;              // this worker's own config copy: tweaked grabs on the rig
     patchShaderChunks();
 
@@ -517,7 +517,7 @@ export class LoadingScene {
     }
     // Debug: ?loaddebug=cam:px,py,pz,tx,ty,tz,fov pins the camera (frame captures of the set).
     if (typeof this.opts.debug === 'string' && this.opts.debug.startsWith('cam:')) {
-      const c = this.opts.debug.slice(4).split(',').map(Number);
+      const c = this.opts.debug.slice(4).split(';')[0].split(',').map(Number);
       cam.position.set(c[0], c[1], c[2]);
       cam.lookAt(c[3], c[4], c[5]);
       if (c[6] && cam.fov !== c[6]) { cam.fov = c[6]; cam.updateProjectionMatrix(); }

@@ -29,8 +29,9 @@ const STYLE = `
 #lobby .hl-seg { display: inline-flex; margin: 0.2em 0 0.9em; border: 1px solid var(--c-line-2); border-radius: var(--r1); }
 #lobby .hl-seg button { padding: 0.45em 0.9em; background: transparent; border: 0; border-radius: 0; color: var(--c-snow-2); font-size: 0.74em; letter-spacing: 0.12em; cursor: pointer; }
 #lobby .hl-seg button.on { background: var(--c-snow); color: var(--c-paper-ink); box-shadow: inset 0 -3px 0 var(--c-signal); }
-#lobby .hl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(12.5em, 1fr)); gap: 0.8em; }
-#lobby .hl-card { position: relative; display: flex; flex-direction: column; background: var(--c-ink-2); border: 1px solid var(--c-line); border-radius: var(--r1); overflow: hidden; }
+#lobby .hl-grid { display: flex; flex-direction: column; gap: 0.55em; }
+#lobby .hl-card { position: relative; display: grid; grid-template-columns: minmax(8.5em, 44%) 1fr; grid-template-rows: 1fr auto; background: var(--c-ink-2); border: 1px solid var(--c-line); border-radius: var(--r1); overflow: hidden; }
+#lobby .hl-card .hl-thumb { grid-row: 1 / 3; height: 100%; min-height: 5.6em; aspect-ratio: auto; }
 #lobby .hl-card:hover { background: var(--c-ink-3); }
 #lobby .hl-card.fav { box-shadow: inset 3px 0 0 var(--c-gold); }
 #lobby .hl-thumb { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; padding: 0; border: 0; border-radius: 0; cursor: pointer;
@@ -50,7 +51,7 @@ const STYLE = `
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #lobby .hl-meta { margin-top: 0.35em; font: 500 0.68em/1.35 var(--font-mono); color: var(--c-snow-3); letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #lobby .hl-meta b { color: var(--c-ice); font-weight: 600; }
-#lobby .hl-acts { display: flex; gap: 0.3em; padding: 0 0.6em 0.6em; }
+#lobby .hl-acts { display: flex; gap: 0.3em; padding: 0 0.6em 0.55em 0.7em; }
 #lobby .hl-acts button { display: inline-flex; align-items: center; justify-content: center; width: 2.1em; height: 2.1em; padding: 0; background: transparent;
   border: 1px solid var(--c-line); border-radius: var(--r1); color: var(--c-snow-2); cursor: pointer; }
 #lobby .hl-acts button svg { width: 1.05em; height: 1.05em; }
@@ -311,6 +312,8 @@ registerLobbyTab({
         ctl.stop();
         root.remove();
         removeEventListener('keydown', onKey, true);
+        const lb = globalThis.__sendit?.lobby;
+        if (lb && lb.overlay === player?.overlay) lb.overlay = null;
         player = null;
         setTimeout(pumpThumbs, 300);
         el.querySelector(`.hl-card[data-id="${CSS_ESC(c.id)}"] .hl-thumb`)?.focus({ preventScroll: true });
@@ -333,28 +336,29 @@ registerLobbyTab({
         else if (!e.metaKey && !e.ctrlKey) e.stopPropagation();   // the lobby behind doesn't react (Q / E tabs, R view)
       };
       addEventListener('keydown', onKey, true);
-      player = { act, close };   // the gamepad reaches it through the tab's onAction (below)
+      player = { act, close };
+      // The pad: a full-screen lobby overlay takes every action first (like the case opener), so Start,
+      // LB / RB don't ride or switch tabs behind the player. B closes, X favourites, Y next camera, A clicks.
+      const lobby = globalThis.__sendit?.lobby;
+      const overlay = {
+        onAction: (a) => {
+          if (a === 'back') close(); else if (a === 'alt') act('fav'); else if (a === 'alt2') act('next');
+          else if (['accept', 'up', 'down', 'left', 'right'].includes(a)) return false;   // A / d-pad: focus + click the player's buttons
+          return true;
+        },
+      };
+      if (lobby) lobby.overlay = overlay;
+      player.overlay = overlay;
       root.querySelector('[data-p=next]').focus({ preventScroll: true });
     };
 
     ctx.on?.('highlightSaved', () => load());
     load();
-    this._player = () => player;
     return () => {
       alive = false;
       player?.close();
     };
-  },
-
-  /** Gamepad: B closes the player, X favourites, Y next camera. */
-  onAction(action) {
-    const p = this._player?.();
-    if (!p) return false;
-    if (action === 'back') { p.close(); return true; }
-    if (action === 'alt') { p.act('fav'); return true; }
-    if (action === 'alt2' || action === 'right' || action === 'accept') { p.act('next'); return true; }
-    return false;
-  },
+  }
 });
 
 const CSS_ESC = (s) => (globalThis.CSS?.escape ? globalThis.CSS.escape(s) : String(s).replace(/"/g, '\\"'));

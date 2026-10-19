@@ -411,3 +411,94 @@ the game's noise texture generator and post grade.
   the dev server's hundreds of module requests make the live scene start late; the build serves a few bundles.
 - Measured: Chrome live at 2.9 s (reduced motion too), WebKit desktop / phone 7.7–7.9 s, Chrome with 4× CPU
   throttling 3.7 s; lobbytest 86/86.
+
+## Round 4 — your highlights on the loading screen (2026-10-19)
+
+Tricks saved with **F / LB** while riding (docs/game-feel.md § 8g) join the loading screens' rotation, and
+once you have a few they are the only thing shown.
+
+### Which shot a load plays (`thrill/clipstore.js` `pickLoadingClip`, unit-tested)
+
+| saved clips | this load |
+|---|---|
+| 0 | a made-up trick, as before |
+| 1–2 | a mix: each load plays a clip with probability 1/2 (one clip) or 2/3 (two) |
+| 3 or more | only your clips |
+
+- **Never the same clip twice in a row** (with one clip, the load after it is a made-up trick).
+- **A clip never shown yet goes first**, even with one or two saved: save a trick, reload, see it.
+- Then **favourites weigh 3×**, and clips shown less often a little more.
+- **Lobby → mountain loads** prefer a clip from the destination mountain (the "Dropping in" card stays).
+- The decision is synchronous, from a small `localStorage` mirror of the clip list, in `loading/index.js`
+  (before any game code). The worker reads the clip's bytes from IndexedDB itself, in parallel with its own
+  module import, and decodes them there. `?loadclip=<id>` forces a clip, `?loadclip=0` none.
+- The boot still (`index.html`) stays a pre-rendered made-up still; the live scene dissolves from it into
+  your clip as before.
+
+Caption: **PERFECT RIGHT 360** / ◆ Your highlight · Ravenspire · Heli Drop · 415 pts.
+
+### Replaying a clip in the loading scene (`loading/clip.js`)
+
+The real map can't run in the worker (it is the whole game), and the loading scene's made-up arête doesn't
+have your kicker, so the clip brings its own snow:
+
+1. **The real snow.** At save time the game samples its own terrain height around the ridden line (0.75 m
+   grid, 26 m margin) plus the trees and rocks near it, and stores them in the clip.
+2. **Placed at the scene's origin.** The clip's map coordinates are moved so the take-off sits at the
+   origin and the take-off → touchdown direction runs down −Z, which is what every hero camera move
+   expects. A group carries that transform; the recorded rig plays inside it untouched.
+3. **The height function** (`makeHeight` with `v.clipPrep`): inside the patch, the real heights (bilinear);
+   over its last 16 m they ease into a 10 m-blurred copy; outside, the blurred edge height carries on —
+   falling downhill at the patch's own slope (at most ~31°), rounding into a crest uphill, falling away
+   gently to the sides, with only broad rolls on top — and from 160 m out the scene's own made-up range
+   takes over as before. So the take-off, the flight and the landing are the real ones to the centimetre
+   (the rider's feet were recorded on that very surface), and the mountains around are the loading scene's.
+4. **A dense mesh along the line.** The near grid gets its own x and z axes: an even 0.6 m core over the
+   ridden line, growing out to ±420 m (`makeAxis`), so the rendered snow follows the sampled snow (no
+   floating or sinking at a 3 m cell). Normals come from the height function at each cell's own scale (the
+   0.6 m × 10 m strips otherwise alias into hatching).
+5. **The rider.** The same rig (rider.js + character/ + equipment/) built with the clip's outfit, gear model
+   and stance; unknown garments or colourways fall back to the defaults (`resolveOutfit`), an unknown gear
+   model to the default model. Nodes are matched by path key (93 / 93 on the current rig); the recording
+   drives them directly (no `rider.update`). A clip recorded in first person gets the full-size head back.
+6. **Trees.** The real trees beside the line stand where they stood; made-up ones (800 instead of 1400) only
+   off the patch and 16 m clear of the line.
+7. **Shots.** `ClipShot` gives the camera planner what `Shot` does (apex, mid-air, touchdown, the centre of
+   mass from the posed pelvis per frame, the ride-out), and the speed ramp: real speed on the in-run, slow
+   motion through the air (0.26–0.5×, deeper for long airs), real speed after. Each loop is the same trick
+   from a new camera: hero three-quarter, close orbit, **tripod filmer** (new: a tripod 9–12 m beside the
+   take-off, a long lens that zooms to keep ~3.4 m in frame — reads well for a small kicker air), side
+   dolly, slow orbit, chase, low hero, drone reveal (no long lens: from 100 m up the slope a kicker air is a
+   speck). The real trees stand close to a real line, so up to eight moves are planned and the one with the
+   fewest tree crowns in or in front of the lens is kept (`scoreMove`).
+8. **Powder.** The take-off and landing bursts fire at the recorded take-off and touchdown.
+
+### Robustness
+
+| case | what happens |
+|---|---|
+| clip missing / not decodable / wrong version | the worker posts `clipFailed`, the page drops it from the rotation, the scene builds a made-up trick |
+| the clip can't be built (no air, rig mismatch < 60 % nodes, an exception in the clip path) | the worker disposes the scene and rebuilds it without the clip (same canvas), `clipFailed` |
+| IndexedDB unavailable (private mode) | no clip is picked (empty mirror) or the read fails → made-up trick; the mirror is kept |
+| removed outfit / gear model | defaults for that slot |
+
+### The same scene as a player and a thumbnail renderer (`loading/clipview.js`)
+
+- `playClip(canvas, id)` — the lobby's Highlights player: the loading worker in a full-screen canvas,
+  looping the clip with a new camera each time (`next` message cuts to the next one).
+- `renderThumb(id, 480, 270)` — the worker in thumb mode on an `OffscreenCanvas`: the hero move, frozen at
+  45 % of the air (`?loadfreeze`), `convertToBlob` WebP; ~15–25 KB, kept in IndexedDB.
+
+### Tests
+
+- `node web/scripts/clips-unit.mjs` (run by `unittest.mjs`): codec round trip and sizes, corrupt / foreign
+  / future-version input, the air span, node keys, the storage cap, and the rotation rules above.
+- `MAC=1 node web/scripts/clips-e2e.mjs <url> <out> [scenario]`: a real trick in the game (default a
+  Valcrest kicker air; `cliff360` = Ravenspire), the SAVE CLIP plate, F, the toast, no duplicate, the
+  loading screen playing it (frame sequence), the lobby tab, its thumbnail, the player, and a corrupt and
+  a missing clip falling back to a made-up trick.
+- `MAC=1 node web/scripts/clips-cams.mjs <url> <out> <clip.bin> [moves] [frames]`: one contact sheet per
+  camera move for a saved clip (`clips-e2e` writes the clip file); `cam:px,py,pz,tx,ty,tz,fov|…` for pinned
+  debug views.
+- `MAC=1 node web/scripts/clips-perf.mjs <url>`: the recorder's per-frame cost, frame times around a save,
+  and 34 saves in a row (the cap holds, the heap stays flat).

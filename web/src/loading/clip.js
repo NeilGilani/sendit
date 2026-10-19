@@ -83,9 +83,23 @@ export function prepareClip(clip) {
     const cmx = Math.min(px1, Math.max(P.x0, mx)), cmz = Math.min(pz1, Math.max(P.z0, mz));
     let out = patchHeight(Ps, cmx, cmz) - o.y;
     if (e < 0) {
-      const cs = xf.toScene(cmx, 0, cmz, _e), dx = Math.abs(x - cs.x), dz = z - cs.z;
-      out += dz > 0 ? slopeZ * 40 * Math.tanh(dz / 40) - 0.0008 * dz * dz * smooth(0, 60, dz) : slopeZ * dz;
-      out -= 0.25 * dx * smooth(0, 40, dx);
+      // Near the patch: its (smoothed) edge carried on. Further out (30 m), the fitted plane over the patch's
+      // box carried on the same way: an edge profile extruded for hundreds of metres turns every couloir
+      // at the edge into a long streak of ridges (seen as bands of rock).
+      const cont = (px, pz) => {
+        const dx = Math.abs(x - px), dz = z - pz;
+        // Uphill: a crest, then gently down the far side. Downhill: the patch's slope for 40 m, then ~17°.
+        // Sides: ~14°. Far out these stay under the far mesh's rock threshold (~35°), or the seam at
+        // ±420 m shows as bands of rock where the near mesh still shows snow.
+        const up = slopeZ * 40 * Math.tanh(dz / 40) - 0.22 * Math.max(0, dz - 70) * smooth(70, 130, dz);
+        const down = -(Math.min(-dz, 40) * slopeZ + Math.max(0, -dz - 40) * Math.min(slopeZ, 0.3));
+        return (dz > 0 ? up : down) - 0.25 * dx * smooth(0, 40, dx);
+      };
+      const cs = xf.toScene(cmx, 0, cmz, _e);
+      const nearE = out + cont(cs.x, cs.z);
+      const bx = Math.min(box.x1, Math.max(box.x0, x)), bz = Math.min(box.z1, Math.max(box.z0, z));
+      const farE = plane[0] * bx + plane[1] * bz + plane[2] + cont(bx, bz);
+      out = nearE + (farE - nearE) * smooth(0, 30, -e);
       if (detail) out += detail(x, z) * smooth(0, 30, -e);
       return out;
     }

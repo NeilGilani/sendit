@@ -74,8 +74,8 @@ export function installHighlights({ player, rider, terrain, input, activities, r
     const fa = ring.at(a), fb = ring.at(b);
     const j0 = fa.a, j1 = fb.b, count = j1 - j0 + 1;
     const stride = ring.stride;
-    // One reusable buffer: the next trick replaces this one anyway, and a save resamples it synchronously
-    // before its first await, so nothing else reads it later.
+    // One reusable buffer: the next trick replaces this one anyway, and a save copies it out synchronously
+    // before its first await.
     if (!buf || buf.data.length < ring.cap * stride) buf = { data: new Float32Array(ring.cap * stride), times: new Float64Array(ring.cap) };
     // Copy logical frames j0..j1: one or two contiguous runs of the ring.
     for (let j = j0; j <= j1;) {
@@ -118,11 +118,14 @@ export function installHighlights({ player, rider, terrain, input, activities, r
     const nx = Math.ceil((x1 - x0) / step) + 1, nz = Math.ceil((z1 - z0) / step) + 1;
     const h = new Float32Array(nx * nz);
     let k = 0;
+    let maxSlice = 0;
     while (k < h.length) {
-      const end = Math.min(h.length, k + CLIPS.samplesPerSlice);
+      const ts = performance.now(), end = Math.min(h.length, k + CLIPS.samplesPerSlice);
       for (; k < end; k++) { const i = k % nx, j = (k / nx) | 0; h[k] = terrain.getHeight(x0 + i * step, z0 + j * step); }
+      maxSlice = Math.max(maxSlice, performance.now() - ts);
       if (k < h.length) await nextFrame();
     }
+    stats.patchSliceMaxMs = +maxSlice.toFixed(2);
     // Trees and rocks near the line (the real ones, so the replay rides past the same trunks).
     const trees = [], seen = new Set(), sc = player.scatter;
     if (sc?.obstaclesNear) {
@@ -169,13 +172,16 @@ export function installHighlights({ player, rider, terrain, input, activities, r
     ui?.prompt(true, c.info.trick, 'saving');
     const T = { start: performance.now() };
     try {
-      const { patch, trees } = await samplePatch(c);
-      T.patch = performance.now() - T.start;
-      const t0 = c.times[0];
-      const meta = { v: CLIP_VERSION, ...c.ctx, ...c.info, takeoff: Math.max(0, c.takeoff - t0), land: Math.max(0, c.land - t0), date: Date.now() };
-      const t1 = performance.now();
+      // Own copy first (synchronously): the shared candidate buffer is reused by the next landed trick,
+      // which can land while the terrain is being sampled below.
       const raw = { data: c.data.slice(0, c.count * c.stride), times: c.times.slice(0, c.count), count: c.count, stride: c.stride, ns: c.ns, nodes: c.nodes };
-      T.copy = performance.now() - t1;
+      T.copy = performance.now() - T.start;
+      const t1 = performance.now();
+      const { patch, trees } = await samplePatch(raw);
+      T.patch = performance.now() - t1;
+      const t0 = raw.times[0];
+      const meta = { v: CLIP_VERSION, ...c.ctx, ...c.info, takeoff: Math.max(0, c.takeoff - t0), land: Math.max(0, c.land - t0), date: Date.now() };
+      T.worstFrame = Math.max(stats.patchSliceMaxMs || 0, T.copy);   // the most save work in any one frame (main thread)
       const res = await build({ raw, keys: c.keys, meta, patch, trees });
       T.build = res.ms;
       await syncIndex().catch(() => {});   // the loading screens' localStorage mirror (workers have no localStorage)
@@ -200,6 +206,8 @@ export function installHighlights({ player, rider, terrain, input, activities, r
     /** For tests. */
     debug: () => ({ pending: pending && { ...pending.info }, cand: cand && { trick: cand.info.trick, saved: cand.saved, frames: cand.count, len: cand.b - cand.a }, saving: !!saving }),
     save,
+    /** Tests (scripts/clips-perf.mjs): allow saving the same trick again (storage cap, memory). */
+    _resaveForTest() { if (cand) cand.saved = false; },
     /** Every frame while riding (also during an instant replay): the save key, and the ride-out timer. */
     input() {
       if (game.mode !== Mode.RIDING) return;

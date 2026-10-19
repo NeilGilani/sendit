@@ -325,7 +325,24 @@ export function buildTerrain(height, sunDir, material, farMaterial) {
     }
     // Near grid: two 3×3 box passes over the baked visibility (it comes from a 7 m height grid and would
     // otherwise show as blocky, grid-aligned shadow shapes on the snow).
-    if (gridW) for (let pass = 0; pass < 2; pass++) {
+    // A clip's grid: cells from 0.6 m to tens of metres, so a 3×3 box is nothing in the dense strips and the
+    // march's 7 m steps show there as hatching. Average over a world-size window instead (±6 m along x, then z).
+    if (gridW && height.mesh) {
+      const rows = n / gridW, R = 6;
+      const along = (count, stride, start, coord) => {
+        const src = new Float32Array(count * 2);
+        for (let k = 0; k < count; k++) { src[k * 2] = vis[(start + k * stride) * 2]; src[k * 2 + 1] = vis[(start + k * stride) * 2 + 1]; }
+        let lo = 0, hi = 0, s0 = 0, s1 = 0;
+        for (let k = 0; k < count; k++) {
+          while (hi < count && coord[hi] <= coord[k] + R) { s0 += src[hi * 2]; s1 += src[hi * 2 + 1]; hi++; }
+          while (coord[lo] < coord[k] - R) { s0 -= src[lo * 2]; s1 -= src[lo * 2 + 1]; lo++; }
+          const m = hi - lo, o = (start + k * stride) * 2;
+          vis[o] = s0 / m; vis[o + 1] = s1 / m;
+        }
+      };
+      for (let j = 0; j < rows; j++) along(gridW, 1, j * gridW, ax);
+      for (let i = 0; i < gridW; i++) along(rows, gridW, i, az);
+    } else if (gridW) for (let pass = 0; pass < 2; pass++) {
       const src = vis.slice(), H2 = n / gridW;
       for (let j = 1; j < H2 - 1; j++) for (let i = 1; i < gridW - 1; i++) {
         for (let c = 0; c < 2; c++) {
