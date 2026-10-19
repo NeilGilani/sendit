@@ -104,6 +104,7 @@ export const CAMERAS = {
   follow: { name: 'Chase', w: 1 },              // behind and above the rider off the lip, over the void
   close: { name: 'Close orbit', w: 3.5 },         // a drone swinging round the rider ~5 m away through the trick
   hero: { name: 'Hero three-quarter', w: 3 },    // 3/4 front, below the apex, backlit: the poster frame
+  filmer: { name: 'Tripod filmer', w: 0 },       // saved highlights only (loading/clip.js): a tripod beside the take-off, long lens
 };
 
 export function rng(seed) {
@@ -144,16 +145,20 @@ export function pickVariant(opts = {}) {
   const r = rng(seed);
   // Lobby → mountain load: the player's own rider on the picked mountain, in that mountain's light.
   const hint = opts.hint && typeof opts.hint === 'object' ? opts.hint : null;
+  // A saved highlight (loading/clip.js): its rider, gear and mountain light; the trick is the recording.
+  const clip = opts.clipMeta && typeof opts.clipMeta === 'object' ? opts.clipMeta : null;
   const own = !!hint?.transition;
-  const look = own ? MAP_LOOKS[hint.mapId] : null;
-  const tod = TIMES[opts.tod] ? opts.tod : look ? r.pick(look.tod) : r.weighted(TIMES);
+  const look = clip ? MAP_LOOKS[clip.mapId] || MAP_LOOKS[hint?.mapId] || null : own ? MAP_LOOKS[hint.mapId] : null;
+  // A highlight's thumbnail wants a clear light (a storm or night sky makes a grey or black stamp).
+  const lookTods = look ? (opts.thumb ? look.tod.filter((t) => t !== 'storm' && t !== 'aurora') : look.tod) : null;
+  const tod = TIMES[opts.tod] ? opts.tod : lookTods?.length ? r.pick(lookTods) : opts.thumb ? 'golden' : r.weighted(TIMES);
   const T = TIMES[tod];
   const mtn = MOUNTAINS[opts.mtn] ? opts.mtn : look ? r.pick(look.mtn) : r.pick(Object.keys(MOUNTAINS));
   const M = MOUNTAINS[mtn];
-  const gearIn = opts.gear || (own ? hint.gear : null);
+  const gearIn = clip ? clip.gear : opts.gear || (own ? hint.gear : null);
   const gear = gearIn === 'ski' || gearIn === 'skis' ? 'ski' : gearIn === 'snowboard' || gearIn === 'board' ? 'snowboard' : (r() < 0.5 ? 'ski' : 'snowboard');
   const pickedModel = r.pick(gear === 'ski' ? ['allmountain', 'powder', 'park', 'allmountain'] : ['allmountain', 'freeride', 'powder', 'park']);
-  const gearModel = own && hint.gearModel && !opts.gear ? hint.gearModel : pickedModel;
+  const gearModel = clip ? (typeof clip.gearModel === 'string' ? clip.gearModel : pickedModel) : own && hint.gearModel && !opts.gear ? hint.gearModel : pickedModel;
   // Outfit: usually one colourway head to toe, sometimes mixed like a real kit.
   const ways = Object.keys(COLORWAYS);
   const base = r.pick(ways);
@@ -166,14 +171,16 @@ export function pickVariant(opts = {}) {
     goggles: { garment: Object.keys(GARMENTS.goggles)[0], ...slot('goggles') },
     gloves: { garment: Object.keys(GARMENTS.gloves)[0], ...slot('gloves') },
   };
-  if (own && hint.outfit && Object.keys(hint.outfit).length) Object.assign(outfit, hint.outfit);
+  if (clip) { if (clip.outfit && typeof clip.outfit === 'object') Object.assign(outfit, clip.outfit); }   // unknown garments / colourways fall back in resolveOutfit
+  else if (own && hint.outfit && Object.keys(hint.outfit).length) Object.assign(outfit, hint.outfit);
   const sunAz = r.range(T.sunAz[0], T.sunAz[1]) * D;
   const place0 = r.pick(M.places);
-  const place = own && hint.mountain ? [hint.mountain, hint.trail].filter(Boolean).join(' · ') : place0;
+  const place = clip ? [clip.mountain, clip.trail].filter(Boolean).join(' · ') || 'Your highlight' : own && hint.mountain ? [hint.mountain, hint.trail].filter(Boolean).join(' · ') : place0;
+  const stance = r() < 0.3 ? 'goofy' : 'regular';
   return {
-    seed, r, tod, time: T, mtn, mountain: M, place, own, riderName: own ? (hint.rider && hint.rider !== 'Rider' ? String(hint.rider).slice(0, 24) : 'You') : null,
+    seed, r, tod, time: T, mtn, mountain: M, place, own: own || !!clip, clip: !!clip, riderName: own ? (hint.rider && hint.rider !== 'Rider' ? String(hint.rider).slice(0, 24) : 'You') : null,
     sunAz, sunElev: T.sunElev * D,
-    gear, gearModel, stance: r() < 0.3 ? 'goofy' : 'regular', outfit,
+    gear, gearModel, stance: clip ? (clip.stance === 'goofy' ? 'goofy' : 'regular') : stance, outfit,
     terrainSeed: Math.floor(r() * 1e6),
     trick: TRICKS[opts.trick] ? opts.trick : null, cam: CAMERAS[opts.cam] ? opts.cam : null,
   };

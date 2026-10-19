@@ -26,6 +26,8 @@ async function test(name, fn) {
 await (await import('./progression-unit.mjs')).run(test, assert);
 // Thrill (instant restart / retry, spots & gaps, adrenaline, replay, versus codes): scripts/thrill-unit.mjs.
 await (await import('./thrill-unit.mjs')).run(test, assert);
+// Saved highlight clips (codec, storage cap, loading-screen rotation): scripts/clips-unit.mjs.
+await (await import('./clips-unit.mjs')).run(test, assert);
 // Gear advisor (Locker stats, best-at badges, the ★ pick): scripts/gear-advisor-unit.mjs.
 await (await import('./gear-advisor-unit.mjs')).run(test, assert);
 

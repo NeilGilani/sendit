@@ -517,6 +517,8 @@ Sources: [Steep store page](https://steep.ubisoft.com), [TheSixthAxis on Steep](
 | `web/src/thrill/spots.js` | Spots and gaps, the background catalog scan, and the Progress tab section (`spotsHtml`). |
 | `web/src/thrill/adrenaline.js` | Heartbeat and edge vignette when exposed. |
 | `web/src/thrill/replay.js` | Recorder, drone replay, letterbox UI, clip saving. |
+| `web/src/thrill/highlights.js` | Save your last trick to the Highlights (F / LB): prompt, ring copy, terrain samples, toast. |
+| `web/src/thrill/clipcodec.js`, `clipbuild.js`, `clipworker.js`, `clipstore.js` | The clip format, building it in a worker, IndexedDB + the loading screens' rotation. |
 | `web/src/thrill/versus.js` | Challenge links: the friend's ghost, the live gap, the verdict, the share button. |
 | `web/src/thrill/index.js` | `installThrill()`, and two settings rows. |
 
@@ -624,7 +626,7 @@ near drops)** (`settings.thrillAdrenaline`). Event: `thrillExposure {level}` at 
 
 ### 8d. Instant replay (thrill/replay.js)
 
-**Recording.** The last 8 s of riding are kept, at up to 60 Hz, in a ring of 496 frames: each node under
+**Recording.** The last 10 s of riding are kept, at up to 60 Hz, in a ring of 620 frames: each node under
 the rider rig, plus the rider's position and whether they were in the air. Each node stores its local
 position, rotation, scale and visibility, which covers bones, gear, garments and poles. That is about
 3 MB, and copying it costs nothing measurable. The node list is rebuilt when the rig changes (gear swap).
@@ -654,8 +656,9 @@ position, rotation, scale and visibility, which covers bones, gear, garments and
 - **Frozen world.** The ride is frozen while it plays: no physics, no timers. Afterwards the rig is put
   back exactly as it was and the chase camera snaps behind.
 - **Skipping.** Space, Esc, Tab, or pad A / B / Start / ▲ skips (not on the frame that started it).
-- **Enter saves a clip.** It restarts the replay and records the canvas with `MediaRecorder` (VP9 or VP8
+- **Enter downloads a video.** It restarts the replay and records the canvas with `MediaRecorder` (VP9 or VP8
   webm, 30 fps, 6 Mbit/s), then downloads `sendit-replay-<time>.webm` when the replay ends.
+- **F saves it to the Highlights** (§ 8g) without leaving the replay.
 
 Not in Challenge runs, where the clock never stops. Setting: **Replay prompt after big tricks**
 (`settings.thrillReplayPrompt`); Tab works either way. Event: `thrillReplay {on, length, clip}`.
@@ -691,8 +694,102 @@ medal up:
 Judged runs (Voltage slopestyle) skip it. Logic: `nextMedalGap(time, targets)`. Tunables: `THRILL.medal`.
 Event: `thrillNextMedal {medal, gap, close}`.
 
+### 8g. Highlights: save your best tricks (thrill/highlights.js)
+
+**What the player sees.**
+
+- **The prompt.** After any clean landing with 0.5 s of air or more (or any named trick), a small
+  **◆ SAVE CLIP [F]** plate shows above the speed read-out for 4.5 s, next to ▶ REPLAY when that shows too.
+  On a controller it reads **LB**.
+- **The key.** **F** on the keyboard (left index finger, next to WASD; Q / E are the lobby tabs, C / V the
+  camera, R restart, E gear swap, so F was free). **LB** on a controller (left index finger, so it works
+  while the thumb steers). The key keeps working for the last trick until the next one lands, so there is
+  no rush. It also works during an instant replay of that trick.
+- **Pressed during the ride-out** (the clip keeps 2 s after the touchdown), the plate says "Saving…" and
+  the save happens the moment the ride-out is recorded.
+- **Confirmation.** The plate turns green, "Saved to highlights", and a toast in the top-right corner
+  names the trick: **HIGHLIGHT SAVED · PERFECT RIGHT 360 · 415 PTS · RAVENSPIRE**, with "Career › Highlights
+  · plays on your loading screens" (or "Oldest highlight replaced" when the 30 slots are full). Pressing
+  again says "Already in your Highlights". If the browser blocks storage (private mode) or every slot is a
+  favourite, the toast says so.
+- **Where they go.** The lobby's **Highlights** tab (§ below) and the loading screens
+  ([loading-screen.md](loading-screen.md) "Round 4").
+
+**Why it hooks (research).** The pattern across the games the user named:
+
+| Game | Save the moment | What we took |
+|---|---|---|
+| Rocket League | A prompt during the goal replay invites a capture; saved replays are *data* (`.replay`), re-rendered by the game, not video. | A prompt right after the moment; clips are data, re-rendered by the engine (small, any camera, any resolution). |
+| NVIDIA Highlights / ShadowPlay (Apex, Fortnite, Battlefield) | A banner top-right confirms "highlight saved"; after the match a gallery to view, trim and share, which only appears if something was saved. | The top-right confirmation naming the trick; the gallery in the lobby; the empty state teaches the key. |
+| STEEP / Riders Republic | Replay editor with drone and follow cams, and sharing. | The highlight player uses the loading scene's drone, orbit and tripod moves. |
+| Fortnite / Forza Horizon | Replays and photo mode make a moment into a picture worth keeping. | Each clip gets a rendered thumbnail of the top of the air. |
+| Apex / Valorant highlights | Your own best plays come back to you later. | Your saved tricks replay on your loading screens: the game remembers you. |
+
+Why it works: savouring (re-watching your own success is rewarding on its own), ownership and
+identity (a personal reel you curate, with favourites), the endowment effect (a saved clip is yours,
+so you come back to look), and social proof for later sharing (download as video). It is skill-neutral:
+nothing about riding changes.
+
+**Cost (measured, see "Tests").** Nothing per frame: the instant-replay recorder already records every rig
+node at up to 60 Hz (its ring grew from 8 s to 10 s so a long air fits with its in-run and ride-out).
+Per landed trick, one copy of its stretch of the ring into a spare buffer (a memcpy). A save samples the
+real snow around the line on the main thread in the browser's idle time after frames (`requestIdleCallback`,
+never past the idle deadline), then hands everything to a worker (`thrill/clipworker.js`) that resamples,
+quantises, gzips and writes IndexedDB.
+
+Measured (`scripts/clips-perf.mjs`, MacBook Air M1, headless Chrome on Metal, 1280×720, Ravenspire, with
+other sessions' browsers running):
+
+| | |
+|---|---|
+| recorder per frame (already there for the replay) | 0.02–0.04 ms mean, 0.1 ms p95 |
+| ring copy per landed trick | 0.2–1 ms, once |
+| frame times, 2 s windows from the save key vs just riding (3 + 3 alternating) | identical: median 16.7 ms, same p95 and max (the long frames come from the world, in both groups) |
+| an earlier version sampling 1500 heights per frame | p95 33 ms vs 17 ms riding: ~1 ms pushed frames already at budget over a vsync; hence idle time |
+| save, key to stored | ~0.3–0.7 s (terrain sampling in idle time ~0.25–0.7 s; worker: resample 6–13 ms, pack 7–15 ms, store 2–6 ms) |
+| clip size | 36–43 KB (93 nodes, 155–203 frames, a 23 000-sample snow patch); thumbnail 30–40 KB |
+| 37 saves in a row | 30 kept (oldest dropped), the index in step, JS heap +4 to +13 MB (noise), no errors |
+
+**The clip** (`thrill/clipcodec.js`, version 1): not video, the recording itself.
+
+- 2.4 s before the take-off to 2.0 s after the touchdown, resampled to 30 Hz (rotations slerped).
+- Per frame and rig node: local position, rotation, scale (93 nodes: bones, gear, garments, poles). Each
+  node has a path key ("Rider/Group/Scene/Armature/root/pelvis"), so a rig built elsewhere matches node by
+  node.
+- One bit per frame for "in the air".
+- A height grid of the real snow around the line (0.75 m cells, 26 m margin, at most 40 000 samples), and
+  the trees and rocks near it.
+- Meta: trick, points, air, drop, grade, map / mountain / trail, gear + model + stance, outfit slots, first
+  person or not, rider name, date.
+- Encoding: each channel is constant (stored once) or 16-bit over its own range (root over ~80 m → 1.3
+  mm, quaternions → 3e-5), delta-coded, split into byte planes, then gzip. **35–40 KB per clip.**
+- Storage (`thrill/clipstore.js`): IndexedDB `sendit-highlights` (stores `meta` and `data`), 30 clips; a
+  new one drops the oldest that isn't a favourite (favourites are never dropped). A small mirror in
+  `localStorage['sendit.highlights']` lets the next page load pick a clip before any game code runs.
+
+Event: `highlightSaved {id, trick, points, mapId, bytes}`. Tunables: `CLIPS` in `thrill/highlights.js`,
+`HIGHLIGHTS.cap` in `thrill/clipstore.js`.
+
+**In the lobby** (`lobby/tabs/highlights.js`, its CSS in the same file, on the lobby's v2 tokens and lip
+recipe). **Highlights** is a sub-tab of Career (Progress · Highlights · Rankings · Profile; as a sixth
+destination it pushed Career off the top bar at 1280 px), with a count badge (`setLobbyBadge`, shown on
+Career too) for clips saved since you last opened it. **Home** gets a fourth tile under Level / Daily / Cases once you have a clip: the latest
+highlight's thumbnail, trick and points; clicking it opens the player on that clip (home.js emits
+`homeTiles` after each render and the Highlights code appends its tile). The screen itself is a list of cards: the thumbnail (rendered once by the loading scene's worker at the top of the air,
+then kept in IndexedDB; the mountain's picture until then), the trick, points, mountain and trail, date
+and gear, a NEW tag for clips saved since the last visit, and buttons: **play**, **favourite** (kept
+forever, shown more often on loading screens), **download video** and **delete** (asks once). Filters:
+All / Favourites. The empty state shows the save plate and the keys.
+
+**The player** (`loading/clipview.js`): full screen, the loading scene's worker replaying the clip on its
+own snow with the hero cameras, letterboxed, the trick, points, mountain and date over it. **→ / N /
+Space** next camera, **X** favourite, **V** download video (records the next whole shot from the canvas,
+VP9 webm, 8 Mbit/s), **Esc** close. Gamepad: B close, X favourite, Y next camera, A presses the focused button.
+
 ### Tests
 
+- Highlights (§ 8g): `node web/scripts/clips-unit.mjs` (in `unittest.mjs`), `clips-e2e.mjs`, `clips-perf.mjs`,
+  `clips-cams.mjs`, `clips-thumbs.mjs` (see docs/loading-screen.md "Round 4 → Tests").
 - `node web/scripts/thrill-unit.mjs`, which `unittest.mjs` also runs. It checks:
   - The spot book: discovery, repeats, the catalog, garbage storage.
   - The landing judge.

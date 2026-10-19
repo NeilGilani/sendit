@@ -278,6 +278,11 @@ bottom right, on every screen:  trail sign  /  Zen · Challenge  +  RIDE
 - Grouping is data, not markup: `NAV` in `lobby/config.js` places the built-in tabs, and a tab can
   set `group`, `short` and `nav: 'utility'` itself (see "Add a lobby tab"). A tab with no group is a
   destination of its own, so a new feature (e.g. Highlights) appears without touching the lobby.
+- **Highlights** (`lobby/tabs/highlights.js`, docs/game-feel.md § 8g) registers itself in Career
+  (Progress · Highlights · Rankings · Profile; as a sixth destination it pushed Career off the top bar at
+  1280 px) with a badge for new clips. Home tiles from other
+  features: `tabs/home.js` emits `homeTiles { el, ctx, i }` after each render; a listener appends its own
+  `.hm-tile` (Highlights adds "Latest highlight").
 - Badges: `setLobbyBadge(tabId, n)` (lobby/tabs.js). The lobby draws the count on the sub-tab, the
   destination (sum of its tabs) and the rider plate (Skins). `cases/notify.js` feeds Cases and Skins.
 
