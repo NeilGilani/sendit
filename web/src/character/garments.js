@@ -220,7 +220,7 @@ export function buildOutfitGeometry(body, cut) {
     const bones = B(new RegExp(`^(thigh_${sd}|calf_${sd}|foot_${sd}|ball_${sd}|pelvis)$`));
     const t0 = 1.02, t1 = cut.cuffY;
     const hemLow = Math.min(cut.hemFront, cut.hemBack);
-    const covered = (t) => smooth(hemLow + 0.06, hemLow + 0.16, t);
+    const covered = (t) => smooth(hemLow - 0.01, hemLow + 0.08, t);
     const knee = J['calf_' + sd].y;
     const rings = bodyRings(body, {
       axis: 'y', t0, t1, rings: 70, segs, half: 0.025, bones,

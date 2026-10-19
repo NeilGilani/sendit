@@ -100,7 +100,7 @@ export const PANT_FITS = {
   // Relaxed tapered pant: roomy thigh, narrowing to the boot.
   tapered: { pantsEase: { thigh: 0.03, knee: 0.03, cuff: 0.036 }, straight: false, cuffY: 0.16, stack: { y0: 0.18, y1: 0.3, n: 2, amp: 0.01 } },
   // Wide new-school pant: wide straight leg, long inseam piling up over the boot.
-  baggy: { pantsEase: { thigh: 0.05, knee: 0.058, cuff: 0.066 }, straight: true, cuffY: 0.12, stack: { y0: 0.14, y1: 0.36, n: 4, amp: 0.018 } },
+  baggy: { pantsEase: { thigh: 0.044, knee: 0.05, cuff: 0.062 }, straight: true, cuffY: 0.12, stack: { y0: 0.14, y1: 0.36, n: 4, amp: 0.018 } },
 };
 
 /** Garment shapes, per slot. Lengths are metres in the rider's bind pose (1.8 m tall, feet at 0). */
