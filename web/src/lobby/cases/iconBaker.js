@@ -327,9 +327,9 @@ export class IconBaker {
     this.rig.visible = true;
     this.root.updateMatrixWorld(true);
     if (head) {
-      // The bust fades out from the chin down to the collar line.
-      const hy = this.bones.Head.getWorldPosition(new THREE.Vector3()).y;
-      this.fade.uFadeY.value.set(hy - 0.13, hy - 0.01);
+      // The bust fades out from the chin down: gone a hand below the helmet's rim.
+      const rim = new THREE.Box3().setFromObject(M.helmet, true).min.y;
+      this.fade.uFadeY.value.set(rim - 0.16, rim - 0.04);
     }
     // Points to frame.
     const pts = [];

@@ -115,7 +115,8 @@ export function reelMetrics() {
 }
 
 // A picture that was the flat SVG because its icon was not baked yet is redone when the icon lands.
-onIcon((iconId) => { const p = pics.get(iconId); if (p?.flat) preparePic(p.rarity, p.key, p.side); });
+const wanted = new Map();       // icon id → { rarity, key, side } (to redo a flat picture when its icon lands)
+onIcon((iconId) => { const w = wanted.get(iconId); if (w && (!pics.get(iconId) || pics.get(iconId).flat)) preparePic(w.rarity, w.key, w.side); });
 
 /** The silhouette of an icon: its solid part filled with a light tint of the grade colour. */
 function silhouette(img, color, side) {
@@ -140,6 +141,7 @@ function silhouette(img, color, side) {
 /** Make sure the picture of a card is ready (decoded icon + silhouette, or the flat SVG art). */
 function preparePic(rarity, key, side) {
   const id = iconIdOf(rarity, key);
+  wanted.set(id, { rarity, key, side });
   const have = pics.get(id);
   const baked = !!iconUrl(id, 3);
   if (have && have.side >= side * 0.9 && (!have.flat || !baked)) return Promise.resolve();
@@ -153,7 +155,7 @@ function preparePic(rarity, key, side) {
   if (have?.flat) return Promise.resolve();
   // No icon yet: the flat SVG art, rasterised once (the silhouette is the art in grade tint).
   const s = key ? skin(key) : null;
-  const svg = (!s || rarity === 'gold' ? goldArt() : itemArt(s.item, s.variant)).replace('<svg ', `<svg width="${Math.round(side)}" height="${Math.round(side)}" `);
+  const svg = (!s || rarity === 'gold' ? goldArt() : itemArt(s.item, s.variant)).replace('<svg ', `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(side)}" height="${Math.round(side)}" `);
   const img = new Image();
   img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   return img.decode().then(() => {
@@ -204,7 +206,7 @@ function enqueue(ids, m, front = false) {
 
 /** Cards still waiting to be painted (captures wait for 0). */
 export const reelPending = () => queue.length + (pumping ? 1 : 0);
-if (typeof window !== 'undefined') window.__senditReelPending = reelPending;
+if (typeof window !== 'undefined') { window.__senditReelPending = reelPending; window.__senditReel = { cache, pics }; }
 
 /** Pre-paint every card of these case series (and the gold card) in idle time, after their icons are baked. */
 export function prerasterReel(seriesList) {
@@ -293,7 +295,8 @@ export class CanvasReel {
     const cps = Math.abs(v) / this.pitch;
     const still = reduced();
     this.sil = landK > 0 ? 0 : smooth(7, 20, cps);
-    this.blur = landK > 0 || still ? 0 : Math.min(this.cw * 0.5, Math.abs(v) / 60 * 0.55);
+    // Blur only while the cards are a blur anyway (above ~14 cards/s), at most a fifth of a card.
+    this.blur = landK > 0 || still ? 0 : this.cw * 0.2 * smooth(14, 45, cps);
     for (let i = first; i <= last; i++) {
       if (i === win && landK > 0) continue;
       this.card(i, i * this.pitch - x, 1, dim * 0.58);
@@ -323,10 +326,6 @@ export class CanvasReel {
     const blur = this.blur;
     if (bm) {
       g.drawImage(bm, left, top, w, h);
-      if (blur > 2) {
-        // Motion blur: two faint copies trailing along the travel direction.
-        g.globalAlpha = 0.3; g.drawImage(bm, left + blur * 0.5, top, w, h); g.drawImage(bm, left + blur, top, w, h); g.globalAlpha = 1;
-      }
     } else {
       // Not painted yet (very first frames on a slow machine): a plain card in its grade colour.
       g.fillStyle = '#172430'; g.fillRect(left, top, w, h);
@@ -338,9 +337,10 @@ export class CanvasReel {
       const sil = this.sil;
       if (sil < 1) { g.globalAlpha = 1 - sil; g.drawImage(pic.img, px, py, ps, ps); }
       if (sil > 0) {
-        const n = blur > 2 ? 4 : 1;
-        g.globalAlpha = sil * (n > 1 ? 0.42 : 1);
-        for (let j = 0; j < n; j++) g.drawImage(pic.sil, px + (blur * j) / Math.max(1, n - 1) - blur * 0.15, py, ps, ps);
+        // Motion blur: the silhouette smeared along the travel (6 faint copies over the blur length).
+        const n = blur > 2 ? 6 : 1;
+        g.globalAlpha = sil * (n > 1 ? 0.3 : 1);
+        for (let j = 0; j < n; j++) g.drawImage(pic.sil, px + (blur * j) / Math.max(1, n - 1) - blur * 0.5, py, ps, ps);
       }
       g.globalAlpha = 1;
     }

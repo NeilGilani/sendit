@@ -34,6 +34,8 @@ try {
         const pick = (r, i) => ({ key: r === 'gold' ? null : pool[r][i % pool[r].length].key, rarity: r });
         const order = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'gold', 'legendary', 'epic', 'rare', 'uncommon', 'common', 'uncommon', 'rare'];
         const cards = order.map((r, i) => pick(r, i));
+        const I = await import('/src/lobby/cases/itemIcons.js');
+        await I.whenIcons(cards.map((c) => c.key ?? I.GOLD_ICON), 120000);   // the Cases tab bakes these before an opening
         document.getElementById('tilesheet')?.remove();
         const el = document.createElement('div');
         el.id = 'tilesheet';
@@ -46,6 +48,7 @@ try {
           row.innerHTML = `<div style="margin:6px 0 2px">${label}</div>`;
           const reel = new CanvasReel(cards);
           row.appendChild(reel.cv);
+          reel.cv.style.position = 'static';
           el.appendChild(row);
           reel.layout(1400, 13 * em, em);
           row._reel = reel; row._cps = cps;
