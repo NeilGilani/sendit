@@ -189,7 +189,7 @@ export function installHighlights({ player, rider, terrain, input, activities, r
       stats.saves++;
       stats.lastSave = { id: res.id, bytes: res.bytes, frames: res.frames, nodes: c.nodes, patch: `${patch.nx}x${patch.nz}`, trees: trees.length, ms: Object.fromEntries(Object.entries(T).filter(([k]) => k !== 'start').map(([k, v]) => [k, typeof v === 'number' ? +v.toFixed(1) : v])) };
       ui?.prompt(true, c.info.trick, 'saved');
-      ui?.toast('Highlight saved', `${c.info.trick}${c.info.points ? ` · ${c.info.points.toLocaleString()} pts` : ''} · ${c.ctx.mountain}`, '', res.dropped.length ? 'Oldest highlight replaced · Lobby › Highlights' : 'Lobby › Highlights · plays on your loading screens');
+      ui?.toast('Highlight saved', `${c.info.trick}${c.info.points ? ` · ${c.info.points.toLocaleString()} pts` : ''} · ${c.ctx.mountain}`, '', res.dropped.length ? 'Oldest highlight replaced · Career › Highlights' : 'Career › Highlights · plays on your loading screens');
       emit('highlightSaved', { id: res.id, trick: c.info.trick, points: c.info.points, mapId: c.ctx.mapId, bytes: res.bytes });
     } catch (e) {
       c.saved = false;

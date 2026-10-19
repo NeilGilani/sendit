@@ -708,7 +708,7 @@ Event: `thrillNextMedal {medal, gap, close}`.
 - **Pressed during the ride-out** (the clip keeps 2 s after the touchdown), the plate says "Saving…" and
   the save happens the moment the ride-out is recorded.
 - **Confirmation.** The plate turns green, "Saved to highlights", and a toast in the top-right corner
-  names the trick: **HIGHLIGHT SAVED · PERFECT RIGHT 360 · 415 PTS · RAVENSPIRE**, with "Lobby › Highlights
+  names the trick: **HIGHLIGHT SAVED · PERFECT RIGHT 360 · 415 PTS · RAVENSPIRE**, with "Career › Highlights
   · plays on your loading screens" (or "Oldest highlight replaced" when the 30 slots are full). Pressing
   again says "Already in your Highlights". If the browser blocks storage (private mode) or every slot is a
   favourite, the toast says so.
