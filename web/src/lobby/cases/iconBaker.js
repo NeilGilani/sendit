@@ -52,7 +52,7 @@ const VIEW = {
   gloves: { az: 55, el: 8, fill: 0.86 },
   face: { az: 28, el: 4, fill: 0.82 },
   helmet: { az: 34, el: 16, fill: 0.84 },
-  goggles: { az: 20, el: 4, fill: 0.86 },
+  goggles: { az: 20, el: 4, fill: 0.76 },
   gear: { az: 0, el: 10, fill: 0.94, fov: 30 },
   parts: { az: 0, el: 14, fill: 0.86 },
   star: { az: 0, el: 0, fill: 0.7 },

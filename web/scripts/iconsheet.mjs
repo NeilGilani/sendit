@@ -45,7 +45,7 @@ try {
       <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:13px">${r.cards.map((c) => `<div style="width:9.2em;height:11.5em;display:flex">${cardHtml(c.key, c.rarity)}</div>`).join('')}</div></div>`).join('')}</section>`).join('');
     document.body.appendChild(el);
     el.querySelectorAll('.cr-card').forEach((c) => { c.style.width = '100%'; });
-    return groups.map((g) => ({ title: g.title, series: g.series || g.title.split(' ')[0].toLowerCase().replace(/\W/g, ''), n: g.rows.reduce((a, r) => a + r.cards.length, 0) }));
+    return groups.map((g) => ({ title: g.title, series: g.series || (g.title.startsWith('★') ? 'gold' : 'starter'), n: g.rows.reduce((a, r) => a + r.cards.length, 0) }));
   }, { flat, only: process.env.ONLY || '' });
   if (!flat) {
     await page.waitForFunction(() => window.__senditIcons.pending() === 0, null, { timeout: 600000, polling: 500 });
@@ -79,6 +79,7 @@ try {
     await page.waitForTimeout(500);
     await page.locator('#rawsheet').screenshot({ path: `${out}/raw-sheet.png` });
     console.log('wrote', `${out}/raw-sheet.png`);
+    await page.evaluate(() => document.getElementById('rawsheet').remove());
   }
   for (let i = 0; i < groups.length; i++) {
     if (!groups[i].n) continue;
