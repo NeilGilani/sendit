@@ -14,6 +14,7 @@
 //                  ?loadseed=<n> (pick the variant) · ?loadtrick=<id> · ?loadcam=<id> · ?loadtod=<id>
 import { TIPS } from './tips.js';
 import { readLoadHint, consumeTransition } from './hint.js';
+import { readIndex, pickLoadingClip, noteShown, forgetInIndex } from '../thrill/clipstore.js';
 
 const $ = (id) => (typeof document !== 'undefined' ? document.getElementById(id) : null);
 const params = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
@@ -91,11 +92,19 @@ class LoadingScreen {
       this.workerAt = performance.now();
       this.worker.onerror = (e) => { e.preventDefault?.(); this.fail(e.message || 'worker error'); };
       const opts = {};
-      // The painted still (index.html picks one) and the live scene share a variant: same seed (place,
-      // light, rider), so the cross-fade lands on the same mountain. A lobby -> mountain load keeps the
-      // still's light but rides the player's own kit on the picked mountain (loading/hint.js).
+      // The player's saved highlights take over the live scene (docs/loading-screen.md "Your highlights"):
+      // thrill/clipstore.js pickLoadingClip decides from a localStorage mirror (synchronous, no game code),
+      // the worker reads the clip itself from IndexedDB. ?loadclip=<id> forces one, ?loadclip=0 none.
       const still = typeof window !== 'undefined' ? window.__ldStill : null;
-      if (this.hint?.transition) {
+      const forced = params.get('loadclip');
+      let clipId = null;
+      try { clipId = forced === '0' ? null : forced || pickLoadingClip(readIndex(), { mapId: this.hint?.transition ? this.hint.mapId : null }); } catch { clipId = null; }
+      if (!forced && !params.has('loadseed')) noteShown(clipId);
+      this.clipId = clipId;
+      if (clipId) {
+        opts.clipId = clipId;
+        if (this.hint?.transition) opts.hint = this.hint;
+      } else if (this.hint?.transition) {
         opts.hint = this.hint;
         if (still) { opts.tod = still.tod; opts.mtn = still.mtn; }
       } else if (still) Object.assign(opts, { seed: still.seed, tod: still.tod, mtn: still.mtn, gear: still.gear });
@@ -158,6 +167,11 @@ class LoadingScreen {
       this.sceneStats = m.stats;
       // Stall start times relative to this page's T0 (same clock as `stages`).
       if (m.stats.stalls) m.stats.stalls = m.stats.stalls.map(([t, ms]) => [Math.round(t - performance.timeOrigin - T0), ms]);
+    } else if (m.type === 'clipFailed') {
+      // Missing or unreadable clip: out of the rotation (IndexedDB being unavailable is not the clip's fault).
+      console.warn('[loading] saved highlight skipped:', m.message);
+      this.clipFailed = m.message;
+      if (m.id && !/IndexedDB|blocked/i.test(m.message || '')) forgetInIndex(m.id);
     } else if (m.type === 'error') {
       this.fail(m.message);
     } else if (m.type === 'shaderError') {
@@ -179,7 +193,10 @@ class LoadingScreen {
     clearTimeout(this._capT);
     this._capT = setTimeout(() => {
       const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-      this.caption.innerHTML = `<b>${esc(info.trick)}</b><span>${info.rider ? `${esc(info.rider)} · ` : ''}${esc(info.place)} · ${esc(info.time)}</span>`;
+      this.caption.innerHTML = info.highlight
+        ? `<b>${esc(info.trick)}</b><span><i class="ld-hl"></i>Your highlight · ${esc(info.place)}${info.points ? ` · ${Number(info.points).toLocaleString()} pts` : ''}</span>`
+        : `<b>${esc(info.trick)}</b><span>${info.rider ? `${esc(info.rider)} · ` : ''}${esc(info.place)} · ${esc(info.time)}</span>`;
+      this.caption.classList.toggle('hl', !!info.highlight);
       this.caption.classList.add('on');
     }, 600);
   }
@@ -281,7 +298,7 @@ class LoadingScreen {
   mark(name) { (this.marks || (this.marks = [])).push([Math.round(performance.now() - T0), name]); }
 
   stats() {
-    return { firstFrameMs: Math.round(this.firstFrameAt), liveMs: Math.round(this.liveAt || 0), firstShotMs: Math.round(this.firstShotAt || 0), msgLagMs: Math.round(this.frameMsgLag || 0), modulesMs: Math.round(this.modulesAt || 0), stillMs: Math.round(window.__ldStillAt || 0), readyMs: Math.round(this.readyAt || 0), stages: this.stages, marks: this.marks || [], scene: this.sceneStats, shot: this.sceneInfo };
+    return { clipId: this.clipId || null, clipFailed: this.clipFailed || null, firstFrameMs: Math.round(this.firstFrameAt), liveMs: Math.round(this.liveAt || 0), firstShotMs: Math.round(this.firstShotAt || 0), msgLagMs: Math.round(this.frameMsgLag || 0), modulesMs: Math.round(this.modulesAt || 0), stillMs: Math.round(window.__ldStillAt || 0), readyMs: Math.round(this.readyAt || 0), stages: this.stages, marks: this.marks || [], scene: this.sceneStats, shot: this.sceneInfo };
   }
 }
 

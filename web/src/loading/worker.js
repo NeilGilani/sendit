@@ -35,6 +35,26 @@ function loop(now) {
     try { scene.recover(); } catch { /* next frame will tell */ }
   }
   if (!sentFrame) { sentFrame = true; post('frame'); }
+  // Thumbnail mode (lobby Highlights): the frozen apex frame, encoded right after it was drawn.
+  if (thumbCanvas && scene.frozen >= 8 && !thumbSent) {
+    thumbSent = true;
+    thumbCanvas.convertToBlob({ type: 'image/webp', quality: 0.82 }).then((blob) => post('thumb', { blob, info: scene.lastInfo })).catch((e) => post('error', { message: `thumb: ${e.message}` }));
+  }
+}
+
+let thumbCanvas = null, thumbSent = false;
+
+/** A saved highlight for this load (clip id from the page): read from IndexedDB and decoded here. */
+async function loadClip(id) {
+  try {
+    const [{ getClipBytes }, { unpackClip }] = await Promise.all([import('../thrill/clipstore.js'), import('../thrill/clipcodec.js')]);
+    const bytes = await getClipBytes(id);
+    if (!bytes) throw new Error('not found');
+    return await unpackClip(bytes);
+  } catch (e) {
+    post('clipFailed', { id, message: e.message || String(e) });
+    return null;
+  }
 }
 
 // Warm the HTTP cache for the rider (glTF + its buffers / textures) and the rock texture while the
@@ -53,7 +73,10 @@ self.onmessage = async (e) => {
     prefetch();
     try {
       const ti = performance.now();
+      const clipP = m.opts?.clipId ? loadClip(m.opts.clipId) : null;
+      if (m.opts?.thumb) thumbCanvas = m.canvas;
       const { LoadingScene } = await import('./scene.js');
+      if (clipP) { const clip = await clipP; if (clip) m.opts.clip = clip; }
       post('modules');   // the page starts the game's own download now (loading/index.js whenStarted)
       scene = new LoadingScene(m.canvas, { ...m, opts: { ...m.opts, modulesMs: Math.round(performance.now() - ti) } }, post);
       await scene.init();
@@ -68,6 +91,9 @@ self.onmessage = async (e) => {
     if (scene) scene.stageP = m.p;
   } else if (m.type === 'visible') {
     visible = m.visible;
+  } else if (m.type === 'next') {
+    // Highlight player: cut to the next camera move now (a short dip).
+    if (scene?.mode === 'shot' && !scene.cutting) scene.cutting = 0.35;
   } else if (m.type === 'outro') {
     // Keep rendering through the dissolve, then stop (the main thread terminates us anyway).
     setTimeout(() => { running = false; }, (m.duration || 1) * 1000 + 200);

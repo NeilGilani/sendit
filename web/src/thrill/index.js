@@ -6,6 +6,7 @@
 //   spots.js       named spots and transfer gaps discovered per mountain
 //   adrenaline.js  heartbeat + closing edges when exposed (cliff ahead, big air, top speed)
 //   replay.js      instant replay of the last big trick from a drone, save as a clip
+//   highlights.js  F / LB after a landed trick saves it to the lobby's Highlights (and the loading screens)
 //   versus.js      "beat my run" challenge links with the friend's ghost
 //   medals.js      "SO CLOSE · 0.42 s off SILVER" on the Challenge results card
 import { settings, setSetting, game, Mode, on, emit } from '../state.js';
@@ -13,6 +14,8 @@ import { installRetry } from './retry.js';
 import { installSpots } from './spots.js';
 import { installAdrenaline } from './adrenaline.js';
 import { installReplay } from './replay.js';
+import { installHighlights } from './highlights.js';
+import '../lobby/tabs/highlights.js';   // the lobby's Highlights tab (registers itself)
 import { installVersus } from './versus.js';
 import { installMedalLine } from './medals.js';
 
@@ -23,6 +26,7 @@ export function installThrill(o) {
   const spots = installSpots({ player, course, features, terrain, getMapId: () => getMap().mapId, hud, scene });
   const adrenaline = installAdrenaline({ player, terrain, sound });
   const replay = installReplay({ player, rider, camera, terrain, input, activities, cam, canvas });
+  const highlights = installHighlights({ player, rider, terrain, input, activities, replay, getMap, getName });
   const versus = installVersus({ scene, course, player, activities, hud, getMap, getName, params });
   installMedalLine();
   mountThrillSettings();
@@ -35,7 +39,7 @@ export function installThrill(o) {
     if (n >= 2) return;
     hintT = setTimeout(() => {
       if (game.mode !== Mode.RIDING) return;
-      emit('hint', input.usingPad ? 'Y restarts instantly · d-pad ▼ retries your last jump · d-pad ▲ replays it' : 'R restarts instantly · Backspace retries your last jump · Tab replays it');
+      emit('hint', input.usingPad ? 'Y restarts instantly · d-pad ▼ retries your last jump · d-pad ▲ replays it · LB saves it to your highlights' : 'R restarts instantly · Backspace retries your last jump · Tab replays it · F saves it to your highlights');
       try { localStorage.setItem('sendit.thrill.hints', String(n + 1)); } catch { /* private mode */ }
     }, 24000);
   });
@@ -43,8 +47,8 @@ export function installThrill(o) {
   // Tab is the replay key while riding: keep the browser from moving focus.
   if (typeof addEventListener === 'function') addEventListener('keydown', (e) => { if (e.code === 'Tab' && game.mode === Mode.RIDING) e.preventDefault(); });
   const thrill = {
-    retry, spots, adrenaline, replay, versus,
-    input: () => replay.input(),
+    retry, spots, adrenaline, replay, versus, highlights,
+    input: () => { highlights.input(); return replay.input(); },
     update(dt) {
       retry.update(dt);
       spots.update(dt);

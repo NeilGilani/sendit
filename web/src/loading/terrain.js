@@ -13,6 +13,7 @@ import { SNOW_COMMON_PARS, SNOW_BAND_GLSL } from '../gfx/snow.js';
 import { SNOW, ROCK } from '../scene.js';
 import { ATMO_PARS_GLSL } from './sky.js';
 import { rng } from './variants.js';
+import { makeAxis } from './clip.js';
 
 const D = Math.PI / 180;
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -126,11 +127,16 @@ export function makeHeight(v) {
   };
   // Value of the regional function at the lip, so the local line sits at y ≈ 0.
   const R0 = regional(0, 0);
+  const clipG = v.clipPrep || null;
+  const clipDetail = (x, z) => fbm(x / 16 + 4.4, z / 16 + 2.2, 3) * 0.9 + fbm(x / 55, z / 55 + 8.1, 3) * 3.0 + fbm(x / 26 + 1.3, z / 26 + 7.7, 4) * 2.2;
   const H = (x, z) => {
     const rr = Math.hypot(x, z * 0.8);
     const w = 1 - smooth(160, 520, rr);
     let reg = regional(x, z) - R0;
     if (w <= 0) return reg;
+    // A saved highlight (loading/clip.js): the real mountain's snow around the ridden line, a fitted plane
+    // with the scene's own rolls beyond it.
+    if (clipG) return reg * (1 - w) + (clipG.local(x, z, clipDetail) + reg * 0.25 * (1 - w)) * w;
     // Local: the spine in-run, the rock band and the landing apron.
     const ax = Math.abs(x);
     // The rock band is ~70 m wide: past it the flank just keeps falling (no step cut into the sides).
@@ -155,7 +161,9 @@ export function makeHeight(v) {
     y += det;
     return reg * (1 - w) + (y + reg * 0.25 * (1 - w)) * w;
   };
-  return { H, line, profile, horn: hz };
+  // Clip: the near grid's dense core follows the ridden line (≤ 0.6 m cells), not the made-up cliff.
+  const mesh = clipG ? { ax: makeAxis(170, -L, L, clipG.core.x0, clipG.core.x1, 0.6), az: makeAxis(300, -L + CZ, L + CZ, clipG.core.z0, clipG.core.z1, 0.6) } : null;
+  return { H, line, profile, horn: hz, mesh, clear: clipG?.clear, inPatch: clipG?.inPatch };
 }
 
 // --------------------------------------------------------------------- meshing
@@ -196,38 +204,41 @@ export function buildTerrain(height, sunDir, material, farMaterial) {
   const { H } = height;
   const coarse = heightGrid(H, 288, 26000);
   const fine = heightGrid(H, 200, 700);
-  const ax = axis(NN);
+  // Near grid axes: x and z (absolute). Default: the same cubic axis both ways around the cliff; a clip
+  // brings its own (a dense core along the ridden line).
+  const ax = height.mesh?.ax || axis(NN);
+  const az = height.mesh?.az || axis(NN).map((v) => v + CZ);
+  const NX = ax.length, NZ = az.length;
   // ---- near grid
-  const nPos = new Float32Array(NN * NN * 3);
-  for (let j = 0; j < NN; j++) for (let i = 0; i < NN; i++) {
-    const x = ax[i], z = ax[j] + CZ, k = (j * NN + i) * 3;
+  const nPos = new Float32Array(NX * NZ * 3);
+  for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) {
+    const x = ax[i], z = az[j], k = (j * NX + i) * 3;
     nPos[k] = x; nPos[k + 1] = H(x, z); nPos[k + 2] = z;
   }
   const nIdx = [];
-  for (let j = 0; j < NN - 1; j++) for (let i = 0; i < NN - 1; i++) {
-    const a = j * NN + i, b = a + 1, c = a + NN, d = c + 1;
+  for (let j = 0; j < NZ - 1; j++) for (let i = 0; i < NX - 1; i++) {
+    const a = j * NX + i, b = a + 1, c = a + NX, d = c + 1;
     nIdx.push(a, c, b, b, c, d);
   }
   // ---- far ring: inner boundary = the near grid's boundary (counter-clockwise, seen from above).
   const ring = [];
-  for (let i = 0; i < NN - 1; i++) ring.push([ax[i], ax[0]]);                 // z = −L edge, x →
-  for (let j = 0; j < NN - 1; j++) ring.push([ax[NN - 1], ax[j]]);            // x = +L edge, z →
-  for (let i = NN - 1; i > 0; i--) ring.push([ax[i], ax[NN - 1]]);            // z = +L edge, x ←
-  for (let j = NN - 1; j > 0; j--) ring.push([ax[0], ax[j]]);                 // x = −L edge, z ←
+  for (let i = 0; i < NX - 1; i++) ring.push([ax[i], az[0]]);                 // z = −L edge, x →
+  for (let j = 0; j < NZ - 1; j++) ring.push([ax[NX - 1], az[j]]);            // x = +L edge, z →
+  for (let i = NX - 1; i > 0; i--) ring.push([ax[i], az[NZ - 1]]);            // z = +L edge, x ←
+  for (let j = NZ - 1; j > 0; j--) ring.push([ax[0], az[j]]);                 // x = −L edge, z ←
   // Row 0 = the near grid boundary (P0 vertices); rows 1.. use every other column (P1) and grow
   // exponentially, so far triangles stay roughly square (no radial streaks on distant faces).
   const P0 = ring.length, P1 = P0;   // every boundary column: ~38 m spacing at 5 km (silhouettes stay smooth)
   const P = P0;
   const fPos = new Float32Array((P0 + P1 * (NR - 1)) * 3);
   for (let p = 0; p < P0; p++) {
-    const [bx, bzr] = ring[p];
-    fPos[p * 3] = bx; fPos[p * 3 + 1] = H(bx, bzr + CZ); fPos[p * 3 + 2] = bzr + CZ;
+    const [bx, bz] = ring[p];
+    fPos[p * 3] = bx; fPos[p * 3 + 1] = H(bx, bz); fPos[p * 3 + 2] = bz;
   }
   for (let rI = 1; rI < NR; rI++) {
     const t = rI / (NR - 1);
     for (let j = 0; j < P1; j++) {
-      const [bx, bzr] = ring[j];
-      const bz = bzr + CZ;
+      const [bx, bz] = ring[j];
       const rb = Math.hypot(bx, bz);
       const f = (rb * Math.pow(RFAR / rb, t) - rb) / (RFAR - rb);
       const a = Math.atan2(bz, bx);
@@ -316,8 +327,9 @@ export function buildTerrain(height, sunDir, material, farMaterial) {
     return g;
   };
   const seamN = [];
-  for (let k = 0; k < NN; k++) seamN.push(k, (NN - 1) * NN + k, k * NN, k * NN + NN - 1);
-  const near = new THREE.Mesh(geo(nPos, nIdx, seamN, NN), material);
+  for (let k = 0; k < NX; k++) seamN.push(k, (NZ - 1) * NX + k);
+  for (let k = 0; k < NZ; k++) seamN.push(k * NX, k * NX + NX - 1);
+  const near = new THREE.Mesh(geo(nPos, nIdx, seamN, NX), material);
   near.name = 'loadingTerrainNear';
   near.receiveShadow = true;
   // Only the rider casts into the shadow map: the terrain's own bumps cast faceted, blocky shadows at
@@ -326,7 +338,7 @@ export function buildTerrain(height, sunDir, material, farMaterial) {
   const far = new THREE.Mesh(geo(fPos, fIdx, [...Array(P).keys()]), farMaterial);
   far.name = 'loadingTerrainFar';
   far.frustumCulled = false;
-  return { near, far, coarse, fine, stats: { build: Math.round(tBuild), total: Math.round(performance.now() - t0), verts: NN * NN + fPos.length / 3 } };
+  return { near, far, coarse, fine, stats: { build: Math.round(tBuild), total: Math.round(performance.now() - t0), verts: NX * NZ + fPos.length / 3 } };
 }
 
 // --------------------------------------------------------------------- material

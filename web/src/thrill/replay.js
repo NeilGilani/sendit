@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { on, game, Mode, settings, emit } from '../state.js';
 import { THRILL, FrameRing, clipRange } from './core.js';
 import { HEAD_SCALE } from '../character/index.js';
+import { nodeKeys } from './clipcodec.js';
 
 const HUGE = /720|900|1080|1260|1440|flip|cork|misty|rodeo|wildcat|tamedog/i;
 const STRIDE_NODE = 11;   // pos 3, quat 4, scale 3, visible 1
@@ -20,7 +21,7 @@ const _c = new THREE.Vector3(), _cam = new THREE.Vector3(), _look = new THREE.Ve
 
 export function installReplay({ player, rider, camera, terrain, input, activities, cam, canvas }) {
   const C = THRILL.replay;
-  let nodes = [], ring = null, recClock = 0, countT = 0;
+  let nodes = [], keys = [], ring = null, recClock = 0, countT = 0;
   let active = null;          // { t, t0, t1, ang, fov, rec? }
   let moment = null;          // the last replayable moment { t, before, after, kind: 'trick' | 'wipeout' }
   let cuts = [];              // rec-clock times of teleports (respawn, retry, drop zone): a replay never spans one
@@ -31,6 +32,7 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
   function rebuild() {
     nodes = [];
     rider.root.traverse((o) => nodes.push(o));
+    keys = nodeKeys(rider.root);
     const stride = nodes.length * STRIDE_NODE + 4;
     ring = new FrameRing(Math.ceil(C.seconds * 62), stride);   // frames are kept at ≤ 60 Hz (fast displays skip some)
     moment = null; cuts = [];
@@ -194,6 +196,8 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
 
   return {
     get active() { return !!active; },
+    /** The recorder itself (thrill/highlights.js saves clips from it): ring, node keys, clock, cuts, stride. */
+    recorder: () => ({ ring, keys, nodes, recClock, cuts, stride: STRIDE_NODE }),
     /** For tests: the recorder's state. */
     debug: () => ({ t0: ring?.t0, t1: ring?.t1, count: ring?.count, cuts: [...cuts], moment, recClock, busy: !!player._busy, state: player.state }),
     start, stop,
@@ -248,6 +252,13 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
   };
 }
 
+/** The row of prompt pills above the HUD (▶ REPLAY · TAB, ◆ SAVE CLIP · F), shared with highlights.js. */
+export function pillRow() {
+  let row = document.getElementById('thrill-pills');
+  if (!row) { row = document.createElement('div'); row.id = 'thrill-pills'; document.body.appendChild(row); }
+  return row;
+}
+
 function mountUi() {
   const st = document.createElement('style');
   st.textContent = `
@@ -260,9 +271,11 @@ function mountUi() {
   #thrill-replay .rate{position:absolute;top:calc(9vh + 14px);right:22px;font-weight:700;letter-spacing:.12em;font-size:14px;opacity:.85}
   #thrill-replay .hint{position:absolute;bottom:calc(9vh + 14px);left:50%;transform:translateX(-50%);font-size:12px;letter-spacing:.14em;opacity:.75;white-space:nowrap}
   #thrill-replay .prog{position:absolute;bottom:9vh;left:0;height:3px;background:#2ff5d6;width:0}
-  #thrill-rp{position:fixed;left:50%;bottom:118px;transform:translateX(-50%) translateY(10px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;z-index:6;
+  #thrill-pills{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);display:flex;gap:10px;align-items:center;pointer-events:none;z-index:6}
+  #thrill-rp{transform:translateY(10px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;white-space:nowrap;
     background:rgba(8,14,28,.72);border:1px solid rgba(47,245,214,.55);border-radius:999px;padding:7px 16px;font-size:13px;font-weight:700;letter-spacing:.16em;color:#dffcf7}
-  #thrill-rp.on{opacity:1;transform:translateX(-50%)}
+  #thrill-rp:not(.on){position:absolute;visibility:hidden}
+  #thrill-rp.on{opacity:1;transform:none}
   #thrill-rp kbd{font:inherit;background:#2ff5d6;color:#06121a;border-radius:5px;padding:1px 7px;margin-left:8px}
   body.thrill-replay #hud,body.thrill-replay #thrill-vignette,body.thrill-replay #lvlUp,body.thrill-replay .cn-stack{visibility:hidden}
   body.pad #thrill-rp .k{display:none}body:not(.pad) #thrill-rp .p{display:none}
@@ -270,19 +283,19 @@ function mountUi() {
   document.head.appendChild(st);
   const el = document.createElement('div');
   el.id = 'thrill-replay';
-  el.innerHTML = '<div class="bar t"></div><div class="bar b"></div><div class="prog"></div><div class="tag"><i></i>REPLAY</div><div class="rate"></div><div class="hint">SPACE / ESC SKIP · ENTER SAVE CLIP</div>';
+  el.innerHTML = '<div class="bar t"></div><div class="bar b"></div><div class="prog"></div><div class="tag"><i></i>REPLAY</div><div class="rate"></div><div class="hint">SPACE / ESC SKIP · F SAVE TO HIGHLIGHTS · ENTER DOWNLOAD VIDEO</div>';
   document.body.appendChild(el);
   const pr = document.createElement('div');
   pr.id = 'thrill-rp';
   pr.innerHTML = '▶ REPLAY<kbd class="k">TAB</kbd><kbd class="p">▲</kbd>';
-  document.body.appendChild(pr);
+  pillRow().appendChild(pr);
   const rate = el.querySelector('.rate'), prog = el.querySelector('.prog'), hint = el.querySelector('.hint'), tag = el.querySelector('.tag');
   let prT = 0;
   return {
     show(v, rec = false) {
       el.classList.toggle('on', v);
       tag.lastChild.textContent = rec ? 'RECORDING CLIP' : 'REPLAY';
-      hint.textContent = rec ? 'SAVING WHEN IT ENDS · ESC STOP' : 'SPACE / ESC SKIP · ENTER SAVE CLIP';
+      hint.textContent = rec ? 'SAVING WHEN IT ENDS · ESC STOP' : 'SPACE / ESC SKIP · F SAVE TO HIGHLIGHTS · ENTER DOWNLOAD VIDEO';
     },
     tick(r, u) { const t = r < 0.97 ? `${r.toFixed(1)}×` : ''; if (rate.textContent !== t) rate.textContent = t; prog.style.width = `${(Math.min(1, u) * 100).toFixed(1)}%`; },
     prompt(v, what = '') {

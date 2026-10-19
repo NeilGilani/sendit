@@ -57,7 +57,7 @@ export const THRILL = {
     closeShare: 0.04,
   },
   replay: {
-    seconds: 8,            // s kept in the recorder
+    seconds: 10,           // s kept in the recorder (a saved highlight needs 2.4 s before the take-off + the air + 2 s after)
     before: 4.0,           // s before touchdown a trick replay starts
     after: 1.5,            // s after touchdown it ends
     slow: 0.4,             // playback rate while airborne
