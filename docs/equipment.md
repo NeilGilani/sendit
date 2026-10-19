@@ -482,31 +482,33 @@ the butt, hem and thighs went 9–13 cm into the deck. What rider.js does now:
   (~3800 of them, skinned on the CPU from the posed bone matrices) are tested against each plank's real cross
   section (`plankSurfaceAt`: half width, top-sheet and base height along its length, camber and kicks included).
   Anything inside the footprint and below the top sheet + 1.2 cm raises the pelvis along the gear's up by
-  exactly that much, and the pose is solved again (the feet stay in the bindings, so the knees open). It is
-  coarse-to-fine (every 8th probe first, the rest only when cloth comes within 6 cm of a plank) and skipped
-  while the hips are > 0.62 m and the knees > 0.3 m above every plank: 0.05–0.3 ms a frame while riding,
-  ~1.3 ms in a grab.
-- **Grabs: the gear comes to the hand.** Real riders suck the knees up and bring the board to the hand instead
-  of bending down to it (Snowboard Addiction, *Basic grabs*). The grabbing hand is two-bone IK'd to just outside
-  and above the edge (`grabPoint`, `armReach`) with its fingers turned down the sidewall (`aimHand`), and it
-  approaches from outside as the grab comes in, so it never sweeps through the deck. In the air a hand that
-  still can't reach brings the board to it (up to `grabGearReach` 0.4 m); skis come up further for every grab
-  (`skiGrabLift` 0.46 m) and the upper body folds a little over them. Grab targets: board Indy = rear hand, toe
-  edge between the feet; Melon = front hand, heel edge by the front foot; Nose / Tail = the toe edge near that
-  end. Skis Safety = own ski, outside edge ahead of the toe piece; Japan = further forward; Mute = the right hand
-  across to the left ski's inside edge; Tail grab = own tail; Truck driver = both hands to the fronts. Each grab
-  owns a stretch of edge and the hand closes on its point nearest the shoulder (`nearestStation`). A Tail-grab
-  tweak now swings the tail toward the hand (it swung away). Tweaks go only as far as the arm reaches
-  (`tweakFit`: while the grabbing hand falls short the tweak eases back, and it returns once the hand holds):
-  tweaked board grabs went from 11–24 cm short of the board to ≤ 3 cm. Of the ski grabs only the Tail grab
-  brings the skis back to the hand (skis pulled into the folded legs bunch the jacket hem between the knees).
-- **Legs never leave the bindings.** If a leg can't reach its binding, the gear follows the foot in the air and
-  the hips come down on the snow.
+  that much, and the pose is solved again (the feet stay in the bindings, so the knees and hips open a little;
+  the gear and the rest of the pose stay put). It is a safeguard: it does nothing unless cloth would actually
+  go into the gear, and the lift is eased in and out (`CLEAR_EASE` 12/s, never more than `CLEAR_LAG` 8 mm
+  behind what's needed), so the hips never jump. It is coarse-to-fine (every 8th probe first, the rest only
+  when cloth comes within 6 cm of a plank) and skipped while the hips are > 0.62 m and the knees > 0.3 m above
+  every plank. In practice it acts on board grabs (the old crouch put the butt ~7 cm into the deck: the hips
+  now sit 3–7 cm higher, knees within 4° of the old pose) and on deep heel-side sits.
+- **Grabs keep the original look** (night-2 revert, user: "the new spinning animation is horrible"). The
+  clipping branch had also changed how grabs and spins *look*: skis yanked 23–36 cm up to the hips on every ski
+  grab (`skiGrabLift`) with an extra hip / back fold, the board moved up to 11 cm toward the hand in the air
+  (`grabGearReach`, frame-to-frame jumps of 4 cm), tweaks easing back (`tweakFit`), arms IK'd to the edge. All
+  of that is gone: the gear stays where the pre-clipping rig put it and the arms use the original straight
+  reach. One safeguard remains for board grabs (`handClear`): only where that straight reach would put the mitt
+  into the deck does the elbow bend (blended by how deep, eased out) so the hand closes over the edge at the
+  grab's own station. Ski grabs never reached the skis, so they never needed it.
+- **Legs never leave the bindings.** If a leg can't reach its binding, the hips come down a little.
 - **Chairlift:** the skis hang from the boots exactly (sole on the plate, tips down with the foot,
   `liftSkiHang`), the board under the soles (they used to hang 10 cm under the ankle bone, inside the boots).
 - **Loading stills** (`assets/loading/*.webp`, first paint of every load) were re-rendered with
   `scripts/loadingstills.mjs`: the old ones baked in the board through the knees. Re-render them whenever the
   rig or the clothes change.
+
+Spin / grab look check: `node web/scripts/spin-sheet.mjs http://localhost:<port>/ --label X --json x.json`
+flies 360, 720, cork 720, 540 + grab, cork 720 + grab and a straight grab (the physics-combo stick, real Player
++ Rider, `src/equipment/spinharness.html`) on skis and board, grabs evenly spaced chase / side (or `--views
+front`) frames, the penetration on every air frame and a pose signature (pelvis, gear, knees, hands); `--compose
+a.json,b.json,…` lays builds out in rows (one sheet per trick) to compare builds frame for frame.
 
 Measured with `node web/scripts/gear-clip.mjs` (below): max penetration over 630 poses (5 ski and 5 board
 models, both stances, every riding / air / grab pose and every loading-screen shot frame by frame) went from
