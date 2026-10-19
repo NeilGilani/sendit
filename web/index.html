@@ -88,6 +88,7 @@
     #loading .ld-ui { position: absolute; inset: 0; pointer-events: none; transition: opacity .6s ease; }
     #loading .ld-brand { position: absolute; left: clamp(20px, 4vw, 64px); top: clamp(14px, calc((100vh - 100vw / 2.2) / 4 - 22px), 7vh); }
     #loading .ld-brand .title { font-size: clamp(28px, 3vw, 46px); margin: 0; letter-spacing: -0.01em; }
+    #loading .ld-brand .title i { font-style: normal; color: #ff5a1f; -webkit-text-fill-color: #ff5a1f; }
     #loading .ld-cap { position: absolute; right: clamp(20px, 4vw, 64px); top: clamp(18px, calc((100vh - 100vw / 2.2) / 4 - 12px), 7.5vh); text-align: right;
       opacity: 0; transform: translateY(-4px); transition: opacity 1.2s ease, transform 1.2s ease; text-shadow: 0 1px 12px rgba(0,0,0,.5); }
     #loading .ld-cap.on { opacity: 1; transform: none; }
@@ -159,7 +160,7 @@
     <div class="ld-snow" aria-hidden="true"><div class="ld-flakes a"></div><div class="ld-flakes b"></div><div class="ld-flakes c"></div></div>
     <div class="ld-bars" aria-hidden="true"><i></i><i></i></div>
     <div class="ld-ui">
-      <div class="ld-brand"><div class="title">SENDIT</div></div>
+      <div class="ld-brand"><div class="title" aria-label="Sendit">SEND<i>I</i>T</div></div>
       <div id="loadcap" class="ld-cap" aria-hidden="true"></div>
       <div id="loaddest" class="ld-dest" aria-live="polite"></div>
       <div class="ld-foot">
