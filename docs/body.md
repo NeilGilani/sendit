@@ -233,6 +233,12 @@ the new behaviour switched off by config (`CFILE=web/scripts/ragdoll-old.json`, 
 | big (278) before | 160 / 94 / 24 | 657° | 8.1 / 12.7 | 0.91 | 1.19 | 2.29 |
 | big after | 186 / 92 / **0** | **452°** | **6.7 / 8.8** | **0.85** | **0.83** | **1.74** |
 
+CPU after the severity pass: Node, same machine, back to back with the old code, 600 crashes: median 0.86 → 0.90 ms per
+60 Hz frame (+3–5 %: the tumble governor at 240 Hz, the fall-mode / lying goals at 240 Hz; per-group body lists took
+some back). The `--check` CPU limit (p95 ≤ 1 ms) is only met on a quiet machine — with other workers' headless browsers
+running, the old code fails it too (p95 1.4 ms). Browser (`ragdoll-bench.mjs`, loaded machine): 0.7–1.1 ms per frame
+awake, one case 1.5 ms.
+
 Thresholds (`TL` in the fuzz): small — no flip at all, tumble p90 ≤ 180° (at most onto the back / side), body spin
 p90 ≤ 5 rad/s, hands p90 ≤ 0.78 m (a forearm from the trunk, not an arm flung out), looseness median ≤ 1.5; medium —
 ≤ 5 % roll over once, tumble p90 ≤ 300°, spin ≤ 7.5, hands ≤ 0.85, looseness ≤ 1.7; big — at most one flip, spin ≤ 11,
