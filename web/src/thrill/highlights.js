@@ -153,7 +153,7 @@ export function installHighlights({ player, rider, terrain, input, activities, r
     if (typeof Worker !== 'undefined' && !noWorker) {
       return new Promise((res, rej) => {
         let w;
-        try { w = new Worker(new URL('./clipworker.js', import.meta.url), { type: 'module', name: 'sendit-clipsave' }); } catch (e) { noWorker = true; build(job).then(res, rej); return; }
+        try { w = new Worker(new URL('./clipworker.js', import.meta.url), { type: 'module', name: 'sendit-clipsave' }); } catch { noWorker = true; build(job).then(res, rej); return; }
         const t = setTimeout(() => { w.terminate(); rej(new Error('save timeout')); }, 30000);
         w.onmessage = (e) => { clearTimeout(t); w.terminate(); if (e.data.ok) res(e.data); else rej(Object.assign(new Error(e.data.message), { code: e.data.code })); };
         // The buffers went to the worker (transferred): a broken worker means this save is lost; the next

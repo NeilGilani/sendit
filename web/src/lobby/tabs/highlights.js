@@ -4,7 +4,7 @@
 // with the hero cameras (loading/clipview.js); thumbnails are rendered the same way, once, and kept.
 // Self-contained: its CSS is the CSS string below, on the lobby's shared tokens (docs/lobby.md "Design system").
 import { registerLobbyTab, setLobbyBadge } from '../tabs.js';
-import { listClips, removeClip, setFavourite, setThumb, syncIndex, readIndex, getClipMeta, HIGHLIGHTS } from '../../thrill/clipstore.js';
+import { removeClip, setFavourite, setThumb, syncIndex, readIndex, getClipMeta, HIGHLIGHTS } from '../../thrill/clipstore.js';
 import { ICONS } from '../icons.js';
 import { on } from '../../state.js';
 import { playClip, renderThumb, canPlayClips } from '../../loading/clipview.js';
