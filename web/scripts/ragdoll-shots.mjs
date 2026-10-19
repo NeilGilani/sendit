@@ -222,7 +222,7 @@ for (const name of names) {
         gap = pl.state !== 1 ? Infinity : Math.abs(pl.position.y - T.getHeight(pl.position.x, pl.position.z));
       }
       if (T.getHeight(p.x, p.z) - T.baseHeight(p.x, p.z) > 0.02) gap = Math.max(gap, 9);
-      if (gap > 0.05) { g.bad++; g.worst = Math.max(g.worst, Math.min(gap, 99)); if (g.at.length < 5) g.at.push(key + '@' + gap.toFixed(2)); }
+      if (gap > 0.05) { g.bad++; g.worst = Math.max(g.worst, Math.min(gap, 99)); if (g.at.length < 5) g.at.push(key + '@' + gap.toFixed(2) + (key === 'body' ? ' a' + (s.ragdoll?.active ? 1 : 0) + 'f' + (s.ragdoll?.failed ? 1 : 0) + 't' + (s.player.crashT ?? 0).toFixed(2) : '')); }
     };
     window.__snap = (tag) => {
       window.__shots.push({ tag, info: window.__info() }); s.game.mode = 2;

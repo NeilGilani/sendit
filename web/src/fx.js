@@ -19,7 +19,7 @@ const FOCUS_THIN = 0.85;   // share of spray alpha removed in front of the rider
 const UP = new THREE.Vector3(0, 1, 0);
 // Crash marks / spray by ragdoll part (FXManager.crashMarks / crashSpray): groove width (m), spray load.
 const CRASH_MARK = { chest: 0.42, pelvis: 0.36, head: 0.24, thigh: 0.18, shin: 0.15, upperarm: 0.12, forearm: 0.12, ski: 0.09, board: 0.26, pole: 0.04 };
-const CRASH_SPRAY = { chest: 0.7, pelvis: 0.7, thigh: 0.35, ski: 0.35, board: 0.5 };
+const CRASH_SPRAY = { chest: 0.35, pelvis: 0.35, thigh: 0.15, ski: 0.2, board: 0.25 };
 
 /** Derive two ski contacts from the player (edge roll from the turn's lean angle, wedge/skid from brake). */
 export function contactsFromSkis(pl, out = []) {
@@ -126,6 +126,7 @@ export class FXManager {
     // if "here" is the snow (a crash in the air — a rail bail, a trunk — throws nothing until something lands).
     on('crashed', () => {
       const pl = this.player;
+      this._crashHits = 0; this._hitCool = 0;
       if (this.ragdollOn()) return;
       if (this.onSnow(pl.renderPos, 0.3)) this.spray.crash(pl.renderPos, pw());
     });
@@ -182,7 +183,7 @@ export class FXManager {
   crashMarks(cs) {
     const pw = this.player.powder ?? 0.5;
     for (const c of cs) {
-      if (!this.onSnow(c.p, 0.045)) continue;
+      if (!this.onSnow(c.p, 0.04)) continue;
       const w = CRASH_MARK[c.part] ?? 0.12;
       const k = Math.min(1, 0.25 + c.imp / 7 + c.speed / 14) * (0.45 + 0.55 * pw);
       this.track.stamp('rd:' + c.key, c.p, c.heading, w, k);
@@ -192,22 +193,26 @@ export class FXManager {
   /** Crash spray: sliding contacts throw snow (spray.emit); fresh hard hits puff (spray.landing), rate-limited. */
   crashSpray(cs, out, dt) {
     const pw = this.player.powder ?? 0.5;
-    const cool = this._hitCool || (this._hitCool = new Map());
-    for (const [k, t] of cool) cool.set(k, t - dt);
+    // One burst at a time for the whole body (11 parts hitting at once would white out the screen): the hardest
+    // fresh hit, the first one as big as the old crash burst, later ones smaller.
+    this._hitCool = (this._hitCool ?? 0) - dt;
     const pool = this._crashSprayPool || (this._crashSprayPool = new Map());
-    let puffs = 0;
+    let hit = null;
     for (const c of cs) {
-      if (!this.onSnow(c.p, 0.045)) continue;
-      if (c.imp > 3.2 && (cool.get(c.key) ?? 0) <= 0 && puffs < 2) {
-        this.spray.landing(c.p, Math.min(14, c.imp * 1.2), pw);
-        cool.set(c.key, 0.25); puffs++;
-      }
+      if (!this.onSnow(c.p, 0.04)) continue;
+      if (c.imp > 3.2 && (!hit || c.imp > hit.imp)) hit = c;
       if (c.speed > 1.5 && CRASH_SPRAY[c.part]) {
         let e = pool.get(c.key);
         if (!e) pool.set(c.key, e = { position: new THREE.Vector3(), direction: new THREE.Vector3(), edgeAngle: 0.5, load: 0.5, speed: 0, id: 'rd:' + c.key });
         e.position.copy(c.p); e.direction.copy(c.v).normalize(); e.speed = c.speed; e.load = CRASH_SPRAY[c.part];
         out.push(e);
       }
+    }
+    if (hit && this._hitCool <= 0) {
+      const first = !this._crashHits;
+      this.spray.landing(hit.p, Math.min(first ? 12 : 7, hit.imp * (first ? 1.2 : 0.7)), pw);
+      this._crashHits = (this._crashHits || 0) + 1;
+      this._hitCool = 0.22;
     }
   }
 
