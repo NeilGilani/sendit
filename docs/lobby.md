@@ -6,7 +6,7 @@ post stack as a ride. You can rotate them like a turntable. It opens on **Home**
 stage, three live tiles on the left (level, daily challenges, cases) and the **Ride cluster** bottom
 right (the selected trail, the **Zen / Challenge** switch and the big **Ride** button, which reads
 **Race** in Challenge; the choice is saved in `sendit.mode`). Five destinations in the top bar lead to
-everything else in at most two clicks: **Locker** (Gear = Skis / Snowboard, Skins = earned outfits,
+everything else in at most two clicks: **Locker** (Gear = Skis / Snowboard with every owned piece rated, compared and a ★ pick, see [equipment.md](equipment.md) "Gear stats in the Locker"; Skins = earned outfits,
 see [character.md](character.md) and [rewards.md](rewards.md)), **Cases**, **Mountains**, **Career**
 (Progress, Rankings, Profile), plus **Friends** (multiplayer, coming soon) and **Settings** as icon
 buttons. See "Navigation (v2)" and "Design system v2" below.
@@ -404,6 +404,7 @@ small filled plate (orange / rank colour) so they read as game icons, not as web
 | Ride | `.lb-ride .lb-ride-face .lb-ride-tag .lb-ride-key` | `.race` in Challenge, `.pg-bonus` shows the 2× XP sticker |
 | toast | `.lb-toast`, `.cn` (case notes), `#juiceHud .tt` | navy plate, coloured inner left edge |
 | item frame | `.cr-card`, `.lk-item`, `.cs-grid` | flat plate, grade colour as the bottom band; the item pictures are not styled here |
+| gear stats | `.gr-bars .gr-row .gr-bar .gr-d` (`.compact`, `.show-d`), `.gr-badge` (`.pick`), `.gr-pick`, `.gr-card .gr-cmpbtn`, `.gr-cmp`, `.gr-tile` | `lobby/gearUi.js` + `tabs/gear.css`: rating bars (snow fill; the gap to what you ride is pine = better, striped alert = worse, shown on hover / focus, always on touch), best-at chips (ice icon on ink), the ★ pick (gold plate with gold lip), compare (ice edge). See docs/equipment.md "Gear stats in the Locker". |
 
 Mountain cards (`.mt-art`) and the trail-view header (`.mt-head`) are framed for full-bleed
 photographic art (~16:10): the picture may come as the `--art` background or as an `<img>` child, both
