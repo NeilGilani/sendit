@@ -64,7 +64,7 @@ export const NAV = {
     cases: { group: 'cases' },
     maps: { group: 'maps' },
     progress: { group: 'career', short: 'Progress' },
-    leaderboards: { group: 'career', short: 'Leaderboards' },
+    leaderboards: { group: 'career', short: 'Rankings' },
     profile: { group: 'career', short: 'Profile' },
     multiplayer: { nav: 'utility', short: 'Friends' },
     settings: { nav: 'utility' },

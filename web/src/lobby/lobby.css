@@ -146,9 +146,9 @@ body.device-touch .lb-key { display: none; }
 
 /* ---------------------------------------------------------------- side: sub-tabs + panel */
 .lb-side { grid-column: 1; grid-row: 2; align-self: start; display: flex; flex-direction: column; gap: 0.7em; min-height: 0; max-height: 100%; }
-.lb-subnav { display: none; flex: none; gap: 0.4em; flex-wrap: wrap; padding-bottom: var(--lip); }
+.lb-subnav { display: none; flex: none; gap: 0.4em; flex-wrap: nowrap; padding: 0.45em 0.4em var(--lip) 0; margin: -0.45em -0.4em 0 0; overflow-x: auto; scrollbar-width: none; }
 .lb-side.has-sub .lb-subnav { display: flex; }
-#lobby .lb-sub { position: relative; display: inline-flex; align-items: center; gap: 0.45em; padding: 0.55em 0.95em; border-radius: var(--r2);
+#lobby .lb-sub { position: relative; flex: none; display: inline-flex; align-items: center; gap: 0.45em; padding: 0.55em 0.85em; border-radius: var(--r2);
   font-weight: 800; font-stretch: 78%; font-size: 0.9em; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c-snow-2);
   background: rgba(16, 26, 36, 0.94); border: 1px solid var(--c-line); }
 #lobby .lb-sub svg { width: 1.15em; height: 1.15em; }
@@ -380,7 +380,11 @@ body.device-touch .lb-key { display: none; }
 .st-foot { margin-top: 1.2em; display: flex; justify-content: flex-end; padding-bottom: var(--lip); }
 
 /* ---------------------------------------------------------------- bottom: hints + the Ride cluster */
-.lb-bottom { grid-column: 1 / -1; grid-row: 3; display: flex; align-items: flex-end; justify-content: space-between; gap: 1em; min-width: 0; }
+.lb-bottom { grid-column: 1 / -1; grid-row: 3; display: flex; align-items: flex-end; justify-content: space-between; gap: 1em; min-width: 0; pointer-events: none !important; }
+.lb-bottom > * { pointer-events: auto; }
+/* Off Home the panel runs down to the bottom edge; the control hints only show on Home. */
+#lobby:not(.lb-home) .lb-side { grid-row: 2 / 4; }
+#lobby:not(.lb-home) .lb-hints { visibility: hidden; }
 .lb-hints { font-size: 0.74em; color: var(--c-snow-2); padding: 0.45em 0.7em; border-radius: var(--r2); background: rgba(8, 14, 20, 0.78); border: 1px solid var(--c-line); }
 .lb-hints kbd { font-size: 0.82em; }
 /* Trail sign on top, mode + RIDE below: one obvious place to start, on every screen. */
@@ -426,8 +430,9 @@ body.device-touch .lb-key { display: none; }
 body.device-touch .lb-ride-key { display: none; }
 /* Progression's first-ride-of-the-day bonus: a gold sticker on Ride instead of a pulsing colour. */
 #lobby .lb-ride.pg-bonus { animation: none; }
-#lobby .lb-ride.pg-bonus .lb-ride-face::after { content: '2× XP'; position: absolute; top: 0.45em; left: 0.9em; font: 700 0.24em/1 var(--font-mono); letter-spacing: 0.06em;
-  color: var(--c-paper-ink); background: var(--c-gold); padding: 0.35em 0.45em; border-radius: var(--r1); }
+.lb-ride-tag { display: none; position: absolute; top: 0.5em; left: 0.8em; font: 700 0.24em/1 var(--font-mono); letter-spacing: 0.06em;
+  color: var(--c-paper-ink); background: var(--c-gold); padding: 0.4em 0.5em; border-radius: var(--r1); box-shadow: 0 2px 0 var(--c-gold-lip); }
+#lobby .lb-ride.pg-bonus .lb-ride-tag { display: block; }
 
 /* ---------------------------------------------------------------- mode (Zen / Challenge) */
 #lobby .lb-mode { grid-area: mode; display: flex; }
@@ -474,7 +479,7 @@ body.device-touch .lb-ride-key { display: none; }
   .lb-tabbar { grid-row: 5; grid-column: 1; height: auto; margin: 0 calc(-1 * var(--lb-pad)); padding: 0 0 env(safe-area-inset-bottom);
     background: rgba(8, 14, 20, 0.97); border-top: 1px solid var(--c-line); }
   #lobby .lb-tabs { flex: 1; justify-content: space-around; padding: 0; gap: 0; overflow: visible; }
-  #lobby .lb-tab { flex: 1; flex-direction: column; justify-content: center; gap: 0.25em; height: 3.9em; margin: 0; padding: 0.3em 0 0.2em; font-size: 0.72em; letter-spacing: 0.08em; }
+  #lobby .lb-tab { flex: 1; flex-direction: column; justify-content: center; gap: 0.25em; height: 4.1em; margin: 0; padding: 0.3em 0 0.2em; font-size: 0.8em; letter-spacing: 0.06em; }
   #lobby .lb-tab:not(.on) span { display: inline; }
   #lobby .lb-tab svg { width: 1.9em; height: 1.9em; }
   #lobby .lb-tab .lb-badge { top: 0.35em; right: calc(50% - 2.1em); }
@@ -516,9 +521,12 @@ body.device-touch .lb-ride-key { display: none; }
   .lb-panel { padding: 0.9em 1em; }
   .lp-sub { margin-bottom: 0.7em; padding-bottom: 0.6em; }
   .eq-txt small, .eq-desc, .eq-more { display: none; }
-  .lb-go { width: min(24em, 100%); }
-  .lb-map-thumb { width: 4.4em; }
-  #lobby .lb-ride { font-size: 1.7em; }
+  .lb-go { width: min(21em, 100%); grid-template-columns: 6.4em minmax(0, 1fr); }
+  .lb-map-thumb { width: 3.6em; }
+  .lb-map-desc, .lb-map-chg span, #lobby .lb-mode-seg button small { display: none; }
+  .lb-map-name { font-size: 1.1em; }
+  #lobby .lb-ride { font-size: 1.75em; min-height: 1.6em; }
+  #lobby .lb-mode-seg button { padding: 0.3em 0.6em; }
   .hm-tiles { gap: calc(0.45em + var(--lip)); }
   #lobby .hm-tile { padding: 0.6em 0.75em 0.7em; }
   .hm-daily .hm-q:nth-child(n+3), .hm-bonus { display: none; }

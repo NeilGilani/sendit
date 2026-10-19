@@ -135,6 +135,7 @@ export class Lobby {
           </div>
           <button class="lb-ride" type="button" data-autofocus>
             <span class="lb-ride-face"><span class="lb-ride-label">Ride</span>${ICONS.play}</span>
+            <span class="lb-ride-tag" aria-hidden="true">2× XP</span>
             <span class="lb-ride-key"><span class="g-kb">Enter</span><span class="g-pad">Start</span><span class="g-touch"></span></span>
           </button>
         </div>

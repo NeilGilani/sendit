@@ -32,5 +32,5 @@ export function hoverTicks(root, selector, play) {
     last = now;
     play();
   });
-  root.addEventListener('pointerout', (e) => { if (e.target.closest?.(selector) === lastEl && !lastEl.contains(e.relatedTarget)) lastEl = null; });
+  root.addEventListener('pointerout', (e) => { if (lastEl && e.target.closest?.(selector) === lastEl && !lastEl.contains(e.relatedTarget)) lastEl = null; });
 }
