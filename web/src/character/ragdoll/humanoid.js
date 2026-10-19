@@ -62,6 +62,7 @@ export function buildHumanoid(seed, env, C) {
     // Rest orientation of the body (armature space): body = bone · off⁻¹, off = Qb⁻¹ · Qbone.
     if (R && R[bone]) b.restQ = R[bone].clone().multiply(conj(Qb0)).multiply(Qb);
     b.isHand = !!opts.hand;
+    b.isTrunk = name === 'pelvis' || name === 'chest';
     world.add(b);
     bodies.push(b);
     parts[name] = b;
@@ -227,25 +228,16 @@ export function buildHumanoid(seed, env, C) {
   }
 
   // ---- muscle tone targets (the protective tuck), relative to rest
-  const T = C.tuck;
-  const flexTarget = (j, deg, flexDir) => {
-    const d = restDir(j.b1);
-    const axis = j.axisArm || _b.crossVectors(d, flexDir).normalize().clone();
-    const Rf = new THREE.Quaternion().setFromAxisAngle(axis, deg * DEG);
-    return conj(j.b0.restQ).multiply(Rf).multiply(j.b1.restQ);
-  };
-  joints.spine.tuck = flexTarget(joints.spine, T.spine, fwd);
-  joints.neck.tuck = flexTarget(joints.neck, T.neck, fwd);
-  for (const S of ['L', 'R']) {
-    const side = S === 'L' ? 1 : -1;
-    joints['hip' + S].tuck = flexTarget(joints['hip' + S], T.hip, fwd);
-    joints['knee' + S].tuck = flexTarget(joints['knee' + S], T.knee, back);
-    joints['elbow' + S].tuck = flexTarget(joints['elbow' + S], T.elbow, fwd);
-    const sh = joints['shoulder' + S], d = restDir(sh.b1);
-    const want = new THREE.Vector3(T.shoulder[0] * side, T.shoulder[1], T.shoulder[2]).normalize();
-    sh.tuck = conj(chest.restQ).multiply(new THREE.Quaternion().setFromUnitVectors(d, want)).multiply(sh.b1.restQ);
+  const H0 = { parts, joints };
+  setTuck(H0, C.tuck);
+  // The drive's target starts at the pose the crash found (the animated frame: no pull at all on the first
+  // sub-step) and moves toward the tuck / the brace at a human speed (updateTone): muscles that snap a limb into a
+  // new pose in one go are what whips it.
+  for (const j of Object.values(joints)) {
+    j.goal = (j.tuck || j.qRest).clone();
+    j.qT = C.toneRate ? conj(j.b0.q).multiply(j.b1.q) : j.goal.clone();
+    j.k = 0; j.maxErr = C.toneMaxErr?.[j.kind] ?? 0;
   }
-  for (const j of Object.values(joints)) { j.qT = (j.tuck || j.qRest).clone(); j.k = 0; j.maxErr = C.toneMaxErr?.[j.kind] ?? 0; }
 
   // ---- self-collision: limbs can't pass through the trunk or each other
   const main = (n) => [parts[n], parts[n].shapes[0]];
@@ -266,10 +258,39 @@ export function buildHumanoid(seed, env, C) {
 }
 
 /**
+ * The protective pose the muscles pull toward (relative to rest): T = { spine, neck, hip, knee, elbow (deg of flexion),
+ * shoulder: arm direction [x left, y up, z forward] in the armature frame }. Sets each joint's `tuck` (and its
+ * `goal`, unless an arm is bracing: updateTone moves the goals every sub-step anyway).
+ */
+export function setTuck(H, T, key = 'tuck') {
+  const { joints, parts } = H;
+  const fwd = new THREE.Vector3(0, 0, 1), back = new THREE.Vector3(0, 0, -1);
+  const restDir = (b) => _a.copy(Y).applyQuaternion(b.restQ).clone();
+  const flexTarget = (j, deg, flexDir) => {
+    const d = restDir(j.b1);
+    const axis = j.axisArm || _b.crossVectors(d, flexDir).normalize().clone();
+    const Rf = new THREE.Quaternion().setFromAxisAngle(axis, deg * DEG);
+    return conj(j.b0.restQ).multiply(Rf).multiply(j.b1.restQ);
+  };
+  joints.spine[key] = flexTarget(joints.spine, T.spine, fwd);
+  joints.neck[key] = flexTarget(joints.neck, T.neck, fwd);
+  for (const S of ['L', 'R']) {
+    const side = S === 'L' ? 1 : -1;
+    joints['hip' + S][key] = flexTarget(joints['hip' + S], T.hip, fwd);
+    joints['knee' + S][key] = flexTarget(joints['knee' + S], T.knee, back);
+    joints['elbow' + S][key] = flexTarget(joints['elbow' + S], T.elbow, fwd);
+    const sh = joints['shoulder' + S], d = restDir(sh.b1);
+    const want = new THREE.Vector3(T.shoulder[0] * side, T.shoulder[1], T.shoulder[2]).normalize();
+    sh[key] = conj(parts.chest.restQ).multiply(new THREE.Quaternion().setFromUnitVectors(d, want)).multiply(sh.b1.restQ);
+  }
+  if (key === 'tuck') for (const j of Object.values(joints)) if (j.goal && j.tuck) j.goal.copy(j.tuck);
+}
+
+/**
  * Give the ragdoll the rider's momentum. vCom / w: the body's linear / angular velocity from the last animated
  * frames (rig.js); cause: { kind, reason }; groundN: the snow's normal under the rider; rnd(): 0..1.
  */
-export function seedMotion(H, { vCom, w, com, cause, groundN, rnd, C }) {
+export function seedMotion(H, { vCom, w, com, cause, groundN, rnd, C, catchMul = 1, twistMul = 1 }) {
   const { parts, human, loose } = H;
   for (const b of human) {
     b.v.copy(w).cross(_a.subVectors(b.x, com)).add(vCom);
@@ -277,12 +298,16 @@ export function seedMotion(H, { vCom, w, com, cause, groundN, rnd, C }) {
   }
   const kind = cause?.kind || 'landing', reason = cause?.reason;
   // The edges / the landing catch the feet: the legs stop sliding, the upper body carries on over them.
-  const catchK = kind === 'landing' ? (C.feetCatch[reason] ?? C.feetCatch.landing) : kind === 'compression' ? C.feetCatch.compression : 0;
+  const catchK = catchMul * (kind === 'landing' ? (C.feetCatch[reason] ?? C.feetCatch.landing) : kind === 'compression' ? C.feetCatch.compression : 0);
   if (catchK > 0) {
     const n = groundN || Y;
-    for (const [name, k] of [['shinL', 1], ['shinR', 1], ['board', 1], ['thighL', 0.45], ['thighR', 0.45]]) {
+    // (only what is on the snow: an edge in the air catches nothing — a crash that starts airborne flies on)
+    const env = H.world.env, low = (b) => { let g = Infinity; for (const sm of b.samples) { b.point(sm.p, _c); g = Math.min(g, _c.y - sm.r - env.height(_c.x, _c.z)); } return g; };
+    const onSnow = Math.min(...['shinL', 'shinR', 'board'].filter((nm) => parts[nm]).map((nm) => low(parts[nm])));
+    const near = 1 - Math.min(1, Math.max(0, (onSnow - 0.1) / 0.3));
+    for (const [name, k] of [['shinL', near], ['shinR', near], ['board', near], ['thighL', 0.45 * near], ['thighR', 0.45 * near]]) {
       const b = parts[name];
-      if (!b) continue;
+      if (!b || !k) continue;
       const vn = b.v.dot(n);
       b.v.addScaledVector(_b.copy(b.v).addScaledVector(n, -vn), -catchK * k);
     }
@@ -296,7 +321,7 @@ export function seedMotion(H, { vCom, w, com, cause, groundN, rnd, C }) {
     }
   }
   // A little twist of its own, so no two falls look alike.
-  const tw = (rnd() - 0.5) * 1.6;
+  const tw = (rnd() - 0.5) * 1.6 * twistMul;
   for (const b of human) b.w.y += tw;
   // Released gear: each piece leaves with the limb it was on, kicked off a little sideways and spinning.
   for (const L of loose) {
@@ -364,28 +389,82 @@ export function depenetrate(H, env, maxLift = 0.8, maxPush = 1.2, maxLiftGear = 
  * Muscle tone for this moment: strong at first, relaxing to C.toneEnd (× rest: 0 once the body lies still, so no
  * muscle keeps nudging a limb against the snow or a trunk); while bracing the arms reach toward `braceDir` (world).
  */
-export function updateTone(H, t, dt, braceDir, C, rest = 1, hold = 0) {
+export function updateTone(H, t, dt, braceDir, C, rest = 1, hold = 0, mul = 1) {
   // Protective tone holds while the body is still moving (hold: 0..1 from its speed) and only fades with time
   // once it slows down; `rest` takes it to limp when the body lies still.
-  const relax = (C.toneEnd + (1 - C.toneEnd) * Math.max(Math.exp(-t / C.toneTau), hold)) * rest;
+  const relax = (C.toneEnd + (1 - C.toneEnd) * Math.max(Math.exp(-t / C.toneTau), hold)) * rest * mul;
   const bracing = !!braceDir;
-  for (const j of Object.values(H.joints)) {
+  for (const j of (H.jl ||= Object.values(H.joints))) {
     const arm = j.kind === 'shoulder' || j.kind === 'elbow';
     j.k = (C.tone[j.kind] || 0) * relax * (bracing && arm ? C.braceTone : 1);
   }
+  const rate = C.toneRate;
+  // Lying: the trunk down on the snow (its axis near the slope, touching): hips, knees and spine head for a lying
+  // pose (legs along the snow, not held up in the air) and the legs' tone eases.
+  // Which way it lies (the chest's front against the snow's up): on the back the knees come up so the skis / board
+  // lie flat on the snow (they are at right angles to the shins: straight legs would stand them on end), face down
+  // the legs stretch out, on the side they stay half bent.
+  let lie = 0;
+  if (rate && H.joints.hipL.lieSide) {
+    const P = H.parts, uy = Math.abs(_a.subVectors(P.chest.x, P.pelvis.x).normalize().y);
+    if (P.pelvis.touch || P.chest.touch) lie = Math.min(1, Math.max(0, (0.75 - uy) / 0.45));
+    const f = _b.set(0, 0, 1).applyQuaternion(conj(P.chest.restQ, _q)).applyQuaternion(P.chest.q).y;
+    H.lie = H.lie === undefined ? lie : H.lie + (lie - H.lie) * Math.min(1, 6 * dt);
+    H.face = H.face === undefined ? f : H.face + (f - H.face) * Math.min(1, 6 * dt);
+    lie = H.lie;
+    const up = Math.min(1, Math.max(0, H.face / 0.6)), dn = Math.min(1, Math.max(0, -H.face / 0.6));
+    for (const j of H.jl) {
+      if (!j.lieSide || j.kind === 'shoulder' || j.kind === 'elbow') continue;
+      _q2.copy(j.lieSide);
+      if (up > 0) _q2.slerp(j.lieUp, up); else if (dn > 0) _q2.slerp(j.lieDown, dn);
+      j.goal.copy(j.tuck).slerp(_q2, lie);
+    }
+    for (const j of H.jl) if (j.kind === 'hip' || j.kind === 'knee') j.k *= 1 - (C.lieLegRelax ?? 0.5) * lie;
+  }
   for (const S of ['L', 'R']) {
     const sh = H.joints['shoulder' + S], el = H.joints['elbow' + S];
+    if (rate) {
+      // Goals: the brace (below) or the tuck; every drive's target turns toward its goal at `rate` rad/s.
+      if (bracing) braceGoal(sh, el, braceDir, C);
+      else { sh.goal.copy(sh.tuck); el.goal.copy(el.tuck); }
+      continue;
+    }
     if (bracing) {
       // Reach: the upper arm toward the snow ahead, the elbow nearly straight.
       const dP = _a.copy(braceDir).applyQuaternion(conj(sh.b0.q, _q)).normalize();
+      // A hand put down, not an arm flung out: within braceCone of the trunk's own down axis (chest local −Y),
+      // the elbow soft.
+      const cone = (C.braceCone ?? 180) * DEG, cd = -dP.y;
+      if (cd < Math.cos(cone)) {
+        const side = _c.set(dP.x, 0, dP.z);
+        if (side.lengthSq() < 1e-8) side.set(1, 0, 0);
+        side.normalize();
+        dP.set(side.x * Math.sin(cone), -Math.cos(cone), side.z * Math.sin(cone));
+      }
       const aRest = _b.copy(Y).applyQuaternion(sh.qRest);
       sh.qT.setFromUnitVectors(aRest, dP).multiply(sh.qRest);
-      el.qT.copy(el.qRest).slerp(el.tuck, 0.2);
+      el.qT.copy(el.qRest).slerp(el.tuck, C.braceElbow ?? 0.2);
     } else {
       const k = 1 - Math.exp(-5 * dt);
       sh.qT.slerp(sh.tuck, k);
       el.qT.slerp(el.tuck, k);
     }
   }
+  if (rate) for (const j of H.jl) j.qT.rotateTowards(j.goal, (C.toneRateKind?.[j.kind] ?? rate) * dt);
   void _q2;
+}
+
+/** The bracing arm's goal: the upper arm toward the snow it falls onto (within braceCone of the trunk's down axis), a soft elbow. */
+function braceGoal(sh, el, braceDir, C) {
+  const dP = _a.copy(braceDir).applyQuaternion(conj(sh.b0.q, _q)).normalize();
+  const cone = (C.braceCone ?? 180) * DEG;
+  if (-dP.y < Math.cos(cone)) {
+    const side = _c.set(dP.x, 0, dP.z);
+    if (side.lengthSq() < 1e-8) side.set(1, 0, 0);
+    side.normalize();
+    dP.set(side.x * Math.sin(cone), -Math.cos(cone), side.z * Math.sin(cone));
+  }
+  const aRest = _b.copy(Y).applyQuaternion(sh.qRest);
+  sh.goal.setFromUnitVectors(aRest, dP).multiply(sh.qRest);
+  el.goal.copy(el.qRest).slerp(el.tuck, C.braceElbow ?? 0.2);
 }

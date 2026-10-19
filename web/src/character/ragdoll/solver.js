@@ -251,6 +251,10 @@ export class World {
       b.w.set(_q.x * s, _q.y * s, _q.z * s);
     }
     // --- velocity pass: friction, restitution, snow drag, joint damping
+    // (a body lying on the snow doesn't glide on the bases of the skis it still has on: they're on their edges,
+    // across, dragged — only a rider still on them slides along them)
+    this.trunkDown = false;
+    for (const b of this.bodies) if (b.isTrunk && b.touch && b.group === 0) this.trunkDown = true;
     for (let i = 0; i < this.nc; i++) this.contactVel(this.contacts[i], h);
     for (let i = 0; i < this.np; i++) this.pairVel(this.pc[i]);
     const digDecay = Math.exp(-(C.digDecay ?? 0) * h);
@@ -293,6 +297,7 @@ export class World {
         this.stats.budgetHits = (this.stats.budgetHits || 0) + 1;
       }
     }
+    if (this.gov && !this.groups.get(0).asleep) this.govern(h);
     // --- safety, sleep
     for (const b of this.bodies) {
       const vl = b.v.length(), wl = b.w.length();
@@ -320,6 +325,78 @@ export class World {
         for (const b of this.bodies) if (b.group === gid) { b.v.set(0, 0, 0); b.w.set(0, 0, 0); }
       }
     }
+  }
+
+  /** The group's rotation as a whole: ω = I⁻¹·L about its centre of mass (null if degenerate). Leaves the centre in this._govC. */
+  rigidOmega(group, out) {
+    let m = 0;
+    const c = (this._govC ||= new THREE.Vector3()).set(0, 0, 0), P = _b.set(0, 0, 0);
+    for (const b of this.bodies) if (b.group === group) { c.addScaledVector(b.x, b.m); P.addScaledVector(b.v, b.m); m += b.m; }
+    c.divideScalar(m); P.divideScalar(m);
+    // L about the centre of mass and the whole-body inertia tensor (world).
+    const L = _c.set(0, 0, 0), I = this._govI || (this._govI = new Float64Array(9));
+    I.fill(0);
+    for (const b of this.bodies) {
+      if (b.group !== group) continue;
+      const r = _d.subVectors(b.x, c), vr = _e.subVectors(b.v, P);
+      L.x += b.m * (r.y * vr.z - r.z * vr.y); L.y += b.m * (r.z * vr.x - r.x * vr.z); L.z += b.m * (r.x * vr.y - r.y * vr.x);
+      // R·I·Rᵀ (body inertia, diagonal in its frame) + parallel axis
+      const { x, y, z, w } = b.q, dI = b.I;
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - w * z), r02 = 2 * (x * z + w * y);
+      const r10 = 2 * (x * y + w * z), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - w * x);
+      const r20 = 2 * (x * z - w * y), r21 = 2 * (y * z + w * x), r22 = 1 - 2 * (x * x + y * y);
+      const X = dI.x, Y = dI.y, Z = dI.z, M = b.m, rr = r.lengthSq(), rx = r.x, ry = r.y, rz = r.z;
+      const i00 = r00 * r00 * X + r01 * r01 * Y + r02 * r02 * Z + M * (rr - rx * rx);
+      const i01 = r00 * r10 * X + r01 * r11 * Y + r02 * r12 * Z - M * rx * ry;
+      const i02 = r00 * r20 * X + r01 * r21 * Y + r02 * r22 * Z - M * rx * rz;
+      const i11 = r10 * r10 * X + r11 * r11 * Y + r12 * r12 * Z + M * (rr - ry * ry);
+      const i12 = r10 * r20 * X + r11 * r21 * Y + r12 * r22 * Z - M * ry * rz;
+      const i22 = r20 * r20 * X + r21 * r21 * Y + r22 * r22 * Z + M * (rr - rz * rz);
+      I[0] += i00; I[1] += i01; I[2] += i02; I[3] += i01; I[4] += i11; I[5] += i12; I[6] += i02; I[7] += i12; I[8] += i22;
+      // spin of the body itself: L += I_b·w_b
+      const wb = _f.copy(b.w).applyQuaternion(_q.set(-x, -y, -z, w));
+      _g.set(dI.x * wb.x, dI.y * wb.y, dI.z * wb.z).applyQuaternion(b.q);
+      L.add(_g);
+    }
+    // ω = I⁻¹ L (3×3 inverse by cofactors)
+    const a = I[0], b2 = I[1], c2 = I[2], d = I[4], e = I[5], f = I[8];
+    const A = d * f - e * e, B = c2 * e - b2 * f, Cc = b2 * e - c2 * d;
+    const det = a * A + b2 * B + c2 * Cc;
+    if (!(det > 1e-9)) return null;
+    const D2 = a * f - c2 * c2, E = b2 * c2 - a * e, F = a * d - b2 * b2;
+    return out.set((A * L.x + B * L.y + Cc * L.z) / det, (B * L.x + D2 * L.y + E * L.z) / det, (Cc * L.x + E * L.y + F * L.z) / det);
+  }
+
+  /**
+   * Tumble governor (group 0; World.gov = { cap, budget, ground }): the body's rotation as a whole — ω = I⁻¹·L, its
+   * angular momentum about the centre of mass over the whole-body inertia — is held under `cap` rad/s while it
+   * touches something (`ground`: only then; else always), and once the body has turned `budget` rad in all the cap
+   * falls to a crawl: a small crash stays a fall onto the side, not a flip. Only that rigid rotation is taken out
+   * (limbs keep their own motion, the slide keeps its speed): energy only ever goes down. It stands in for what a
+   * real rider does — arms and legs out, edges and hands dug in — that a capsule body can't.
+   */
+  govern(h) {
+    const G = this.gov;
+    const om = this.rigidOmega(0, _n), c = this._govC;
+    let touch = false;
+    for (const b of this.bodies) if (b.group === 0 && b.touch) touch = true;
+    if (!om) return;
+    const wl = om.length();
+    this.turned = (this.turned || 0) + wl * h;
+    if (G.ground && !touch) return;
+    // The cap: full up to 70 % of the budget, then down to a crawl (0.4 rad/s) at the budget.
+    const over = (this.turned - 0.7 * G.budget) / (0.3 * G.budget);
+    const cap = over <= 0 ? G.cap : over >= 1 ? 0.4 : G.cap + (0.4 - G.cap) * over * over * (3 - 2 * over);
+    if (wl <= cap) return;
+    // Take out (1 − cap/|ω|) of the rigid rotation, at most `rate` per second (no visible jolt).
+    const k = Math.min(1 - cap / wl, (G.rate ?? 40) * h);
+    om.multiplyScalar(k);
+    for (const b of this.bodies) {
+      if (b.group !== 0) continue;
+      b.v.sub(_d.crossVectors(om, _e.subVectors(b.x, c)));
+      b.w.sub(om);
+    }
+    this.stats.govHits = (this.stats.govHits || 0) + 1;
   }
 
   fail() {
@@ -594,7 +671,7 @@ export class World {
     }
     if (b.group === 0 && -vn > this.impact) { this.impact = -vn; this.impactAt.copy(p); }
     if (smp && -vn > (b.dig || 0)) b.dig = -vn;
-    if (b.isHand) this.handTouch = true;
+    if (b.isHand || (b.isTrunk && b.group === 0)) this.handTouch = true;   // (bracing ends once a hand or the trunk is down)
   }
 
   contactVel(c, h) {
@@ -613,7 +690,7 @@ export class World {
       // Slow slides grip more (the body settles into the snow): μ rises toward the static μ under slowGrip m/s.
       const sg = this.C.slowGrip || 0;
       let mu = sg > 0 && vtl < sg ? c.muS + (c.mu - c.muS) * (vtl / sg) * (2 - vtl / sg) : c.mu;
-      if (c.ax) {
+      if (c.ax && !(this.trunkDown && this.C.skiDragDown)) {
         // A ski base: slides along its length (muA), its edge bites across it (mu).
         const ca = _e.copy(c.ax).applyQuaternion(b.q).dot(_d), c2 = ca * ca;
         mu = c.muA * c2 + mu * (1 - c2);

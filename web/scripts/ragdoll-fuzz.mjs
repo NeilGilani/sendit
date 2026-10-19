@@ -137,7 +137,7 @@ export function setup(sc, overrides = {}) {
     heading: Math.atan2(-vdir.x, -vdir.z), lastCrash: (() => {
       // What player.land would have recorded (the ragdoll grades the crash from it): the pitch / yaw error, the impact.
       const ang = 2 * Math.acos(Math.min(1, Math.abs(extraQ.w))) * 180 / Math.PI;
-      const c = { reason, impact: Math.max(0, -v.y) };
+      const c = { reason, impact: reason === 'impact' ? Math.max(18.5, -v.y) : Math.max(0, -v.y) };   // (an 'impact' crash is > PHYSICS.crashImpact by definition)
       if (reason === 'pitch') c.flipDev = s.fx?.flipDev ?? 43 + ang;
       if (reason === 'yaw') c.dev = s.fx?.dev ?? ang;
       return c;
@@ -311,7 +311,7 @@ for (let i = (process.env.ONLY ? Number(process.env.ONLY) : 0); i < (process.env
 }
 const fails = results.filter((r) => r.fail.length);
 const med = (a) => q(a, 0.5), p90 = (a) => q(a, 0.9);
-if (process.env.DUMP) (await import('node:fs')).writeFileSync(process.env.DUMP, JSON.stringify(results.map(({ i, type, cause, deg, speed, sleep, fadeAt, shown, peak, mean, swings }) => ({ i, type, cause, deg, speed, sleep, fadeAt, shown, peak, mean, swings }))));
+if (process.env.DUMP) (await import('node:fs')).writeFileSync(process.env.DUMP, JSON.stringify(results.map(({ i, type, cause, deg, speed, sleep, fadeAt, shown, peak, mean, swings, tier, sev, flips, tumble, roll, wMax, gentle }) => ({ i, type, cause, deg, speed, sleep, fadeAt, shown, peak, mean, swings, tier, sev, flips, tumble, roll, wMax, gentle }))));
 if (process.env.SLOW) for (const r of results.filter((x) => x.gentle)) console.log('slow', r.i, r.cause, r.deg.toFixed(0), r.speed.toFixed(1), 'com<0.3 at', r.slow?.toFixed(2), 'asleep', r.sleep?.toFixed(2));
 const q = (arr, p) => { const a = [...arr].sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(p * a.length))]; };
 const sleepers = results.filter((r) => r.sleep !== null);
@@ -354,13 +354,13 @@ for (const name of ['small', 'medium', 'big']) {
   if (!rs.length) { console.log(`    ${name}: none`); tierBad.push(`no ${name} crashes`); continue; }
   const f = (k) => rs.map((r) => r[k]);
   const flips = f('flips'), with1 = flips.filter((x) => x >= 1).length;
-  console.log(`    ${name.padEnd(6)} ${String(rs.length).padStart(3)} runs: flips 0/1/2+ ${flips.filter((x) => x === 0).length}/${flips.filter((x) => x === 1).length}/${flips.filter((x) => x >= 2).length}, tumble median ${med(f('tumble')).toFixed(0)}° p90 ${p90(f('tumble')).toFixed(0)}°, roll median ${med(f('roll')).toFixed(0)}° p90 ${p90(f('roll')).toFixed(0)}°; trunk spin max median ${med(f('wMax')).toFixed(1)} p90 ${p90(f('wMax')).toFixed(1)} rad/s; hand from trunk peak median ${med(f('armPeak')).toFixed(2)} p90 ${p90(f('armPeak')).toFixed(2)} m (mean ${med(f('armMean')).toFixed(2)}); ankles apart peak p90 ${p90(f('legPeak')).toFixed(2)} m; looseness median ${med(f('mean')).toFixed(2)} p90 ${p90(f('mean')).toFixed(2)} rad/s; asleep median ${med(rs.map((r) => r.sleep ?? 4)).toFixed(2)} s`);
+  console.log(`    ${name.padEnd(6)} ${String(rs.length).padStart(3)} runs: flips 0/1/2+ ${flips.filter((x) => x === 0).length}/${flips.filter((x) => x === 1).length}/${flips.filter((x) => x >= 2).length}, tumble median ${med(f('tumble')).toFixed(0)}° p90 ${p90(f('tumble')).toFixed(0)}°, roll median ${med(f('roll')).toFixed(0)}° p90 ${p90(f('roll')).toFixed(0)}°; body spin (0.1 s) peak median ${med(f('wMax')).toFixed(1)} p90 ${p90(f('wMax')).toFixed(1)} rad/s; hand from trunk peak median ${med(f('armPeak')).toFixed(2)} p90 ${p90(f('armPeak')).toFixed(2)} m (mean ${med(f('armMean')).toFixed(2)}); ankles apart peak p90 ${p90(f('legPeak')).toFixed(2)} m; looseness median ${med(f('mean')).toFixed(2)} p90 ${p90(f('mean')).toFixed(2)} rad/s; asleep median ${med(rs.map((r) => r.sleep ?? 4)).toFixed(2)} s`);
   const L = TL[name];
   if (L.flips !== undefined && with1 > L.flips) tierBad.push(`${name}: ${with1} flips`);
   if (L.flipShare !== undefined && with1 / rs.length > L.flipShare) tierBad.push(`${name}: ${(with1 / rs.length * 100).toFixed(0)} % flip`);
   if (L.flipsMax !== undefined && Math.max(...flips) > L.flipsMax) tierBad.push(`${name}: ${Math.max(...flips)} flips`);
   if (L.tumbleP90 !== undefined && p90(f('tumble')) > L.tumbleP90) tierBad.push(`${name}: tumble p90 ${p90(f('tumble')).toFixed(0)}°`);
-  if (p90(f('wMax')) > L.wMaxP90) tierBad.push(`${name}: trunk spin p90 ${p90(f('wMax')).toFixed(1)}`);
+  if (p90(f('wMax')) > L.wMaxP90) tierBad.push(`${name}: body spin p90 ${p90(f('wMax')).toFixed(1)}`);
   if (p90(f('armPeak')) > L.armPeakP90) tierBad.push(`${name}: hand spread p90 ${p90(f('armPeak')).toFixed(2)}`);
   if (med(f('mean')) > L.looseMed) tierBad.push(`${name}: looseness ${med(f('mean')).toFixed(2)}`);
 }
