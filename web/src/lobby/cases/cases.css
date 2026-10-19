@@ -419,3 +419,8 @@ body.cr-open #lobby, body.cr-open .cn-stack { opacity: 0 !important; pointer-eve
 .cn-text b { font-style: normal; font-weight: 800; font-stretch: 80%; text-transform: uppercase; letter-spacing: .02em; }
 .cn-text small { color: var(--c-snow-2); }
 .cn-xp { font-family: var(--font-mono); font-weight: 600; color: #5fd08e; }
+
+/* In a ride (notify.js adds .ride): left edge, below the middle, clear of the score / snowflakes (top right),
+   the challenge timer (top centre), the speed read-out (bottom centre) and the score notes (bottom right). */
+.cn-stack.ride { left: 1.2em; right: auto; top: auto; bottom: 26%; align-items: flex-start; }
+@media (max-width: 760px) { .cn-stack.ride { left: .6em; bottom: 30%; font-size: 11px; } }
