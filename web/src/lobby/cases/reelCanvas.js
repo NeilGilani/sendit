@@ -6,6 +6,7 @@ import { rarityOf } from '../../profile/rarity.js';
 import { skin, casePool } from '../../profile/rewards.js';
 import { RARITIES } from '../../profile/rarity.js';
 import { itemArt, goldArt } from './art.js';
+import { iconUrl, iconImage, requestIcons, whenIcons, onIcon, GOLD_ICON } from './itemIcons.js';
 
 // Card geometry in em (matches cases.css: .cr-strip .cr-card 9.2em wide, gap .45em, strip inset 1.1em).
 export const CARD = { w: 9.2, gap: 0.45, inset: 1.1 };
@@ -19,13 +20,17 @@ function mix(hex, k, to = 255) {
   return `rgb(${c.join(',')})`;
 }
 
-/** One card as a standalone SVG string, `h` em tall. */
-function cardSvg(key, rarity, h) {
+/** Where the card's picture sits, in card SVG units (W × H). */
+const artRect = (W, H) => { const h = Math.min(70, H - 34); return { x: 5, y: 4, w: W - 10, h }; };
+
+/** One card as a standalone SVG string, `h` em tall; `art: false` leaves the picture out (drawn on top). */
+function cardSvg(key, rarity, h, { art: withArt = true } = {}) {
   const r = rarityOf(rarity);
   const s = key ? skin(key) : null;
   const gold = rarity === 'gold' || !s;
   const W = CARD.w * U, H = h * U;
-  const art = (gold ? goldArt() : itemArt(s.item, s.variant)).replace('<svg ', `<svg x="5" y="4" width="${W - 10}" height="${Math.min(70, H - 34)}" preserveAspectRatio="xMidYMid meet" `);
+  const ar = artRect(W, H);
+  const art = !withArt ? '' : (gold ? goldArt() : itemArt(s.item, s.variant)).replace('<svg ', `<svg x="${ar.x}" y="${ar.y}" width="${ar.w}" height="${ar.h}" preserveAspectRatio="xMidYMid meet" `);
   const name = gold ? '★ Rare Special Item' : s.item.name;
   const sub = gold ? 'Exceedingly Rare' : s.variant.name;
   const bg = gold
@@ -59,20 +64,55 @@ export function reelMetrics() {
   return { em, dpr, w, h, size: `${w}x${h}` };
 }
 
+// Cards rasterised with the flat SVG art because their rendered icon was not baked yet: redone when it is.
+const flat = new Map();   // icon id → Set of cache keys
+const iconIdOf = (rarity, key) => (rarity === 'gold' || !key ? GOLD_ICON : key);
+onIcon((iconId) => {
+  const ks = flat.get(iconId);
+  if (!ks) return;
+  flat.delete(iconId);
+  for (const k of ks) {
+    if (!cache.has(k)) continue;
+    cache.delete(k);
+    const [w, h] = k.split('|')[0].split('x').map(Number);
+    const id = k.slice(k.indexOf('|') + 1);
+    const m = metricsFor.get(`${w}x${h}`);
+    if (m) enqueue([id], m, true);
+  }
+  if (queue.length) pump(true);
+});
+const metricsFor = new Map();   // size → the metrics it was enqueued with
+
 function rasterOne(job) {
   const k = `${job.size}|${job.id}`;
   if (cache.has(k)) return Promise.resolve();
   const [rarity, key] = job.id.split('|');
-  const img = new Image();
-  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(cardSvg(key || null, rarity, job.hEm))}`;
-  return img.decode().then(() => {
-    const c = document.createElement('canvas');
-    c.width = job.w; c.height = job.h;
-    c.getContext('2d').drawImage(img, 0, 0, job.w, job.h);
-    cache.set(k, c);
-    // An ImageBitmap blits faster than a small (software) canvas once it is on the GPU.
-    return globalThis.createImageBitmap?.(c).then((b) => cache.set(k, b), () => {});
-  }, () => cache.set(k, null));
+  const iconId = iconIdOf(rarity, key || null);
+  const hasIcon = !!iconUrl(iconId, 3);
+  return (hasIcon ? iconImage(iconId) : Promise.resolve(null)).then((icon) => {
+    const img = new Image();
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(cardSvg(key || null, rarity, job.hEm, { art: !icon }))}`;
+    return img.decode().then(() => {
+      const c = document.createElement('canvas');
+      c.width = job.w; c.height = job.h;
+      const g = c.getContext('2d');
+      g.drawImage(img, 0, 0, job.w, job.h);
+      if (icon) {
+        // The rendered icon (square) fitted into the art box, like preserveAspectRatio="meet".
+        const W = CARD.w * U, H = job.hEm * U, sx = job.w / W, sy = job.h / H;
+        const ar = artRect(W, H);
+        const side = Math.min(ar.w * sx, ar.h * sy);
+        g.imageSmoothingQuality = 'high';
+        g.drawImage(icon, ar.x * sx + (ar.w * sx - side) / 2, ar.y * sy + (ar.h * sy - side) / 2, side, side);
+      } else {
+        if (!flat.has(iconId)) flat.set(iconId, new Set());
+        flat.get(iconId).add(k);
+      }
+      cache.set(k, c);
+      // An ImageBitmap blits faster than a small (software) canvas once it is on the GPU.
+      return globalThis.createImageBitmap?.(c).then((b) => { if (cache.get(k) === c) cache.set(k, b); }, () => {});
+    }, () => cache.set(k, null));
+  });
 }
 
 /** Work through the queue: in idle time (prewarm) or ~4 ms per frame (an opening needs them now). */
@@ -94,6 +134,7 @@ function pump(urgent) {
 }
 
 function enqueue(ids, m, front = false) {
+  metricsFor.set(m.size, m);
   const hEm = m.h / m.dpr / m.em;
   const jobs = ids.filter((id) => !cache.has(`${m.size}|${id}`) && !queue.some((q) => q.id === id && q.size === m.size)).map((id) => ({ id, size: m.size, w: m.w, h: m.h, hEm }));
   if (front) queue.unshift(...jobs); else queue.push(...jobs);
@@ -103,13 +144,15 @@ function enqueue(ids, m, front = false) {
 export const reelPending = () => queue.length + (pumping ? 1 : 0);
 if (typeof window !== 'undefined') window.__senditReelPending = reelPending;
 
-/** Pre-rasterise every card of these case series (and the gold card) in idle time. */
+/** Pre-rasterise every card of these case series (and the gold card) in idle time, after their icons are baked. */
 export function prerasterReel(seriesList) {
   const m = reelMetrics();
   const ids = [cardId('gold', null)];
   for (const s of seriesList) { const pool = casePool(s); for (const r of RARITIES) if (r.id !== 'gold') for (const e of pool[r.id]) ids.push(cardId(r.id, e.key)); }
-  enqueue([...new Set(ids)], m);
-  pump(false);
+  const uniq = [...new Set(ids)];
+  const icons = uniq.map((id) => { const [r, k] = id.split('|'); return iconIdOf(r, k || null); });
+  requestIcons(icons, 0);
+  whenIcons(icons, 30000).then(() => { enqueue(uniq, m); pump(false); });
 }
 
 export class CanvasReel {

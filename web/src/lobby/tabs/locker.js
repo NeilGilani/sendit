@@ -6,6 +6,8 @@ import { registerLobbyTab } from '../tabs.js';
 import { ICONS } from '../icons.js';
 import { esc } from './common.js';
 import { cardHtml } from '../cases/opener.js';
+import { artHtml } from '../cases/itemIcons.js';
+import { itemArt } from '../cases/art.js';
 import { caseSfx } from '../cases/sfx.js';
 import { rarityOf } from '../../profile/rarity.js';
 import { ownKey, listItems, rewardSkins } from '../../profile/catalog.js';
@@ -78,9 +80,9 @@ registerLobbyTab({
           </button>`;
         }).join('')}${missingOn ? missingSkins.map((o) => `
           <button type="button" role="option" class="lk-item missing" data-miss="${esc(o.key)}" aria-selected="false" title="${esc(`${o.item.name} | ${o.variant.name} (not owned)`)}">
-            ${cardHtml(o.variant.rarity === 'gold' ? null : o.key, o.variant.rarity).replace('class="cr-card', 'class="cr-card missing')}
+            ${cardHtml(o.variant.rarity === 'gold' ? null : o.key, o.variant.rarity, { icon: false }).replace('class="cr-card', 'class="cr-card missing')}
           </button>`).join('') : ''}</div>
-        ${sel ? `<div class="lk-sel" style="--rc:${r.color}">
+        ${sel ? `<div class="lk-sel" style="--rc:${r.color}">${sel.missing ? '' : artHtml(sel.key, itemArt(sel.item, sel.variant), { cls: 'lk-sel-icon', prio: 2 })}
           <span class="lk-grade">${esc(sel.variant.starter ? 'Starter' : r.name)}${sel.missing ? ' · not owned yet' : ''}</span>
           <b>${esc(sel.variant.rarity === 'gold' && sel.missing ? '★ ??? ' : `${sel.item.name} | ${sel.variant.name}`)}</b>
           <p>${esc(sel.missing ? dropInfo(sel.variant, sel.key) : sel.item.description || '')}</p></div>` : ''}
