@@ -383,8 +383,12 @@ the butt, hem and thighs went 9–13 cm into the deck. What rider.js does now:
   (`skiGrabLift` 0.46 m) and the upper body folds a little over them. Grab targets: board Indy = rear hand, toe
   edge between the feet; Melon = front hand, heel edge by the front foot; Nose / Tail = the toe edge near that
   end. Skis Safety = own ski, outside edge ahead of the toe piece; Japan = further forward; Mute = the right hand
-  across to the left ski's inside edge; Tail grab = own tail; Truck driver = both hands to the fronts. A Tail-grab
-  tweak now swings the tail toward the hand (it swung away).
+  across to the left ski's inside edge; Tail grab = own tail; Truck driver = both hands to the fronts. Each grab
+  owns a stretch of edge and the hand closes on its point nearest the shoulder (`nearestStation`). A Tail-grab
+  tweak now swings the tail toward the hand (it swung away). Tweaks go only as far as the arm reaches
+  (`tweakFit`: while the grabbing hand falls short the tweak eases back, and it returns once the hand holds):
+  tweaked board grabs went from 11–24 cm short of the board to ≤ 3 cm. Of the ski grabs only the Tail grab
+  brings the skis back to the hand (skis pulled into the folded legs bunch the jacket hem between the knees).
 - **Legs never leave the bindings.** If a leg can't reach its binding, the gear follows the foot in the air and
   the hips come down on the snow.
 
