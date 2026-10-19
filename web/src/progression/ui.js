@@ -11,12 +11,12 @@ const CSS = /* css */`
 #lvlUp .ring { position: absolute; left: 50%; top: 32%; width: 140px; height: 140px; margin: -70px 0 0 -70px; border-radius: 50%; border: 6px solid var(--rc, #ffe14d); opacity: 0; }
 #lvlUp.show .ring { animation: luRing 1.1s cubic-bezier(.1,.8,.3,1) forwards; }
 #lvlUp.show .ring.r2 { animation-delay: .14s; }
-#lvlUp .box { position: absolute; left: 50%; top: 32%; transform: translate(-50%, -50%); text-align: center; padding: 22px 64px 20px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(12,16,40,.62) 0%, rgba(12,16,40,.38) 55%, transparent 72%); font-family: "Arial Black", Impact, sans-serif; font-style: italic; color: #fffaf0; white-space: nowrap; }
+#lvlUp .box { position: absolute; left: 50%; top: 32%; transform: translate(-50%, -50%); text-align: center; padding: 22px 64px 20px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(12,16,40,.62) 0%, rgba(12,16,40,.38) 55%, transparent 72%); font-family: "Archivo", "Arial Black", Impact, sans-serif; font-style: italic; color: #fffaf0; white-space: nowrap; }
 #lvlUp .k { font-size: 20px; letter-spacing: .5em; color: var(--rc, #ffe14d); -webkit-text-stroke: 1px #1b1446; paint-order: stroke fill; }
 #lvlUp .n { font-size: 120px; line-height: .95; -webkit-text-stroke: 4px #1b1446; paint-order: stroke fill; text-shadow: 0 0 40px var(--rc, #ffe14d), 0 8px 0 rgba(27,20,70,.6); }
 #lvlUp.show .n { animation: luNum .6s cubic-bezier(.2,1.8,.4,1); }
 #lvlUp .rk { font-size: 24px; letter-spacing: .12em; margin-top: 4px; color: var(--rc, #ffe14d); -webkit-text-stroke: 1px #1b1446; paint-order: stroke fill; }
-#lvlUp .sub { font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 900; font-size: 13px; letter-spacing: .2em; color: #fffaf0; margin-top: 8px; text-shadow: 0 1px 3px #1b1446, 0 0 10px rgba(12,16,40,.9); }
+#lvlUp .sub { font-family: var(--font); font-style: normal; font-weight: 900; font-size: 13px; letter-spacing: .2em; color: #fffaf0; margin-top: 8px; text-shadow: 0 1px 3px #1b1446, 0 0 10px rgba(12,16,40,.9); }
 #lvlUp .bg { position: absolute; inset: 0; background: radial-gradient(circle at 50% 32%, rgba(255,225,77,.22), rgba(122,92,255,.12) 35%, transparent 65%); }
 @keyframes luIn { 0% { opacity: 0; } 6% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes luRing { 0% { opacity: 1; transform: scale(.3); } 100% { opacity: 0; transform: scale(5); } }
@@ -25,18 +25,18 @@ const CSS = /* css */`
 #xpMini.on { opacity: 1; }
 #xpMini i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #2ff5d6, #7a5cff); transition: width .35s; }
 #xpMini b { position: absolute; }
-#xpLv { position: absolute; left: 50%; bottom: 17px; transform: translateX(calc(-50% - 104px)); text-shadow: 0 1px 4px rgba(0,0,0,.6); font: 800 11px "Inter", "Segoe UI", sans-serif; letter-spacing: .14em; color: rgba(250,248,243,.7); opacity: 0; transition: opacity .6s; }
+#xpLv { position: absolute; left: 50%; bottom: 17px; transform: translateX(calc(-50% - 104px)); text-shadow: 0 1px 4px rgba(0,0,0,.6); font: 800 11px var(--font); letter-spacing: .14em; color: rgba(250,248,243,.7); opacity: 0; transition: opacity .6s; }
 #xpLv.on { opacity: 1; }
 body.fp #xpMini, body.fp #xpLv { display: none; }
 body.lvlup #juiceHud .cb { opacity: 0 !important; transition: opacity .2s; }
-#rideRecap { position: fixed; right: clamp(16px, 3vw, 40px); top: 50%; z-index: 35; width: min(330px, 86vw); padding: 18px 20px 16px; border-radius: 16px;
-  background: rgba(12,16,30,.72); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,.16); box-shadow: 0 18px 60px rgba(0,0,0,.4);
-  font-family: "Inter", "Segoe UI", sans-serif; color: #fffaf0; transform: translate(120%, -50%); opacity: 0; transition: transform .55s cubic-bezier(.2,1.2,.4,1), opacity .35s; pointer-events: auto; cursor: pointer; }
+#rideRecap { position: fixed; right: clamp(16px, 3vw, 40px); top: 50%; z-index: 35; width: min(330px, 86vw); padding: 18px 20px 16px; border-radius: 4px;
+  background: rgba(10,18,26,.94); border: 1px solid rgba(214,228,240,.14); border-top: 3px solid var(--c-signal); box-shadow: 0 18px 60px rgba(0,0,0,.4);
+  font-family: var(--font); color: #fffaf0; transform: translate(120%, -50%); opacity: 0; transition: transform .55s cubic-bezier(.2,1.2,.4,1), opacity .35s; pointer-events: auto; cursor: pointer; }
 #rideRecap.on { transform: translate(0, -50%); opacity: 1; }
-#rideRecap h3 { margin: 0; font: italic 900 13px "Arial Black", Impact, sans-serif; letter-spacing: .3em; color: rgba(250,248,243,.7); }
-#rideRecap .xp { font: italic 900 46px/1.05 "Arial Black", Impact, sans-serif; color: #ffe14d; -webkit-text-stroke: 1.5px #1b1446; paint-order: stroke fill; text-shadow: 0 0 22px rgba(255,180,60,.45); margin: 4px 0 2px; }
+#rideRecap h3 { margin: 0; font: italic 900 13px "Archivo", "Arial Black", Impact, sans-serif; letter-spacing: .3em; color: rgba(250,248,243,.7); }
+#rideRecap .xp { font: italic 900 46px/1.05 "Archivo", "Arial Black", Impact, sans-serif; color: #ffe14d; -webkit-text-stroke: 1.5px #1b1446; paint-order: stroke fill; text-shadow: 0 0 22px rgba(255,180,60,.45); margin: 4px 0 2px; }
 #rideRecap .lv { display: flex; justify-content: space-between; font-size: 12px; font-weight: 800; letter-spacing: .12em; color: rgba(250,248,243,.75); margin-top: 6px; }
-#rideRecap .bar { height: 7px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; margin: 5px 0 10px; }
+#rideRecap .bar { height: 7px; border-radius: 0; background: rgba(255,255,255,.14); overflow: hidden; margin: 5px 0 10px; }
 #rideRecap .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #2ff5d6, #7a5cff); transition: width 1.1s cubic-bezier(.3,.8,.3,1); }
 #rideRecap .row { display: flex; gap: 8px; font-size: 13px; padding: 3px 0; }
 #rideRecap .row b { flex: none; width: 18px; text-align: center; }
