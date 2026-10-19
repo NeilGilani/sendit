@@ -12,8 +12,9 @@
 import * as THREE from 'three';
 import { RAGDOLL, PHYSICS } from '../../config.js';
 import { on, emit } from '../../state.js';
-import { buildHumanoid, seedMotion, depenetrate, updateTone } from './humanoid.js';
+import { buildHumanoid, seedMotion, depenetrate, updateTone, setTuck } from './humanoid.js';
 import { captureSeed, applyPose } from './rig.js';
+import { crashSeverity, bySeverity } from './severity.js';
 
 const CRASH = 3;
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
@@ -186,7 +187,10 @@ export class RagdollController {
       this._impactCool = 0.16;
     }
     W.impact = 0;
-    this.restT = W.asleep(0) ? this.restT + dt : 0;
+    // At rest for the respawn fade: asleep — or, for a small / medium fall, the centre of mass all but stopped (a limb
+    // still settling doesn't keep a small mistake on screen).
+    const rs = this.S ? this.S('restSpeed', 0) : 0;
+    this.restT = W.asleep(0) || (rs > 0 && pl.speed < rs) ? this.restT + dt : 0;
     this.measure(dt);
     const ms = typeof performance !== 'undefined' ? performance.now() - t0 : 0;
     this.stats.lastMs = ms; this.stats.maxMs = Math.max(this.stats.maxMs, ms); this.stats.sumMs = (this.stats.sumMs || 0) + ms; this.stats.steps = (this.stats.steps || 0) + 1;
@@ -205,6 +209,33 @@ export class RagdollController {
     if (!m.c0) m.c0 = com.clone();
     m.dist = Math.hypot(com.x - m.c0.x, com.z - m.c0.z);
     if (H.world.asleep(0) || this.t > 2.5) return;
+    // Tumbling: the angle the trunk's long axis (pelvis → chest) sweeps (head over heels / cartwheels: 360° = one
+    // flip) and the roll about that axis (a log roll), the trunk's peak spin; limb spread: each hand's distance from
+    // the trunk segment and the distance between the ankles (peak and time average).
+    const pv = P.pelvis, ch = P.chest;
+    const u = _c.subVectors(ch.x, pv.x).normalize();
+    if (m.u) { m.tumble += Math.acos(Math.max(-1, Math.min(1, u.dot(m.u)))); m.roll += Math.abs(_b.addVectors(pv.w, ch.w).multiplyScalar(0.5).dot(u)) * dt; }
+    else m.u = new THREE.Vector3();
+    m.u.copy(u);
+    // Body spin: the whole body's rotation rate (I⁻¹·L about its centre of mass, what reads as a flip / roll),
+    // averaged over 0.1 s; its peak after the first 0.05 s.
+    const om = H.world.rigidOmega(0, _b);
+    if (om) {
+      const k = Math.min(1, dt / 0.1);
+      m.wAvg = m.wAvg === undefined ? om.length() : m.wAvg + (om.length() - m.wAvg) * k;
+      if (this.t > 0.05) m.wMax = Math.max(m.wMax, m.wAvg);
+    }
+    let arm = 0;
+    for (const f of [P.forearmL, P.forearmR]) {
+      f.point(f.shapes[1].a, _b);
+      const L = ch.x.distanceTo(pv.x);
+      const k = Math.max(0, Math.min(L, _b.clone().sub(pv.x).dot(u)));
+      arm = Math.max(arm, _b.sub(pv.x).addScaledVector(u, -k).length());
+    }
+    const ankle = (sh, out) => sh.point(sh.shapes[0].b, out);
+    const leg = ankle(P.shinL, _b).distanceTo(ankle(P.shinR, _a.clone()));
+    m.armPeak = Math.max(m.armPeak, arm); m.legPeak = Math.max(m.legPeak, leg);
+    m.armSum += arm * dt; m.legSum += leg * dt;
     let sum = 0;
     for (let i = 0; i < FLAP.length; i++) {
       const [limb, trunk] = FLAP[i];
@@ -256,7 +287,7 @@ export class RagdollController {
 
   _doneAt(crashT) {
     const C = this.C;
-    if ((crashT > PHYSICS.tumbleTime && this.restT > C.restHold) || crashT > C.maxTumble || this.H?.world.failed) return true;
+    if ((crashT > PHYSICS.tumbleTime && this.restT > (this.S ? this.S('restHold', C.restHold) : C.restHold)) || crashT > C.maxTumble || this.H?.world.failed) return true;
     // Still going after the tumble: on a steep face (a body keeps sliding there) or once it has slid far enough,
     // the fade starts instead of showing a long slide.
     if (crashT > C.slideFadeTime && this.H) {
@@ -278,8 +309,12 @@ export class RagdollController {
     const sp = W.comVel(0, _a).length(), hs = C.toneHoldSpeed || 0;
     const hold = hs > 0 ? Math.min(1, Math.max(0, (sp - hs * 0.25) / (hs * 0.75))) : 0;
     if (W.t < C.braceTime && !W.handTouch) {
-      _a.setY(0);
-      brace = _b.copy(_a.lengthSq() > 1 ? _a.normalize() : this.fallDir).multiplyScalar(0.75).add(_c.set(0, -1, 0)).normalize();
+      // Toward the snow the trunk is tipping onto (where its top leans), else the fall mode's way, else the motion.
+      _c.set(0, 1, 0).applyQuaternion(H.parts.chest.q).setY(0);
+      if (_c.lengthSq() > 0.09) _b.copy(_c).normalize();
+      else if (this.fall?.dir) _b.copy(this.fall.dir).setY(0).normalize();
+      else { _a.setY(0); _b.copy(_a.lengthSq() > 1 ? _a.normalize() : this.fallDir); }
+      brace = _b.multiplyScalar(0.75).add(_c.set(0, -1, 0)).normalize();
     }
     // Lying still: the muscles let go (a resting limb pushed by its tone against snow or bark would jitter).
     // Still upright after the first moments (a board under both feet makes a stable base): the knees and hips let
@@ -287,7 +322,32 @@ export class RagdollController {
     _c.set(0, 1, 0).applyQuaternion(H.parts.chest.q);
     const upright = W.t > C.uprightAfter && _c.y > 0.75 && H.parts.chest.x.y - H.parts.pelvis.x.y > 0.15;
     this.rest = W.settling || upright ? this.rest * Math.exp(-6 * W.h) : Math.min(1, this.rest + W.h);
-    updateTone(H, W.t, W.h, brace, C, this.rest, hold * hold * (3 - 2 * hold));
+    updateTone(H, W.t, W.h, brace, C, this.rest, hold * hold * (3 - 2 * hold), this.toneMul ?? 1);
+  }
+
+  /**
+   * Fall mode at the crash: { mode: 'back' | 'front' | 'side' | null, dir (horizontal-ish unit vector on the snow
+   * the trunk tips toward), axis (the rotation that tips it there: n × dir) }.
+   */
+  fallMode(seed, mot, n, reason, rnd) {
+    if (/tree|rock|tower|post|wall|fence|rail/.test(this.kind || '')) return { mode: null };
+    const B = seed.bones;
+    const u = new THREE.Vector3().subVectors(B.spine_03.p, B.pelvis.p).normalize();
+    const t = mot.v.clone().addScaledVector(n, -mot.v.dot(n));
+    if (t.lengthSq() < 0.25) t.set(-Math.sin(this.player.heading || 0), 0, -Math.cos(this.player.heading || 0)).addScaledVector(n, -0);
+    t.addScaledVector(n, -t.dot(n)).normalize();
+    const side = new THREE.Vector3().crossVectors(n, t).normalize();
+    const lf = u.dot(t), ls = u.dot(side);
+    // The trick's leftover pitch adds to the lean: a backflip still turning tips the body back.
+    const pitchRate = mot.w.dot(side);   // > 0 tips the top forward (side = n × t, and side × n = t)
+    const lean = lf + 0.08 * pitchRate;
+    let mode, dir;
+    if (reason === 'yaw' && Math.abs(lean) < 0.35) { mode = 'side'; dir = side.clone().multiplyScalar(Math.abs(ls) > 0.08 ? Math.sign(ls) : (rnd() < 0.5 ? -1 : 1)); }
+    else if (lean < -0.12 || (reason === 'impact' && lean < 0.25) || (reason === 'pitch' && lean < 0.12 && pitchRate < -0.5)) { mode = 'back'; dir = t.clone().negate(); }
+    else if (lean > 0.12 || reason === 'pitch') { mode = 'front'; dir = t.clone(); }
+    else { mode = Math.abs(ls) > 0.15 ? 'side' : 'back'; dir = mode === 'side' ? side.clone().multiplyScalar(Math.sign(ls)) : t.clone().negate(); }
+    const axis = new THREE.Vector3().crossVectors(n, dir).normalize();
+    return { mode, dir, axis, lean: +lean.toFixed(2), ls: +ls.toFixed(2) };
   }
 
   begin(pl) {
@@ -304,7 +364,18 @@ export class RagdollController {
     if (this.kind === 'rail' && reason === 'balance') mot.v.copy(pl.velocity);
     const sp = mot.v.length();
     seed.powder = pl.powder || 0;
-    seed.eject = seed.type === 'ski' && (sp > C.ejectSpeed || /tree|rock|tower|post|wall|fence/.test(this.kind || ''));
+    // How bad is it? (graded from what the riding physics recorded; the crash itself was decided there)
+    const dc = pl.dyn?.C || PHYSICS[seed.type] || {};   // (the equipment's landing limits, read only)
+    const n0 = this.env.normal(seed.bones.pelvis.p.x, seed.bones.pelvis.p.z, new THREE.Vector3());
+    this.sev = crashSeverity({ crash: pl.lastCrash, kind: this.kind, v: mot.v, w: mot.w, n: n0, C,
+      lim: { flipStumble: dc.flipLandStumble, yawCrash: seed.type === 'snowboard' ? dc.landSlide : dc.landCrash,
+        impact0: PHYSICS.hardLanding * 0.64, impact1: PHYSICS.crashImpact + 2 } });
+    const S = C.sev ? (k, d = 1) => (C.sev[k] ? bySeverity(C.sev[k], this.sev.s, C) : d) : (k, d = 1) => d;
+    this.S = S;
+    // The trick's leftover rotation: a near miss keeps little of it (the landing took it), a huge one keeps it all.
+    if (C.sev) { mot.w.multiplyScalar(S('spinKeep')); if (mot.w.length() > S('spinCap', 99)) mot.w.setLength(S('spinCap', 99)); }
+    const hard = /tree|rock|tower|post|wall|fence/.test(this.kind || '');
+    seed.eject = seed.type === 'ski' && (sp > (C.sev ? S('eject') : C.ejectSpeed) || hard);
     this.env.obstacles.length = 0;
     this.env.refresh(seed.bones.pelvis.p, 4);
     const H = buildHumanoid(seed, this.env, C);
@@ -314,14 +385,41 @@ export class RagdollController {
     const groundN = this.env.normal(com.x, com.z, new THREE.Vector3());
     const p0 = seed.bones.pelvis.p;
     const rnd = rng(Math.floor(p0.x * 131 + p0.z * 977 + (pl.simTime || 0) * 61));
-    seedMotion(H, { vCom: mot.v, w: mot.w, com, cause: { kind: this.kind, reason }, groundN, rnd, C });
-    this.stats.seed = { kind: this.kind, reason, v: +mot.v.length().toFixed(2), vy: +mot.v.y.toFixed(2), w: +mot.w.length().toFixed(2), pl: +pl.velocity.length().toFixed(2), tracked: this.frames.length, shift: +shift.length().toFixed(3) };
+    // Which way does it go? From how the trunk is tipped at the crash against the snow and the line of travel (and
+    // the trick's leftover pitch): back (landed on the tails: the skis shoot out, a sit-down onto the back), front
+    // (onto the hands and knees) or side (across the line: onto the hip). Trees / rocks / rails: the hit decides.
+    const fall = this.fallMode(seed, mot, groundN, reason, rnd);
+    this.fall = fall;
+    if (fall.mode && C.tuckModes?.[fall.mode]) setTuck(H, { ...C.tuck, ...C.tuckModes[fall.mode] });
+    if (C.tuckLie) for (const k of ['Side', 'Up', 'Down']) setTuck(H, { ...C.tuck, ...C.tuckLie[k.toLowerCase()] }, 'lie' + k);
+    seedMotion(H, { vCom: mot.v, w: mot.w, com, cause: { kind: this.kind, reason }, groundN, rnd, C,
+      catchMul: S('feetCatch') * (fall.mode === 'back' ? (C.backCatch ?? 1) : 1), twistMul: S('twist') });
+    // Small and medium falls tip over the way the body leans at a human rate (no less than sev.tip rad/s about
+    // that axis; a leftover rotation the other way is taken out): a slip, not a frozen statue and not a flip.
+    const tip = S('tip', 0);
+    if (tip > 0 && fall.axis) {
+      const ax = fall.axis;
+      let wc = 0, mm = 0;
+      for (const b of H.human) { wc += b.w.dot(ax) * b.m; mm += b.m; }
+      wc /= mm;
+      const dw = Math.max(tip, Math.min(wc, tip * 1.6)) - wc;
+      if (Math.abs(dw) > 1e-4) for (const b of H.human) { b.w.addScaledVector(ax, dw); b.v.add(_c.copy(ax).multiplyScalar(dw).cross(_b.subVectors(b.x, com))); }
+    }
+    // Stiffer, better-damped joints the smaller the crash; the tumble governor's cap and budget.
+    this.toneMul = S('tone');
+    for (const j of Object.values(H.joints)) j.damp *= S('damp');
+    // Self-arrest: after a small fall the rider digs the edge and hands in (more snow drag on the body and the board).
+    const pg = S('plough');
+    if (pg !== 1) for (const b of H.world.bodies) if (b.group === 0) b.plough *= pg;
+    if (C.sev) H.world.gov = { cap: S('govCap'), budget: S('govBudget') * Math.PI / 180, ground: false };
+    this.stats.seed = { kind: this.kind, reason, fall: this.fall?.mode, lean: this.fall?.lean, sev: +this.sev.s.toFixed(2), tier: this.sev.tier, imp: +(this.sev.vn || 0).toFixed(1), dev: this.sev.angleDeg !== undefined ? +(+this.sev.angleDeg).toFixed(0) : null, v: +mot.v.length().toFixed(2), vy: +mot.v.y.toFixed(2), w: +mot.w.length().toFixed(2), pl: +pl.velocity.length().toFixed(2), tracked: this.frames.length, shift: +shift.length().toFixed(3) };
     this.fallDir = new THREE.Vector3(mot.v.x, 0, mot.v.z);
     if (this.fallDir.lengthSq() < 1e-4) this.fallDir.set(-Math.sin(pl.heading), 0, -Math.cos(pl.heading));
     this.fallDir.normalize();
     this.H = H; this.seed = seed; this.shift = shift;
     this.t = 0; this.restT = 0; this.rest = 1; this.active = true;
-    this.m = { peak: 0, mean: 0, sum: 0, T: 0, swings: 0, armed: FLAP.map(() => true), dist: 0, c0: null };
+    this.m = { peak: 0, mean: 0, sum: 0, T: 0, swings: 0, armed: FLAP.map(() => true), dist: 0, c0: null,
+      tumble: 0, roll: 0, wMax: 0, armPeak: 0, armSum: 0, legPeak: 0, legSum: 0, u: null, tier: this.sev.tier, sev: this.sev.s, sevT: this.sev.t, fall: this.fall?.mode };
     this.E0 = H.world.energy(0);
     H.world.budget = this.E0;
     this.stats.crashes++;
