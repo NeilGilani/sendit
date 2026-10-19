@@ -117,7 +117,7 @@ are now narrower than the waist and hem on the long fits (A-line). The sleeve co
 | `suit` | `retro-suit` | 90s one-piece: a fitted top bloused over the waist belt (1.02), the legs in the suit colour below | 46 × 34 / 44 × 31 | 7.1 / 6.6 / 6.5 | 0.93 / 0.93 |
 
 Below the waist (1.1) every jacket is widened where needed to clear the pants' trunk by `seatClear`
-(default 2.4 cm; anorak 3.2, hoodie 3.0, suit 2.2), so the hem always hangs over the hips.
+(default 2.8 cm; anorak 3.2, hoodie 3.0, suit 2.2), so the hem always hangs over the hips.
 
 Pants (`PANT_FITS`):
 
@@ -160,7 +160,7 @@ Below the jacket hem + 12 cm, covered skin takes the pants colour (`uJHem` in bo
 | key | meaning |
 |---|---|
 | `hemFront`, `hemBack` | hem height at the centre front and back (back lower = drop tail) |
-| `seatClear` | how far the jacket below the waist must clear the pants' trunk (default 0.024) |
+| `seatClear` | how far the jacket below the waist must clear the pants' trunk (default 0.028) |
 | `hemFlare` | + flares the last 12 cm out; − pulls the hem in (rib or drawcord) with the fabric blousing above |
 | `torso.chest / waist / hem` | `[half width, front depth, back depth]` from the body's centre line at 1.38, 1.12 and the hem; `torso.n` = superellipse exponent (2 = round, 3 = boxy) |
 | `shoulder`, `shoulderY` | extra stand-off near the neck; height where the shoulder line starts rounding off to the neck (default 1.43) |

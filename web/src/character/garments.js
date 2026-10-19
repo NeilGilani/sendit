@@ -172,7 +172,7 @@ export function buildOutfitGeometry(body, cut) {
         // The pants' waist and seat sit inside the jacket's lower body: it always clears them by a few cm,
         // so the full-rise pants never poke through the hem (the hem hangs over the hips, not on them).
         if (cut.seat) {
-          const PT = pantsTrunk(cut), clear = cut.seatClear ?? 0.024;
+          const PT = pantsTrunk(cut), clear = cut.seatClear ?? 0.028;
           for (const r of rings) {
             if (r.t > PT.rise + 0.02) continue;
             const fade = smooth(PT.rise + 0.02, PT.rise - 0.04, r.t);
