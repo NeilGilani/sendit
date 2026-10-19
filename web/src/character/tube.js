@@ -248,7 +248,7 @@ export function sweep(rings, meta) {
       if (orient > 0) idx.push(a, b, c, c, b, d); else idx.push(a, c, b, c, d, b);
     }
   }
-  return { pos: P, nrm: N, g: G, lin: L, crease: C, idx, rows: nr, cols, skinBones: meta.skinBones, rigid: meta.rigid, anchor: meta.anchor, skinMask: meta.skinMask, weightLimit: meta.weightLimit };
+  return { pos: P, nrm: N, g: G, lin: L, crease: C, idx, rows: nr, cols, skinBones: meta.skinBones, rigid: meta.rigid, anchor: meta.anchor, skinMask: meta.skinMask, weightLimit: meta.weightLimit, weightFloor: meta.weightFloor };
 }
 
 // ------------------------------------------------------------------ skinning + merge
@@ -317,6 +317,21 @@ export function skinPiece(piece, body, smoothIters = 6) {
       for (let i = 0; i < rows; i++) for (let q = 0; q < nb; q++) W[(i * cols + cols - 1) * nb + q] = W[(i * cols) * nb + q];
     }
     limit();
+    // Optional per-bone floor (e.g. a long jacket's front hem rides on the thighs): weightFloor(bone, x, y, z)
+    // → minimum share of that bone; the other bones give up the difference in proportion.
+    if (piece.weightFloor) {
+      for (let i = 0; i < nv; i++) {
+        const x = piece.pos[i * 3], y = piece.pos[i * 3 + 1], z = piece.pos[i * 3 + 2];
+        for (let q = 0; q < nb; q++) {
+          const fl = piece.weightFloor(body.names[used[q]], x, y, z);
+          if (!fl || W[i * nb + q] >= fl) continue;
+          const rest = 1 - W[i * nb + q];
+          const k = rest > 1e-6 ? (1 - fl) / rest : 0;
+          for (let p = 0; p < nb; p++) if (p !== q) W[i * nb + p] *= k;
+          W[i * nb + q] = fl;
+        }
+      }
+    }
   }
   const si = new Uint16Array(nv * 4), sw = new Float32Array(nv * 4);
   const top = [];

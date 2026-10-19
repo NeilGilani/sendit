@@ -98,6 +98,8 @@ export function dressRider(scene, { bones, fp = () => false } = {}) {
         helmetMat.userData.uniforms.uHelm.value.set(h.hs.top, h.hs.cz, h.hs.halfW, h.hs.yEq);
         const c = o.garments.jacket.cut, pc = o.garments.pants.cut;
         fabric.userData.uniforms.uHemY.value.set(c.hemFront, pc.cuffY, c.sleeveEnd);
+        suit.userData.uniforms.uJHem.value = Math.min(c.hemFront, c.hemBack) + 0.12;
+        fabric.userData.uniforms.uFit.value.set(c.style ?? 0, c.quilt?.pitch ?? 0.1, c.hemBack, c.kangaroo || 0);
       }
       const C = o.colors, F = fabric.userData.uniforms, S = suit.userData.uniforms, H = helmetMat.userData.uniforms, L = lens.userData.uniforms;
       F.uJacket.value.set(C.jacket.base); F.uPanel.value.set(C.jacket.panel); F.uAccent.value.set(C.jacket.accent);
