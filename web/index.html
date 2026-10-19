@@ -43,11 +43,16 @@
       }, function () { window.__ldStillFailed = true; root.classList.remove('ld-still-pending'); });
     })();
   </script>
+  <!-- Type: Archivo (variable width + weight) and IBM Plex Mono. Loaded without blocking the first paint
+       (the loading screen falls back to Helvetica/Arial for the first frames). docs/lobby.md → Design system. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=IBM+Plex+Mono:wght@500;600&display=swap" media="print" onload="this.media='all'" />
   <link rel="stylesheet" href="/src/style.css" />
   <style>
     /* Loading screen (src/loading/index.js) — inline so it paints before anything else loads. */
     #loading { position: fixed; inset: 0; z-index: 30; overflow: hidden; background: #141a2c; color: #faf8f3;
-      font-family: "Inter", "SF Pro Display", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+      font-family: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif; }
     #loading .ld-static { position: absolute; inset: 0; transition: opacity 1.6s ease;
       background: linear-gradient(180deg, #17213d 0%, #2d3b66 30%, #6d6f99 52%, #c48f97 66%, #f0c08e 76%, #f6d6a8 82%); }
     #loading .ld-sun { position: absolute; left: 62%; top: 70%; width: 46vmax; height: 46vmax; transform: translate(-50%, -50%); border-radius: 50%;
@@ -82,23 +87,23 @@
     #loading .ld-bars i:last-child { bottom: 0; transform-origin: bottom; }
     #loading .ld-ui { position: absolute; inset: 0; pointer-events: none; transition: opacity .6s ease; }
     #loading .ld-brand { position: absolute; left: clamp(20px, 4vw, 64px); top: clamp(14px, calc((100vh - 100vw / 2.2) / 4 - 22px), 7vh); }
-    #loading .ld-brand .title { font-size: clamp(30px, 3.4vw, 52px); margin: 0; letter-spacing: 0.08em; }
+    #loading .ld-brand .title { font-size: clamp(28px, 3vw, 46px); margin: 0; letter-spacing: -0.01em; }
     #loading .ld-cap { position: absolute; right: clamp(20px, 4vw, 64px); top: clamp(18px, calc((100vh - 100vw / 2.2) / 4 - 12px), 7.5vh); text-align: right;
       opacity: 0; transform: translateY(-4px); transition: opacity 1.2s ease, transform 1.2s ease; text-shadow: 0 1px 12px rgba(0,0,0,.5); }
     #loading .ld-cap.on { opacity: 1; transform: none; }
-    #loading .ld-cap b { display: block; font-weight: 800; font-style: italic; font-size: 15px; letter-spacing: .22em; text-transform: uppercase; }
-    #loading .ld-cap span { display: block; margin-top: 4px; font-size: 12px; letter-spacing: .14em; color: rgba(250,248,243,.62); text-transform: uppercase; }
+    #loading .ld-cap b { display: block; font-weight: 800; font-stretch: 75%; font-size: 17px; letter-spacing: .12em; text-transform: uppercase; }
+    #loading .ld-cap span { display: block; margin-top: 4px; font: 500 11px "IBM Plex Mono", ui-monospace, Menlo, monospace; letter-spacing: .1em; color: rgba(242,244,241,.7); text-transform: uppercase; }
     #loading .ld-foot { position: absolute; left: clamp(20px, 4vw, 64px); right: clamp(20px, 4vw, 64px); bottom: clamp(14px, calc((100vh - 100vw / 2.2) / 4 - 18px), 6vh);
       display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; }
     #loading .ld-tips { position: relative; flex: 1; height: 2.6em; font-size: 14px; color: rgba(250,248,243,.78); letter-spacing: .03em; max-width: 640px; }
     #loading .tip { position: absolute; left: 0; bottom: 0; opacity: 0; animation: ld-tip var(--tip-cycle, 52s) linear infinite both; text-shadow: 0 1px 10px rgba(0,0,0,.55); }
-    #loading .tip::before { content: "TIP"; font-size: 10px; font-weight: 800; letter-spacing: .2em; color: #ffcc94; margin-right: 10px; }
-    #loading kbd { font: inherit; font-size: 12px; font-weight: 700; padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,.28); background: rgba(255,255,255,.08); }
+    #loading .tip::before { content: "TIP"; font: 600 10px "IBM Plex Mono", ui-monospace, Menlo, monospace; letter-spacing: .14em; color: #0f1a24; background: #ff5a1f; padding: 2px 5px; margin-right: 10px; vertical-align: 1px; }
+    #loading kbd { font: 500 12px "IBM Plex Mono", ui-monospace, Menlo, monospace; padding: 1px 6px; border-radius: 2px; border: 1px solid rgba(255,255,255,.28); background: rgba(255,255,255,.08); }
     @keyframes ld-tip { 0% { opacity: 0; transform: translateY(6px); } 1.6% { opacity: 1; transform: none; } 11% { opacity: 1; transform: none; } 12.5% { opacity: 0; transform: translateY(-4px); } 100% { opacity: 0; } }
     #loading .ld-progress { width: min(300px, 38vw); flex: none; }
-    #loading .ld-msg { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: rgba(250,248,243,.6); margin-bottom: 9px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    #loading .bar { position: relative; height: 2px; background: rgba(255,255,255,.16); overflow: hidden; border-radius: 2px; }
-    #loadbar { position: absolute; inset: 0; background: linear-gradient(90deg, #ffcc94, #fff3d6 60%, #7ff9ea); transform-origin: left; transform: scaleX(0);
+    #loading .ld-msg { font: 500 11px "IBM Plex Mono", ui-monospace, Menlo, monospace; letter-spacing: .1em; text-transform: uppercase; color: rgba(250,248,243,.6); margin-bottom: 9px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #loading .bar { position: relative; height: 2px; background: rgba(255,255,255,.16); overflow: hidden; border-radius: 0; }
+    #loadbar { position: absolute; inset: 0; background: #f2f4f1; transform-origin: left; transform: scaleX(0);
       transition: transform .9s cubic-bezier(.2,.7,.2,1); }
     #loading .bar::after { content: ""; position: absolute; top: 0; bottom: 0; width: 30%; left: -30%;
       background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); animation: ld-shimmer 2.4s ease-in-out infinite; }
@@ -115,14 +120,14 @@
     #loading .ld-dest.on { opacity: 1; transform: none; }
     #loading .ld-dest::before { content: ""; position: absolute; z-index: -1; left: -30vw; right: -12vw; top: -14vh; bottom: -10vh;
       background: radial-gradient(ellipse at 30% 70%, rgba(5,6,10,.5), rgba(5,6,10,0) 65%); }
-    #loading .ld-dest small { display: block; font-size: 11px; font-weight: 800; letter-spacing: .3em; text-transform: uppercase; color: var(--accent, #ffcc94); }
-    #loading .ld-dest b { display: block; margin-top: 6px; font-size: clamp(34px, 5vw, 76px); line-height: .95; font-weight: 900; font-style: italic; letter-spacing: .01em; text-transform: uppercase; }
-    #loading .ld-dest span { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; letter-spacing: .14em; text-transform: uppercase; color: rgba(250,248,243,.85); }
+    #loading .ld-dest small { display: block; font: 600 12px "IBM Plex Mono", ui-monospace, Menlo, monospace; letter-spacing: .16em; text-transform: uppercase; color: var(--accent, #ff7a45); }
+    #loading .ld-dest b { display: block; margin-top: 6px; font-size: clamp(38px, 5.6vw, 84px); line-height: .9; font-weight: 900; font-stretch: 72%; letter-spacing: .005em; text-transform: uppercase; }
+    #loading .ld-dest span { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: rgba(242,244,241,.88); }
     #loading .ld-dest em { font-style: normal; color: rgba(250,248,243,.55); }
     #loading .ld-dest em::before { content: "·"; margin-right: 10px; }
-    #loading .ld-dest .dot { width: 10px; height: 10px; border-radius: 50%; background: #9aa; flex: none; }
-    #loading .ld-dest .dot.green { background: #3fbf6f; } #loading .ld-dest .dot.blue { background: #3f8cff; }
-    #loading .ld-dest .dot.black, #loading .ld-dest .dot.double-black { background: #111; box-shadow: 0 0 0 1.5px #fff; } #loading .ld-dest .dot.park { background: #ff8a2a; }
+    #loading .ld-dest .dot { width: 11px; height: 11px; background: #9aa; flex: none; box-shadow: 0 0 0 1.5px #fff; }
+    #loading .ld-dest .dot.green { background: #1f9d55; border-radius: 50%; } #loading .ld-dest .dot.blue { background: #1f66d6; }
+    #loading .ld-dest .dot.black, #loading .ld-dest .dot.double-black { background: #0b0f14; transform: rotate(45deg) scale(.85); } #loading .ld-dest .dot.park { background: #f47b20; width: 15px; }
     @media (max-aspect-ratio: 1/1) { #loading .ld-bars { display: none; }
       #loading .ld-ui::before, #loading .ld-ui::after { content: ""; position: absolute; left: 0; right: 0; height: 26vh; pointer-events: none; }
       #loading .ld-ui::before { top: 0; background: linear-gradient(rgba(5,6,10,.55), transparent); }

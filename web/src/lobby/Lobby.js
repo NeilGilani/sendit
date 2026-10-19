@@ -19,6 +19,11 @@ import { ICONS } from './icons.js';
 import './lobby.css';
 
 const TAB_KEY = 'sendit.lobby.tab';
+/** "Season 26/27": the northern-hemisphere ski season we are in (it turns over in July). */
+function seasonLabel(d = new Date()) {
+  const y = d.getFullYear() % 100, a = d.getMonth() >= 6 ? y : (y + 99) % 100;
+  return `Season ${String(a).padStart(2, '0')}/${String((a + 1) % 100).padStart(2, '0')}`;
+}
 const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 
 export class Lobby {
@@ -54,7 +59,7 @@ export class Lobby {
     this.root.innerHTML = `
       <div class="lb-hit" aria-hidden="true"></div>
       <header class="lb-top">
-        <div class="lb-brand" aria-label="Sendit">SENDIT</div>
+        <div class="lb-brand" aria-label="Sendit"><b>SEND<i>I</i>T</b><small>${seasonLabel()}</small></div>
         <div class="lb-tabbar">
           <span class="lb-key" aria-hidden="true"><span class="g-kb">Q</span><span class="g-pad">LB</span></span>
           <nav class="lb-tabs" role="tablist" aria-label="Lobby sections"></nav>
@@ -184,10 +189,10 @@ export class Lobby {
     let info = 'Free ride · no clock';
     if (this.mode === 'challenge') {
       const best = this.mapInfo?.course ? bestFor(courseKey(this.mapInfo.course)) : null;
-      const medal = { gold: '🥇', silver: '🥈', bronze: '🥉' }[best?.medal] || '';
-      info = best ? `Best ${fmtTime(best.time)} ${medal}` : 'Gates · ghost · medals';
+      const medal = ['gold', 'silver', 'bronze'].includes(best?.medal) ? `<i class="lb-medal ${best.medal}" title="${best.medal}"></i>` : '';
+      info = best ? `Best ${esc(fmtTime(best.time))}${medal}` : 'Gates · ghost · medals';
     }
-    this.el.modeInfo.textContent = info;
+    this.el.modeInfo.innerHTML = info;
   }
 
   setDevice(d) {
