@@ -232,7 +232,7 @@ export const CLOTHING_ITEMS = [
     variants: [
       { id: 'basic', name: 'Rental', starter: true, colors: cw('basic', 'gloves') },
       { id: 'tuff', name: 'Tuff', rarity: 'common', series: 'first-chair', colors: cw('tuff', 'gloves') },
-      { id: 'nightshift', name: 'Nightshift', rarity: 'uncommon', series: 'first-chair', colors: cw('nightshift', 'gloves') },
+      { id: 'nightshift', name: 'Nightshift', rarity: 'uncommon', series: 'first-chair', colors: { ...cw('nightshift', 'gloves'), cuff: '#1fb89a' } },
       { id: 'summit', name: 'Summit Crew', rarity: 'common', series: 'first-chair', colors: cw('summit', 'gloves') },
       { id: 'arcade', name: 'Arcade', rarity: 'common', series: 'night-park', colors: cw('arcade', 'gloves') },
       { id: 'woodland', name: 'Woodland', rarity: 'rare', series: 'first-chair', colors: { base: '#4d5a36', cuff: '#2b2a1f', pat: 'camo', patA: '#2b2a1f', patB: '#8a7650' } },
