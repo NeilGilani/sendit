@@ -20,10 +20,23 @@ landings, grinds, lifts, the loading-screen and lobby riders, replays of non-cra
   cone + twist hips, shoulders, spine and neck (`RAGDOLL.limits`, measured from the rig's rest pose, so "straight"
   and "bent" mean the same whatever pose the crash starts in). Self-collision pairs keep forearms out of the trunk,
   head and legs, legs out of each other.
-- **Muscle tone**: every joint is driven softly toward a protective tuck (`RAGDOLL.tuck`, `tone`): strong at the
-  crash, relaxing to `toneEnd` over `toneTau`, and let go entirely once the body lies still (a resting limb pushed
-  by its tone against snow or bark would jitter). For the first `braceTime` the arms reach toward the snow the body
-  is falling onto (until a hand touches something).
+- **Muscle tone** (a braced wipeout, not a noodle): every joint is driven toward a protective tuck
+  (`RAGDOLL.tuck`, `tone`) with a strength limit (`toneMaxErr`: far from the target the pull saturates, so limbs
+  move into the tuck instead of whip-cracking there). The tone holds at full while the body still moves faster
+  than `toneHoldSpeed` (3 m/s), only fades toward `toneEnd` (15 %) over `toneTau` once it slows, and lets go
+  entirely once the body lies still (a resting limb pushed by its tone against snow or bark would jitter). For the
+  first `braceTime` the arms reach toward the snow the body is falling onto (until a hand touches something).
+- **Damping**: `jointDamping` (60–100 /s) takes out a limb's spin relative to its parent **and its swing**
+  (`swingDamping`: the child's centre velocity against where the parent's rigid motion would carry it, an equal and
+  opposite impulse at the joint — damping the spin alone did little, the swing lives in the limb's linear
+  velocity). Limits are tighter (shoulder cone 75° / twist 50°, elbow 0–135°, neck 35° / 45°, spine 30° / 20°, hip
+  60° / 30°); the hand rides on the forearm (no wrist to flop). A hinge the animated pose left outside its range
+  (elbows, nearly always) is let back in at `limitEase` rad/s instead of being snapped in on the first sub-step —
+  that snap was the first-frame arm whip (12–24 rad/s).
+- What real slams look like (tomahawks, yard sales, cartwheels, edge-catch slams): the body mostly tumbles as a
+  unit, limbs stay fairly close, arms brace / flail now and then; a hard hit can throw one limb, but nothing
+  whips continuously. Measured as limb spin relative to the trunk (arms / head vs the chest, legs vs the pelvis:
+  `RagdollController.measure`, `ragdoll.m`), see *Tests*.
 - **Gear**: skis release above `ejectSpeed` (always on a tree / rock / wall hit) and slide as flat bodies with their
   brakes out (`muGear`, `ploughGear`); below it they stay on, part of the boot body (with their mass and their
   lever in its inertia). Poles always leave the hands. A snowboard stays strapped on: a 12th body jointed to both
@@ -31,11 +44,17 @@ landings, grinds, lifts, the loading-screen and lobby riders, replays of non-cra
 - **World**: snow from `terrain.getHeight` (a local plane per sample, refreshed every 8 sub-steps or 25 cm; a step
   in the height field met sideways — a kicker's side, a roof edge — is a wall, not a floor), trees and posts as
   vertical cylinders, rocks as domes (`scatter.obstaclesNear`), rails / boxes as capsules along their top line.
-- **Stopping**: Coulomb friction (`muSnow` sliding, `muStaticSnow` dug in; a slam grips as if it were at most
-  `impactGrip` m/s hard, so the body doesn't stop dead on its first hit), snow drag while touching (`plough`,
-  `ploughSpin`), wobble-only settling once the centre of mass crawls (`settleSpeed`, `settleRate`), then sleep
-  (`sleepSpeed`, `sleepSpin`, `sleepTime`). Muscle tone can move limbs but **never adds energy** beyond the crash's
-  own (an energy budget set at the seed).
+- **Stopping**: Coulomb friction with real snow numbers — a jacket sliding on hardpack `muSnow` 0.32, static
+  `muStaticSnow` 0.65, both + `muPowder` × the snow's powder (`player.powder` at the crash); slow slides grip more
+  (below `slowGrip` 1.5 m/s μ rises toward the static value: the body settles into the snow instead of creeping
+  down a 19° slope for seconds); strapped-on skis slide along their bases (`muSkiOn` 0.12) and bite across with
+  their edges. A slam grips as if it were at most `impactGrip` (6) m/s hard. Snow drag while touching: `plough`
+  (3 /s, × (1 + `ploughPowder` · powder)) plus the hole the last hit dug (`ploughDig` × its approach speed, fading at
+  `digDecay`), `ploughSpin`. Then wobble-only settling once the centre of mass crawls (`settleSpeed`, `settleRate`),
+  then sleep (`sleepSpeed`, `sleepSpin`, `sleepTime`). Muscle tone can move limbs but **never adds energy** beyond
+  the crash's own (an energy budget set at the seed).
+- **Snow contacts** for marks and spray: the solver keeps, per body (and per strapped-on ski), the snow contacts
+  since the last read; `ragdoll.snowContacts()` hands them to `fx.js` (docs/graphics.md § Tracks and spray).
 
 ### How it plugs in
 
@@ -51,7 +70,9 @@ landings, grinds, lifts, the loading-screen and lobby riders, replays of non-cra
   bail throws the body off the side, a tree / rock hit just carries the body into the trunk. Then it steps the
   world and the player follows the body's centre of mass (`position`, `velocity`, `speed`: camera aim, audio,
   wipeout distance). The respawn fade starts once the body has rested `restHold` s (never before
-  `PHYSICS.tumbleTime`) or at `maxTumble` at the latest.
+  `PHYSICS.tumbleTime`), or after `slideFadeTime` (1.6 s) once it has slid `slideFadeDist` (9 m) or is still
+  sliding faster than `steepFadeSpeed` on a face steeper than `steepFadeDeg` (30°), or at `maxTumble` (2.6 s) at the
+  latest.
 - **Drawing**: `rider.update()` hands the crashed body to `ragdoll.pose()` (`rig.js applyPose`): bone rotations
   are each body's rotation since the seed (spine and neck bones share theirs), so the first ragdoll frame is the
   last animated frame exactly; the pose blends in over `blendTime` anyway; bodies are interpolated between frame
@@ -83,12 +104,40 @@ node web/scripts/ragdoll-bench.mjs http://localhost:5196/ ski         # CPU per 
   and by 4 s in ≥ 98 %. The same crash at dt 1/30, 1/60, 1/144 is identical at matching times. A scripted run
   with jumps and landings (real `Player`) is bit-identical with and without the ragdoll installed, and its
   tracker never writes to the pose. `--seed n` changes the set; `--verbose` prints every crash, `ONLY=i` one.
+  Also reported (not thresholds): flappiness — peak and mean limb spin relative to the trunk and big swings per
+  crash — and the slide shown before the respawn fade by slope band (median, p90, max) with the fade's start;
+  `DUMP=file.json` writes every crash's numbers. The fuzz thresholds were not changed by the wipeout pass.
+- **`ragdoll-shots.mjs`** also prints per scenario `flap` (peak / mean / swings, centre-of-mass travel, fade
+  start: measured page-side, so older builds measure the same way) and `ghost` (track stamps checked against what
+  touches the snow: a crash stamp needs a ragdoll sample within 5 cm of the snow within 0.5 m, a riding stamp a
+  grounded player on heightfield snow).
 - **`ragdoll-identity.mjs`** (real game, Valcrest kicker 2): a straight air, a 360 and a backflip, each played
   twice from the same snapshot of the player and rider state — once with the ragdoll installed (tracking every
   frame), once after `ragdoll.uninstall()` — and every frame's player state, rider root and all bone / gear
   transforms compared (a run that ends in a crash is compared up to the crash).
 
-Numbers at the time of writing (MacBook Air M-series, 8 GB): fuzz seed 1 — stretch ≤ 0.41 cm, ≤ 1.8 cm under the
+**Flappiness and slides** (fuzz seed 1, 600 crashes; "shown" = centre-of-mass travel until the fade has covered
+the screen, fade start + 0.45 s), before → after the wipeout pass:
+
+| | before | after |
+|---|---|---|
+| peak limb spin vs trunk, median / p90 | 37.7 / 50.3 rad/s | 25.2 / 37.3 rad/s |
+| mean limb spin vs trunk (first 2.5 s), median / p90 | 5.69 / 7.58 rad/s | 2.05 / 2.82 rad/s |
+| big swings per crash (> 8 rad/s after < 4), median / p90 / max | 25 / 39 / 70 | 13 / 22 / 37 |
+| shown slide 0–10°, median / p90 / max | 5.5 / 19.8 / 31.9 m | 5.5 / 17.4 / 23.6 m |
+| shown slide 10–20° | 7.5 / 27.8 / 48.7 m | 7.0 / 23.7 / 40.8 m |
+| shown slide 20–30° | 15.5 / 37.1 / 62.9 m | 11.6 / 31.4 / 37.8 m |
+| shown slide 30–45° | 25.0 / 62.9 / 73.6 m | 18.3 / 36.3 / 48.3 m |
+| fade starts, 30–45°, median / p90 | 3.02 / 3.03 s | 1.62 / 1.97 s |
+
+(The fuzz crashes happen at 2–22 m/s: most of a fast crash's distance is the speed it had, the slide afterwards
+is short.) In the real game (`ragdoll-shots.mjs`, skis, chase cam): Valcrest over-flip peak 58.7 → 48.6 rad/s, mean
+6.0 → 2.9, swings 12 → 9, travel 2.8 → 0.9 m; sideways 47.4 → 42.2 / 6.2 → 3.6 / 13 → 9; Ravenspire cliff mean
+8.2 → 5.0, swings 25 → 17, travel 33.9 → 22.9 m, fade at 1.4 s (before: none within 2.8 s); steep face mean
+3.5 → 1.7, swings 25 → 7, travel 14.7 → 8.5 m; Blackspruce tree mean 5.9 → 3.1; Voltage rail 6.4 → 3.2. Ghost
+stamps under an airborne body / on raised meshes in those runs: 5–172 per scenario before, 0 after.
+
+Earlier numbers (MacBook Air M-series, 8 GB, before the wipeout pass): fuzz seed 1 — stretch ≤ 0.41 cm, ≤ 1.8 cm under the
 snow, energy never above the crash's, joints ≤ 5.5° past a limit, drawn rig ≤ 0.17 cm off the bodies, 154 / 162
 gentle crashes asleep by 3 s (median 2.3 s), ~0.46 ms per 60 Hz frame in Node. In the browser
 (`node web/scripts/ragdoll-bench.mjs`, synchronous, rendering excluded) 0.5–0.9 ms per frame while the body is
@@ -98,9 +147,12 @@ awake (Valcrest, Blackspruce, Voltage Park, skis and board), ~0.05 ms asleep, no
 ### Known limits
 
 - The body is capsules: no fingers, the jacket doesn't crumple, the board is two thin edges.
-- A body draped over a rail or a rock may slide off it slowly; on steep faces (> ~30°) it keeps sliding until the
-  respawn (`maxTumble`).
-- Fast crashes on 15–20° slopes (≥ 12 m/s) can take 3–3.7 s to come to rest; the respawn waits up to `maxTumble`.
+- A body draped over a rail or a rock may slide off it slowly; on steep faces (> 30°) it keeps tumbling / sliding
+  (as real bodies do there) and the fade starts at 1.6 s instead.
+- Fast crashes on 15–20° slopes (≥ 12 m/s) can take 3–3.7 s to come to rest; the fade starts at 1.6 s once
+  they've slid 9 m, `maxTumble` (2.6 s) at the latest.
+- Friction is isotropic for the body (a jacket slides the same in every direction); only strapped-on skis are
+  anisotropic. Snow is rigid: "digging in" is a drag term from the last hit, not a real hole.
 - The chase camera still doesn't collide with trees (an old known issue); the helmet cam keeps out of crowns.
 - Gear doesn't collide with the body (a released ski can pass through a leg for a frame or two).
 
