@@ -162,10 +162,11 @@
 /* ------------------------------------------------------------- small screens */
 @media (max-width: 760px), (max-aspect-ratio: 4/5) {
   .eq-choice { gap: 0.4em; }
-  #lobby .eq-opt { flex-direction: row; align-items: center; padding: 0.4em 0.6em; gap: 0.45em; }
-  #lobby .eq-opt .eq-txt b { font-size: 1.1em; }  #lobby .eq-opt .eq-txt small { display: none; }
-  #lobby .eq-opt .eq-ico svg { width: 1.6em; height: 1.6em; }
-  #lobby .eq-opt .eq-check { top: 50%; transform: translateY(-50%); }
+  #lobby .eq-choice .eq-opt { flex-direction: row; align-items: center; padding: 0.4em 0.6em; gap: 0.45em; }
+  #lobby .eq-choice .eq-opt .eq-txt b { font-size: 1.1em; }
+  #lobby .eq-choice .eq-opt .eq-txt small { display: none; }
+  #lobby .eq-choice .eq-opt .eq-ico svg { width: 1.6em; height: 1.6em; }
+  #lobby .eq-choice .eq-opt .eq-check { top: 50%; transform: translateY(-50%); }
   .gr-pick { margin-top: 0.6em; }
   #lobby .gr-card-main { grid-template-columns: 3.6em minmax(0, 1fr); }
   .gr-card-top { padding-right: 2.4em; }
