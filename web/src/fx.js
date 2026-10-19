@@ -126,7 +126,7 @@ export class FXManager {
     // if "here" is the snow (a crash in the air — a rail bail, a trunk — throws nothing until something lands).
     on('crashed', () => {
       const pl = this.player;
-      if (pl.ragdoll && !pl.ragdoll.uninstalled && pl.ragdoll.C?.enabled) return;
+      if (this.ragdollOn()) return;
       if (this.onSnow(pl.renderPos, 0.3)) this.spray.crash(pl.renderPos, pw());
     });
     on('nearMiss', (e) => {
@@ -154,6 +154,12 @@ export class FXManager {
    * Tracks are carved into the terrain mesh from above by x / z only, so a stamp made on a roof, a deck or a kicker
    * would show on the snow beside / below it.
    */
+  /** Does the crash ragdoll handle this player's crashes (its contacts then make the crash marks / spray)? */
+  ragdollOn() {
+    const r = this.player.ragdoll;
+    return !!r && !r.uninstalled && !!r.C?.enabled && !r.failed;
+  }
+
   onSnow(p, tol = 0.05) {
     const T = this.player.terrain;
     const h = T.getHeight(p.x, p.z);
@@ -176,7 +182,7 @@ export class FXManager {
   crashMarks(cs) {
     const pw = this.player.powder ?? 0.5;
     for (const c of cs) {
-      if (!this.onSnow(c.p, 0.06)) continue;
+      if (!this.onSnow(c.p, 0.045)) continue;
       const w = CRASH_MARK[c.part] ?? 0.12;
       const k = Math.min(1, 0.25 + c.imp / 7 + c.speed / 14) * (0.45 + 0.55 * pw);
       this.track.stamp('rd:' + c.key, c.p, c.heading, w, k);
@@ -191,7 +197,7 @@ export class FXManager {
     const pool = this._crashSprayPool || (this._crashSprayPool = new Map());
     let puffs = 0;
     for (const c of cs) {
-      if (!this.onSnow(c.p, 0.06)) continue;
+      if (!this.onSnow(c.p, 0.045)) continue;
       if (c.imp > 3.2 && (cool.get(c.key) ?? 0) <= 0 && puffs < 2) {
         this.spray.landing(c.p, Math.min(14, c.imp * 1.2), pw);
         cool.set(c.key, 0.25); puffs++;
@@ -294,7 +300,7 @@ export class FXManager {
     T.beginFrame();
     if (pl.state === State.CRASH) {
       if (crashC) this.crashMarks(crashC);
-      else if (!crashRag && this.onSnow(pl.renderPos, 0.1)) T.stamp('body', pl.renderPos, pl.heading, 1.2, 1);   // (old slide-and-roll crash, ?ragdoll=0)
+      else if (!this.ragdollOn() && this.onSnow(pl.renderPos, 0.1)) T.stamp('body', pl.renderPos, pl.heading, 1.2, 1);   // (old slide-and-roll crash, ?ragdoll=0)
     } else if (ground) {
       const h = pl.heading, pwr = pl.powder ?? 1;
       const wedge = pl.brake;

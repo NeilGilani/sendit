@@ -177,17 +177,38 @@ for (const name of names) {
       return { st: p.state, spd: +p.speed.toFixed(1), rx: +pn.x.toFixed(2), ry: +pn.y.toFixed(2), clear: +(cam.position.y - s.terrain.getHeight(cam.position.x, cam.position.z)).toFixed(2),
         dist: +cam.position.distanceTo(pv).toFixed(2), jump: +jump.toFixed(3), ms: +(s.ragdoll?.stats.lastMs || 0).toFixed(3), active: !!s.ragdoll?.active, sleep: !!s.ragdoll?.H?.world.asleep(0) };
     };
-    window.__vt.hook = () => { if (window.__rec && s.game.mode === 1) window.__log.push(window.__info()); };
+    // Flappiness measured page-side (same definition as RagdollController.measure, so older builds measure too).
+    const FLAP = [['upperarmL', 'chest'], ['upperarmR', 'chest'], ['forearmL', 'chest'], ['forearmR', 'chest'], ['head', 'chest'],
+      ['thighL', 'pelvis'], ['thighR', 'pelvis'], ['shinL', 'pelvis'], ['shinR', 'pelvis']];
+    window.__flap = { peak: 0, sum: 0, T: 0, swings: 0, armed: FLAP.map(() => true), c0: null, dist: 0, fadeAt: null, t: 0 };
+    const fw = new V();
+    const flapStep = () => {
+      const r = s.ragdoll, f = window.__flap, H = r?.H;
+      if (!H || s.player.state !== 3) return;
+      f.t += 1 / 60;
+      const c = H.world.com(0, new V());
+      if (!f.c0) f.c0 = c.clone();
+      f.dist = Math.hypot(c.x - f.c0.x, c.z - f.c0.z);
+      if (f.fadeAt === null && s.player._crashStage === 1) f.fadeAt = +f.t.toFixed(2);
+      if (H.world.asleep(0) || f.t > 2.5) return;
+      let sum = 0;
+      FLAP.forEach(([a, b], i) => { const w = fw.subVectors(H.parts[a].w, H.parts[b].w).length(); sum += w; f.peak = Math.max(f.peak, w); if (f.armed[i] && w > 8) { f.swings++; f.armed[i] = false; } else if (w < 4) f.armed[i] = true; });
+      f.sum += sum / FLAP.length / 60; f.T += 1 / 60;
+    };
+    window.__vt.hook = () => { if (window.__rec && s.game.mode === 1) { window.__log.push(window.__info()); flapStep(); } };
     // Ghost marks: every track stamp is checked against what really touches the snow there — a crash stamp needs a
     // ragdoll sample within 5 cm of the snow within 0.5 m of it, a riding stamp a grounded player on the snow; no
     // stamp on a raised mesh (kicker, roof, deck: getHeight above baseHeight).
     window.__ghost = { stamps: 0, crash: 0, bad: 0, worst: 0, at: [] };
     const sp = new V();
-    s.fx.track.onStamp = (key, p) => {
+    // (wraps TrackMap.stamp, so it measures builds without the onStamp hook too)
+    const stamp0 = s.fx.track.stamp.bind(s.fx.track);
+    s.fx.track.stamp = (key, p, ...rest) => { if (window.__rec) check(key, p); return stamp0(key, p, ...rest); };
+    const check = (key, p) => {
       const g = window.__ghost, T = s.terrain;
       g.stamps++;
       let gap = 0;
-      if (key.startsWith('rd:')) {
+      if (s.player.state === 3) {
         g.crash++;
         const W = s.ragdoll?.H?.world;
         gap = Infinity;
@@ -256,7 +277,7 @@ for (const name of names) {
   };
   m.seed = await page.evaluate(() => window.__sendit.ragdoll?.stats.seed);
   // Flappiness (limb spin relative to the trunk), the slide (centre of mass travel) and the fade of this crash.
-  m.flap = await page.evaluate(() => { const q = window.__sendit.ragdoll?.m; return q ? { peak: +q.peak.toFixed(1), mean: +q.mean.toFixed(2), swings: q.swings, dist: +q.dist.toFixed(1), fadeAt: q.fadeAt ?? null } : null; });
+  m.flap = await page.evaluate(() => { const q = window.__flap; return { peak: +q.peak.toFixed(1), mean: +(q.sum / Math.max(1e-6, q.T)).toFixed(2), swings: q.swings, dist: +q.dist.toFixed(1), fadeAt: q.fadeAt }; });
   m.ghost = await page.evaluate(() => window.__ghost);
   console.log(`${equip} ${view} ${name.padEnd(9)} ${JSON.stringify(m)}`);
   sheets.push({ name, frames, m });
