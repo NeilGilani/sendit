@@ -356,7 +356,7 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   ok(t.same, 'picking a trail on the loaded map does not reload');
   ok(/trail=middle-drops/.test(t.url) && /map=valcrest-gully/.test(t.url), `URL carries map + trail (${t.url})`);
   ok(t.prof.id === 'valcrest-gully' && t.prof.trail === 'middle-drops', 'profile saves map + trail');
-  ok(/Valcrest/i.test(t.card) && /The Middle Drops/.test(t.card), `map card shows mountain + trail (${t.card.split('\n').join(' / ')})`);
+  ok(/Valcrest/i.test(t.card) && /The Middle Drops/i.test(t.card), `map card shows mountain + trail (${t.card.split('\n').join(' / ')})`);
   ok(t.on === 'middle-drops', 'the list marks the new trail');
   await page.keyboard.press('Escape');
   await page.waitForSelector('.mt-card', { timeout: T });

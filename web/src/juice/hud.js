@@ -37,7 +37,7 @@ const GRADES = {
 };
 
 const CSS = /* css */`
-#juiceHud { position: absolute; inset: 0; pointer-events: none; font-family: "Arial Black", "Segoe UI Black", Impact, sans-serif; font-style: italic; color: #fffaf0; }
+#juiceHud { position: absolute; inset: 0; pointer-events: none; font-family: "Archivo", "Archivo", "Arial Black", Impact, sans-serif; font-style: italic; color: #fffaf0; }
 #juiceHud .stroke { -webkit-text-stroke: 1.5px #1b1446; paint-order: stroke fill; }
 /* combo chain */
 #juiceHud .cb { position: absolute; left: 50%; top: 96px; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity .25s; white-space: nowrap; }
@@ -47,7 +47,7 @@ const CSS = /* css */`
 #juiceHud .cb .m.hot { color: #ffe14d; text-shadow: 0 3px 24px rgba(255,150,60,.75); }
 #juiceHud .cb .m.blaze { color: #ff9a3d; text-shadow: 0 0 28px rgba(255,90,60,.9), 0 0 6px #fff; }
 #juiceHud .cb .p { font-size: 24px; color: #2ff5d6; margin-left: 12px; display: inline-block; }
-#juiceHud .cb .it { font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 800; font-size: 13px; letter-spacing: .06em; color: rgba(250,248,243,.85); margin-top: 6px; text-shadow: 0 1px 6px rgba(0,0,0,.65); }
+#juiceHud .cb .it { font-family: var(--font); font-style: normal; font-weight: 800; font-size: 13px; letter-spacing: .06em; color: rgba(250,248,243,.85); margin-top: 6px; text-shadow: 0 1px 6px rgba(0,0,0,.65); }
 #juiceHud .cb .tm { height: 4px; width: 190px; margin: 7px auto 0; background: rgba(255,255,255,.22); border-radius: 2px; overflow: hidden; }
 #juiceHud .cb .tm i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #2ff5d6, #7a5cff); transform-origin: left; }
 #juiceHud .cb .rk { font-size: 13px; letter-spacing: .3em; color: #ff6bb0; margin-top: 5px; height: 16px; opacity: 0; transition: opacity .15s; }
@@ -61,7 +61,7 @@ const CSS = /* css */`
 /* challenge split delta (next to the timer) */
 #juiceHud .sp { position: absolute; left: calc(50% + 118px); top: 30px; font-size: 26px; -webkit-text-stroke: 1.5px #1b1446; paint-order: stroke fill; opacity: 0; white-space: nowrap; }
 #juiceHud .sp.show { animation: jhSplit 2.2s ease-out forwards; }
-#juiceHud .sp small { display: block; font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 800; font-size: 10px; letter-spacing: .28em; color: rgba(250,248,243,.75); -webkit-text-stroke: 0; }
+#juiceHud .sp small { display: block; font-family: var(--font); font-style: normal; font-weight: 800; font-size: 10px; letter-spacing: .28em; color: rgba(250,248,243,.75); -webkit-text-stroke: 0; }
 @keyframes jhSplit { 0% { opacity: 0; transform: translateX(-12px); } 10% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
 /* announcer */
 #juiceHud .an { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; opacity: 0; }
@@ -70,7 +70,7 @@ const CSS = /* css */`
 #juiceHud .an .g span { display: inline-block; transform: skewX(12deg); }
 #juiceHud .an .t { font-size: min(clamp(34px, 4.6vw, 64px), var(--an-fit, 100vw)); line-height: 1.05; letter-spacing: .02em; -webkit-text-stroke: 3px #1b1446; paint-order: stroke fill; text-shadow: 0 5px 0 rgba(27,20,70,.55); }
 #juiceHud .an .s { font-size: 26px; color: #2ff5d6; margin-top: 2px; -webkit-text-stroke: 1.5px #1b1446; paint-order: stroke fill; }
-#juiceHud .an .s small { font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 900; font-size: 14px; letter-spacing: .16em; color: #fffaf0; margin-left: 10px; -webkit-text-stroke: 0; text-shadow: 0 1px 2px #1b1446, 0 0 8px rgba(27,20,70,.9); }
+#juiceHud .an .s small { font-family: var(--font); font-style: normal; font-weight: 900; font-size: 14px; letter-spacing: .16em; color: #fffaf0; margin-left: 10px; -webkit-text-stroke: 0; text-shadow: 0 1px 2px #1b1446, 0 0 8px rgba(27,20,70,.9); }
 #juiceHud .an .nw { display: none; margin: 6px auto 0; width: max-content; font-size: 13px; letter-spacing: .3em; padding: 3px 10px 3px 13px; border-radius: 3px; color: #1b1446;
   background: linear-gradient(90deg, #2ff5d6, #ffe14d); box-shadow: 0 0 18px rgba(47,245,214,.7); animation: jhBlink .35s 4 alternate; }
 #juiceHud .an.new .nw { display: block; }
@@ -99,7 +99,7 @@ const CSS = /* css */`
 @keyframes jhLost { 0% { opacity: 0; transform: translateX(-50%) scale(1.3); } 8% { opacity: 1; transform: translateX(calc(-50% - 10px)); } 14% { transform: translateX(calc(-50% + 10px)); } 20% { transform: translateX(calc(-50% - 6px)); } 26% { transform: translateX(-50%); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(26px); } }
 /* floating score pops (minor scores rise off the rider) */
 #juiceHud .fp { position: absolute; left: 0; top: 0; font-size: 20px; white-space: nowrap; -webkit-text-stroke: 1.2px #1b1446; paint-order: stroke fill; color: #2ff5d6; pointer-events: none; animation: jhFloat .95s ease-out forwards; }
-#juiceHud .fp small { font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 900; font-size: 11px; letter-spacing: .14em; margin-left: 5px; color: #fffaf0; -webkit-text-stroke: 0; text-shadow: 0 1px 3px #1b1446; }
+#juiceHud .fp small { font-family: var(--font); font-style: normal; font-weight: 900; font-size: 11px; letter-spacing: .14em; margin-left: 5px; color: #fffaf0; -webkit-text-stroke: 0; text-shadow: 0 1px 3px #1b1446; }
 @keyframes jhFloat { 0% { opacity: 0; transform: translate(var(--x), var(--y)) scale(.6); } 15% { opacity: 1; transform: translate(var(--x), calc(var(--y) - 10px)) scale(1.1); } 100% { opacity: 0; transform: translate(calc(var(--x) + var(--dx)), calc(var(--y) - 70px)) scale(.95); } }
 /* at risk: a big chain riding on an air or a rail */
 #juiceHud .rv { position: absolute; inset: 0; opacity: 0; transition: opacity .25s; box-shadow: inset 0 0 120px 26px rgba(255,61,154,.32); }
@@ -121,17 +121,17 @@ const CSS = /* css */`
 #juiceHud .sc { position: absolute; right: 26px; top: 18px; text-align: right; transition: opacity .8s; }
 #juiceHud .sc b { display: inline-block; font-size: 30px; line-height: 1; -webkit-text-stroke: 1.5px #1b1446; paint-order: stroke fill; text-shadow: 0 2px 12px rgba(0,0,0,.35); transform-origin: right center; }
 #juiceHud .sc b.up { animation: jhScore .3s cubic-bezier(.2,1.8,.4,1); color: #ffe14d; }
-#juiceHud .sc small { display: block; font-family: "Inter", "Segoe UI", sans-serif; font-style: normal; font-weight: 800; font-size: 10px; letter-spacing: .3em; color: rgba(250,248,243,.65); margin-top: 2px; }
+#juiceHud .sc small { display: block; font-family: var(--font); font-style: normal; font-weight: 800; font-size: 10px; letter-spacing: .3em; color: rgba(250,248,243,.65); margin-top: 2px; }
 @keyframes jhScore { 0% { transform: scale(1); } 40% { transform: scale(1.22); } 100% { transform: scale(1); } }
 #flakesHud { top: 66px !important; }
 /* toasts */
 /* left side: the reward-cases notifications (lobby/cases/notify.js) stack top right */
 #juiceHud .ts { position: absolute; left: 26px; top: 110px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
-#juiceHud .tt { display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: 360px; padding: 10px 16px 10px 12px; border-radius: 12px; font-style: normal;
-  background: rgba(12,16,30,.72); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.16); box-shadow: 0 10px 34px rgba(0,0,0,.35);
-  transform: translateX(-120%); opacity: 0; transition: transform .45s cubic-bezier(.2,1.3,.4,1), opacity .3s; font-family: "Inter", "Segoe UI", sans-serif; }
+#juiceHud .tt { display: flex; align-items: center; gap: 12px; min-width: 250px; max-width: 360px; padding: 10px 16px 10px 12px; border-radius: 2px; font-style: normal;
+  background: rgba(10,18,26,.92); border: 1px solid rgba(214,228,240,.14); box-shadow: 0 10px 34px rgba(0,0,0,.35);
+  transform: translateX(-120%); opacity: 0; transition: transform .45s cubic-bezier(.2,1.3,.4,1), opacity .3s; font-family: var(--font); }
 #juiceHud .tt.on { transform: none; opacity: 1; }
-#juiceHud .tt .ic { flex: none; width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; font-size: 20px; background: linear-gradient(135deg, var(--c1, #2ff5d6), var(--c2, #7a5cff)); color: #1b1446; font-family: "Arial Black", Impact, sans-serif; }
+#juiceHud .tt .ic { flex: none; width: 38px; height: 38px; border-radius: 2px; display: grid; place-items: center; font-size: 20px; background: linear-gradient(135deg, var(--c1, #2ff5d6), var(--c2, #7a5cff)); color: #1b1446; font-family: "Archivo", "Arial Black", Impact, sans-serif; }
 #juiceHud .tt b { display: block; font-size: 11px; letter-spacing: .24em; color: var(--c1, #2ff5d6); font-weight: 800; }
 #juiceHud .tt span { display: block; font-size: 15px; font-weight: 800; color: #fffaf0; margin-top: 1px; }
 #juiceHud .tt small { display: block; font-size: 12px; color: rgba(250,248,243,.65); margin-top: 1px; }
