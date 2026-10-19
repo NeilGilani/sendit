@@ -273,3 +273,29 @@ Maps emit a few bus events as hooks; these have no listener because the scoring 
 `ridgeHop` (dragonback; the score label "Ridge hop / Ridge run ×n" is on the HUD), `toriiTunnel` (kitsune; "Senbon Torii ·
 km/h" score label), `slopeJudged` (voltage; `voltage/hud.js` shows the judging card itself). `parkPump` (voltage) gets a
 "PERFECT PUMP" call-out in `juice/hud.js`.
+
+
+## Mountain pictures (lobby)
+
+The Maps tab's mountain cards, the trail list header and the lobby's map button show a picture of the
+real mountain, rendered by the game itself: `assets/maps/<map id>.webp` (served at `/maps/<id>.webp`,
+`mapShot(id)` in maps/registry.js). The old painted `thumbnail` stays underneath as the fallback: the
+`<img>` removes itself if the file is missing, and the map button lists both as background layers.
+
+Regenerate after a look change (terrain, trees, atmosphere, post stack) or for a new map:
+
+```
+npm --prefix web run dev -- --port 5198 --strictPort
+cd web && SHEET=/tmp/mountains.png node scripts/mountainshots.mjs http://localhost:5198/            # all 8
+node scripts/mountainshots.mjs http://localhost:5198/ ../assets/maps fjordline,kitsune-peak            # some
+CAM='{"fjordline":{"az":40,"up":0.8}}' node scripts/mountainshots.mjs http://localhost:5198/ /tmp/try fjordline   # try an angle
+```
+
+The script boots each map at quality 2 with its own atmosphere (`?map=<id>&quality=2`), hides the lobby
+UI and the rider/plinth, and puts `window.__gfxCam` on an establishing shot: it walks down the spawn
+heading until the snow stops dropping (the face's length L and drop), then places the camera across the
+valley, `az` degrees around the face centre, `dist` × L away and `up` × the drop above the valley floor,
+looking `look` of the way down the face (`SHOT` table in the script; the two gully maps use a drone shot
+up the valley). It waits 9 s for terrain / trees to stream in, screenshots 1600×1000 and encodes WebP in
+the browser, stepping the quality down until the file is under ~300 KB. A new map: add its id to `ALL`
+(and a `SHOT` entry if the default angle does not frame it), run it, commit the webp.

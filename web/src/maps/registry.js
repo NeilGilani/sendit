@@ -141,6 +141,12 @@ export function listMountains() {
   return [...out.values()];
 }
 
+/**
+ * The map's picture rendered by the game itself (scripts/mountainshots.mjs → assets/maps/<id>.webp,
+ * docs/maps.md). Callers keep `thumbnail` underneath as the fallback when the file is missing.
+ */
+export const mapShot = (mapId) => `/maps/${mapId}.webp`;
+
 export const getMountain = (id) => listMountains().find((m) => m.id === id) ?? null;
 
 /**

@@ -8,7 +8,7 @@
 import { on, emit } from '../state.js';
 import { profileStore } from '../profile/store.js';
 import * as catalog from '../profile/catalog.js';
-import { listMaps, getMap, listMountains, DIFFICULTIES } from '../maps/registry.js';
+import { listMaps, getMap, listMountains, DIFFICULTIES, mapShot } from '../maps/registry.js';
 import { difficultyBadge, trailStats } from '../maps/badges.js';
 import { services } from '../services/index.js';
 import { storage } from '../services/storage.js';
@@ -169,7 +169,8 @@ export class Lobby {
     }
     this.el.mapBtn.style.setProperty('--acc', m?.accent || '');
     this.el.mapBtn.setAttribute('aria-label', `Trail: ${trail ? `${trail.name} on ${m?.name}` : map.name}. Change trail`);
-    this.el.mapThumb.style.backgroundImage = map.thumbnail ? `url("${map.thumbnail}")` : '';
+    // The rendered picture (assets/maps) over the painted thumbnail, which shows if the file is missing.
+    this.el.mapThumb.style.backgroundImage = [`url("${mapShot(map.id)}")`, map.thumbnail && `url("${map.thumbnail}")`].filter(Boolean).join(', ');
     this.renderMode();
   }
 

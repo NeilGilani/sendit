@@ -61,6 +61,15 @@ try {
   await page.evaluate(() => window.__sendit.lobby.select('equipment'));
   await page.waitForTimeout(600); await icons(page); await page.waitForTimeout(400);
   await shot(page, 'flow-6-equipment');
+  // Maps tab: the mountain cards with the rendered mountain pictures, then one mountain's header.
+  await page.evaluate(() => window.__sendit.lobby.select('maps'));
+  await page.waitForTimeout(2500);
+  await shot(page, 'flow-7-maps');
+  await page.evaluate(() => document.querySelector('.mt-card')?.click());
+  await page.waitForTimeout(1500);
+  await shot(page, 'flow-8-mountain');
+  const broken = await page.evaluate(() => [...document.querySelectorAll('img')].filter((i) => i.complete && !i.naturalWidth).map((i) => i.src));
+  if (broken.length) errors.push('broken images: ' + broken.join(', '));
 } finally {
   await browser.close();
 }
