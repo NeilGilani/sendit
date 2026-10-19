@@ -22,10 +22,12 @@ const maps = (process.argv[4] || ALL.join(',')).split(',').filter(Boolean);
 const W = Number(process.env.W || 1600), H = Number(process.env.H || 1000), DPR = Number(process.env.DPR || 1), Q = Number(process.env.Q || 0.82);
 const DEF = { az: 28, dist: 1.25, up: 0.62, look: 0.5, fov: 42, side: 0 };
 export const SHOT = {
-  // The two gully maps sit in narrow valleys: a drone shot from the run-out looking up the valley.
-  'valcrest-gully': { az: 0, up: 1.2, dist: 1.05, look: 0.35, fov: 48 },
+  // The two gully maps sit in narrow valleys, and from high above they look alike (a slot seen from the
+  // top). Valcrest: from above the top station, down the winding gully to the peaks beyond.
+  'valcrest-gully': { az: 180, up: 0.75, dist: 0.55, look: 0.7, fov: 50 },
   'lake-tahoe': { dist: 1.1, up: 0.75 },
-  blackspruce: { az: 0, up: 1.1, dist: 1.05, look: 0.3, fov: 48 },
+  // Blackspruce: low from the valley floor, up the steep spruce-filled face (trees seen from the side).
+  blackspruce: { az: 0, up: 0.28, dist: 0.65, look: 0.35, fov: 55 },
   ravenspire: {},
   'voltage-park': { up: 0.8 },
   dragonback: {},
