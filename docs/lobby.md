@@ -320,6 +320,11 @@ uses the same orange.
 | toast | `.lb-toast`, `.cn` (case notes), `#juiceHud .tt` | navy plate, coloured inner left edge |
 | item frame | `.cr-card`, `.lk-item`, `.cs-grid` | flat plate, grade colour as the bottom band; the item pictures are not styled here |
 
+Mountain cards (`.mt-art`) and the trail-view header (`.mt-head`) are framed for full-bleed
+photographic art (~16:10): the picture may come as the `--art` background or as an `<img>` child, both
+`cover`ed; a top scrim carries the tags, a deeper bottom scrim the region caption, and the mountain's
+accent is a 3 px band under the picture. The art itself belongs to the map-image code, not this CSS.
+
 Cases and Locker overrides are appended at the end of `lobby/cases/cases.css` (so the item-art code
 above merges cleanly); the Progress tab's CSS is the `CSS` string in `progression/lobby.js`; the
 Maps tab is `lobby/tabs/maps.css`.

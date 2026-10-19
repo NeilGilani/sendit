@@ -24,12 +24,19 @@
 #lobby .mt-card:hover, #lobby .mt-card:focus-visible { border-color: var(--c-snow); background: var(--c-ink-3); }
 #lobby .mt-card:focus-visible { outline: 2px solid var(--c-signal); outline-offset: 2px; }
 #lobby .mt-card.here { box-shadow: inset 0 3px 0 var(--c-signal); }
-.mt-art { position: relative; display: block; aspect-ratio: 16 / 7.2; background: var(--art, none) center 62% / cover no-repeat, #6f93c2;
-  border-bottom: 3px solid var(--acc, var(--c-line)); transition: background-size .4s ease; }
-.mt-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 50%, rgba(8, 14, 20, 0.72) 100%); }
-#lobby .mt-card:hover .mt-art, #lobby .mt-card:focus-visible .mt-art { background-size: 108%; }
-.mt-region { position: absolute; left: 0.75em; bottom: 0.55em; z-index: 1; font-family: var(--font-mono); font-weight: 500; font-size: 0.62em; letter-spacing: 0.1em;
-  color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+/* The card art is a full-bleed photographic render (~16:10, assets/maps/<id>.webp) held either as the
+   --art background or as an <img> inside .mt-art; both are covered the same way. A scrim at the top
+   (for the tags) and a deeper one at the bottom (for the region caption) keep the text readable on
+   bright snow; the mountain's accent runs as a 3 px band under the picture. */
+.mt-art { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; background: var(--art, none) center 55% / cover no-repeat, #5d7590;
+  border-bottom: 3px solid var(--acc, var(--c-line)); }
+.mt-art > img, .mt-art > picture, .mt-art > picture > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 55%;
+  display: block; transition: transform .5s cubic-bezier(.2, .8, .3, 1); }
+.mt-art::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(6, 11, 16, 0.45) 0%, rgba(6, 11, 16, 0) 26%, rgba(6, 11, 16, 0) 52%, rgba(6, 11, 16, 0.82) 100%); }
+#lobby .mt-card:hover .mt-art > img, #lobby .mt-card:focus-visible .mt-art > img { transform: scale(1.05); }
+.mt-region { position: absolute; left: 0.75em; right: 0.75em; bottom: 0.6em; z-index: 1; font-family: var(--font-mono); font-weight: 500; font-size: 0.62em; letter-spacing: 0.1em;
+  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.85), 0 0 8px rgba(0,0,0,.5); }
 .mt-here, .mt-exp { position: absolute; top: 0.55em; z-index: 1; font: 600 0.58em/1 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase;
   padding: 0.45em 0.6em; border-radius: var(--r1); }
 .mt-here { left: 0.55em; color: var(--c-paper-ink); background: var(--c-signal); }
@@ -50,8 +57,13 @@
 
 /* ---------------------------------------------------------------- mountain header (trail view) */
 .mt-head { position: relative; margin: -0.2em -0.3em 0.9em; border-radius: var(--r1); overflow: hidden; padding: 0.7em 0.9em 0.85em;
-  background: linear-gradient(180deg, rgba(8,14,20,0.15) 0%, rgba(8,14,20,0.85) 80%), var(--art, none) center 60% / cover no-repeat, #6f93c2;
+  background: linear-gradient(180deg, rgba(6,11,16,0.4) 0%, rgba(6,11,16,0.1) 28%, rgba(6,11,16,0.88) 82%), var(--art, none) center 55% / cover no-repeat, #5d7590;
   border-bottom: 3px solid var(--acc, var(--c-line)); }
+/* If the header art arrives as an <img> instead of --art, it sits under the same scrim. */
+.mt-head > img { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 55%; }
+.mt-head:has(> img)::before { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(6,11,16,0.4) 0%, rgba(6,11,16,0.1) 28%, rgba(6,11,16,0.88) 82%); }
+.mt-head > :not(img) { z-index: 1; }
 #lobby .mt-back { position: relative; display: inline-flex; align-items: center; gap: 0.35em; padding: 0.35em 0.7em 0.35em 0.45em; border-radius: var(--r1);
   font-size: 0.78em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; background: rgba(8,14,20,0.75); border: 1px solid var(--c-line-2); }
 #lobby .mt-back:hover, #lobby .mt-back:focus-visible { background: var(--c-snow); color: var(--c-paper-ink); border-color: var(--c-snow); }
@@ -146,11 +158,11 @@
 }
 @media (max-height: 560px) and (min-aspect-ratio: 4/5) {
   .mt-feat { display: none; }
-  .mt-art { aspect-ratio: 16 / 5; }
+  .mt-art { aspect-ratio: 16 / 6; }
   .mt-hero { margin-top: 0.8em; }
   .mt-hero p, .tr-desc { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .lb-panel.mt-enter > *, .pm-mk.on .pm-pulse { animation: none; }
-  #lobby .mt-card, .mt-art { transition: none; }
+  #lobby .mt-card, .mt-art > img { transition: none; }
 }
