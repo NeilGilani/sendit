@@ -15,8 +15,7 @@
 .d-green { --d: #1f9d55; } .d-blue { --d: #1f66d6; } .d-black { --d: #e9edf2; } .d-double-black { --d: #9aa5b3; } .d-park { --d: #f47b20; }
 .tr-badge { display: inline-block; vertical-align: -0.18em; }
 /* Small badges sit on a white sign plate, like real trail signs (the black diamonds stay readable on the dark panel). */
-.mt-spread .tr-badge, .mt-feat .tr-badge, .tr-filters .tr-badge, .lb-map-badge { background: #f2f4f1; border-radius: 1px; padding: 0.1em; box-sizing: content-box; }
-.lb-map-badge { box-shadow: 0 0 0 1px rgba(15, 26, 36, 0.25); }
+.mt-spread .tr-badge, .mt-feat .tr-badge, .tr-filters .tr-badge { background: #f2f4f1; border-radius: 1px; padding: 0.1em; box-sizing: content-box; }
 
 /* ---------------------------------------------------------------- mountain cards */
 .mt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14.5em, 1fr)); gap: 0.6em; }

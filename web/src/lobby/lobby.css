@@ -74,11 +74,11 @@ body.device-touch .lb-key { display: none; }
 #lobby .lb-tabs { flex-direction: row; align-items: stretch; margin: 0; }
 .lb-tabs { display: flex; gap: 0; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .lb-tabs::-webkit-scrollbar { display: none; }
-#lobby .lb-tab { position: relative; flex: none; display: flex; align-items: center; gap: 0.5em; padding: 0 1em; height: 100%;
-  color: var(--c-snow-2); font-weight: 700; font-stretch: 78%; font-size: 0.98em; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
+#lobby .lb-tab { position: relative; flex: none; display: flex; align-items: center; gap: 0.5em; padding: 0 0.8em; height: 100%;
+  color: var(--c-snow-2); font-weight: 700; font-stretch: 75%; font-size: 0.92em; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
   border-left: 1px solid rgba(214, 228, 240, 0.07); }
 #lobby .lb-tab:first-child { border-left: 0; }
-#lobby .lb-tab svg { width: 1.15em; height: 1.15em; stroke-width: 1.7; opacity: 0.8; }
+#lobby .lb-tab svg { display: none; width: 1.2em; height: 1.2em; stroke-width: 1.7; opacity: 0.85; }
 #lobby .lb-tab:hover { color: var(--c-snow); background: rgba(255,255,255,0.05); }
 /* Active: a snow-white sign plate with an orange top rule. */
 #lobby .lb-tab.on { color: var(--c-paper-ink); background: var(--c-snow); box-shadow: inset 0 3px 0 var(--c-signal); }
@@ -269,7 +269,7 @@ body.device-touch .lb-key { display: none; }
 #lobby .lb-ride svg { width: 0.7em; height: 0.7em; }
 #lobby .lb-ride:hover { background: var(--c-signal-2); }
 #lobby .lb-ride:active { background: #e94c12; }
-#lobby .lb-ride:focus-visible { outline: 0; box-shadow: inset 0 0 0 2px var(--c-paper-ink), inset 0 0 0 4px var(--c-snow); }
+#lobby .lb-ride:focus-visible { outline: 0; box-shadow: inset 0 -0.14em 0 var(--c-paper-ink); }
 .lb-ride-label { line-height: 1; }
 .lb-ride-key { font: 500 0.3em/1 var(--font-mono); letter-spacing: 0.04em; text-transform: none; padding: 0.35em 0.5em; border-radius: var(--r1);
   border: 1px solid rgba(15, 26, 36, 0.4); margin-left: 0.5em; align-self: center; }
@@ -296,7 +296,9 @@ body.device-touch .lb-ride-key { display: none; }
 .lb-toast.gold { color: var(--c-gold); box-shadow: inset 3px 0 0 var(--c-gold), 0 8px 24px rgba(0,0,0,0.3); }
 
 /* ---------------------------------------------------------------- responsive */
-@media (max-width: 1380px) {
+/* Wide: the tabs are words, like a sign board. Narrower: icons, with the active tab keeping its word. */
+@media (max-width: 1240px) {
+  #lobby .lb-tab svg { display: block; }
   #lobby .lb-tab:not(.on) span { display: none; }
   #lobby .lb-tab:not(.on) { padding: 0 0.85em; }
 }
