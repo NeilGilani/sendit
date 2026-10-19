@@ -297,7 +297,7 @@ export class World {
         this.stats.budgetHits = (this.stats.budgetHits || 0) + 1;
       }
     }
-    if (this.gov && !this.groups.get(0).asleep) this.govern(h);
+    if (this.gov && this.ticks % 2 === 0 && !this.groups.get(0).asleep) this.govern(2 * h);   // (480 Hz is plenty)
     // --- safety, sleep
     for (const b of this.bodies) {
       const vl = b.v.length(), wl = b.w.length();
@@ -671,7 +671,7 @@ export class World {
     }
     if (b.group === 0 && -vn > this.impact) { this.impact = -vn; this.impactAt.copy(p); }
     if (smp && -vn > (b.dig || 0)) b.dig = -vn;
-    if (b.isHand || (b.isTrunk && b.group === 0)) this.handTouch = true;   // (bracing ends once a hand or the trunk is down)
+    if (b.isHand || (b.isTrunk && b.group === 0 && this.C.braceEndTrunk !== false)) this.handTouch = true;   // (bracing ends once a hand or the trunk is down)
   }
 
   contactVel(c, h) {

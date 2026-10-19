@@ -304,7 +304,7 @@ export function seedMotion(H, { vCom, w, com, cause, groundN, rnd, C, catchMul =
     // (only what is on the snow: an edge in the air catches nothing — a crash that starts airborne flies on)
     const env = H.world.env, low = (b) => { let g = Infinity; for (const sm of b.samples) { b.point(sm.p, _c); g = Math.min(g, _c.y - sm.r - env.height(_c.x, _c.z)); } return g; };
     const onSnow = Math.min(...['shinL', 'shinR', 'board'].filter((nm) => parts[nm]).map((nm) => low(parts[nm])));
-    const near = 1 - Math.min(1, Math.max(0, (onSnow - 0.1) / 0.3));
+    const near = C.catchOnSnow === false ? 1 : 1 - Math.min(1, Math.max(0, (onSnow - 0.1) / 0.3));
     for (const [name, k] of [['shinL', near], ['shinR', near], ['board', near], ['thighL', 0.45 * near], ['thighR', 0.45 * near]]) {
       const b = parts[name];
       if (!b || !k) continue;
@@ -450,7 +450,9 @@ export function updateTone(H, t, dt, braceDir, C, rest = 1, hold = 0, mul = 1) {
       el.qT.slerp(el.tuck, k);
     }
   }
-  if (rate) for (const j of H.jl) j.qT.rotateTowards(j.goal, (C.toneRateKind?.[j.kind] ?? rate) * dt);
+  // (the targets move every 4th sub-step, 240 Hz: smooth enough, a quarter of the cost)
+  H.rt = (H.rt || 0) + 1;
+  if (rate && H.rt % 4 === 0) for (const j of H.jl) j.qT.rotateTowards(j.goal, (C.toneRateKind?.[j.kind] ?? rate) * dt * 4);
   void _q2;
 }
 

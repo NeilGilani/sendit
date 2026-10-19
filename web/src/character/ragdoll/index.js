@@ -187,7 +187,10 @@ export class RagdollController {
       this._impactCool = 0.16;
     }
     W.impact = 0;
-    this.restT = W.asleep(0) ? this.restT + dt : 0;
+    // At rest for the respawn fade: asleep — or, for a small / medium fall, the centre of mass all but stopped (a limb
+    // still settling doesn't keep a small mistake on screen).
+    const rs = this.S ? this.S('restSpeed', 0) : 0;
+    this.restT = W.asleep(0) || (rs > 0 && pl.speed < rs) ? this.restT + dt : 0;
     this.measure(dt);
     const ms = typeof performance !== 'undefined' ? performance.now() - t0 : 0;
     this.stats.lastMs = ms; this.stats.maxMs = Math.max(this.stats.maxMs, ms); this.stats.sumMs = (this.stats.sumMs || 0) + ms; this.stats.steps = (this.stats.steps || 0) + 1;

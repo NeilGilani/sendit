@@ -527,7 +527,8 @@ export const RAGDOLL = {
     govCap: [3.5, 6, 9],          // rad/s: the body's whole rotation while touching something (tumble governor) …
     govBudget: [110, 260, 620],  // deg: … and after turning this much in all it comes to a stop
     eject: [99, 9, 5],           // m/s: skis release above this (small: they stay on; trees / rocks: always but small)
-    restHold: [0.3, 0.4, 0.45],  // s at rest before the respawn fade
+    restHold: [0.3, 0.4, 0.45],  // s at rest before the respawn fade …
+    restSpeed: [0.45, 0.3, 0],   // m/s: … where 'at rest' for a small / medium fall is the centre of mass slower than this
     tip: [2.2, 2.4, 0],          // rad/s: small / medium falls tip over the way the body leans at least this fast
   },
 };

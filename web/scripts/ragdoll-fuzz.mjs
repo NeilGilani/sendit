@@ -346,7 +346,10 @@ for (const c of CAUSES) {
 const NT = arg('--tiers', 270);
 const tiers = [];
 for (let i = process.env.TONLY ? Number(process.env.TONLY) : 0; i < (process.env.TONLY ? Number(process.env.TONLY) + 1 : NT); i++) { const r = runCrash(tierScenario(i)); r.aim = AIMS[i % AIMS.length]; tiers.push(r); if (r.fail.length) fails.push(r); if (VERBOSE) console.log(`T${i} ${r.aim} ${r.type} → ${r.tier} s ${r.sev?.toFixed(2)}: tumble ${r.tumble?.toFixed(0)}° roll ${r.roll?.toFixed(0)}° wMax ${r.wMax?.toFixed(1)} arm ${r.armPeak?.toFixed(2)} leg ${r.legPeak?.toFixed(2)} loose ${r.mean?.toFixed(2)} ${r.fail.join(', ')}`); }
-const TL = { small: { flips: 0, tumbleP90: 150, wMaxP90: 6, armPeakP90: 0.75, looseMed: 1.6 }, medium: { flipShare: 0.1, tumbleP90: 330, wMaxP90: 9, armPeakP90: 0.85, looseMed: 2.2 }, big: { flipsMax: 3, wMaxP90: 14, armPeakP90: 0.95, looseMed: 3.0 } };
+// Targets per tier (docs/body.md § Severity): a small fall never goes over (no flip; the trunk turns ≤ 180°, i.e. at
+// most onto the back / side), turns slowly as a whole and keeps the hands within a forearm of the trunk; a medium one
+// rolls at most once in a while; a big one may tumble but not twice over and never as a noodle.
+const TL = { small: { flips: 0, tumbleP90: 180, wMaxP90: 5, armPeakP90: 0.78, looseMed: 1.5 }, medium: { flipShare: 0.05, tumbleP90: 300, wMaxP90: 7.5, armPeakP90: 0.85, looseMed: 1.7 }, big: { flipsMax: 1, wMaxP90: 11, armPeakP90: 0.92, looseMed: 2.2 } };
 const tierBad = [];
 console.log(`  tiers (${NT} aimed crashes; flips = full head-over-heels / cartwheels of the trunk axis):`);
 for (const name of ['small', 'medium', 'big']) {
@@ -354,7 +357,7 @@ for (const name of ['small', 'medium', 'big']) {
   if (!rs.length) { console.log(`    ${name}: none`); tierBad.push(`no ${name} crashes`); continue; }
   const f = (k) => rs.map((r) => r[k]);
   const flips = f('flips'), with1 = flips.filter((x) => x >= 1).length;
-  console.log(`    ${name.padEnd(6)} ${String(rs.length).padStart(3)} runs: flips 0/1/2+ ${flips.filter((x) => x === 0).length}/${flips.filter((x) => x === 1).length}/${flips.filter((x) => x >= 2).length}, tumble median ${med(f('tumble')).toFixed(0)}° p90 ${p90(f('tumble')).toFixed(0)}°, roll median ${med(f('roll')).toFixed(0)}° p90 ${p90(f('roll')).toFixed(0)}°; body spin (0.1 s) peak median ${med(f('wMax')).toFixed(1)} p90 ${p90(f('wMax')).toFixed(1)} rad/s; hand from trunk peak median ${med(f('armPeak')).toFixed(2)} p90 ${p90(f('armPeak')).toFixed(2)} m (mean ${med(f('armMean')).toFixed(2)}); ankles apart peak p90 ${p90(f('legPeak')).toFixed(2)} m; looseness median ${med(f('mean')).toFixed(2)} p90 ${p90(f('mean')).toFixed(2)} rad/s; asleep median ${med(rs.map((r) => r.sleep ?? 4)).toFixed(2)} s`);
+  console.log(`    ${name.padEnd(6)} ${String(rs.length).padStart(3)} runs: flips 0/1/2+ ${flips.filter((x) => x === 0).length}/${flips.filter((x) => x === 1).length}/${flips.filter((x) => x >= 2).length}, tumble median ${med(f('tumble')).toFixed(0)}° p90 ${p90(f('tumble')).toFixed(0)}°, roll median ${med(f('roll')).toFixed(0)}° p90 ${p90(f('roll')).toFixed(0)}°; body spin (0.1 s) peak median ${med(f('wMax')).toFixed(1)} p90 ${p90(f('wMax')).toFixed(1)} rad/s; hand from trunk peak median ${med(f('armPeak')).toFixed(2)} p90 ${p90(f('armPeak')).toFixed(2)} m (mean ${med(f('armMean')).toFixed(2)}); ankles apart peak p90 ${p90(f('legPeak')).toFixed(2)} m; looseness median ${med(f('mean')).toFixed(2)} p90 ${p90(f('mean')).toFixed(2)} rad/s; asleep median ${med(rs.map((r) => r.sleep ?? 4)).toFixed(2)} s; fade starts median ${med(f('fadeAt')).toFixed(2)} s, p90 ${p90(f('fadeAt')).toFixed(2)} s`);
   const L = TL[name];
   if (L.flips !== undefined && with1 > L.flips) tierBad.push(`${name}: ${with1} flips`);
   if (L.flipShare !== undefined && with1 / rs.length > L.flipShare) tierBad.push(`${name}: ${(with1 / rs.length * 100).toFixed(0)} % flip`);
