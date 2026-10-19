@@ -203,6 +203,8 @@ export class IconBaker {
     const look = this.look = dressRider(rig, { bones });
     // Own material instances: double-sided cloth so the openings show the lining.
     look.fabric.side = THREE.DoubleSide;
+    // No jacket over a bib in its own picture: show its shoulder straps.
+    look.fabric.userData.uniforms.uStraps.value = 1;
     this.others = [];
     rig.traverse((o) => { if (o.isMesh && !Object.values(look.meshes).includes(o)) this.others.push(o); });
     // A matte slate head that fades out above the shoulders (a product-shot bust, not a white torso
@@ -265,6 +267,12 @@ export class IconBaker {
       } else {
         this.aim(B['upperarm' + s], B['lowerarm' + s], new THREE.Vector3(x * 0.5, -0.86, 0.1));
         this.aim(B['lowerarm' + s], B['hand' + s], new THREE.Vector3(x * 0.32, -0.92, 0.22));
+      }
+      if (slot === 'pants') {
+        // Product shot of pants: legs a little apart and straight, so the crotch and both legs read.
+        const d = new THREE.Vector3(x * 0.075, -1, 0);
+        this.aim(B['thigh' + s], B['calf' + s], d);
+        this.aim(B['calf' + s], B['foot' + s], d);
       }
     }
   }
