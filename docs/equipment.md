@@ -391,11 +391,16 @@ the butt, hem and thighs went 9–13 cm into the deck. What rider.js does now:
   brings the skis back to the hand (skis pulled into the folded legs bunch the jacket hem between the knees).
 - **Legs never leave the bindings.** If a leg can't reach its binding, the gear follows the foot in the air and
   the hips come down on the snow.
+- **Chairlift:** the skis hang from the boots exactly (sole on the plate, tips down with the foot,
+  `liftSkiHang`), the board under the soles (they used to hang 10 cm under the ankle bone, inside the boots).
+- **Loading stills** (`assets/loading/*.webp`, first paint of every load) were re-rendered with
+  `scripts/loadingstills.mjs`: the old ones baked in the board through the knees. Re-render them whenever the
+  rig or the clothes change.
 
 Measured with `node web/scripts/gear-clip.mjs` (below): max penetration over 630 poses (5 ski and 5 board
 models, both stances, every riding / air / grab pose and every loading-screen shot frame by frame) went from
-body 13.2 / hand 4.3 / boot sunk 20 / boot through base 22 cm to ≤ 0.3 cm everywhere (see the summary in the
-night-2 report for the per-pose table).
+body 13.2 / hand 4.3 / boot sunk 20 / boot through base 22 cm to ≤ 0.34 cm everywhere; with the night-2
+clothing (`--fits`: all 7 jackets, 3 pants, both gloves) ≤ 0.33 cm over 694 poses.
 
 #### gear-clip.mjs — the penetration check
 
@@ -407,7 +412,7 @@ the edge), `hand` (mitt inside a plank; a grip may wrap 3 cm under the edge), `s
 seat), `base` (boot below the base: visible from under the gear), `gap` (boot floating off its plate). It also
 says when a grabbing hand falls short of the gear. `--check` fails above 1 cm (0.3 cm for `base`, 1.5 for `gap`).
 Filters: `--gear ski|snowboard`, `--mode game|loading`, `--only <pose names>`, `--tricks <loading tricks>`;
-`--where` prints the worst vertex; `--views side,below,front,side2,chase --size WxH` for the contact sheets.
+`--fits` adds every outfit fit; `--where` prints the worst vertex; `--views side,below,front,side2,chase --size WxH` for the contact sheets.
 
 ## Testing and tuning results
 
