@@ -177,6 +177,7 @@ export class World {
     this.impact = 0;         // largest approach speed into the snow / an obstacle since last read (group 0)
     this.impactAt = new THREE.Vector3();
     this.handTouch = false;  // a hand touched something (bracing ends)
+    this.snow = new Map();   // key → { b, gear, p (sum), n, imp }: snow contacts since the last snowContacts() read
     this.stats = { substeps: 0 };
   }
 
@@ -573,6 +574,17 @@ export class World {
       return;
     }
     b.touch++; b.touchN.add(nn);
+    if (smp) {
+      // Snow contacts since the controller last read them (snow marks / spray only where something touches):
+      // one entry per body (or per strapped-on ski), averaged contact point, hardest approach speed.
+      const key = smp.gear || b.name;
+      let e2 = this.snow.get(key);
+      if (!e2) this.snow.set(key, e2 = { key, b, gear: smp.gear || null, p: new THREE.Vector3(), n: 0, imp: 0 });
+      if (e2.n === 0) { e2.p.set(0, 0, 0); e2.imp = 0; }
+      e2.p.add(_c.copy(p).addScaledVector(nn, -r));
+      e2.n++;
+      if (-vn > e2.imp) e2.imp = -vn;
+    }
     if (this.nc < 256) {
       const c = this.contacts[this.nc] ||= { r: new THREE.Vector3(), n: new THREE.Vector3() };
       this.nc++;

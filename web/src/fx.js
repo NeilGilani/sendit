@@ -17,6 +17,9 @@ import { SprayEmitter, K_MIST, K_CHUNK } from './gfx/spray.js';
 const KIND_LINE = 2;
 const FOCUS_THIN = 0.85;   // share of spray alpha removed in front of the rider's body (gfx/spray.js uFocus)
 const UP = new THREE.Vector3(0, 1, 0);
+// Crash marks / spray by ragdoll part (FXManager.crashMarks / crashSpray): groove width (m), spray load.
+const CRASH_MARK = { chest: 0.42, pelvis: 0.36, head: 0.24, thigh: 0.18, shin: 0.15, upperarm: 0.12, forearm: 0.12, ski: 0.09, board: 0.26, pole: 0.04 };
+const CRASH_SPRAY = { chest: 0.7, pelvis: 0.7, thigh: 0.35, ski: 0.35, board: 0.5 };
 
 /** Derive two ski contacts from the player (edge roll from the turn's lean angle, wedge/skid from brake). */
 export function contactsFromSkis(pl, out = []) {
@@ -110,15 +113,22 @@ export class FXManager {
     globals.uTrackMap.value = this.track.texture;
 
     const pw = () => this.player.powder ?? 0.5;
-    on('jumped', (depth) => this.spray.puff(this.player.renderPos, 8 + depth * 22, pw(), 2 + depth * 2));
-    on('landed', ({ impact }) => this.spray.landing(this.player.renderPos, impact, pw()));
+    on('jumped', (depth) => { if (this.onSnow(this.player.renderPos, 0.25)) this.spray.puff(this.player.renderPos, 8 + depth * 22, pw(), 2 + depth * 2); });
+    on('landed', ({ impact }) => { if (this.onSnow(this.player.position, 0.15)) this.spray.landing(this.player.position, impact, pw()); });
     // Ski pole plants (rider.js placePoles): a small puff of snow where the basket touches down.
-    on('polePlant', (e) => this.spray.puff(new THREE.Vector3(e.x, e.y, e.z), 5, pw(), 0.8));
+    on('polePlant', (e) => { const p = new THREE.Vector3(e.x, e.y, e.z); if (this.onSnow(p, 0.12)) this.spray.puff(p, 5, pw(), 0.8); });
     on('hardBrake', (speed) => {
       const pl = this.player;
+      if (pl.state !== State.GROUNDED || !this.onSnow(pl.renderPos, 0.15)) return;
       this.spray.stopFan(pl.renderPos, pl.forward(), speed || pl.speed, pw(), Math.sign(pl.turnInput || 1));
     });
-    on('crashed', () => this.spray.crash(this.player.renderPos, pw()));
+    // A crash: with the ragdoll the snow flies where the body actually hits it (crashSpray); without it, here —
+    // if "here" is the snow (a crash in the air — a rail bail, a trunk — throws nothing until something lands).
+    on('crashed', () => {
+      const pl = this.player;
+      if (pl.ragdoll && !pl.ragdoll.uninstalled && pl.ragdoll.C?.enabled) return;
+      if (this.onSnow(pl.renderPos, 0.3)) this.spray.crash(pl.renderPos, pw());
+    });
     on('nearMiss', (e) => {
       this.acc.lines += FX.speedLineCount * 0.25;
       if (e?.kind === 'tree') this.treePlop(e.x, e.z);
@@ -136,6 +146,56 @@ export class FXManager {
       else this.spray.spawn(K_CHUNK, p, v, 0.05 + Math.random() * 0.06, 1.2 + Math.random() * 0.6, { grav: 4.5 });
     }
     emit('treePlop', { x, y, z });
+  }
+
+  /**
+   * Is world point p on snow that tracks and spray belong to: within `tol` m of the terrain's height there, and
+   * that height is the drawn snow (not a roof, a deck, a box or a pipe: terrain.trackable, when the map says which
+   * raised surfaces are structures). Tracks are carved into the terrain mesh from above, so a stamp under a rider
+   * on a roof or a rail would show on the snow below.
+   */
+  onSnow(p, tol = 0.05) {
+    const T = this.player.terrain;
+    const h = T.getHeight(p.x, p.z);
+    if (!(Math.abs(p.y - h) <= tol)) return false;
+    return T.trackable ? T.trackable(p.x, p.z, h) : true;
+  }
+
+  /**
+   * Crash marks: one groove per body part / piece of gear touching the snow this frame, shaped by the part (a
+   * trunk-wide smear, a narrow arm or ski line) and as deep as the hit / the slide (powder deeper). Parts in the
+   * air leave nothing.
+   */
+  crashMarks(cs) {
+    const pw = this.player.powder ?? 0.5;
+    for (const c of cs) {
+      if (!this.onSnow(c.p, 0.06)) continue;
+      const w = CRASH_MARK[c.part] ?? 0.12;
+      const k = Math.min(1, 0.25 + c.imp / 7 + c.speed / 14) * (0.45 + 0.55 * pw);
+      this.track.stamp('rd:' + c.key, c.p, c.heading, w, k);
+    }
+  }
+
+  /** Crash spray: sliding contacts throw snow (spray.emit); fresh hard hits puff (spray.landing), rate-limited. */
+  crashSpray(cs, out, dt) {
+    const pw = this.player.powder ?? 0.5;
+    const cool = this._hitCool || (this._hitCool = new Map());
+    for (const [k, t] of cool) cool.set(k, t - dt);
+    const pool = this._crashSprayPool || (this._crashSprayPool = new Map());
+    let puffs = 0;
+    for (const c of cs) {
+      if (!this.onSnow(c.p, 0.06)) continue;
+      if (c.imp > 3.2 && (cool.get(c.key) ?? 0) <= 0 && puffs < 2) {
+        this.spray.landing(c.p, Math.min(14, c.imp * 1.2), pw);
+        cool.set(c.key, 0.25); puffs++;
+      }
+      if (c.speed > 1.5 && CRASH_SPRAY[c.part]) {
+        let e = pool.get(c.key);
+        if (!e) pool.set(c.key, e = { position: new THREE.Vector3(), direction: new THREE.Vector3(), edgeAngle: 0.5, load: 0.5, speed: 0, id: 'rd:' + c.key });
+        e.position.copy(c.p); e.direction.copy(c.v).normalize(); e.speed = c.speed; e.load = CRASH_SPRAY[c.part];
+        out.push(e);
+      }
+    }
   }
 
   /** Generic sparkly puff (snowflake pickups). */
@@ -170,11 +230,19 @@ export class FXManager {
     const fwd = pl.forward();
     const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
 
-    // Snow spray from whatever is touching the snow.
+    // Snow spray from whatever is touching the snow: the skis / board while grounded on snow (not on a roof, a
+    // box, a deck), the crashed body's real contacts.
+    const crashRag = pl.state === State.CRASH && pl.ragdoll?.drives?.(pl);
+    const crashC = crashRag ? pl.ragdoll.snowContacts(this._crashC || (this._crashC = [])) : null;
+    const sprayC = this._sprayC || (this._sprayC = []);
+    sprayC.length = 0;
     if (ground) {
       const contacts = this.contactSource ? this.contactSource() : contactsFromSkis(pl, this._contacts);
-      this.spray.emit(contacts, dt, { powder: pl.powder ?? 0.5, normal: pl.groundNormal });
-    } else this.spray.emit([], dt);
+      // (an edge contact sinks into powder by up to its `depth`)
+      for (const c of contacts) if (this.onSnow(c.position, 0.1 + (c.depth || 0))) sprayC.push(c);
+    }
+    if (crashC) this.crashSpray(crashC, sprayC, dt);
+    this.spray.emit(sprayC, dt, { powder: pl.powder ?? 0.5, normal: pl.groundNormal });
     this.spray.update(dt);
 
     // Proximity speed lines: close shaves (and top speed) stream white lines past the camera.
@@ -213,25 +281,35 @@ export class FXManager {
 
     // Persistent tracks: two grooves inside a trough pushed through the powder. Strength = depth:
     // deep and soft in powder, a shallow scratch on hardpack.
-    if (pl.state === State.CRASH) this.track.stamp('body', pl.renderPos, pl.heading, 1.2, 1);
-    else if (ground) {
+    // Only where the gear / body touches the snow (onSnow): an air, a rail, a roof or a deck writes nothing, and a
+    // groove never bridges a gap (TrackMap.endFrame forgets keys that weren't stamped this frame).
+    const T = this.track;
+    T.beginFrame();
+    if (pl.state === State.CRASH) {
+      if (crashC) this.crashMarks(crashC);
+      else if (!crashRag && this.onSnow(pl.renderPos, 0.1)) T.stamp('body', pl.renderPos, pl.heading, 1.2, 1);   // (old slide-and-roll crash, ?ragdoll=0)
+    } else if (ground) {
       const h = pl.heading, pwr = pl.powder ?? 1;
       const wedge = pl.brake;
       const depth = 0.22 + 0.78 * pwr;
+      const tol = 0.06 + (pl.sink || 0);
+      const at = this._at || (this._at = new THREE.Vector3());
       if (pl.equipment?.type === 'snowboard') {
         // One wide groove: the board's waist, smeared wider as it skids across the fall line.
         const waist = pl.equipment.spec?.waist ?? 0.25;
         const w = waist + Math.abs(Math.sin(pl.skidAngle || 0)) * 0.6 + (pl.skid || 0) * 0.15;
-        this.track.stamp('L', pl.renderPos, h, w, depth);
+        if (this.onSnow(pl.renderPos, tol)) T.stamp('L', pl.renderPos, h, w, depth);
       } else {
         for (const sk of [-1, 1]) {
-          const at = pl.renderPos.clone().addScaledVector(side, sk * (FX.skiSpacing * 0.5 + wedge * 0.1));
-          this.track.stamp(sk < 0 ? 'L' : 'R', at, h + sk * wedge * 0.28, FX.trackWidth + wedge * 0.12 + (pl.skid || 0) * 0.15, depth);
+          // (each ski on its own: one can hang over a kicker's edge while the other is still on it)
+          at.copy(pl.renderPos).addScaledVector(side, sk * (FX.skiSpacing * 0.5 + wedge * 0.1));
+          if (this.onSnow(at, tol)) T.stamp(sk < 0 ? 'L' : 'R', at, h + sk * wedge * 0.28, FX.trackWidth + wedge * 0.12 + (pl.skid || 0) * 0.15, depth);
         }
       }
-      if (pwr > 0.2) this.track.stamp('plow', pl.renderPos, h, FX.plowWidth, FX.plowStrength * pwr);
+      if (pwr > 0.2 && this.onSnow(pl.renderPos, tol)) T.stamp('plow', pl.renderPos, h, FX.plowWidth, FX.plowStrength * pwr);
     }
-    this.track.flush(pl.renderPos);
+    T.endFrame();
+    T.flush(pl.renderPos);
   }
 }
 
@@ -312,9 +390,16 @@ class TrackMap {
     r.setRenderTarget(prev);
   }
 
+  /** Per frame: keys not stamped between beginFrame and endFrame lose their last point, so no groove bridges the
+   * gap to where they touch down again (an air, a rail, a body part lifting off the snow). */
+  beginFrame() { (this.touched ||= new Set()).clear(); this.framed = true; }
+  endFrame() { if (this.lastBy) for (const k in this.lastBy) if (!this.touched.has(k)) delete this.lastBy[k]; this.framed = false; }
+
   stamp(key, p, heading, width, strength) {
     const cur = new THREE.Vector2(p.x, p.z);
     this.lastBy = this.lastBy || {};
+    if (this.framed) this.touched.add(key);
+    this.onStamp?.(key, p, width, strength);   // (tests: track-ghost.mjs)
     const last = this.lastBy[key];
     if (last && last.distanceTo(cur) < 0.12) return;
     const len = last && last.distanceTo(cur) < 4 ? last.distanceTo(cur) : 0.3;

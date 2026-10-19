@@ -217,6 +217,36 @@ export class RagdollController {
     m.mean = m.sum / m.T;
   }
 
+  /**
+   * Where the crashed body (and its gear) touched the snow since the last call (fx.js: snow marks and spray only
+   * at real contacts, nothing under a body in the air). Fills `out` with
+   *   { key, part: 'chest' | 'pelvis' | 'head' | 'thigh' | 'shin' | 'upperarm' | 'forearm' | 'ski' | 'board' | 'pole',
+   *     p (contact point on the snow), v (that body's velocity), speed, imp (hardest approach speed, m/s), heading,
+   *     axis (body axis, world), hits (sub-step contacts) }
+   * and returns it. Entries are pooled (copy what you keep).
+   */
+  snowContacts(out = []) {
+    out.length = 0;
+    if (!this.H) return out;
+    const W = this.H.world, pool = this._snowPool || (this._snowPool = new Map());
+    for (const e of W.snow.values()) {
+      if (e.n === 0) continue;
+      let c = pool.get(e.key);
+      if (!c) pool.set(e.key, c = { key: e.key, part: '', p: new THREE.Vector3(), v: new THREE.Vector3(), axis: new THREE.Vector3(), speed: 0, imp: 0, heading: 0, hits: 0 });
+      const b = e.b;
+      c.part = e.gear ? 'ski' : b.name.replace(/[LR]$/, '').replace(/\d+$/, '');
+      c.p.copy(e.p).divideScalar(e.n);
+      c.v.copy(b.v); c.speed = b.v.length(); c.imp = e.imp; c.hits = e.n;
+      // Axis: a strapped-on ski along its length, a body along its capsule.
+      if (e.gear) { const s = b.samples.find((q) => q.gear === e.gear); c.axis.copy(s.axis).applyQuaternion(b.q); }
+      else c.axis.set(0, 1, 0).applyQuaternion(b.q);
+      c.heading = Math.atan2(-c.axis.x, -c.axis.z);
+      e.n = 0;
+      out.push(c);
+    }
+    return out;
+  }
+
   /** Time for the respawn fade? (player.crashStep asks once the ragdoll ran) */
   doneAt(crashT) {
     const C = this.C;
