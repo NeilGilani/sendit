@@ -584,13 +584,13 @@ export function bodyMaterial(src) {
     // Jacket zone (big superhero shoulders / arms) pulls in furthest, pants and hands less.
     // Arms are always inside the sleeves: pull them toward the arm's axis (never through it), the
     // rest of the covered skin in along its normal.
-    float arm = color.a * color.r / tot * smoothstep(0.15, 0.23, abs(position.x)) * step(1.25, position.y);
+    float arm = color.a * color.r / tot * smoothstep(0.12, 0.2, abs(position.x)) * step(1.25, position.y);
     transformed.yz = mix(transformed.yz, vec2(1.45, -0.075), arm * 0.6);
     // Hands live in the mitts: pull them toward the hand's axis too.
     float hand = color.a * color.b / tot * smoothstep(0.66, 0.7, abs(position.x)) * step(1.25, position.y);
     transformed.yz = mix(transformed.yz, vec2(1.43, -0.05), hand * 0.55);
     transformed.x = mix(transformed.x, sign(transformed.x) * min(abs(transformed.x), 0.84), hand);   // fingers curl into the fist
-    float cover = color.a * (color.r / tot * 1.8 * (1.0 - arm) + color.g / tot * 1.25 + step(1.2, position.y) * color.b / tot * 0.8);
+    float cover = color.a * (color.r / tot * 2.8 * (1.0 - arm) + color.g / tot * 1.25 + step(1.2, position.y) * color.b / tot * 0.8);
     transformed -= objectNormal * uShrink * cover;
   }`,
     fragPars: `${COMMON}\nvarying vec4 vZone; varying vec3 vObj;\nuniform vec3 uJacket, uPants, uMitt, uBoot, uBootAccent; uniform float uJHem;\nfloat fabRough = 0.85, fabSheen = 0.1, fabSheenRough = 0.6, fabSpec = 0.2, fabAO = 1.0;`,

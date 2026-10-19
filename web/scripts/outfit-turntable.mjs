@@ -49,6 +49,8 @@ await page.evaluate(({ equip, zoom }) => {
   st.textContent = 'body > *:not(canvas) { visibility: hidden !important; }';
   document.head.appendChild(st);
   const S = window.__sendit, stage = S.stage;
+  // Other skiers (life.js) pass behind the plinth: hide them so nothing but the rider is in frame.
+  if (S.life?.group) Object.defineProperty(S.life.group, 'visible', { get: () => false, set: () => {} });
   if (equip === 'snowboard') stage.setEquipment('snowboard', { animate: false });
   stage.setShot('full');
   stage.zoom = zoom;

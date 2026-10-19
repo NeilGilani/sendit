@@ -33,42 +33,42 @@
 export const FITS = {
   // Slim technical shell (Rush / lofoten class): close shoulders, follows the taper, hem over the seat.
   shell: {
-    style: 0, hemFront: 0.85, hemBack: 0.825, hemFlare: 0.002,
-    torso: { chest: [0.226, 0.15, 0.16], waist: [0.216, 0.144, 0.157], hem: [0.22, 0.147, 0.161], n: 2.4 },
-    shoulder: 0.008, sleeve: { upper: 0.066, elbow: 0.063, forearm: 0.058, cuff: 0.053 }, sleeveEnd: 0.69,
-    collarTop: 1.628, collarEase: 0.016, hood: 'down', hoodRoll: [0.024, 0.032], gaiter: true, gaiterTop: 1.69,
+    style: 0, hemFront: 0.83, hemBack: 0.8, hemFlare: 0.002,
+    torso: { chest: [0.222, 0.15, 0.158], waist: [0.218, 0.146, 0.158], hem: [0.226, 0.15, 0.164], n: 2.4 },
+    shoulder: 0.004, sleeve: { upper: 0.068, elbow: 0.066, forearm: 0.063, cuff: 0.06 }, sleeveEnd: 0.69,
+    collarTop: 1.628, collarEase: 0.016, hood: 'down', hoodRoll: [0.034, 0.05, 0.045], gaiter: true, gaiterTop: 1.69,
     folds: 0.75, quilt: null, kangaroo: 0,
   },
   // Relaxed freeride shell (Sabre class): roomy through chest, waist and hip but hanging straight from the
   // chest and shoulder blades, close at the shoulders, a slight drop tail below the seat.
   relaxed: {
-    style: 0, hemFront: 0.785, hemBack: 0.76, hemFlare: 0.003,
-    torso: { chest: [0.24, 0.16, 0.164], waist: [0.236, 0.158, 0.165], hem: [0.242, 0.162, 0.17], n: 2.4 },
-    shoulder: 0.011, sleeve: { upper: 0.073, elbow: 0.07, forearm: 0.064, cuff: 0.057 }, sleeveEnd: 0.695,
-    collarTop: 1.628, collarEase: 0.02, hood: 'down', hoodRoll: [0.029, 0.04], gaiter: true, gaiterTop: 1.69,
+    style: 0, hemFront: 0.765, hemBack: 0.725, hemFlare: 0.0,
+    torso: { chest: [0.232, 0.158, 0.164], waist: [0.238, 0.16, 0.168], hem: [0.25, 0.168, 0.178], n: 2.4 },
+    shoulder: 0.005, sleeve: { upper: 0.075, elbow: 0.074, forearm: 0.071, cuff: 0.066 }, sleeveEnd: 0.695,
+    collarTop: 1.628, collarEase: 0.02, hood: 'down', hoodRoll: [0.044, 0.068, 0.065], gaiter: true, gaiterTop: 1.69,
     folds: 1, quilt: null, kangaroo: 0,
   },
   // New-school anorak (relaxed anorak / long pullover class): long and loose, half zip, kangaroo pocket.
   anorak: {
-    style: 1, hemFront: 0.72, hemBack: 0.7, hemFlare: 0.0,
-    torso: { chest: [0.247, 0.166, 0.168], waist: [0.246, 0.166, 0.17], hem: [0.252, 0.17, 0.176], n: 2.35 },
-    shoulder: 0.013, sleeve: { upper: 0.077, elbow: 0.074, forearm: 0.068, cuff: 0.059 }, sleeveEnd: 0.7,
-    collarTop: 1.628, collarEase: 0.02, hood: 'down', hoodRoll: [0.032, 0.046], gaiter: true, gaiterTop: 1.69,
+    style: 1, hemFront: 0.68, hemBack: 0.65, hemFlare: 0.0,
+    torso: { chest: [0.236, 0.164, 0.168], waist: [0.246, 0.168, 0.174], hem: [0.262, 0.178, 0.188], n: 2.35 },
+    shoulder: 0.006, sleeve: { upper: 0.079, elbow: 0.078, forearm: 0.075, cuff: 0.07 }, sleeveEnd: 0.7,
+    collarTop: 1.628, collarEase: 0.02, hood: 'down', hoodRoll: [0.048, 0.072, 0.075], gaiter: true, gaiterTop: 1.69,
     folds: 1.2, quilt: null, kangaroo: 0.012,
   },
   // Insulated puffer: the one cut that is meant to be round. Wide baffles, hem cinched at the hip.
   puffer: {
     style: 2, hemFront: 0.88, hemBack: 0.875, hemFlare: -0.014,
     torso: { chest: [0.25, 0.172, 0.174], waist: [0.248, 0.17, 0.174], hem: [0.238, 0.164, 0.17], n: 2.1 },
-    shoulder: 0.02, sleeve: { upper: 0.079, elbow: 0.077, forearm: 0.071, cuff: 0.058 }, sleeveEnd: 0.69,
+    shoulder: 0.012, sleeve: { upper: 0.079, elbow: 0.077, forearm: 0.073, cuff: 0.06 }, sleeveEnd: 0.69,
     collarTop: 1.632, collarEase: 0.028, hood: 'none', hoodRoll: null, gaiter: true, gaiterTop: 1.69,
     folds: 0.3, quilt: { pitch: 0.105, depth: 0.012 }, kangaroo: 0,
   },
   // Tall hoodie worn over a shell: soft cotton, ribbed hem blousing at the hip, the shell's collar out the top.
   hoodie: {
-    style: 3, hemFront: 0.755, hemBack: 0.745, hemFlare: -0.016,
-    torso: { chest: [0.242, 0.16, 0.164], waist: [0.244, 0.162, 0.168], hem: [0.236, 0.156, 0.162], n: 2.3 },
-    shoulder: 0.012, sleeve: { upper: 0.075, elbow: 0.072, forearm: 0.067, cuff: 0.054 }, sleeveEnd: 0.695,
+    style: 3, hemFront: 0.71, hemBack: 0.69, hemFlare: -0.016,
+    torso: { chest: [0.236, 0.16, 0.164], waist: [0.246, 0.164, 0.17], hem: [0.244, 0.162, 0.17], n: 2.3 },
+    shoulder: 0.006, sleeve: { upper: 0.077, elbow: 0.076, forearm: 0.073, cuff: 0.062 }, sleeveEnd: 0.695,
     collarTop: 1.622, collarEase: 0.016, hood: 'hoodie', hoodRoll: null, gaiter: true, gaiterTop: 1.69,
     folds: 1.3, quilt: null, kangaroo: 0.01,
   },
@@ -76,8 +76,8 @@ export const FITS = {
   suit: {
     style: 4, hemFront: 0.84, hemBack: 0.84, hemFlare: 0.0,
     torso: { chest: [0.23, 0.152, 0.162], waist: [0.22, 0.146, 0.158], hem: [0.226, 0.149, 0.162], n: 2.4 },
-    shoulder: 0.009, sleeve: { upper: 0.069, elbow: 0.066, forearm: 0.061, cuff: 0.055 }, sleeveEnd: 0.69,
-    collarTop: 1.628, collarEase: 0.018, hood: 'down', hoodRoll: [0.026, 0.034], gaiter: true, gaiterTop: 1.69,
+    shoulder: 0.004, sleeve: { upper: 0.07, elbow: 0.068, forearm: 0.065, cuff: 0.06 }, sleeveEnd: 0.69,
+    collarTop: 1.628, collarEase: 0.018, hood: 'down', hoodRoll: [0.03, 0.045, 0.04], gaiter: true, gaiterTop: 1.69,
     folds: 0.8, quilt: null, kangaroo: 0,
   },
 };
@@ -96,11 +96,11 @@ export function jacketCut(fit, over = {}) {
  */
 export const PANT_FITS = {
   // Relaxed bib: roomy, straight below the knee, two or three folds over the boot.
-  relaxed: { pantsEase: { thigh: 0.032, knee: 0.036, cuff: 0.044 }, straight: true, cuffY: 0.15, stack: { y0: 0.17, y1: 0.33, n: 3, amp: 0.014 } },
+  relaxed: { pantsEase: { thigh: 0.034, knee: 0.044, cuff: 0.058 }, straight: true, round: 0.6, cuffY: 0.11, stack: { y0: 0.13, y1: 0.34, n: 3, amp: 0.018 } },
   // Relaxed tapered pant: roomy thigh, narrowing to the boot.
-  tapered: { pantsEase: { thigh: 0.03, knee: 0.03, cuff: 0.036 }, straight: false, cuffY: 0.16, stack: { y0: 0.18, y1: 0.3, n: 2, amp: 0.01 } },
+  tapered: { pantsEase: { thigh: 0.032, knee: 0.034, cuff: 0.044 }, straight: false, round: 0.45, cuffY: 0.14, stack: { y0: 0.15, y1: 0.3, n: 2, amp: 0.013 } },
   // Wide new-school pant: wide straight leg, long inseam piling up over the boot.
-  baggy: { pantsEase: { thigh: 0.044, knee: 0.05, cuff: 0.062 }, straight: true, cuffY: 0.12, stack: { y0: 0.14, y1: 0.36, n: 4, amp: 0.018 } },
+  baggy: { pantsEase: { thigh: 0.046, knee: 0.056, cuff: 0.07 }, straight: true, round: 0.75, cuffY: 0.09, stack: { y0: 0.1, y1: 0.37, n: 4, amp: 0.022 } },
 };
 
 /** Garment shapes, per slot. Lengths are metres in the rider's bind pose (1.8 m tall, feet at 0). */

@@ -24,7 +24,7 @@ export function buildOutfitGeometry(body, cut) {
   let collarRings = null, jacketRings = null;
   // Target sleeve radius along the arm (|x| in the T-pose): the fit's upper / elbow / forearm / cuff.
   const SL = cut.sleeve;
-  const sleeveKeys = [[0.2, SL.upper * 0.94], [0.3, SL.upper], [0.46, SL.elbow], [0.58, SL.forearm], [cut.sleeveEnd - 0.03, SL.cuff], [1, SL.cuff]];
+  const sleeveKeys = [[0.2, SL.upper * 0.98], [0.3, SL.upper * 1.02], [0.46, SL.elbow], [0.58, SL.forearm], [cut.sleeveEnd - 0.03, SL.cuff], [1, SL.cuff]];
   const sleeveR = (t) => {
     let i = 0;
     while (i < sleeveKeys.length - 2 && sleeveKeys[i + 1][0] < t) i++;
@@ -71,7 +71,7 @@ export function buildOutfitGeometry(body, cut) {
       if (t >= yWaist) return mix3(T.waist, T.chest, smooth(yWaist, yChest, t));
       return mix3(T.hem, T.waist, smooth(bot, yWaist, t));
     };
-    const MIN = -0.026;
+    const MIN = -0.058;
     const rings = bodyRings(body, {
       axis: 'y', t0: top, t1: bot, rings: 62, segs, half: 0.03, bones,
       axisPoint: (t) => new THREE.Vector3(0, t, 0),
@@ -80,32 +80,26 @@ export function buildOutfitGeometry(body, cut) {
       smoothA: 8, smoothT: 5, minEase: MIN,
       ease: (t, th) => cut.shoulder + ((1 - Math.cos(th)) / 2) * 0.004,
       post: (rings, S) => {
-        // Yoke: the superhero chest is far deeper than a real one, flatten its front (the skin underneath
-        // is pulled in further than this).
+        // The whole shell is the fit's cross-section, including the yoke: from the chest up the width and
+        // depths round off over the shoulders to the neck along a soft, dropped shoulder line (the fabric
+        // bridges from the neck to the upper arm instead of hugging the deltoids and traps).
+        const neck = [0.085, 0.076, 0.072], yS = cut.shoulderY ?? 1.43;
         for (const r of rings) {
-          const k = 0.1 * smooth(1.3, 1.42, r.t) * (1 - smooth(1.52, 1.58, r.t));
-          for (let q = 0; q < S; q++) r.r[q] *= 1 - k * Math.max(0, Math.cos((q / S) * TAU)) ** 2;
-        }
-        // Shoulder line: the shell slopes from the collar down to the armholes (no boxy epaulettes).
-        for (const r of rings) {
-          const k = smooth(1.36, 1.6, r.t) * 0.6;
-          for (let q = 0; q < S; q++) {
-            const sd = Math.pow(Math.abs(Math.sin((q / S) * TAU)), 1.6);
-            r.r[q] = Math.max(r.r[q] * (1 - k * sd), r.raw[q] - 0.02);
-          }
-        }
-        // Below the yoke: the fit's cross-section.
-        for (const r of rings) {
-          const w = smooth(1.4, 1.5, r.t);
-          const [hw, dF, dB] = dims(r.t), n = T.n ?? 2.4;
+          const [hw0, dF0, dB0] = dims(r.t), n = T.n ?? 2.4;
+          const u = Math.min(1, Math.max(0, (r.t - yS) / (top - yS)));
+          const rnd = Math.sqrt(Math.max(0, 1 - Math.pow(u, 2.2)));
+          const hw = neck[0] + (hw0 - neck[0]) * rnd;
+          const dF = neck[1] + (dF0 - neck[1]) * Math.sqrt(Math.max(0, 1 - Math.pow(u, 1.6)));
+          const dB = neck[2] + (dB0 - neck[2]) * Math.sqrt(Math.max(0, 1 - Math.pow(u, 3.0)));
           // The skin limit is max-filtered around the ring: where the shell rests on the body it bridges
           // over the grooves between muscles instead of showing them.
           const lim = new Float32Array(S);
-          for (let q = 0; q < S; q++) { let m = -1; for (let d = -4; d <= 4; d++) m = Math.max(m, r.raw[(q + d + S) % S]); lim[q] = m; }
+          for (let q = 0; q < S; q++) { let m = -1; for (let d = -5; d <= 5; d++) m = Math.max(m, r.raw[(q + d + S) % S]); lim[q] = m; }
           for (let q = 0; q < S; q++) {
             const th = (q / S) * TAU, s = Math.abs(Math.sin(th)), c = Math.cos(th);
             const tr = 1 / Math.pow(Math.pow(s / hw, n) + Math.pow(Math.abs(c) / (c > 0 ? dF : dB), n), 1 / n);
-            r.r[q] = Math.max(THREE.MathUtils.lerp(tr, r.r[q], w), THREE.MathUtils.lerp(lim[q], r.raw[q], w) + MIN);
+            // (less allowance on the shoulder tops: the clavicles lift there in a crouch)
+            r.r[q] = Math.max(tr + cut.shoulder * u, lim[q] + MIN + 0.022 * smooth(1.42, 1.48, r.t) * smooth(0.4, 0.75, s));
           }
         }
         // The back hangs straight from the shoulder blades: below 1.5 a back radius may only shrink a
@@ -129,7 +123,7 @@ export function buildOutfitGeometry(body, cut) {
         // Hem: a slight flare (shells), or a rib / drawcord pulling it in with the fabric blousing above.
         const fl = cut.hemFlare ?? 0;
         for (const r of rings) {
-          const f = fl >= 0 ? smooth(bot + 0.12, bot, r.t) * fl
+          const f = fl >= 0 ? smooth(bot + 0.12, bot, r.t) * fl + 0.0045 * bump(r.t, bot + 0.085, 0.065)
             : fl * smooth(bot + 0.075, bot + 0.02, r.t) - fl * 0.45 * bump(r.t, bot + 0.12, 0.07);
           for (let k = 0; k < S; k++) r.r[k] = Math.max(r.r[k] + f, r.raw[k] + MIN);
         }
@@ -156,7 +150,7 @@ export function buildOutfitGeometry(body, cut) {
         const flute = (Math.sin(th * 9 + pnoise(u * 4, 5.3, 4) * 2.2) * 0.0045 + pnoise(u * 13, r.t * 3 + 9.7, 13) * 0.002) * smooth(bot + 0.28, bot + 0.02, r.t);
         // Tension folds from the armpit running down and forward over the front of the ribs.
         const ath = Math.abs(Math.atan2(Math.sin(th), Math.cos(th)));
-        const diag = Math.sin(((r.t - 1.2) + 0.09 * (ath - 1.0)) * TAU / 0.065 + pnoise(u * 5, 2.9, 5) * 1.2) * 0.0028 * bump(r.t, 1.29, 0.13) * bump(ath, 1.05, 0.45);
+        const diag = Math.sin(((r.t - 1.2) + 0.09 * (ath - 1.0)) * TAU / 0.065 + pnoise(u * 5, 2.9, 5) * 1.2) * 0.0018 * bump(r.t, 1.27, 0.11) * bump(ath, 1.05, 0.45);
         r.r[k] += (drape * below + waist + flute + diag + lump * smooth(1.45, 1.2, r.t)) * folds;
         // Quilted baffles (puffers): tubes between stitch lines, pinched at each line.
         if (quilt) {
@@ -178,6 +172,9 @@ export function buildOutfitGeometry(body, cut) {
       // …and only partly, at the outer edge: the chest panel stays flat when the arms reach forward.
       weightLimit: (b, x, y) => (b.startsWith('upperarm') ? 0.55 * smooth(0.15, 0.23, Math.abs(x)) * smooth(1.43, 1.5, y) : undefined),
     }));
+    // Spread the weights further over the shell than on other pieces: a jacket panel bends as one sheet
+    // when the spine flexes (no groove along the spine, no shoulder-blade dents in a crouch).
+    pieces[pieces.length - 1].smoothIters = 24;
   }
 
   // ---------------------------------------------------------------- sleeves
@@ -202,7 +199,7 @@ export function buildOutfitGeometry(body, cut) {
           for (let k = 0; k < S; k++) r.r[k] = Math.max(tr, r.raw[k] * shrink + 0.01);
           // Near the armhole the top of the sleeve follows the sloped shoulder line of the body shell.
           if (r.t < 0.34) {
-            const lim = 1.575 - (r.t - 0.08) * 0.42 - r.c.y - 0.02 * smooth(0.3, 0.2, r.t);
+            const lim = 1.575 - (r.t - 0.08) * 0.42 - r.c.y - 0.02 * smooth(0.3, 0.2, r.t) - 0.02 * smooth(0.36, 0.22, r.t);
             for (let k = 0; k < S; k++) {
               const up = Math.cos((k / S) * TAU);
               if (up > 0.05) r.r[k] = Math.max(Math.min(r.r[k], lim / up), r.raw[k] * shrink);
@@ -254,6 +251,13 @@ export function buildOutfitGeometry(body, cut) {
       },
       post: (rings, S) => {
         // Straight, wide leg: below the knee the leg never narrows (bootcut over the boot).
+        // Fabric, not a leg: below the knee the leg becomes a round tube (it hangs from the knee and falls
+        // over the boot instead of tracing the calf); the thigh rounds off a little too.
+        for (const r of rings) {
+          let m = 0; for (let k = 0; k < S; k++) m = Math.max(m, r.r[k]);
+          const f = (cut.round ?? 0.5) * (0.35 + 0.65 * smooth(knee + 0.15, knee - 0.05, r.t));
+          for (let k = 0; k < S; k++) r.r[k] = THREE.MathUtils.lerp(r.r[k], m, f);
+        }
         if (cut.straight !== false) hang(rings, S, knee + 0.05, 0.04);
         // Under the jacket the leg is a slim lining (the hidden seat and hips must not bulge through the
         // jacket's back hem); it opens out to the full cut just above the hem.
@@ -305,7 +309,8 @@ export function buildOutfitGeometry(body, cut) {
   // ---------------------------------------------------------------- stowed hood (a roll behind the neck) or a hoodie's hood lying on the back
   if (cut.hood === 'down' || cut.hood === 'hoodie') {
     const soft = cut.hood === 'hoodie';
-    const [rollThick, rollTall] = cut.hoodRoll || [0.03, 0.04];
+    // Stowed / collapsed hood: [thickness, height above the neckline, drop down the back] (shells).
+    const [rollThick, rollUp, rollDown] = cut.hoodRoll || [0.04, 0.06, 0.055];
     const segs = 18, n = 22;
     const rings = [];
     const e1s = [], e2s = [];
@@ -332,7 +337,7 @@ export function buildOutfitGeometry(body, cut) {
       const T = pts[Math.min(n - 1, i + 1)].clone().sub(pts[Math.max(0, i - 1)]).normalize();
       const out = new THREE.Vector3(pts[i].x, 0, pts[i].z + 0.03).normalize();
       const up = new THREE.Vector3().crossVectors(T, out).normalize();
-      if (soft) {
+      {
         // The hoodie's hood lies on the back: its "down" runs along the jacket's back surface, which
         // slopes out from the neck to the shoulder blades.
         const a = f * THREE.MathUtils.degToRad(95), y = pts[i].y;
@@ -344,9 +349,12 @@ export function buildOutfitGeometry(body, cut) {
       const o2 = new THREE.Vector3().crossVectors(up, T).normalize();
       const r = new Float32Array(segs);
       // Roll: an elliptical section. Hoodie: a soft teardrop, the hood's body hanging down the back.
-      const thick = soft ? 0.036 * (1 - f * f * 0.5) : rollThick * (1 - f * f * 0.55);
-      const tallUp = soft ? 0.03 * (1 - f * f * 0.4) : rollTall * (1 - f * f * 0.45);
-      const tallDown = soft ? 0.034 + 0.13 * Math.pow(Math.max(0, 1 - f * f), 1.6) : tallUp;
+      // Shell hood: a collapsed hood with volume, piled up behind the neck below the helmet and draping a
+      // little down the yoke, thinning toward the collar at the sides.
+      const fall = Math.pow(Math.max(0, 1 - f * f), 1.3);
+      const thick = soft ? 0.036 * (1 - f * f * 0.5) : rollThick * (0.45 + 0.55 * fall);
+      const tallUp = soft ? 0.03 * (1 - f * f * 0.4) : 0.022 + (rollUp - 0.022) * fall;
+      const tallDown = soft ? 0.034 + 0.13 * Math.pow(Math.max(0, 1 - f * f), 1.6) : 0.02 + (rollDown - 0.02) * fall;
       const down = up.y > 0 ? -1 : 1;
       for (let k = 0; k < segs; k++) {
         const th = (k / segs) * TAU;
@@ -478,7 +486,7 @@ export function buildOutfitGeometry(body, cut) {
     }
   }
 
-  for (const p of pieces) skinPiece(p, body);
+  for (const p of pieces) skinPiece(p, body, p.smoothIters ?? 6);
   return mergePieces(pieces);
 }
 
