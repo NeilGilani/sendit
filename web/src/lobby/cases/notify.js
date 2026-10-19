@@ -6,6 +6,7 @@ import { profileStore } from '../../profile/store.js';
 import { SERIES } from '../../profile/items.js';
 import { caseArt } from './caseArt.js';
 import { caseSfx } from './sfx.js';
+import { setLobbyBadge } from '../tabs.js';
 import './cases.css';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -34,17 +35,9 @@ function show(html, cls = '', ms = 4200) {
 }
 
 function badges() {
-  if (typeof document === 'undefined') return;
-  const set = (tab, n) => {
-    const b = document.querySelector(`.lb-tab[data-tab="${tab}"]`);
-    if (!b) return;
-    let s = b.querySelector('.cs-badge');
-    if (!n) { s?.remove(); return; }
-    if (!s) { s = document.createElement('i'); s.className = 'cs-badge'; b.appendChild(s); }
-    s.textContent = n > 9 ? '9+' : String(n);
-  };
-  set('cases', profileStore.unopened.length);
-  set('locker', profileStore.newSkins().length);
+  // Counts go through the tab registry; the lobby draws them on the tab, its destination and Home.
+  setLobbyBadge('cases', profileStore.unopened.length);
+  setLobbyBadge('locker', profileStore.newSkins().length);
 }
 const soon = () => setTimeout(badges, 0);
 
