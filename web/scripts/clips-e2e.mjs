@@ -118,6 +118,14 @@ check('the player plays it', playing);
 await page.keyboard.press('ArrowRight');
 await wait(3000);
 await shot('6-player-next');
+// V: download the next whole shot as a video (MediaRecorder on the player's canvas).
+const dl = page.waitForEvent('download', { timeout: 60000 }).catch(() => null);
+await page.keyboard.press('KeyV');
+const d = await dl;
+const vpath = d ? `${out}/highlight.webm` : null;
+if (d) await d.saveAs(vpath);
+const vsize = vpath ? (await import('node:fs')).statSync(vpath).size : 0;
+check('V downloads the highlight as a video', vsize > 50000, `${d?.suggestedFilename() || 'no download'} · ${Math.round(vsize / 1024)} KB`);
 await page.keyboard.press('Escape');
 await wait(500);
 check('Esc closes the player', !(await page.evaluate(() => !!document.getElementById('hl-player'))));
