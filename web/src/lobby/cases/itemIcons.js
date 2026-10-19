@@ -24,7 +24,7 @@
 import { skin } from '../../profile/rewards.js';
 import './icons.css';
 
-export const ICON_VERSION = 2;
+export const ICON_VERSION = 3;
 export const GOLD_ICON = 'gold-star';
 const DB = 'sendit-icons', STORE = 'icons';
 

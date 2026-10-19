@@ -71,7 +71,8 @@
 @media (prefers-reduced-motion: reduce) { .ca-img.fresh, .cr-card.r-gold::before { animation: none; } }
 
 /* Locker detail: the big picture (HD) on its own grade stage. The Equipment card keeps a small box. */
-.lk-sel-icon { float: right; width: 9.5em; height: 9.5em; margin: -.3em -.3em .4em .7em; padding: .5em; display: grid; place-items: center; border-radius: var(--r2, 4px);
+.lk-sel { display: flow-root; }   /* contains the floated picture (and whatever the panel grows) */
+.lk-sel-icon { float: right; width: 8.5em; height: 8.5em; margin: -.2em -.3em .2em .7em; padding: .5em; display: grid; place-items: center; border-radius: var(--r2, 4px);
   background:
     radial-gradient(60% 50% at 50% 45%, color-mix(in srgb, var(--rc) 50%, transparent), transparent),
     linear-gradient(0deg, color-mix(in srgb, var(--rc) 48%, transparent), transparent 70%),

@@ -339,7 +339,10 @@ export class IconBaker {
       const g = M.garments.geometry, v = new THREE.Vector3();
       for (const i of g.userData.sample) pts.push(M.garments.getVertexPosition(i, v).applyMatrix4(M.garments.matrixWorld).clone());
     }
-    if (head) {
+    if (slot === 'face') {
+      // Frame the gaiter and the goggle above it (the helmet may run out of the top).
+      corners(new THREE.Box3().setFromObject(M.lens, true), pts);
+    } else if (head) {
       const box = new THREE.Box3().setFromObject(slot === 'goggles' ? M.lens : M.helmet, true);
       if (slot !== 'goggles') box.union(new THREE.Box3().setFromObject(M.lens, true));
       if (slot === 'goggles') box.expandByVector(box.getSize(new THREE.Vector3()).multiply(new THREE.Vector3(0.18, 0.5, 0.2)));
