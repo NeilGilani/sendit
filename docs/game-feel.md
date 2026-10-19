@@ -733,8 +733,22 @@ nothing about riding changes.
 **Cost (measured, see "Tests").** Nothing per frame: the instant-replay recorder already records every rig
 node at up to 60 Hz (its ring grew from 8 s to 10 s so a long air fits with its in-run and ride-out).
 Per landed trick, one copy of its stretch of the ring into a spare buffer (a memcpy). A save samples the
-real snow around the line on the main thread in slices of 1500 heights per frame, then hands everything to a
-worker (`thrill/clipworker.js`) that resamples, quantises, gzips and writes IndexedDB.
+real snow around the line on the main thread in the browser's idle time after frames (`requestIdleCallback`,
+never past the idle deadline), then hands everything to a worker (`thrill/clipworker.js`) that resamples,
+quantises, gzips and writes IndexedDB.
+
+Measured (`scripts/clips-perf.mjs`, MacBook Air M1, headless Chrome on Metal, 1280×720, Ravenspire, with
+other sessions' browsers running):
+
+| | |
+|---|---|
+| recorder per frame (already there for the replay) | 0.02–0.04 ms mean, 0.1 ms p95 |
+| ring copy per landed trick | 0.2–1 ms, once |
+| frame times, 2 s windows from the save key vs just riding (3 + 3 alternating) | identical: median 16.7 ms, same p95 and max (the long frames come from the world, in both groups) |
+| an earlier version sampling 1500 heights per frame | p95 33 ms vs 17 ms riding: ~1 ms pushed frames already at budget over a vsync; hence idle time |
+| save, key to stored | ~0.3–0.7 s (terrain sampling in idle time ~0.25–0.7 s; worker: resample 6–13 ms, pack 7–15 ms, store 2–6 ms) |
+| clip size | 36–43 KB (93 nodes, 155–203 frames, a 23 000-sample snow patch); thumbnail 30–40 KB |
+| 37 saves in a row | 30 kept (oldest dropped), the index in step, JS heap +4 to +13 MB (noise), no errors |
 
 **The clip** (`thrill/clipcodec.js`, version 1): not video, the recording itself.
 
@@ -774,6 +788,8 @@ VP9 webm, 8 Mbit/s), **Esc** close. Gamepad: B close, X favourite, Y next camera
 
 ### Tests
 
+- Highlights (§ 8g): `node web/scripts/clips-unit.mjs` (in `unittest.mjs`), `clips-e2e.mjs`, `clips-perf.mjs`,
+  `clips-cams.mjs`, `clips-thumbs.mjs` (see docs/loading-screen.md "Round 4 → Tests").
 - `node web/scripts/thrill-unit.mjs`, which `unittest.mjs` also runs. It checks:
   - The spot book: discovery, repeats, the catalog, garbage storage.
   - The landing judge.
