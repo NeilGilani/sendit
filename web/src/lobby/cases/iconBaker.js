@@ -49,11 +49,11 @@ const PIECES = {
 const VIEW = {
   jacket: { az: 26, el: 8, fill: 0.9 },
   pants: { az: 24, el: 6, fill: 0.9 },
-  gloves: { az: 16, el: 6, fill: 0.86 },
+  gloves: { az: 55, el: 8, fill: 0.86 },
   face: { az: 28, el: 4, fill: 0.82 },
   helmet: { az: 34, el: 16, fill: 0.84 },
   goggles: { az: 20, el: 4, fill: 0.86 },
-  gear: { az: 0, el: 16, fill: 0.94, fov: 30 },
+  gear: { az: 0, el: 10, fill: 0.94, fov: 30 },
   parts: { az: 0, el: 14, fill: 0.86 },
   star: { az: 0, el: 0, fill: 0.7 },
 };
@@ -228,8 +228,8 @@ export class IconBaker {
     for (const [s, x] of [['_l', 1], ['_r', -1]]) {
       if (slot === 'gloves') {
         // Hands up in front, side by side: the mitts stand upright like a product shot.
-        this.aim(B['upperarm' + s], B['lowerarm' + s], new THREE.Vector3(-x * 0.22, -0.2, 0.95));
-        this.aim(B['lowerarm' + s], B['hand' + s], new THREE.Vector3(-x * 0.06, 1, 0.12));
+        this.aim(B['upperarm' + s], B['lowerarm' + s], new THREE.Vector3(x * 0.05, -0.55, 0.85));
+        this.aim(B['lowerarm' + s], B['hand' + s], new THREE.Vector3(-x * 0.12, 0.85, 0.5));
       } else {
         this.aim(B['upperarm' + s], B['lowerarm' + s], new THREE.Vector3(x * 0.5, -0.86, 0.1));
         this.aim(B['lowerarm' + s], B['hand' + s], new THREE.Vector3(x * 0.32, -0.92, 0.22));
@@ -322,7 +322,7 @@ export class IconBaker {
       for (const k of P.skis) k.visible = false;
       inner.rotation.set(0, 20 * DEG, 0);
     } else if (slot === 'bindings') {
-      P.board.visible = false;
+      for (const c of P.board.children) if (c.isMesh) c.visible = false;   // the deck, not the bindings on it
       model.rotation.x = 0.5;
       inner.rotation.set(0, -35 * DEG, 0);
     } else {
@@ -332,8 +332,8 @@ export class IconBaker {
         l.position.x = -0.11; r.position.x = 0.11; r.position.z = 0.18;
       }
       model.rotation.x = Math.PI / 2;                // tips up, topsheet to the camera
-      // Tails tilted toward the (raised) camera, a quarter turn on the long axis, then laid diagonal.
-      inner.rotation.set(-20 * DEG, (type === 'ski' ? -16 : -24) * DEG, (type === 'ski' ? -40 : -42) * DEG, 'ZYX');
+      // Tilted just enough that a mirror topsheet reflects the horizon line (not only white sky), a quarter turn on the long axis, then laid diagonal.
+      inner.rotation.set((type === 'ski' ? 7 : 14) * DEG, (type === 'ski' ? -16 : -24) * DEG, (type === 'ski' ? -40 : -42) * DEG, 'ZYX');
     }
     this.pivot.add(inner);
     this.subject = { obj: inner, dispose: () => disposeEquipmentModel(model) };
