@@ -22,6 +22,15 @@ export function buildOutfitGeometry(body, cut) {
   const J = body.joint;
 
   let collarRings = null, jacketRings = null;
+  // Target sleeve radius along the arm (|x| in the T-pose): the fit's upper / elbow / forearm / cuff.
+  const SL = cut.sleeve;
+  const sleeveKeys = [[0.2, SL.upper * 0.94], [0.3, SL.upper], [0.46, SL.elbow], [0.58, SL.forearm], [cut.sleeveEnd - 0.03, SL.cuff], [1, SL.cuff]];
+  const sleeveR = (t) => {
+    let i = 0;
+    while (i < sleeveKeys.length - 2 && sleeveKeys[i + 1][0] < t) i++;
+    const [a, ra] = sleeveKeys[i], [b, rb] = sleeveKeys[i + 1];
+    return ra + (rb - ra) * smooth(a, b, t);
+  };
   // ---------------------------------------------------------------- collar (zipped to the chin)
   {
     const segs = 40;
@@ -32,7 +41,7 @@ export function buildOutfitGeometry(body, cut) {
       filter: (x) => Math.abs(x) < 0.1,
       centre: (t, c) => new THREE.Vector3(0, t, c.z),
       smoothA: 4, smoothT: 4, minEase: 0.02,
-      ease: (t, th) => 0.026 + smooth(1.56, cut.collarTop, t) * 0.012 + Math.max(0, Math.cos(th)) * 0.01,
+      ease: (t, th) => (cut.collarEase ?? 0.02) + smooth(1.56, cut.collarTop, t) * 0.008 + Math.max(0, Math.cos(th)) * 0.008,
       post: (rings, S) => {
         // A collar is a smooth funnel: lean toward the widest outline over its height.
         const mx = new Float32Array(S);
@@ -44,39 +53,55 @@ export function buildOutfitGeometry(body, cut) {
   }
 
   // ---------------------------------------------------------------- jacket body
+  // Two zones: the yoke (shoulders, upper back, top of the chest) follows the body closely, as every
+  // modern cut does; below it the shell takes the fit's target cross-section (cut.torso), a superellipse
+  // per height that hangs straight from the chest and shoulder blades. Volume sits low (waist, seat, hem),
+  // not on the shoulders. The shell never comes closer than 2.6 cm inside the unshrunk skin (the body
+  // material pulls covered skin in by ~4 cm), so a target smaller than the body just follows it.
   {
     const segs = 56;
     const hemF = cut.hemFront, hemB = cut.hemBack;
     const top = 1.575, bot = hemF;   // the rings end at the front hem; the back moves by hemB − hemF
+    const T = cut.torso, folds = cut.folds ?? 1;
     const bones = B(/^(pelvis|spine_0[123]|neck_01|clavicle_[lr]|upperarm_[lr]|thigh_[lr])$/);
+    const yChest = 1.38, yWaist = 1.12;
+    const dims = (t) => {
+      const mix3 = (a, b, f) => a.map((v, i) => v + (b[i] - v) * f);
+      if (t >= yChest) return T.chest;
+      if (t >= yWaist) return mix3(T.waist, T.chest, smooth(yWaist, yChest, t));
+      return mix3(T.hem, T.waist, smooth(bot, yWaist, t));
+    };
+    const MIN = -0.026;
     const rings = bodyRings(body, {
       axis: 'y', t0: top, t1: bot, rings: 62, segs, half: 0.03, bones,
       axisPoint: (t) => new THREE.Vector3(0, t, 0),
       filter: (x, y, z, b) => (b.startsWith('upperarm') ? Math.abs(x) < 0.2 : b.startsWith('neck') ? y < 1.56 : true),
       centre: (t, c) => new THREE.Vector3(0, t, c.z),
-      smoothA: 8, smoothT: 5, minEase: -0.028,   // the skin underneath is pulled in 4 cm: no muscles through the shell
-      ease: (t, th) => {
-        const back = (1 - Math.cos(th)) / 2;            // 0 front … 1 back
-        const side = Math.abs(Math.sin(th));
-        let e = THREE.MathUtils.lerp(cut.jacketEase.chest, cut.jacketEase.hem, smooth(1.3, bot + 0.07, t));
-        e = THREE.MathUtils.lerp(cut.jacketEase.shoulder, e, smooth(1.53, 1.42, t));
-        return e + back * 0.012 + side * 0.006;
-      },
+      smoothA: 8, smoothT: 5, minEase: MIN,
+      ease: (t, th) => cut.shoulder + ((1 - Math.cos(th)) / 2) * 0.004,
       post: (rings, S) => {
-        // The superhero chest is far deeper than a real one: flatten the front of the upper body a little
-        // (the skin underneath is pulled in further than this).
+        // Yoke: the superhero chest is far deeper than a real one, flatten its front (the skin underneath
+        // is pulled in further than this).
         for (const r of rings) {
-          const k = 0.05 * smooth(1.05, 1.25, r.t) * (1 - smooth(1.5, 1.58, r.t));
+          const k = 0.1 * smooth(1.3, 1.42, r.t) * (1 - smooth(1.52, 1.58, r.t));
           for (let q = 0; q < S; q++) r.r[q] *= 1 - k * Math.max(0, Math.cos((q / S) * TAU)) ** 2;
         }
-        // Fabric drops straight from the chest and shoulder blades: never nipped in at the waist.
-        hang(rings, S, 1.32, 0.05);
         // Shoulder line: the shell slopes from the collar down to the armholes (no boxy epaulettes).
         for (const r of rings) {
           const k = smooth(1.36, 1.6, r.t) * 0.52;
           for (let q = 0; q < S; q++) {
             const sd = Math.pow(Math.abs(Math.sin((q / S) * TAU)), 1.6);
-            r.r[q] = Math.max(r.r[q] * (1 - k * sd), r.raw[q] + 0.004);
+            r.r[q] = Math.max(r.r[q] * (1 - k * sd), r.raw[q] - 0.012);
+          }
+        }
+        // Below the yoke: the fit's cross-section.
+        for (const r of rings) {
+          const w = smooth(1.4, 1.5, r.t);
+          const [hw, dF, dB] = dims(r.t), n = T.n ?? 2.4;
+          for (let q = 0; q < S; q++) {
+            const th = (q / S) * TAU, s = Math.abs(Math.sin(th)), c = Math.cos(th);
+            const tr = 1 / Math.pow(Math.pow(s / hw, n) + Math.pow(Math.abs(c) / (c > 0 ? dF : dB), n), 1 / n);
+            r.r[q] = Math.max(THREE.MathUtils.lerp(tr, r.r[q], w), r.raw[q] + MIN);
           }
         }
         // Neckline: the top of the shell tucks under the collar (which is sewn on over it).
@@ -86,28 +111,43 @@ export function buildOutfitGeometry(body, cut) {
           const w = smooth(1.525, 1.56, r.t);
           for (let q = 0; q < S; q++) r.r[q] = THREE.MathUtils.lerp(r.r[q], Math.min(r.r[q], cr[q] - 0.006), w);
         }
-        // Hem: a little flare over the last 12 cm.
+        // Hem: a slight flare (shells), or a rib / drawcord pulling it in with the fabric blousing above.
+        const fl = cut.hemFlare ?? 0;
         for (const r of rings) {
-          const f = smooth(bot + 0.12, bot, r.t) * (cut.hemFlare ?? 0.012);
-          for (let k = 0; k < S; k++) r.r[k] += f;
+          const f = fl >= 0 ? smooth(bot + 0.12, bot, r.t) * fl
+            : fl * smooth(bot + 0.075, bot + 0.02, r.t) - fl * 0.45 * bump(r.t, bot + 0.12, 0.07);
+          for (let k = 0; k < S; k++) r.r[k] = Math.max(r.r[k] + f, r.raw[k] + MIN);
         }
       },
     });
     const S = segs;
+    const quilt = cut.quilt;
     for (const r of rings) {
       r.off = new Float32Array(S);
-      const below = smooth(1.22, bot + 0.04, r.t);
+      const below = smooth(1.3, bot + 0.04, r.t) * smooth(bot - 0.02, bot + 0.1, r.t + 0.12);
       for (let k = 0; k < S; k++) {
         const th = (k / S) * TAU, u = k / S;
         // Back hem: the lowest rings sag toward the back (dropped tail) or lift (hemBack above hemFront).
         // Level across the back third, changing over the sides (no point at the centre back).
-        const back = (1 - Math.cos(th)) / 2;
+        const back = (1 - Math.cos(th)) / 2, side = Math.abs(Math.sin(th));
         r.off[k] = (hemB - hemF) * smooth(0.2, 0.8, back) * smooth(1.05, bot, r.t);
-        // Vertical drape folds below the chest, horizontal bunching above the hips at the back/sides.
-        const drape = pnoise(u * 9 + r.t * 1.5, r.t * 2.5, 9) * 0.009 + Math.sin(th * 7 + pnoise(u * 3, r.t * 3, 3) * 2.5) * 0.007;
-        const bunch = Math.sin((r.t - 1.0) * TAU / 0.06 + pnoise(u * 6, 1.7, 6) * 2) * 0.007 * bump(r.t, 1.05, 0.13) * (0.3 + back * 0.7);
-        const lump = pnoise(u * 5, r.t * 4 + 3.1, 5) * 0.004;
-        r.r[k] += drape * below + bunch + lump * smooth(1.45, 1.2, r.t);
+        // Long vertical drape folds from the chest and shoulder blades to the hem (stronger toward the
+        // hem, where the cloth hangs free), soft compression folds over the waist at the sides.
+        const hangF = smooth(1.3, bot, r.t);
+        const drape = (pnoise(u * 9 + r.t * 1.2, r.t * 2.2, 9) * 0.0055 + Math.sin(th * 7 + pnoise(u * 3, r.t * 3, 3) * 2.5) * 0.0026) * (0.5 + hangF);
+        const waist = Math.sin((r.t - 1.0) * TAU / 0.05 + pnoise(u * 6, 1.7, 6) * 2) * 0.0035 * bump(r.t, 1.1, 0.12) * (0.25 + side * 0.75);
+        const lump = pnoise(u * 5, r.t * 4 + 3.1, 5) * 0.003;
+        r.r[k] += (drape * below + waist + lump * smooth(1.45, 1.2, r.t)) * folds;
+        // Quilted baffles (puffers): tubes between stitch lines, pinched at each line.
+        if (quilt) {
+          const ph = ((((r.t - bot) / quilt.pitch) % 1) + 1) % 1;
+          r.r[k] += quilt.depth * (Math.pow(Math.sin(Math.PI * ph), 0.55) - 0.35) * smooth(1.6, 1.5, r.t) * smooth(bot, bot + 0.03, r.t);
+        }
+        // Kangaroo pocket: a shallow patch across the belly, a little proud of the shell.
+        if (cut.kangaroo && Math.cos(th) > 0) {
+          const ax = Math.abs(Math.sin(th)) * r.r[k];
+          r.r[k] += cut.kangaroo * smooth(0.165, 0.13, ax) * smooth(0.93, 0.96, r.t) * smooth(1.15, 1.11, r.t) * Math.cos(th);
+        }
       }
     }
     // Only the top of the shoulder rides on the upper arm (like a deltoid); the armpit stays with the trunk.
@@ -121,35 +161,31 @@ export function buildOutfitGeometry(body, cut) {
   }
 
   // ---------------------------------------------------------------- sleeves
+  // Target radii per fit (cut.sleeve), never thinner than the collapsed arm (the body material pulls the
+  // arm 60 % toward its axis); articulated elbow folds, a stack of folds above the cuff.
   for (const s of [1, -1]) {
     const segs = 28;
     const sd = s > 0 ? 'l' : 'r';
     const bones = B(new RegExp(`^(upperarm_${sd}|lowerarm_${sd}|clavicle_${sd})$`));
     const t0 = 0.19, t1 = cut.sleeveEnd;
+    const folds = cut.folds ?? 1;
     const rings = bodyRings(body, {
       axis: 'x', side: s, t0, t1, rings: 44, segs, half: 0.022, bones,
       axisPoint: (t) => new THREE.Vector3(s * t, J['upperarm_' + sd].y, J['upperarm_' + sd].z),
       filter: (x, y) => y > 1.3,
-      smoothA: 2, smoothT: 3, minEase: 0.012,
-      ease: (t) => {
-        let e = THREE.MathUtils.lerp(cut.sleeveEase.upper, cut.sleeveEase.elbow, smooth(0.25, 0.46, t));
-        e = THREE.MathUtils.lerp(e, cut.sleeveEase.forearm, smooth(0.48, 0.6, t));
-        return e;
-      },
+      smoothA: 2, smoothT: 3, minEase: 0,
+      ease: () => 0,
       post: (rings, S) => {
-        // Cinched cuff: the last few cm pull in to the wrist (Velcro tab), the fabric above bunches.
         for (const r of rings) {
-          const w = smooth(t1 - 0.06, t1, r.t);
-          for (let k = 0; k < S; k++) r.r[k] = THREE.MathUtils.lerp(r.r[k], r.raw[k] + 0.014, w * 0.85);
-          // Slim sleeve head: it sits inside the jacket's shoulder and only widens past the armhole.
-          const head = THREE.MathUtils.lerp(0.74, 1, smooth(0.2, 0.33, r.t));
-          for (let k = 0; k < S; k++) r.r[k] *= head;
+          const tr = sleeveR(r.t);
+          const shrink = THREE.MathUtils.lerp(0.75, 0.45, smooth(0.19, 0.25, r.t));
+          for (let k = 0; k < S; k++) r.r[k] = Math.max(tr, r.raw[k] * shrink + 0.01);
           // Near the armhole the top of the sleeve follows the sloped shoulder line of the body shell.
           if (r.t < 0.34) {
             const lim = 1.575 - (r.t - 0.08) * 0.42 - r.c.y - 0.02 * smooth(0.3, 0.2, r.t);
             for (let k = 0; k < S; k++) {
               const up = Math.cos((k / S) * TAU);
-              if (up > 0.05) r.r[k] = Math.max(Math.min(r.r[k], lim / up), r.raw[k] - 0.01);
+              if (up > 0.05) r.r[k] = Math.max(Math.min(r.r[k], lim / up), r.raw[k] * shrink);
             }
           }
         }
@@ -159,10 +195,14 @@ export function buildOutfitGeometry(body, cut) {
       for (let k = 0; k < segs; k++) {
         const th = (k / segs) * TAU, u = k / segs;
         const inner = Math.max(0, Math.sin(th));          // front of the arm = inside of the elbow bend
-        const elbow = Math.sin((r.t - 0.46) * TAU / 0.055 + pnoise(u * 4, 2.3, 4) * 1.5) * 0.011 * bump(r.t, 0.46, 0.09) * (0.3 + inner * 0.9);
-        const wrist = Math.sin((r.t - t1) * TAU / 0.032 + pnoise(u * 5, 4.1, 5) * 2.2) * 0.009 * bump(r.t, t1 - 0.07, 0.055);
-        const twist = pnoise(u * 4 + r.t * 3, r.t * 5, 4) * 0.004;
-        r.r[k] += elbow + wrist + twist;
+        const elbow = Math.sin((r.t - 0.46) * TAU / 0.05 + pnoise(u * 4, 2.3, 4) * 1.5) * 0.0075 * bump(r.t, 0.46, 0.085) * (0.25 + inner * 0.9);
+        const wrist = Math.sin((r.t - t1) * TAU / 0.03 + pnoise(u * 5, 4.1, 5) * 2.2) * 0.0065 * bump(r.t, t1 - 0.06, 0.05);
+        const twist = pnoise(u * 4 + r.t * 3, r.t * 5, 4) * 0.003 + Math.sin(th * 3 + r.t * 14 * s) * 0.002 * bump(r.t, 0.36, 0.1);
+        r.r[k] += (elbow + wrist + twist) * folds;
+        if (cut.quilt) {
+          const ph = ((((r.t - 0.2) / (cut.quilt.pitch * 0.72)) % 1) + 1) % 1;
+          r.r[k] += cut.quilt.depth * 0.85 * (Math.pow(Math.sin(Math.PI * ph), 0.55) - 0.35) * smooth(0.21, 0.25, r.t) * smooth(t1 - 0.03, t1 - 0.07, r.t);
+        }
       }
     }
     // The armhole end stays with the shoulder girdle (clavicle) and blends into the arm, so the sleeve
@@ -173,13 +213,14 @@ export function buildOutfitGeometry(body, cut) {
       anchor: { bone: body.bone('clavicle_' + sd), axis: 0, abs: true, y0: 0.2, y1: 0.28 },
     }));
   }
-
   // ---------------------------------------------------------------- pant legs
   for (const s of [1, -1]) {
     const segs = 36;
     const sd = s > 0 ? 'l' : 'r';
     const bones = B(new RegExp(`^(thigh_${sd}|calf_${sd}|foot_${sd}|ball_${sd}|pelvis)$`));
     const t0 = 1.02, t1 = cut.cuffY;
+    const hemLow = Math.min(cut.hemFront, cut.hemBack);
+    const covered = (t) => smooth(hemLow + 0.06, hemLow + 0.16, t);
     const knee = J['calf_' + sd].y;
     const rings = bodyRings(body, {
       axis: 'y', t0, t1, rings: 70, segs, half: 0.025, bones,
@@ -193,7 +234,13 @@ export function buildOutfitGeometry(body, cut) {
       },
       post: (rings, S) => {
         // Straight, wide leg: below the knee the leg never narrows (bootcut over the boot).
-        hang(rings, S, knee + 0.05, 0.04);
+        if (cut.straight !== false) hang(rings, S, knee + 0.05, 0.04);
+        // Under the jacket the leg is a slim lining (the hidden seat and hips must not bulge through the
+        // jacket's back hem); it opens out to the full cut just above the hem.
+        for (const r of rings) {
+          const cov = covered(r.t);
+          for (let k = 0; k < S; k++) r.r[k] = THREE.MathUtils.lerp(r.r[k], Math.min(r.r[k], r.raw[k] - 0.016), cov);
+        }
       },
     });
     for (const r of rings) {
@@ -208,7 +255,7 @@ export function buildOutfitGeometry(body, cut) {
         const kf = Math.sin((r.t - knee) * TAU / 0.05 + pnoise(u * 4, 3.3 + s, 4) * 2) * bump(r.t, knee + 0.02, 0.1) * (0.003 + back * 0.011);
         // Long drape folds down the thigh and shin, a slight twist.
         const drape = pnoise(u * 6 + r.t * 2.2 * s, r.t * 2, 6) * 0.009 + Math.sin(u * TAU * 5 + r.t * 9 * s + pnoise(u * 3, r.t * 4, 3) * 2) * 0.004 * smooth(0.95, 0.75, r.t);
-        r.r[k] += roll + kf + drape;
+        r.r[k] += roll + kf + drape * (1 - covered(r.t));
         // Pre-bent knee: the fabric hangs forward of the kneecap.
         if (Math.cos(th) > 0) r.r[k] += Math.cos(th) * 0.012 * bump(r.t, knee, 0.12);
       }
@@ -235,8 +282,10 @@ export function buildOutfitGeometry(body, cut) {
     pieces.push(sweep(rings, { id: PIECE.gaiter, side: 0, ...frame('y'), lipEnd: true, skinBones: bones, anchor: { bone: body.bone('neck_01'), y0: 1.595, y1: 1.64 } }));
   }
 
-  // ---------------------------------------------------------------- stowed hood (a thick roll behind the neck)
-  if (cut.hood === 'down') {
+  // ---------------------------------------------------------------- stowed hood (a roll behind the neck) or a hoodie's hood lying on the back
+  if (cut.hood === 'down' || cut.hood === 'hoodie') {
+    const soft = cut.hood === 'hoodie';
+    const [rollThick, rollTall] = cut.hoodRoll || [0.03, 0.04];
     const segs = 18, n = 22;
     const rings = [];
     const e1s = [], e2s = [];
@@ -256,25 +305,39 @@ export function buildOutfitGeometry(body, cut) {
       const y = 1.553 - f * f * 0.03;
       const surf = torsoAt(y, Math.PI - a);
       const outw = new THREE.Vector3(surf.x, 0, surf.z - jacketRings[0].c.z).normalize();
-      pts.push(surf.clone().addScaledVector(outw, -0.012 * (1 - f * f * 0.5)));
+      pts.push(surf.clone().addScaledVector(outw, (soft ? -0.006 : -0.012) * (1 - f * f * 0.5)));
     }
     for (let i = 0; i < n; i++) {
       const f = (i / (n - 1)) * 2 - 1;
       const T = pts[Math.min(n - 1, i + 1)].clone().sub(pts[Math.max(0, i - 1)]).normalize();
       const out = new THREE.Vector3(pts[i].x, 0, pts[i].z + 0.03).normalize();
       const up = new THREE.Vector3().crossVectors(T, out).normalize();
+      if (soft) {
+        // The hoodie's hood lies on the back: its "down" runs along the jacket's back surface, which
+        // slopes out from the neck to the shoulder blades.
+        const a = f * THREE.MathUtils.degToRad(95), y = pts[i].y;
+        const lo = torsoAt(y - 0.1, Math.PI - a), hi = torsoAt(y, Math.PI - a);
+        const d = lo.sub(hi).normalize();
+        up.copy(d).negate();
+        up.addScaledVector(T, -up.dot(T)).normalize();
+      }
       const o2 = new THREE.Vector3().crossVectors(up, T).normalize();
       const r = new Float32Array(segs);
-      const thick = 0.036 * (1 - f * f * 0.55), tall = 0.046 * (1 - f * f * 0.45);
+      // Roll: an elliptical section. Hoodie: a soft teardrop, the hood's body hanging down the back.
+      const thick = soft ? 0.03 * (1 - f * f * 0.5) : rollThick * (1 - f * f * 0.55);
+      const tallUp = soft ? 0.03 * (1 - f * f * 0.4) : rollTall * (1 - f * f * 0.45);
+      const tallDown = soft ? 0.034 + 0.115 * Math.pow(Math.max(0, 1 - f * f), 1.6) : tallUp;
+      const down = up.y > 0 ? -1 : 1;
       for (let k = 0; k < segs; k++) {
         const th = (k / segs) * TAU;
         const ex = Math.cos(th), ey = Math.sin(th);
-        r[k] = 1 / Math.sqrt((ex * ex) / (thick * thick) + (ey * ey) / (tall * tall)) + pnoise(k / segs * 4, f * 3, 4) * 0.004;
+        const tall = ey * down > 0 ? tallDown : tallUp;
+        r[k] = 1 / Math.sqrt((ex * ex) / (thick * thick) + (ey * ey) / (tall * tall)) + pnoise(k / segs * 4, f * 3, 4) * (soft ? 0.003 : 0.004);
       }
       rings.push({ c: pts[i], r, t: f, e1: o2, e2: up });
       e1s.push(o2); e2s.push(up);
     }
-    pieces.push(sweepFrames(rings, { id: PIECE.hood, side: 0, capStart: true, capEnd: true, skinBones: B(/^(spine_03|neck_01|clavicle_[lr])$/) }));
+    pieces.push(sweepFrames(rings, { id: PIECE.hood, side: 0, capStart: true, capEnd: true, skinBones: soft ? B(/^(spine_0[23]|neck_01|clavicle_[lr])$/) : B(/^(spine_03|neck_01|clavicle_[lr])$/) }));
   }
 
   // ---------------------------------------------------------------- hood worn up, over the helmet
@@ -378,8 +441,17 @@ export function buildOutfitGeometry(body, cut) {
         axis: 'x', side: s, t0: a0, t1: a1, rings: 10, segs, half: 0.02, bones,
         axisPoint: (t) => new THREE.Vector3(s * t, 1.44, -0.07),
         filter: (x) => Math.abs(x) < 0.72,
-        smoothA: 3, smoothT: 2, minEase: 0.012,
-        ease: (t) => THREE.MathUtils.lerp(cut.gauntlet[1], 0.016, smooth(a0 + 0.03, a1 - 0.01, t)),
+        smoothA: 3, smoothT: 2, minEase: 0,
+        ease: () => 0,
+        // Open end just over the sleeve (its target radius + the cut's clearance), cinched toward the wrist;
+        // never inside the collapsed forearm.
+        post: (rings, S) => {
+          const open = sleeveR(a0) + cut.gauntlet[1] + 0.004;
+          for (const r of rings) {
+            const tr = THREE.MathUtils.lerp(open, Math.min(open, 0.054), smooth(a0 + 0.03, a1 - 0.01, r.t));
+            for (let k = 0; k < S; k++) r.r[k] = Math.max(tr, r.raw[k] * 0.5 + 0.012);
+          }
+        },
       });
       for (const r of rings) for (let k = 0; k < segs; k++) r.r[k] += Math.sin(r.t * TAU / 0.03 + k) * 0.0015;
       pieces.push(sweep(rings, { id: PIECE.gauntlet, side: s, ...frame('x', s), lipStart: true, skinBones: bones }));

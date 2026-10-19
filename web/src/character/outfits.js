@@ -7,40 +7,150 @@
 // entry (or reuse one) and register a catalog item for it; to add a colourway: add an entry to
 // COLORWAYS. docs/character.md walks through both.
 
+/**
+ * Jacket fits: the silhouette families every jacket cut starts from (docs/character.md, "Fits").
+ * Research and the numbers behind them: docs/character.md § Research. All lengths are metres in the
+ * bind pose (1.8 m rider, feet at 0: hip joint 0.97, crotch ~0.86, knee 0.54).
+ *
+ *   hemFront / hemBack  hem height at the centre front / back (back lower = dropped tail)
+ *   hemFlare            outward (+) or inward (−, a rib or drawcord pulling in) shaping of the last 12 cm
+ *   torso               target cross-section of the shell below the yoke: [half width, front depth,
+ *                       back depth] from the body's centre line at the chest (1.38), the waist (1.12) and
+ *                       the hem, plus n = superellipse exponent (2 round … 3 boxy). The shell never comes
+ *                       closer to the (shrunk) skin than `minEase`, so a target smaller than the body only
+ *                       means "follow the body".
+ *   shoulder            how far the shell stands off the shoulders / yoke (close on every modern cut)
+ *   sleeve              target sleeve radius at the upper arm (|x| 0.30), elbow (0.46), forearm (0.58)
+ *                       and cuff (sleeveEnd − 0.03); sleeveEnd = |x| of the cuff in the T-pose (wrist 0.706)
+ *   collarTop/Ease      collar height (zipped to the chin) and stand-off from the neck
+ *   hood                'down' (stowed roll, hoodRoll = [thickness, height]) | 'up' (over the helmet) |
+ *                       'hoodie' (soft cotton hood lying on the back) | 'none'
+ *   folds               drape / fold amplitude (1 = a 3-layer shell; quilted puffers ~0.3, cotton 1.3)
+ *   quilt               { pitch, depth } horizontal baffles (puffers), null for flat fabric
+ *   kangaroo            bulge of a front kangaroo pocket (anorak, hoodie), 0 for none
+ *   style               shader layout of the fit: 0 shell, 1 anorak, 2 puffer, 3 hoodie, 4 one-piece
+ */
+export const FITS = {
+  // Slim technical shell (Rush / lofoten class): close shoulders, follows the taper, hem over the seat.
+  shell: {
+    style: 0, hemFront: 0.85, hemBack: 0.825, hemFlare: 0.002,
+    torso: { chest: [0.226, 0.15, 0.16], waist: [0.216, 0.144, 0.157], hem: [0.22, 0.147, 0.161], n: 2.4 },
+    shoulder: 0.008, sleeve: { upper: 0.066, elbow: 0.063, forearm: 0.058, cuff: 0.053 }, sleeveEnd: 0.69,
+    collarTop: 1.628, collarEase: 0.016, hood: 'down', hoodRoll: [0.024, 0.032], gaiter: true, gaiterTop: 1.69,
+    folds: 0.75, quilt: null, kangaroo: 0,
+  },
+  // Relaxed freeride shell (Sabre class): roomy through chest, waist and hip but hanging straight from the
+  // chest and shoulder blades, close at the shoulders, a slight drop tail below the seat.
+  relaxed: {
+    style: 0, hemFront: 0.785, hemBack: 0.76, hemFlare: 0.003,
+    torso: { chest: [0.24, 0.16, 0.164], waist: [0.236, 0.158, 0.165], hem: [0.242, 0.162, 0.17], n: 2.4 },
+    shoulder: 0.011, sleeve: { upper: 0.073, elbow: 0.07, forearm: 0.064, cuff: 0.057 }, sleeveEnd: 0.695,
+    collarTop: 1.628, collarEase: 0.02, hood: 'down', hoodRoll: [0.029, 0.04], gaiter: true, gaiterTop: 1.69,
+    folds: 1, quilt: null, kangaroo: 0,
+  },
+  // New-school anorak (relaxed anorak / long pullover class): long and loose, half zip, kangaroo pocket.
+  anorak: {
+    style: 1, hemFront: 0.72, hemBack: 0.7, hemFlare: 0.0,
+    torso: { chest: [0.247, 0.166, 0.168], waist: [0.246, 0.166, 0.17], hem: [0.252, 0.17, 0.176], n: 2.35 },
+    shoulder: 0.013, sleeve: { upper: 0.077, elbow: 0.074, forearm: 0.068, cuff: 0.059 }, sleeveEnd: 0.7,
+    collarTop: 1.628, collarEase: 0.02, hood: 'down', hoodRoll: [0.032, 0.046], gaiter: true, gaiterTop: 1.69,
+    folds: 1.2, quilt: null, kangaroo: 0.012,
+  },
+  // Insulated puffer: the one cut that is meant to be round. Wide baffles, hem cinched at the hip.
+  puffer: {
+    style: 2, hemFront: 0.88, hemBack: 0.875, hemFlare: -0.014,
+    torso: { chest: [0.25, 0.172, 0.174], waist: [0.248, 0.17, 0.174], hem: [0.238, 0.164, 0.17], n: 2.1 },
+    shoulder: 0.02, sleeve: { upper: 0.079, elbow: 0.077, forearm: 0.071, cuff: 0.058 }, sleeveEnd: 0.69,
+    collarTop: 1.632, collarEase: 0.028, hood: 'none', hoodRoll: null, gaiter: true, gaiterTop: 1.69,
+    folds: 0.3, quilt: { pitch: 0.105, depth: 0.012 }, kangaroo: 0,
+  },
+  // Tall hoodie worn over a shell: soft cotton, ribbed hem blousing at the hip, the shell's collar out the top.
+  hoodie: {
+    style: 3, hemFront: 0.755, hemBack: 0.745, hemFlare: -0.016,
+    torso: { chest: [0.242, 0.16, 0.164], waist: [0.244, 0.162, 0.168], hem: [0.236, 0.156, 0.162], n: 2.3 },
+    shoulder: 0.012, sleeve: { upper: 0.075, elbow: 0.072, forearm: 0.067, cuff: 0.054 }, sleeveEnd: 0.695,
+    collarTop: 1.622, collarEase: 0.016, hood: 'hoodie', hoodRoll: null, gaiter: true, gaiterTop: 1.69,
+    folds: 1.3, quilt: null, kangaroo: 0.01,
+  },
+  // 90s one-piece: fitted top over the hem belt (the pants take the suit's colours).
+  suit: {
+    style: 4, hemFront: 0.84, hemBack: 0.84, hemFlare: 0.0,
+    torso: { chest: [0.23, 0.152, 0.162], waist: [0.22, 0.146, 0.158], hem: [0.226, 0.149, 0.162], n: 2.4 },
+    shoulder: 0.009, sleeve: { upper: 0.069, elbow: 0.066, forearm: 0.061, cuff: 0.055 }, sleeveEnd: 0.69,
+    collarTop: 1.628, collarEase: 0.018, hood: 'down', hoodRoll: [0.026, 0.034], gaiter: true, gaiterTop: 1.69,
+    folds: 0.8, quilt: null, kangaroo: 0,
+  },
+};
+export const FIT_STYLE = Object.fromEntries(Object.entries(FITS).map(([k, f]) => [k, f.style]));
+
+/** A jacket cut: a fit plus overrides (deep-merged one level for torso / sleeve). */
+export function jacketCut(fit, over = {}) {
+  const f = FITS[fit];
+  return { ...f, ...over, fit, torso: { ...f.torso, ...over.torso }, sleeve: { ...f.sleeve, ...over.sleeve } };
+}
+
+/**
+ * Pant fits. pantsEase = stand-off from the leg at the thigh / knee / cuff, straight = the leg never
+ * narrows below the knee (wide, straight leg) instead of tapering, cuffY = hem height over the boot,
+ * stack = stacked folds above the boot { y0, y1, n, amp }.
+ */
+export const PANT_FITS = {
+  // Relaxed bib: roomy, straight below the knee, two or three folds over the boot.
+  relaxed: { pantsEase: { thigh: 0.032, knee: 0.036, cuff: 0.044 }, straight: true, cuffY: 0.15, stack: { y0: 0.17, y1: 0.33, n: 3, amp: 0.014 } },
+  // Relaxed tapered pant: roomy thigh, narrowing to the boot.
+  tapered: { pantsEase: { thigh: 0.03, knee: 0.03, cuff: 0.036 }, straight: false, cuffY: 0.16, stack: { y0: 0.18, y1: 0.3, n: 2, amp: 0.01 } },
+  // Wide new-school pant: wide straight leg, long inseam piling up over the boot.
+  baggy: { pantsEase: { thigh: 0.05, knee: 0.058, cuff: 0.066 }, straight: true, cuffY: 0.12, stack: { y0: 0.14, y1: 0.36, n: 4, amp: 0.018 } },
+};
+
 /** Garment shapes, per slot. Lengths are metres in the rider's bind pose (1.8 m tall, feet at 0). */
 export const GARMENTS = {
   jacket: {
     'tuff-shell': {
       name: 'Tuff Shell',
-      blurb: 'Roomy 3-layer freeride shell to the upper thigh: straight hem, high collar, stowed hood.',
-      cut: {
-        // Length: the hem's height above the ground (hip joint 0.97, crotch ~0.86, knee 0.54). A level
-        // hem at the upper thigh and seat: a lower back (dropped tail) read as a dress from the chase cam.
-        // hemBack < hemFront drops the back, > lifts it. hemFlare = outward flare over the last 12 cm.
-        hemFront: 0.84, hemBack: 0.84, hemFlare: 0.006,
-        jacketEase: { shoulder: 0.016, chest: 0.036, hem: 0.062 },   // how far the shell stands off the skin
-        sleeveEase: { upper: 0.012, elbow: 0.026, forearm: 0.022 },
-        sleeveEnd: 0.69,                           // |x| of the cuff in the T-pose (wrist at 0.706)
-        collarTop: 1.628,                          // zipped up under the jaw
-        hood: 'down',                              // 'down' = thick roll behind the neck
-        gaiter: true, gaiterTop: 1.69,            // fleece gaiter pulled up under the goggle
-      },
+      blurb: 'Relaxed 3-layer freeride shell: hangs straight from the chest, drop tail below the seat, stowed hood.',
+      cut: jacketCut('relaxed'),
     },
     'storm-shell': {
       name: 'Tuff Shell, hood up',
-      blurb: 'The same roomy shell with its helmet-compatible hood pulled up over the lid.',
-      cut: null,                                   // filled in below: tuff-shell with the hood up
+      blurb: 'The same relaxed shell with its helmet-compatible hood pulled up over the lid.',
+      cut: jacketCut('relaxed', { hood: 'up' }),
+    },
+    // Reward cuts (profile/items.js). The one-piece's colours dress the pants too (resolveOutfit).
+    'retro-suit': {
+      name: 'Retro One-Piece', blurb: 'A 90s one-piece suit with a hem belt and colour-blocked sleeves.',
+      cut: jacketCut('suit'),
+    },
+    'ridge-shell': {
+      name: 'Ridge Shell', blurb: 'Slim technical hardshell: close at the shoulders, articulated sleeves, hem over the seat.',
+      cut: jacketCut('shell'),
+    },
+    'tall-anorak': {
+      name: 'Tall Anorak', blurb: 'Long new-school pullover: half zip, kangaroo pocket, cut loose to mid-thigh.',
+      cut: jacketCut('anorak'),
+    },
+    'cloud-puffer': {
+      name: 'Cloud Puffer', blurb: 'Insulated puffer with wide baffles and a high quilted collar, cinched at the hip.',
+      cut: jacketCut('puffer'),
+    },
+    'layer-hoodie': {
+      name: 'Layer Hoodie', blurb: 'Tall cotton hoodie over a shell: ribbed hem, kangaroo pocket, the shell collar out the top.',
+      cut: jacketCut('hoodie'),
     },
   },
   pants: {
     'tuff-bib': {
       name: 'Tuff Bib',
-      blurb: 'Wide straight-leg bib that stacks over the boots, reinforced cuffs.',
-      cut: {
-        pantsEase: { thigh: 0.036, knee: 0.042, cuff: 0.048 },
-        cuffY: 0.15,                               // hem height over the boot (to the lower buckles)
-        stack: { y0: 0.17, y1: 0.33, n: 3, amp: 0.016 },   // stacked folds above the boot
-      },
+      blurb: 'Relaxed straight-leg bib that stacks over the boots, reinforced cuffs.',
+      cut: { ...PANT_FITS.relaxed, fit: 'relaxed' },
+    },
+    'cargo-pant': {
+      name: 'Cargo Pant', blurb: 'Relaxed cargo pant tapering to the boot.',
+      cut: { ...PANT_FITS.tapered, fit: 'tapered' },
+    },
+    'wide-pant': {
+      name: 'Wide Pant', blurb: 'Wide new-school pant: straight leg, long inseam stacking over the boot.',
+      cut: { ...PANT_FITS.baggy, fit: 'baggy' },
     },
   },
   helmet: {
@@ -67,28 +177,14 @@ export const GARMENTS = {
     'tuff-mitt': {
       name: 'Tuff Mitt',
       blurb: 'Leather mitts with long nylon gauntlets over the cuffs.',
-      cut: { mittLength: 0.835, gauntlet: [0.618, 0.032] },   // fist end |x| (wrist 0.706), gauntlet start |x| + ease at its open end
+      cut: { mittLength: 0.835, gauntlet: [0.618, 0.008] },   // fist end |x| (wrist 0.706), gauntlet start |x| + clearance over the sleeve at its open end
+    },
+    'pipe-glove': {
+      name: 'Pipe Glove', blurb: 'Short-cuff park glove.',
+      cut: { mittLength: 0.835, gauntlet: [0.64, 0.005] },
     },
   },
 };
-
-GARMENTS.jacket['storm-shell'].cut = { ...GARMENTS.jacket['tuff-shell'].cut, hood: 'up' };
-
-// Reward cuts (profile/items.js). The one-piece is the shell cut a little closer; its colours dress
-// the pants too (resolveOutfit). The cargo pant and pipe glove are slimmer versions of the defaults.
-GARMENTS.jacket['retro-suit'] = {
-  name: 'Retro One-Piece', blurb: 'A 90s one-piece suit with a hem belt and colour-blocked sleeves.',
-  cut: { ...GARMENTS.jacket['tuff-shell'].cut, jacketEase: { shoulder: 0.014, chest: 0.03, hem: 0.05 } },
-};
-GARMENTS.pants['cargo-pant'] = {
-  name: 'Cargo Pant', blurb: 'Relaxed cargo pant with a slimmer leg.',
-  cut: { ...GARMENTS.pants['tuff-bib'].cut, pantsEase: { thigh: 0.03, knee: 0.034, cuff: 0.04 } },
-};
-GARMENTS.gloves['pipe-glove'] = {
-  name: 'Pipe Glove', blurb: 'Short-cuff park glove.',
-  cut: { ...GARMENTS.gloves['tuff-mitt'].cut, gauntlet: [0.64, 0.024] },
-};
-
 /**
  * Colourways. Each slot's colours are what a catalog variant carries in `colors`:
  *   jacket:  base (body), panel (yoke / side panels / hood), accent (zips, logo, lining), gaiter, style

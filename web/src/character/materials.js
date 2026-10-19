@@ -237,6 +237,7 @@ export function fabricMaterial() {
     uGaiter: { value: col('#d9ceb5') }, uPants: { value: col('#3a3129') }, uCuff: { value: col('#231d18') },
     uMitt: { value: col('#9c6f45') }, uGauntlet: { value: col('#1c1c1b') }, uStyle: { value: 0 },
     uHemY: { value: new THREE.Vector3(0.84, 0.15, 0.69) },    // jacket hem, pants cuff, sleeve end
+    uFit: { value: new THREE.Vector4(0, 0.1, 0, 0) },          // jacket fit layout (outfits.js FITS style), quilt pitch
     uHide: { value: 0 },
     // Reward looks (applyLook): x = print, y = scale, z = finish; A / B = the print's colours.
     uJPat: { value: new THREE.Vector4(0, 1, 0, 0) }, uJPatA: { value: col('#222222') }, uJPatB: { value: col('#888888') },
@@ -250,7 +251,7 @@ export function fabricMaterial() {
     vertPre: 'vG = aG; vLin = aLin; vCrease = aCrease; vObj = position;\n  if (uHide > 0.5 && ((aG.x > 2.5 && aG.x < 5.5) || aG.x > 7.5)) transformed *= 0.0;\n  if (uHide > 0.5 && (abs(aG.x - 1.0) < 0.5 || abs(aG.x - 7.0) < 0.5)) transformed.yz = mix(transformed.yz, vec2(1.45, -0.075), 0.25 * smoothstep(0.4, 0.6, abs(position.x)));',
     fragPars: `${COMMON}
 varying vec4 vG; varying float vLin; varying float vCrease; varying vec3 vObj; uniform float uHide;
-uniform vec3 uJacket, uPanel, uAccent, uGaiter, uPants, uCuff, uMitt, uGauntlet; uniform float uStyle; uniform vec3 uHemY;
+uniform vec3 uJacket, uPanel, uAccent, uGaiter, uPants, uCuff, uMitt, uGauntlet; uniform float uStyle; uniform vec3 uHemY; uniform vec4 uFit;
 uniform vec4 uJPat, uPPat, uGPat, uMPat; uniform vec3 uJPatA, uJPatB, uPPatA, uPPatB, uGPatA, uGPatB, uMPatA;
 float fabRough = 0.82, fabSheen = 0.32, fabSheenRough = 0.55, fabSpec = 0.25, fabAO = 1.0, fabH = 0.0;
 float fabMetal = 0.0, fabRefl = 0.0, fabIri = 0.0;
@@ -268,55 +269,134 @@ ${PRINTS}`,
         vec2 wf = vec2(14.0, 4.0);                 // wrinkle frequency (around u, along v): long drape folds
         float ink = 0.0;                           // the print's ink mask (neon finishes glow there)
         if (id < 0.5) {
-          // ---------------- jacket body: x = arc metres from the centre front
-          float x = uc * 1.42, ax = abs(x);
+          // ---------------- jacket body: x = arc metres from the centre front. uFit.x = the fit's layout:
+          // 0 shell, 1 anorak, 2 puffer, 3 hoodie, 4 one-piece (outfits.js FITS).
+          float fit = uFit.x;
+          float x = uc * 1.3, ax = abs(x);
           float back = smoothstep(0.2, 0.35, abs(uc));
           float yokeY = mix(1.395, 1.355, back) - 0.02 * smoothstep(0.1, 0.25, abs(uc)) * (1.0 - back);
           float yoke = step(yokeY, v);
-          float sideP = 1.0 - step(0.055, abs(abs(uc) - 0.25) * 1.42);
+          float sideP = 1.0 - step(0.05, abs(abs(uc) - 0.25) * 1.3);
           float panel = max(yoke, sideP * step(v, yokeY));
-          if (uStyle > 0.5) panel = yoke;                    // style 1: yoke + colour-blocked sleeves, no side panels
+          if (uStyle > 0.5 || fit > 1.5) panel = yoke;       // colour-blocked sleeves / puffer: no side panels
+          if (abs(fit - 3.0) < 0.5) panel = 0.0;              // hoodie: one colour
           vec3 jb = chPrint(uJPat.x, vec2(u, v), floor(8.0 * uJPat.y + 0.5), uJacket, uJPatA, uJPatB, 1.18, ink);
           if (uJPat.x > 0.5 && abs(uJPat.x - 4.0) > 0.5) panel = 0.0;   // a print covers the panels (bands keep them)
           c = mix(jb, uPanel, panel);
-          seam += chLine(v - yokeY, 0.0022);
-          seam += chLine(abs(abs(uc) - 0.25) * 1.42 - 0.055, 0.0022) * step(v, yokeY);
-          // accent piping along the front yoke seam
-          c = mix(c, uAccent, chLine(v - yokeY - 0.006, 0.0025) * (1.0 - back) * step(ax, 0.3) * step(uStyle, 0.5));
-          // centre-front zip with a storm flap
-          zip = chLine(x, 0.0055) * step(v, 1.66);
-          seam += chLine(x - 0.02, 0.0018);
+          float hem = uHemY.x;
           float pull = 0.0;   // zip pulls (accent)
-          // two chest pocket zips, angled out
-          for (int s = 0; s < 2; s++) {
-            float sx = s == 0 ? 1.0 : -1.0;
-            float px = sx * x - (0.07 + (v - 1.24) * 0.16);
-            zip += chLine(px, 0.0035) * step(1.24, v) * step(v, 1.42) * (1.0 - back);
-            pull = max(pull, 1.0 - step(0.0, chBox(vec2(px - 0.006, v - 1.405), vec2(0.004, 0.011), 0.003)));
-            // hand pockets: high and angled
-            float hx = sx * x - 0.1 - (v - 0.95) * 0.58;
-            zip += chLine(hx, 0.0032) * step(0.95, v) * step(v, 1.1) * (1.0 - back);
+          if (fit < 2.5 || fit > 3.5) {
+            // Technical layouts: yoke + side panel seams (taped), accent piping on the front yoke seam.
+            if (fit < 1.5 || fit > 3.5) {
+              seam += chLine(v - yokeY, 0.0022);
+              seam += chLine(abs(abs(uc) - 0.25) * 1.3 - 0.05, 0.0022) * step(v, yokeY);
+              c = mix(c, uAccent, chLine(v - yokeY - 0.006, 0.0025) * (1.0 - back) * step(ax, 0.3) * step(uStyle, 0.5));
+            } else {
+              seam += chLine(v - yokeY, 0.0022) * step(0.5, uStyle);
+            }
+            // Front zip: full length with a storm flap; the anorak's half zip stops at the chest.
+            float zipLo = abs(fit - 1.0) < 0.5 ? 1.3 : 0.0;
+            zip = chLine(x, 0.0055) * step(v, 1.66) * step(zipLo, v);
+            seam += chLine(x - 0.02, 0.0018) * step(zipLo, v);
+            if (zipLo > 0.0) {
+              pull = max(pull, 1.0 - step(0.0, chBox(vec2(x - 0.008, v - zipLo - 0.01), vec2(0.005, 0.014), 0.003)));
+              seam += chLine(chBox(vec2(x, v - zipLo + 0.004), vec2(0.008, 0.004), 0.002), 0.0015);
+            }
+            pull = max(pull, 1.0 - step(0.0, chBox(vec2(x - 0.008, v - 1.57), vec2(0.005, 0.014), 0.003)));
+            if (abs(fit - 1.0) < 0.5) {
+              // Anorak: kangaroo pocket across the belly (open at both sides, a zip across its top), one
+              // horizontal chest pocket zip, a side zip down the right side seam.
+              float kp = chBox(vec2(x, v - 1.035), vec2(0.15, 0.085), 0.025);
+              seam += chLine(kp, 0.0018) * step(v, 1.1);
+              zip += chLine(v - 1.11, 0.0032) * step(ax, 0.12);
+              pull = max(pull, 1.0 - step(0.0, chBox(vec2(x - 0.12, v - 1.105), vec2(0.012, 0.005), 0.003)));
+              zip += chLine(v - 1.43, 0.003) * step(0.03, x) * step(x, 0.15) * (1.0 - back);
+              zip += chLine(abs(uc + 0.25) * 1.3 - 0.012, 0.003) * step(hem + 0.04, v) * step(v, 1.33);
+            } else {
+              // Shell / suit / puffer: two chest pocket zips angled out (vertical on the slim shell), high hand pockets.
+              float lean = fit < 0.5 ? 0.16 : (fit > 1.5 && fit < 2.5 ? 0.0 : 0.12);
+              for (int s = 0; s < 2; s++) {
+                float sx = s == 0 ? 1.0 : -1.0;
+                float px = sx * x - (0.07 + (v - 1.24) * lean);
+                if (fit < 1.5 || fit > 3.5) {
+                  zip += chLine(px, 0.0035) * step(1.24, v) * step(v, 1.42) * (1.0 - back);
+                  pull = max(pull, 1.0 - step(0.0, chBox(vec2(px - 0.006, v - 1.405), vec2(0.004, 0.011), 0.003)));
+                }
+                float hx = sx * x - (fit > 1.5 && fit < 2.5 ? 0.16 : 0.1 + (v - 0.95) * 0.58);
+                zip += chLine(hx, 0.0032) * step(0.95, v) * step(v, 1.1) * (1.0 - back);
+              }
+              // Pit zip under each arm (a long zip at the top of the side seam).
+              if (fit < 1.5) zip += chLine(abs(abs(uc) - 0.25) * 1.3, 0.003) * step(1.25, v) * step(v, 1.43);
+            }
+            if (fit < 1.5 || fit > 3.5) {
+              // hem drawcord channel, cord toggles at the side seams
+              seam += chLine(v - (hem + 0.03), 0.002);
+              vec2 tg = vec2((abs(uc) - 0.25) * 1.3, v - hem - 0.016);
+              float tog = 1.0 - step(0.0, chBox(tg, vec2(0.007, 0.011), 0.004));
+              c = mix(c, uAccent * 0.8, tog);
+              fabH += tog * 0.003;
+            }
+            if (fit > 3.5) {
+              // One-piece: a waist belt in the panel colour with a buckle at the front.
+              float belt = step(abs(v - 1.02), 0.022);
+              c = mix(c, uPanel * 0.85, belt);
+              seam += chLine(abs(v - 1.02) - 0.022, 0.0016);
+              float bk = 1.0 - step(0.0, chBox(vec2(x, v - 1.02), vec2(0.026, 0.019), 0.004));
+              c = mix(c, vec3(0.5, 0.52, 0.55), bk);
+              fabH += bk * 0.002;
+            }
+            if (fit > 1.5 && fit < 2.5) {
+              // Puffer: stitch lines between the baffles (geometry pinches there), a ripstop nylon sheen.
+              float ph = (v - hem) / max(uFit.y, 0.02);
+              float st = chLine(fract(ph + 0.5) - 0.5, 0.0025 / max(uFit.y, 0.02)) * step(hem + 0.01, v) * step(v, 1.56);
+              seam += st * 1.4;
+              fabRough = 0.48; fabSpec = 0.6; fabSheen = 0.22; fabSheenRough = 0.4;
+              // hem: elastic binding in the panel colour
+              c = mix(c, uPanel, step(v, hem + 0.022));
+            } else {
+              fabRough = 0.7; fabSpec = 0.34; fabSheen = 0.26;   // 3-layer hardshell face: matte with a soft sheen
+            }
+            // logo: small accent chevron on the left chest, a bar across the back yoke
+            vec2 lp = vec2(x - 0.11, v - 1.355);
+            float chev = step(abs(lp.x) * 0.55 + lp.y, 0.009) * step(-0.009, lp.y - abs(lp.x) * 0.55) * step(abs(lp.x), 0.018);
+            c = mix(c, uAccent, chev * (1.0 - back));
+            vec2 bp = vec2((abs(uc) - 0.5) * 1.3, v - 1.455);
+            c = mix(c, uAccent, (1.0 - step(0.0, chBox(bp, vec2(0.06, 0.007), 0.002))) * back);
+          } else {
+            // Hoodie: heavyweight cotton fleece. Kangaroo pocket, ribbed hem band, drawcords from the hood,
+            // a small chest print; no zips.
+            float kp = chBox(vec2(x, v - 1.03), vec2(0.155, 0.09), 0.03);
+            float inK = 1.0 - smoothstep(-0.001, 0.001, kp);
+            seam += chLine(kp, 0.0016) * step(v, 1.09);
+            seam += chLine(kp + 0.006, 0.0012) * step(v, 1.09);
+            fabH += inK * 0.0008;
+            float rib = step(v, hem + 0.065);
+            seam += chLine(v - hem - 0.065, 0.0018);
+            float rr = u * 6.2831853 * 160.0;
+            fabH += rib * sin(rr) * 0.00025 * (1.0 - smoothstep(0.3, 0.8, fwidth(rr)));
+            c *= 1.0 - rib * 0.06;
+            // drawcords: two cords from the neckline, aglets at the ends
+            for (int s = 0; s < 2; s++) {
+              float sx = s == 0 ? 1.0 : -1.0;
+              float cx = sx * x - 0.04 - (1.53 - v) * 0.05;
+              float cord = chLine(cx, 0.0028) * step(1.4, v) * step(v, 1.53) * (1.0 - back);
+              float agl = (1.0 - step(0.0, chBox(vec2(cx, v - 1.395), vec2(0.0035, 0.012), 0.002))) * (1.0 - back);
+              c = mix(c, uAccent * 0.9, max(cord, agl));
+              fabH += max(cord, agl) * 0.0015;
+            }
+            // chest print: a small accent wordmark block
+            vec2 lp = vec2(x + 0.0, v - 1.3);
+            float word = (1.0 - step(0.0, chBox(lp, vec2(0.06, 0.012), 0.002))) * step(0.5, fract(lp.x * 60.0 + 0.25)) * (1.0 - back);
+            c = mix(c, uPanel, word);
+            fabRough = 0.95; fabSpec = 0.03; fabSheen = 0.55; fabSheenRough = 0.85;
+            wf = vec2(9.0, 3.0);
           }
-          // hem band seam + drawcord channel, cord toggles at the side seams
-          seam += chLine(v - (uHemY.x + 0.03), 0.002);
-          vec2 tg = vec2((abs(uc) - 0.25) * 1.42, v - uHemY.x - 0.016);
-          float tog = 1.0 - step(0.0, chBox(tg, vec2(0.007, 0.011), 0.004));
-          c = mix(c, uAccent * 0.8, tog);
-          fabH += tog * 0.003;
-          // zip pull of the main zip at the chin
-          pull = max(pull, 1.0 - step(0.0, chBox(vec2(x - 0.008, v - 1.57), vec2(0.005, 0.014), 0.003)));
           c = mix(c, uAccent, pull * (1.0 - back));
           fabH += pull * 0.002;
-          // logo: small accent chevron on the left chest, a bar across the back yoke
-          vec2 lp = vec2(x - 0.115, v - 1.355);
-          float chev = step(abs(lp.x) * 0.55 + lp.y, 0.009) * step(-0.009, lp.y - abs(lp.x) * 0.55 + 0.0) * step(abs(lp.x), 0.018);
-          c = mix(c, uAccent, chev * (1.0 - back));
-          vec2 bp = vec2((abs(uc) - 0.5) * 1.42, v - 1.455);
-          c = mix(c, uAccent, (1.0 - step(0.0, chBox(bp, vec2(0.06, 0.007), 0.002))) * back);
           wr = 1.0;
         } else if (id < 1.5) {
           // ---------------- sleeve: uc 0 = top of the arm (outside when the arms hang), v = |x|
-          float a = uc * 0.62;                      // arc metres
+          float a = uc * 0.46;                      // arc metres
           // Shoulder cap in the yoke colour (continues the yoke over the armhole), a raglan stripe down
           // the top of the arm to the elbow.
           float capV = mix(0.37, 0.27, smoothstep(0.12, 0.42, abs(a)));
@@ -327,26 +407,44 @@ ${PRINTS}`,
           vec3 jb = chPrint(uJPat.x, vec2(u, v), floor(4.0 * uJPat.y + 0.5), uJacket, uJPatA, uJPatB, 0.42, ink);
           if (uJPat.x > 0.5 && abs(uJPat.x - 4.0) > 0.5) { raglan = 0.0; cap = 0.0; block = 0.0; }
           if (abs(uJPat.x - 5.0) < 0.5) jb = side > 0.5 ? uJPatA : uJPatB;   // two-tone: one sleeve each
+          float sfit = uFit.x;
+          bool hoodie = abs(sfit - 3.0) < 0.5, puffer = abs(sfit - 2.0) < 0.5;
+          if (hoodie) { raglan = 0.0; cap = 0.0; block = 0.0; }
+          if (puffer) raglan = 0.0;
           c = mix(jb, uPanel, max(max(raglan, cap) * (1.0 - block), block));
           seam += max(chLine(abs(a) - rw, 0.002) * step(capV, v) * step(v, 0.42), chLine(v - capV, 0.002) * step(rw, abs(a))) * (1.0 - block);
           // elbow articulation darts (back of the arm)
-          float ea = (uc + 0.25) * 0.62;
+          float ea = (uc + 0.25) * 0.46;
           seam += chLine(v - 0.43 - ea * ea * 5.0, 0.0018) * step(abs(ea), 0.08);
           seam += chLine(v - 0.475 - ea * ea * 5.0, 0.0018) * step(abs(ea), 0.08);
           // cuff: Velcro tab underneath + seam
           float cuffV = uHemY.z - 0.04;
           seam += chLine(v - cuffV, 0.002);
-          vec2 tp = vec2((abs(uc) - 0.5) * 0.62, v - cuffV - 0.02);
+          vec2 tp = vec2((abs(uc) - 0.5) * 0.46, v - cuffV - 0.02);
           float tab = 1.0 - step(0.0, chBox(tp, vec2(0.014, 0.02), 0.004));
           c = mix(c, uJacket * 0.7, tab);
           seam += chLine(chBox(tp, vec2(0.014, 0.02), 0.004), 0.0015);
           // left sleeve: forearm pocket zip and a shoulder logo
-          if (side > 0.5) {
+          if (side > 0.5 && !hoodie) {
             zip += chLine(a - 0.03, 0.003) * step(0.52, v) * step(v, 0.61);
             vec2 sp = vec2(a + 0.04, v - 0.25);
             c = mix(c, uAccent, 1.0 - step(0.0, chBox(sp, vec2(0.018, 0.005), 0.002)));
           }
           wr = 1.2; wf = vec2(3.0, 20.0);         // ring-shaped compression folds
+          if (puffer) {
+            // baffle stitch rings matching the geometry (pitch × 0.72 from |x| 0.2)
+            float pp = max(uFit.y * 0.72, 0.02);
+            seam += chLine(fract((v - 0.2) / pp + 0.5) - 0.5, 0.0025 / pp) * step(0.22, v) * step(v, uHemY.z - 0.05) * 1.4;
+            fabRough = 0.48; fabSpec = 0.6; fabSheen = 0.22; fabSheenRough = 0.4; wr = 0.4;
+          } else if (hoodie) {
+            seam = chLine(abs(uc) - 0.5, 0.002);    // single seam underneath
+            float rib = step(uHemY.z - 0.05, v);
+            float rr = u * 6.2831853 * 60.0;
+            fabH += rib * sin(rr) * 0.00025 * (1.0 - smoothstep(0.3, 0.8, fwidth(rr)));
+            fabRough = 0.95; fabSpec = 0.03; fabSheen = 0.55; fabSheenRough = 0.85;
+          } else {
+            fabRough = 0.7; fabSpec = 0.34; fabSheen = 0.26;
+          }
         } else if (id < 2.5) {
           // ---------------- pant leg: uc 0 = front, outer side at uc = +0.25·side
           float a = uc * 0.95;
@@ -376,14 +474,25 @@ ${PRINTS}`,
           wr = 1.1; wf = vec2(7.0, 6.0);
         } else if (id < 3.5) {
           // ---------------- collar: zip continues to the chin, accent lining at the rim
-          c = mix(uJacket, uPanel, step(0.5, uStyle) * 0.0);
-          zip = chLine(uc * 0.62, 0.005);
+          // (hoodie: this is the shell worn underneath, out the top in the panel colour; puffer: quilted)
+          c = abs(uFit.x - 3.0) < 0.5 ? uPanel : uJacket;
+          zip = chLine(uc * 0.6, 0.005);
+          if (abs(uFit.x - 2.0) < 0.5) { seam += chLine(v - 1.585, 0.002) * 1.4; fabRough = 0.48; fabSpec = 0.6; fabSheen = 0.22; }
+          else { fabRough = 0.7; fabSpec = 0.34; fabSheen = 0.26; }
           wr = 0.6; wf = vec2(10.0, 30.0);
         } else if (id < 4.5) {
-          // ---------------- stowed hood roll
-          c = uPanel;
-          seam += chLine(uc, 0.004);
-          wr = 1.4;
+          // ---------------- stowed hood roll (shells) / a hoodie's soft hood lying on the back
+          if (abs(uFit.x - 3.0) < 0.5) {
+            c = uJacket * 0.97;
+            seam += chLine(uc, 0.003) * 0.6;
+            fabRough = 0.95; fabSpec = 0.03; fabSheen = 0.55; fabSheenRough = 0.85;
+            wr = 1.6; wf = vec2(5.0, 6.0);
+          } else {
+            c = uPanel;
+            seam += chLine(uc, 0.004);
+            fabRough = 0.7; fabSpec = 0.34; fabSheen = 0.26;
+            wr = 1.4;
+          }
         } else if (id < 5.5) {
           // ---------------- fleece gaiter
           // Heathered knit with fine vertical ribs and a small accent tag on the left; the print comes
@@ -407,6 +516,7 @@ ${PRINTS}`,
           c = uJPat.x > 0.5 && abs(uJPat.x - 4.0) > 0.5 ? chPrint(uJPat.x, vec2(u, v + 1.0), 4.0, uJacket, uJPatA, uJPatB, 1.9, ink) : uPanel;
           seam += chLine(uc * 0.75, 0.002) + chLine((abs(uc) - 0.5) * 0.75, 0.002);
           seam += chLine(v - 0.93, 0.002);
+          fabRough = 0.7; fabSpec = 0.34; fabSheen = 0.26;
           wr = 0.6; wf = vec2(12.0, 6.0);
         } else if (id > 6.5) {
           // ---------------- gauntlet: nylon with a cinch strap at the wrist
@@ -463,7 +573,7 @@ ${PRINTS}`,
 export function bodyMaterial(src) {
   const U = {
     uJacket: { value: col('#5e5f45') }, uPants: { value: col('#3a3129') }, uMitt: { value: col('#9c6f45') },
-    uBoot: { value: col('#33363b') }, uBootAccent: { value: col('#4a4d52') }, uShrink: { value: 0.022 },
+    uBoot: { value: col('#33363b') }, uBootAccent: { value: col('#4a4d52') }, uShrink: { value: 0.022 }, uJHem: { value: 0.84 },
   };
   const m = toonMaterial({
     name: 'riderBody', map: src.map, rim: 0.3, uniforms: U,
@@ -474,7 +584,7 @@ export function bodyMaterial(src) {
     // Jacket zone (big superhero shoulders / arms) pulls in furthest, pants and hands less.
     // Arms are always inside the sleeves: pull them toward the arm's axis (never through it), the
     // rest of the covered skin in along its normal.
-    float arm = color.a * color.r / tot * smoothstep(0.17, 0.25, abs(position.x)) * step(1.25, position.y);
+    float arm = color.a * color.r / tot * smoothstep(0.15, 0.23, abs(position.x)) * step(1.25, position.y);
     transformed.yz = mix(transformed.yz, vec2(1.45, -0.075), arm * 0.6);
     // Hands live in the mitts: pull them toward the hand's axis too.
     float hand = color.a * color.b / tot * smoothstep(0.66, 0.7, abs(position.x)) * step(1.25, position.y);
@@ -483,12 +593,13 @@ export function bodyMaterial(src) {
     float cover = color.a * (color.r / tot * 1.8 * (1.0 - arm) + color.g / tot * 1.25 + step(1.2, position.y) * color.b / tot * 0.8);
     transformed -= objectNormal * uShrink * cover;
   }`,
-    fragPars: `${COMMON}\nvarying vec4 vZone; varying vec3 vObj;\nuniform vec3 uJacket, uPants, uMitt, uBoot, uBootAccent;\nfloat fabRough = 0.85, fabSheen = 0.1, fabSheenRough = 0.6, fabSpec = 0.2, fabAO = 1.0;`,
+    fragPars: `${COMMON}\nvarying vec4 vZone; varying vec3 vObj;\nuniform vec3 uJacket, uPants, uMitt, uBoot, uBootAccent; uniform float uJHem;\nfloat fabRough = 0.85, fabSheen = 0.1, fabSheenRough = 0.6, fabSpec = 0.2, fabAO = 1.0;`,
     frag: /* glsl */`
       {
         float tot = max(vZone.r + vZone.g + vZone.b, 0.001);
         float boot = step(vObj.y, 0.6) * vZone.b / tot;
-        vec3 cloth = (uJacket * vZone.r + uPants * vZone.g + mix(uMitt, uBoot, step(vObj.y, 0.6)) * vZone.b) / tot;
+        // Below the jacket hem (the crotch between the pant legs) covered skin takes the pants colour.
+        vec3 cloth = (mix(uPants, uJacket, step(uJHem, vObj.y)) * vZone.r + uPants * vZone.g + mix(uMitt, uBoot, step(vObj.y, 0.6)) * vZone.b) / tot;
         // Ski boot: rubber sole, glossy lower shell, two metal buckles across the instep, a lighter
         // shell panel on the outside of the heel.
         vec3 bootCol = uBoot;
