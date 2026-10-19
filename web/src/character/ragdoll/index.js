@@ -14,6 +14,7 @@ import { RAGDOLL, PHYSICS } from '../../config.js';
 import { on, emit } from '../../state.js';
 import { buildHumanoid, seedMotion, depenetrate, updateTone } from './humanoid.js';
 import { captureSeed, applyPose } from './rig.js';
+import { crashSeverity } from './severity.js';
 
 const CRASH = 3;
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
@@ -205,6 +206,26 @@ export class RagdollController {
     if (!m.c0) m.c0 = com.clone();
     m.dist = Math.hypot(com.x - m.c0.x, com.z - m.c0.z);
     if (H.world.asleep(0) || this.t > 2.5) return;
+    // Tumbling: the angle the trunk's long axis (pelvis → chest) sweeps (head over heels / cartwheels: 360° = one
+    // flip) and the roll about that axis (a log roll), the trunk's peak spin; limb spread: each hand's distance from
+    // the trunk segment and the distance between the ankles (peak and time average).
+    const pv = P.pelvis, ch = P.chest;
+    const u = _c.subVectors(ch.x, pv.x).normalize();
+    if (m.u) { m.tumble += Math.acos(Math.max(-1, Math.min(1, u.dot(m.u)))); m.roll += Math.abs(_b.addVectors(pv.w, ch.w).multiplyScalar(0.5).dot(u)) * dt; }
+    else m.u = new THREE.Vector3();
+    m.u.copy(u);
+    if (this.t > 0.05) m.wMax = Math.max(m.wMax, pv.w.length(), ch.w.length());
+    let arm = 0;
+    for (const f of [P.forearmL, P.forearmR]) {
+      f.point(f.shapes[1].a, _b);
+      const L = ch.x.distanceTo(pv.x);
+      const k = Math.max(0, Math.min(L, _b.clone().sub(pv.x).dot(u)));
+      arm = Math.max(arm, _b.sub(pv.x).addScaledVector(u, -k).length());
+    }
+    const ankle = (sh, out) => sh.point(sh.shapes[0].b, out);
+    const leg = ankle(P.shinL, _b).distanceTo(ankle(P.shinR, _a.clone()));
+    m.armPeak = Math.max(m.armPeak, arm); m.legPeak = Math.max(m.legPeak, leg);
+    m.armSum += arm * dt; m.legSum += leg * dt;
     let sum = 0;
     for (let i = 0; i < FLAP.length; i++) {
       const [limb, trunk] = FLAP[i];
@@ -312,16 +333,20 @@ export class RagdollController {
     H.world.easeLimits();
     const com = H.world.com(0, new THREE.Vector3());
     const groundN = this.env.normal(com.x, com.z, new THREE.Vector3());
+    const dc = pl.dyn?.C || {};
+    this.sev = crashSeverity({ crash: pl.lastCrash, kind: this.kind, v: mot.v, w: mot.w, n: groundN, C,
+      lim: { flipStumble: dc.flipLandStumble, yawCrash: seed.type === 'snowboard' ? dc.landSlide : dc.landCrash } });
     const p0 = seed.bones.pelvis.p;
     const rnd = rng(Math.floor(p0.x * 131 + p0.z * 977 + (pl.simTime || 0) * 61));
     seedMotion(H, { vCom: mot.v, w: mot.w, com, cause: { kind: this.kind, reason }, groundN, rnd, C });
-    this.stats.seed = { kind: this.kind, reason, v: +mot.v.length().toFixed(2), vy: +mot.v.y.toFixed(2), w: +mot.w.length().toFixed(2), pl: +pl.velocity.length().toFixed(2), tracked: this.frames.length, shift: +shift.length().toFixed(3) };
+    this.stats.seed = { kind: this.kind, reason, sev: +this.sev.s.toFixed(2), tier: this.sev.tier, v: +mot.v.length().toFixed(2), vy: +mot.v.y.toFixed(2), w: +mot.w.length().toFixed(2), pl: +pl.velocity.length().toFixed(2), tracked: this.frames.length, shift: +shift.length().toFixed(3) };
     this.fallDir = new THREE.Vector3(mot.v.x, 0, mot.v.z);
     if (this.fallDir.lengthSq() < 1e-4) this.fallDir.set(-Math.sin(pl.heading), 0, -Math.cos(pl.heading));
     this.fallDir.normalize();
     this.H = H; this.seed = seed; this.shift = shift;
     this.t = 0; this.restT = 0; this.rest = 1; this.active = true;
-    this.m = { peak: 0, mean: 0, sum: 0, T: 0, swings: 0, armed: FLAP.map(() => true), dist: 0, c0: null };
+    this.m = { peak: 0, mean: 0, sum: 0, T: 0, swings: 0, armed: FLAP.map(() => true), dist: 0, c0: null,
+      tumble: 0, roll: 0, wMax: 0, armPeak: 0, armSum: 0, legPeak: 0, legSum: 0, u: null, tier: this.sev.tier, sev: this.sev.s };
     this.E0 = H.world.energy(0);
     H.world.budget = this.E0;
     this.stats.crashes++;
