@@ -308,7 +308,7 @@ files you are not editing: a source edit reloads the page mid-run.
 
 ## Rider vs gear (no clipping)
 
-Boots seated in the bindings, the garment clearance pass, grabs that bring the gear to the hand and the
+Boots seated in the bindings, the (eased) garment clearance pass, the board-grab hand safeguard and the
 `gear-clip.mjs` penetration check are documented in docs/equipment.md § *Boots, bindings and clearance*.
 The clearance pass reads the outfit's skinned vertices (hips, butt, hem, thighs, shins), so new garment cuts
 are covered automatically; run `node web/scripts/gear-clip.mjs <url> --quick --fits --check` after changing
