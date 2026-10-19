@@ -101,16 +101,18 @@ the hood but keep the shoulders narrow, so the volume sits low.
 
 All lengths are metres in the bind pose (1.8 m rider: hip joint 0.97, crotch about 0.86, knee 0.54).
 Bind-pose sizes come from `outfit-measure.mjs`, as width × depth of the shell at the chest (1.4) and
-the waist (1.1). The old cut measured 54 × 46 and 51 × 44, with a sleeve radius of 10–11 cm.
+the waist (1.1). The original cut measured 54 × 46 and 51 × 44 with 10–11 cm sleeves. The shoulders
+are now narrower than the waist and hem on the long fits (A-line). The sleeve column gives the radius at
+|x| 0.35, 0.45 and 0.55.
 
 | fit (`FITS`) | garments | silhouette | chest / waist (cm) | sleeve r (cm) | hem F / B |
 |---|---|---|---|---|---|
-| `relaxed` | `tuff-shell` (default), `storm-shell` (hood up) | Sabre-style relaxed freeride shell: close yoke, straight hang, slight drop tail below the seat | 48 × 35 / 48 × 33 | 7.3 / 7.0 / 6.4 | 0.785 / 0.76 |
-| `shell` | `ridge-shell` (new) | slim technical hardshell: follows the taper, vertical chest zips, pit zips | 45 × 31 / 43 × 30 | 6.6 / 6.3 / 5.8 | 0.85 / 0.825 |
-| `anorak` | `tall-anorak` (new) | long new-school pullover: half zip, kangaroo pocket, side zip, mid-thigh | 49 × 35 / 49 × 34 | 7.7 / 7.4 / 6.8 | 0.72 / 0.70 |
-| `puffer` | `cloud-puffer` (new) | the one round cut: 10.5 cm baffles, high quilted collar, hem cinched at the hip | 50 × 36 / 50 × 35 (+1.2 cm loft) | 7.9 / 7.7 / 7.1 | 0.88 / 0.875 |
-| `hoodie` | `layer-hoodie` (new) | tall cotton hoodie over a shell: ribbed hem blousing at the hip, kangaroo pocket, drawcords, the shell collar out the top in the panel colour | 48 × 33 / 49 × 33 | 7.5 / 7.2 / 6.7 | 0.755 / 0.745 |
-| `suit` | `retro-suit` | 90s one-piece: fitted, waist belt with a buckle | 46 × 32 / 44 × 30 | 6.9 / 6.6 / 6.1 | 0.84 / 0.84 |
+| `relaxed` | `tuff-shell` (default), `storm-shell` (hood up) | Sabre-style relaxed freeride shell: soft dropped shoulder, straight / slight A-line column, drop tail to the lower seat | 46 × 35 / 48 × 34 | 7.7 / 7.2 / 7.1 | 0.765 / 0.725 |
+| `shell` | `ridge-shell` (new) | slim technical hardshell: close, straight, vertical chest zips, pit zips, hem over the seat | 44 × 34 / 44 × 31 | 6.9 / 6.4 / 6.3 | 0.83 / 0.80 |
+| `anorak` | `tall-anorak` (new) | long new-school pullover: half zip, kangaroo pocket, side zip, A-line to mid-thigh | 47 × 35 / 50 × 36 | 8.1 / 7.6 / 7.6 | 0.68 / 0.65 |
+| `puffer` | `cloud-puffer` (new) | the one round cut: 10.5 cm baffles, high quilted collar, hem cinched at the hip | 50 × 37 / 50 × 35 (+1.2 cm loft) | 7.9 / 8.1 / 8.0 | 0.88 / 0.875 |
+| `hoodie` | `layer-hoodie` (new) | tall cotton hoodie over a shell: ribbed hem blousing at the hip, kangaroo pocket, drawcords, the shell collar out the top in the panel colour | 47 × 35 / 50 × 35 | 7.9 / 7.3 / 7.3 | 0.71 / 0.69 |
+| `suit` | `retro-suit` | 90s one-piece: fitted, waist belt with a buckle | 46 × 34 / 44 × 31 | 7.1 / 6.6 / 6.5 | 0.84 / 0.84 |
 
 Pants (`PANT_FITS`):
 
