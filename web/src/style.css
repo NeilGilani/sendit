@@ -21,6 +21,19 @@
   --c-alert: #e5382b;      /* patrol red: new / badges */
   --r1: 2px;               /* radii: 0 for strips, 2px for controls, 4px for panels. Circles only where the thing is a circle. */
   --r2: 4px;
+  /* ---- v2: tactile depth + motion (docs/lobby.md → Design system v2) ---- */
+  --c-ink-4: #2b3e51;      /* pressed / active face on dark */
+  --c-ink-lip: #04080c;    /* the "lip" under a dark chunky control (its side face) */
+  --c-snow-lip: #9aabbb;   /* the lip under a snow plate */
+  --c-signal-hi: #ff8650;  /* top of the Ride face */
+  --c-signal-lip: #a8360c; /* the lip under orange */
+  --c-gold-lip: #9c7311;
+  --lip: 4px;              /* depth of a chunky control; hover lifts by 2–3 px, press sinks into the lip */
+  --skew: -10deg;          /* the speed slant (Ride, the active destination plate) — same family as the HUD's skewed speed read-out */
+  --e-out: cubic-bezier(.2, .8, .3, 1);     /* settle */
+  --e-pop: cubic-bezier(.3, 1.55, .5, 1);   /* overshoot: badges, plates, entrances */
+  --t1: 110ms;             /* press / hover */
+  --t2: 260ms;             /* slides, plates */
   --ink: var(--c-snow);
   --dim: var(--c-snow-2);
   --accent: var(--c-signal);

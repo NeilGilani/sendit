@@ -1,12 +1,15 @@
 # Sendit rider look: outfit system
 
-The rider wears a modern, baggy freeride kit: a roomy 3-layer shell with a straight hem at the
-upper thigh, a high collar, a stowed hood and a fleece gaiter pulled up under the goggle; a wide straight-leg bib that
-stacks over the boots; leather mitts with nylon gauntlets; and a low-profile matte helmet with a big
-frameless mirror goggle on a wide strap. Everything is built procedurally around the Quaternius body
-when the rider loads, skinned to the same bones the animation drives, and coloured from data. The
-research behind the look (cuts, offsets, helmet and goggle dimensions, colourways) is in
-[character-research.md](character-research.md).
+The rider wears modern new-school / freeride kit. Jackets come in six **fits** (slim technical shell,
+relaxed freeride shell, long anorak, insulated puffer, tall hoodie over a shell, 90s one-piece). They
+sit close at the neck and shoulders and hang straight from the chest and shoulder blades, so the volume
+is low (waist, seat, hem) instead of inflated all over. The default is the relaxed shell. Each jacket has
+a high collar and a stowed hood or a hoodie hood, plus a fleece gaiter pulled up under the goggle. The
+legs are a relaxed bib, a tapered cargo pant or a wide pant, stacking over the boots. Gloves are leather
+mitts with nylon gauntlets, and the helmet is a low-profile matte shell with a big frameless mirror goggle.
+Everything is built procedurally around the Quaternius body when the rider loads. It is skinned to the
+same bones the animation drives and coloured from data. Research: § Research below (October 2026)
+and the earlier [character-research.md](character-research.md) (lengths, helmet / goggle, colours).
 
 ```
 npm --prefix web run dev -- --port 5181 --strictPort
@@ -15,6 +18,165 @@ http://localhost:5181/?ride               chase cam (C toggles the helmet cam)
 http://localhost:5181/?ride&equip=snowboard
 ```
 
+Dev tools (screenshots go outside the repo):
+
+```
+node web/scripts/outfit-turntable.mjs <url> <outDir> '@looks.txt' stand,crouch,carve front,q34,side,back
+node web/scripts/outfit-ingame.mjs    <url> <outDir> '@looks.txt' ski|snowboard   # carve, tuck, air grab, first person
+node web/scripts/outfit-measure.mjs   <url> tuff-shell,ridge-shell                 # bind-pose widths / depths / sleeve radii
+node web/scripts/outfit-compare.mjs   <out.png> "before=a.png" "after=b.png"
+node web/scripts/outfit-eval.mjs      <url> '<js expression>'                      # poke the lobby page
+```
+A looks file holds `label=slot:garment@colorway,…;label2=…`, e.g.
+`anorak=jacket:tall-anorak@arcade,pants:wide-pant@arcade,gloves:@arcade,helmet:@arcade,goggles:@arcade`.
+
+## Research (October 2026): what modern ski and snowboard outerwear looks like
+
+The user's brief: jackets "more like regular jackets than winter coats". The old cut made the rider
+boxy and round. The target is the Arc'teryx look, baggy but wrapping the body, plus new-school cuts,
+keeping a few puffers on purpose. Below are the sources and what I took from them. Brands are described,
+never copied: no logos or trademarks are used.
+
+**Why the old cut looked like a coat.** It inflated the body outline along its normals: the jacket was
+the body plus 1.6 to 6 cm of ease, and it hung straight down from the chest. Over the Quaternius
+"superhero" body this gave a chest ring of 54 × 46 cm and sleeves of 10 to 11 cm radius, against a body
+that renders at about 40 × 25 cm under the clothes. Shoulders, arms and belly were all rounded at once.
+Real shells do the opposite:
+- they sit close at the neck, the shoulder tops and the upper back;
+- they hang like a cylinder from the chest and shoulder blades;
+- they put the volume at the waist, seat and hem;
+- they read as flat panels with seams and a few folds.
+
+**Brands and cuts** (product pages, retailer specs and reviews, 2024–2026):
+
+| piece | fit and silhouette | numbers |
+|---|---|---|
+| Arc'teryx Sabre | relaxed/regular, articulated, slight drop hem, helmet hood, pit zips, powder skirt, Velcro cuffs over long sleeves | CB 79 cm (M) puts the hem at about 0.76 m on a 1.8 m rider, just over the seat |
+| Arc'teryx Sabre SV / Rush | Rush is regular and athletic: two chest pockets plus two hand pockets, big pit zips | SV CB 85 cm, Rush 79.5 cm |
+| Arc'teryx Sabre Relaxed Anorak | the "baggy Arc'teryx": loose through chest, waist, hip and thigh; no front zip, a full side zip, a kangaroo pocket, a chest pocket | CB 83 cm |
+| Norrøna lofoten | trim, roomier chest and shoulders, tapers at the waist; the lofoten anorak is the long relaxed variant | ~85 / ~91 cm |
+| Beyond Medals | unisex, loose, wide and short-ish (boxy) | M chest 122 cm garment, length 72 to 80 cm |
+| ThirtyTwo | the same chest for every fit; only the length changes: Regular 76, Relaxed 86, Loose 95 cm | chest ~128 cm around (~28 cm ease) |
+| Volcom (Longo, "91 fit") | loose, dropped shoulders, a bit shorter; the Longo pullover is "very baggy"; drop-tail fits | CB 75 cm |
+| Dope / Montec (new-school) | Regular / Relaxed ("looser through body and shoulders, slightly longer, drop tail") / Boxy (short and wide, skate). The long look comes from riders sizing up to XL–XXL | — |
+| Burton [ak], 686, Jones, Picture, Planks, Black Crows | regular articulated hip-length shells; Picture has a "long back"; 686 rates fit 1 (slim) to 8 (loose) and the Core Shell is a 5 | — |
+| Puffers (Moncler Grenoble, Norrøna Lyngen down, Dope Puffer, Rab) | hip length, wide horizontal baffles that bulge like tubes with pinched stitch lines: the one garment that should look round | baffles 10 to 16 cm, loft 1 to 1.5 cm |
+| Airblaster Freedom Suit | a retro one-piece, regular volume, waist adjusters, loud colours | — |
+| Layering (park) | an oversized DWR hoodie worn alone or over a shell, the shell collar showing at the neck; ribbed cuffs and hem bunching | — |
+| Pants and bibs | bibs dominate freeride and new-school; legs relaxed and straight, or wide with 1 to 3 stacked folds over the boot; scuff patches, cargo pockets, thigh vents | thigh ease 20 to 30 cm around |
+
+**Chest ease** (garment minus body, cm around): slim 12–18, regular 18–24, relaxed 24–32, oversized
+32–45. Burton's guide places the hem at the waist for slim, the hips for standard and mid-thigh for
+long or relaxed, and lets relaxed sleeves cover most of the hand.
+
+**Styling.** The hood goes over the helmet on storm days. A balaclava or gaiter is pulled up to the
+goggle. Mitts and leather pipe gloves are both common. Gauntlets go over the sleeve on technical kit;
+on new-school kit the sleeve stacks over a short cuff. Colours (2024–2026 buyer guides and brand
+ranges):
+- earth tones: olive, canvas/tan, carob, rust, bone;
+- muted pastels: sage, dusty blue, lilac, butter, blush;
+- tonal monochrome;
+- two-tone colour blocking (black/bone, navy/orange, forest/lime) with one small saturated accent.
+
+**Games.** In STEEP, Riders Republic and Shredders, modern outerwear reads through a long torso, hood
+volume behind the helmet, straight-hanging panels with real hem drape, seams and colour blocks
+breaking up the big surfaces, and sleeve and pant stacks. SSX and Fortnite exaggerate the length and
+the hood but keep the shoulders narrow, so the volume sits low.
+
+**What I modelled** (the numbers are in `FITS`, outfits.js):
+- a close yoke on every fit;
+- a target cross-section below the chest (a superellipse per height) that hangs straight;
+- drape folds that grow toward the hem, with flutes in the free-hanging bottom;
+- tension folds from the armpit;
+- elbow compression folds and a wrist stack;
+- quilted baffles on the puffer;
+- a kangaroo pocket bulge on the anorak and hoodie;
+- the hoodie's soft hood lying on the back;
+- pants that stay slim under the jacket and open out below it;
+- materials: a matte hardshell with a soft sheen, ripstop puffer nylon with more spec, cotton fleece
+  that is fully matte with a fuzzy sheen;
+- new skins in the trend palettes.
+
+## Fits
+
+All lengths are metres in the bind pose (1.8 m rider: hip joint 0.97, crotch about 0.86, knee 0.54).
+Bind-pose sizes come from `outfit-measure.mjs`, as width × depth of the shell at the chest (1.4) and
+the waist (1.1). The original cut measured 54 × 46 and 51 × 44 with 10–11 cm sleeves. The shoulders
+are now narrower than the waist and hem on the long fits (A-line). The sleeve column gives the radius at
+|x| 0.35, 0.45 and 0.55.
+
+| fit (`FITS`) | garments | silhouette | chest / waist (cm) | sleeve r (cm) | hem F / B |
+|---|---|---|---|---|---|
+| `relaxed` | `tuff-shell` (default), `storm-shell` (hood up) | Sabre-style relaxed freeride shell: soft dropped shoulder, straight / slight A-line column, drop tail to the lower seat | 46 × 35 / 48 × 34 | 7.7 / 7.2 / 7.1 | 0.765 / 0.725 |
+| `shell` | `ridge-shell` (new) | slim technical hardshell: close, straight, vertical chest zips, pit zips, hem over the seat | 44 × 34 / 44 × 31 | 6.9 / 6.4 / 6.3 | 0.83 / 0.80 |
+| `anorak` | `tall-anorak` (new) | long new-school pullover: half zip, kangaroo pocket, side zip, A-line to mid-thigh | 47 × 35 / 50 × 36 | 8.1 / 7.6 / 7.6 | 0.68 / 0.65 |
+| `puffer` | `cloud-puffer` (new) | the one round cut: 10.5 cm baffles, high quilted collar, hem cinched at the hip | 50 × 37 / 50 × 35 (+1.2 cm loft) | 7.9 / 8.1 / 8.0 | 0.88 / 0.875 |
+| `hoodie` | `layer-hoodie` (new) | tall cotton hoodie over a shell: ribbed hem blousing at the hip, kangaroo pocket, drawcords, the shell collar out the top in the panel colour | 47 × 35 / 50 × 35 | 7.9 / 7.3 / 7.3 | 0.71 / 0.69 |
+| `suit` | `retro-suit` | 90s one-piece: fitted, waist belt with a buckle | 46 × 34 / 44 × 31 | 7.1 / 6.6 / 6.5 | 0.84 / 0.84 |
+
+Pants (`PANT_FITS`):
+
+| fit | garment | look |
+|---|---|---|
+| `relaxed` | `tuff-bib` (default) | roomy, a round tube below the knee falling over the boot, three folds, hem at 0.11 |
+| `tapered` | `cargo-pant` | roomy thigh, narrowing to the boot, two folds, hem at 0.14 |
+| `baggy` | `wide-pant` (new) | wide straight tube, long inseam, four folds piling up over the boot, hem at 0.09 |
+
+`round` (0–1) is how far the leg becomes a round tube instead of tracing the thigh and calf; it gets
+stronger below the knee.
+
+Under the jacket the pant legs shrink to a slim lining (`covered()` in garments.js), so the seat never
+bulges through a jacket's back hem. Below the jacket hem, covered skin (the crotch between the legs)
+takes the pants colour (`uJHem` in bodyMaterial).
+
+**Parameters of a jacket fit** (`FITS[fit]`; a garment is `jacketCut(fit, overrides)`):
+
+| key | meaning |
+|---|---|
+| `hemFront`, `hemBack` | hem height at the centre front and back (back lower = drop tail) |
+| `hemFlare` | + flares the last 12 cm out; − pulls the hem in (rib or drawcord) with the fabric blousing above |
+| `torso.chest / waist / hem` | `[half width, front depth, back depth]` from the body's centre line at 1.38, 1.12 and the hem; `torso.n` = superellipse exponent (2 = round, 3 = boxy) |
+| `shoulder`, `shoulderY` | extra stand-off near the neck; height where the shoulder line starts rounding off to the neck (default 1.43) |
+| `sleeve {upper, elbow, forearm, cuff}`, `sleeveEnd` | target sleeve radius at \|x\| 0.30, 0.46, 0.58 and the cuff; cuff position (wrist 0.706) |
+| `collarTop`, `collarEase` | collar height and stand-off |
+| `hood`, `hoodRoll` | `'down'` (collapsed hood, `[thickness, height above the neckline, drop down the back]`), `'up'` (over the helmet), `'hoodie'`, `'none'` |
+| `folds` | drape / fold amplitude (shell 1, slim 0.75, puffer 0.3, cotton 1.3) |
+| `quilt {pitch, depth}` | horizontal baffles (null = flat fabric) |
+| `kangaroo` | bulge of a front kangaroo pocket (m) |
+| `style` | shader layout: 0 shell, 1 anorak, 2 puffer, 3 hoodie, 4 one-piece (`uFit.x`) |
+| `gaiter`, `gaiterTop` | fleece gaiter pulled up under the goggle |
+
+**How the torso is built** (garments.js, jacket body). The second pass came out of integration review:
+the shoulders and chest were still too broad, and muscles showed on the back.
+1. **Every ring is the fit's superellipse, the yoke included.** From `shoulderY` (1.43) to the neckline,
+   the half width and both depths round off to the neck `[0.085, 0.076, 0.072]` along a quarter-ellipse.
+   This makes a soft, slightly dropped shoulder line: the fabric bridges from the neck to the upper arm
+   instead of hugging the deltoids and traps. The chest is no longer sculpted, and the torso is a
+   straight to slightly A-line column from the armpit to the hem.
+2. **The back may only shrink 12 cm per metre below 1.5**, so it hangs straight from the shoulder blades.
+3. **The shell never comes closer than 5.8 cm inside the unshrunk skin** (`MIN`). On the shoulder tops
+   the limit is 3.6 cm, because the clavicles lift there in a crouch.
+   - The body material pulls covered jacket-zone skin in by about 6.2 cm (`2.8 × uShrink`). It collapses
+     the arms toward their axis from |x| 0.12, so the superhero deltoids stay inside the dropped shoulder.
+   - The limit is max-filtered around the ring (±5 segments), so the shell bridges the grooves between
+     the muscles instead of showing them.
+4. **Skinning.** The jacket's weights are smoothed 24 times over the grid (other pieces use 6), so the
+   back panel bends as one sheet: no spine groove and no shoulder-blade dents in a crouch.
+   `weightFloor` makes the front of the hem below the crotch follow the thighs (up to 80 %), so long
+   hems lift and bunch over the legs in crouches and grabs instead of being cut by them.
+5. **Folds and hem.**
+   - Folds: vertical drape folds growing toward the hem, flutes in the free-hanging bottom, light
+     tension folds from the armpit.
+   - Hem: a slight blouse 6–15 cm above it, and a rib or drawcord pull for negative `hemFlare`.
+
+Sleeves are relaxed tubes. The target radius barely tapers from the upper arm to the cuff, with a gentle
+elbow fold and a stack at the wrist. A sleeve is never thinner than the collapsed arm (`bodyMaterial`
+pulls the arm 60 % toward its axis). Near the armhole its top stays under the dropped shoulder line.
+Gauntlets open just over the sleeve (`gauntlet[1]` = clearance).
+
+Shell hoods (`hood: 'down'`) are a collapsed helmet hood with volume. `hoodRoll = [thickness, height
+above the neckline, drop down the back]`, piled up behind the neck under the helmet and thinning toward
+the collar at the sides. The hoodie's hood is a softer, longer lobe lying down the back.
 ## Files
 
 ```
@@ -96,7 +258,15 @@ hooks, so they sit in the same light as the terrain:
   Charlie sheen (matte nylon fuzz) + a broad GGX lobe + grazing sky sheen (brighter rims). Leather mitts,
   fleece gaiter (heathered knit with a topographic contour print) and nylon gauntlets change
   roughness / sheen / spec per piece.
-- **bodyMaterial**: shrink + garment colours + glossy boots.
+  Per fit (`uFit.x` = the fit's `style`):
+  - shell: yoke, side panels, chest and hand pocket zips, pit zips, hem drawcord; 3-layer face = rough 0.7, spec 0.34, sheen 0.26;
+  - anorak: half zip, kangaroo pocket with a zip across it, horizontal chest pocket, side zip;
+  - puffer: baffle stitch lines matching the geometry, ripstop sheen (rough 0.48, spec 0.6), elastic hem binding;
+  - hoodie: cotton fleece (rough 0.95, spec 0.03, fuzzy sheen), kangaroo pocket, rib hem and cuffs,
+    drawcords with aglets, a chest print; the collar shows the shell underneath in the panel colour;
+  - one-piece: waist belt with a buckle.
+- **bodyMaterial**: shrink + garment colours + glossy boots. Below `uJHem` (the jacket hem + 12 cm),
+  covered skin takes the pants colour.
 - **helmetMaterial**: hybrid shell (matte top over a glossier lower band split by a parting groove),
   vent slots with bevels, ear pads, liner, padded strap with wordmarks.
 - **lensMaterial**: mirror: a sky → horizon → snow environment (with a procedural mountain skyline and
@@ -114,9 +284,9 @@ wrinkle detail fades out by itself with distance.
 
 | slot | default | what the cut / shape controls |
 |---|---|---|
-| jacket | `tuff-shell`, `storm-shell` | `hemFront`, `hemBack` (hem height above the ground, see below), `hemFlare`, `jacketEase {shoulder, chest, hem}`, `sleeveEase {upper, elbow, forearm}`, `sleeveEnd`, `collarTop`, `hood: 'down' \| 'up'`, `gaiter`, `gaiterTop` |
-| pants | `tuff-bib` | `pantsEase {thigh, knee, cuff}`, `cuffY`, `stack {y0, y1, n, amp}` |
-| gloves | `tuff-mitt` | `mittLength` (|x| where the fist ends; wrist at 0.706), `gauntlet [start |x|, ease at the open end]` |
+| jacket | `tuff-shell`, `storm-shell`, `retro-suit`, `ridge-shell`, `tall-anorak`, `cloud-puffer`, `layer-hoodie` | a fit from `FITS` plus overrides: `jacketCut(fit, {…})`; see § Fits for every key |
+| pants | `tuff-bib`, `cargo-pant`, `wide-pant` | `PANT_FITS`: `pantsEase {thigh, knee, cuff}`, `straight`, `cuffY`, `stack {y0, y1, n, amp}` |
+| gloves | `tuff-mitt`, `pipe-glove` | `mittLength` (|x| where the fist ends; wrist at 0.706), `gauntlet [start |x|, clearance over the sleeve at the open end]` |
 | helmet | `tuff-helmet` | `shape {width, front, back, top, brim}` |
 | goggles | `tuff-goggle` | `shape {width, height, radius}` |
 
@@ -131,7 +301,9 @@ helmet {base, liner, accent}, goggles {lens, lensBase, strap, strapLogo}, gloves
 | `arcade` | retro park: teal + magenta, cream pants, white helmet, violet lens, yellow mitts |
 | `summit` | pro team: brick red under a black yoke, white helmet, sapphire lens |
 
-**Jacket length.** `hemFront` / `hemBack` are the hem's height above the ground in the bind pose
+**Jacket length** (history of the first shell; the October 2026 fits are in § Fits; with the slimmer
+cut a longer hem no longer reads as a coat, so the relaxed shell went back to 0.785 / 0.76 and the anorak
+to 0.72 / 0.70). `hemFront` / `hemBack` are the hem's height above the ground in the bind pose
 (1.8 m rider: hip joint 0.97, crotch ≈ 0.86, knee 0.54). `hemBack` below `hemFront` drops the back (a
 dropped tail), above it lifts the back; the difference is level across the back third and changes over
 the sides. The default shell has a **level hem at 0.84**: the upper thigh in front, the seat behind.
@@ -164,8 +336,11 @@ helmet: a shell offset 1.9 cm off the helmet surface (`helmetFit()` in helmet.js
 over the goggle, the face opening running down behind the goggle's sides, rigid on the head above the
 jaw and blended into the neck below; it replaces the stowed hood roll.
 
-**Catalog.** `profile/catalog.js` registers one clothing item per garment (`helmet-tuff`,
-`goggles-tuff`, `jacket-tuff-shell`, `jacket-tuff-shell-hood`, `gloves-tuff-mitt`, `pants-tuff-bib`) with
+**Catalog.** `profile/items.js` (CLOTHING_ITEMS) lists one clothing item per garment, and
+`profile/catalog.js` registers them: `helmet-tuff`, `goggles-tuff`, `jacket-tuff-shell`,
+`jacket-tuff-shell-hood`, `jacket-retro-suit`, `jacket-ridge-shell`, `jacket-tall-anorak`,
+`jacket-cloud-puffer`, `jacket-layer-hoodie`, `gloves-tuff-mitt`, `gloves-pipe`, `pants-tuff-bib`,
+`pants-cargo`, `pants-wide`, and the face items. Each item has
 `model: { kind: 'outfit', ref: <garment id> }` and one variant per colourway (`variant.id` = colourway id,
 `variant.colors` = that slot's colours). The profile stores `{ item, variant }` per slot as before.
 
@@ -184,18 +359,22 @@ the HDR sun).
 
 ### Add a garment (a new cut)
 ```js
-// outfits.js
-GARMENTS.jacket['long-anorak'] = {
-  name: 'Long Anorak', blurb: 'Knee-length pullover, extra roomy.',
-  cut: { ...GARMENTS.jacket['tuff-shell'].cut, hemFront: 0.56, hemBack: 0.52,
-         jacketEase: { shoulder: 0.02, chest: 0.05, hem: 0.08 } },
-};
-// profile/catalog.js: add it to CLOTHING (or registerItem it yourself)
-registerItem({ id: 'jacket-long-anorak', name: 'Long Anorak', slot: 'jacket', brand: NW,
-  variants: Object.entries(COLORWAYS).map(([cw, c]) => ({ id: cw, name: c.name, colors: c.jacket })),
-  model: { kind: 'outfit', ref: 'long-anorak' }, unlock: { type: 'distance', value: 50000 } });
+// outfits.js: start from the nearest fit and override what differs
+'knee-anorak': {
+  name: 'Knee Anorak', blurb: 'Knee-length pullover, extra roomy.',
+  cut: jacketCut('anorak', { hemFront: 0.6, hemBack: 0.58,
+    torso: { waist: [0.252, 0.17, 0.174], hem: [0.26, 0.176, 0.182] }, sleeve: { upper: 0.08 } }),
+},
+// profile/items.js: an item in CLOTHING_ITEMS with skins in the case series
+{ id: 'jacket-knee-anorak', slot: 'jacket', garment: 'knee-anorak', name: 'Knee Anorak', unlock: 'case',
+  variants: [{ id: 'bone', name: 'Bone', rarity: 'common', series: 'night-park',
+    colors: { base: '#e8e2d4', panel: '#c8b28a', accent: '#4a3328', gaiter: '#c8b28a', style: 0 } }] },
 ```
-The rider builds that cut the first time it is worn (about 50–150 ms) and caches it.
+The rider builds that cut the first time it is worn (about 120–160 ms) and caches it. Check it with
+`outfit-turntable.mjs` (stand, crouch, carve; front, side, back), `outfit-ingame.mjs` (tuck, air grab,
+first person) and `outfit-measure.mjs`, then run `node web/scripts/unittest.mjs` (item data, odds,
+reachability). A new silhouette family (not just new numbers) gets an entry in `FITS` with a `style`,
+and a branch in `fabricMaterial()` if it needs its own seams, pockets or fabric.
 
 ### Add a new kind of piece (e.g. a backpack, a hood-up variant)
 1. Build it in `garments.js` (with `bodyRings` + `sweep`, or your own rings with `sweepFrames`), give it
@@ -230,6 +409,18 @@ first load, shared by both riders) and adds two draw calls (outfit + lens) to th
 The shorter jacket (October 2026) has the same vertex count (rings per piece are fixed): outfit 0.10 + 0.03 ms
 per draw after vs 0.09 + 0.04 ms before, whole frame 13.9 ms GPU at quality 1 before and after (best runs).
 
+The modern fits (October 2026, second pass) keep the same mesh budget: every fit has the same ring counts.
+With the default face gaiter and mitts:
+- `tuff-shell`, `ridge-shell`, `tall-anorak`, `layer-hoodie` and `retro-suit`: 15 915 vertices / 30 084 triangles;
+- `cloud-puffer` (no hood roll): 15 345 / 29 040;
+- `storm-shell` (hood up): 17 360 / 32 880.
+
+That is identical to before, still one skinned draw plus one shadow draw. Each cut takes 120–160 ms to
+build on first wear, then it is cached. The fabric shader gained a per-fit branch (uniform `uFit`, a
+few lines per pixel), and the vertex shader is unchanged. GPU timer queries aren't available in headless
+Chrome on the MacBook (Metal), so the per-draw cost was not re-timed. Re-measure on the Surface with
+`gfxgpu.mjs` if in doubt.
+
 No new asset files: everything is generated in code, so CREDITS.md is unchanged.
 
 ## Known issues / limits
@@ -239,6 +430,15 @@ No new asset files: everything is generated in code, so CREDITS.md is unchanged.
 - In a deep crouch the thighs pass in front of the jacket's front hem instead of lifting it (the shell
   doesn't collide with the legs). The shorter hem makes this much smaller than it was, and it reads as the
   hem tucked behind the thighs. From the front, the back hem shows between the legs as a thin olive edge.
+- Modern fits:
+  - The long cuts (anorak 0.72, hoodie 0.75) ride up over the thighs in a deep crouch or grab, because
+    the shell doesn't collide with the legs. Seen from behind in a crouch, the seat rounds the back hem.
+  - The bib's top (chest panel, braces) is never modelled, since every jacket covers it.
+  - The hoodie's hood is a soft lobe on the back, not a real hood opening.
+  - The folds are static bind-pose geometry plus shader wrinkles; there is no cloth simulation.
+  - The superhero back can still show faint muscle relief through the slim shell's upper back.
+- Item icons for the new garments come from the existing icon baker (pieces by slot); another
+  worker rebalances the icon framing.
 - The hood worn up is rigid on the head; it doesn't sway or crease with fast head turns.
 - The goggle reflection is a stylised environment (sky gradient, skyline, snow), not a real reflection
   of the scene.
