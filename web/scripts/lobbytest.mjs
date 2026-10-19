@@ -91,6 +91,10 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   ok(/lb-ride/.test(s.focus), 'Ride button has focus');
   ok(s.stageInWorld && s.stageShown && s.stageActive && !s.riderShown, 'lobby stage stands in the world (game rider hidden)');
   ok(await page.evaluate(() => { const s = window.__sendit; return s.camera.position.distanceTo(s.stage.focusPoint) < 20; }), 'world camera frames the lobby stage');
+  // Design v2 (docs/lobby.md → Navigation): the lobby opens on Home; Equipment lives under Locker.
+  ok(s.tab === 'home' && await page.evaluate(() => document.querySelectorAll('.hm-tile').length >= 2), 'opens on Home with its tiles');
+  await page.click('.lb-tab[data-tab=locker]');
+  ok((await state(page)).tab === 'equipment' && await page.evaluate(() => !!document.querySelector('.lb-sub[data-tab=locker]')), 'Locker opens on Gear (Equipment) with a Skins sub-tab');
 
   await page.click('.eq-opt[data-type=snowboard]');
   await page.waitForFunction(() => window.__sendit.stage.pl?.equipment?.type === 'snowboard' && window.__sendit.stage.gearMode === 'native', null, { timeout: T });
@@ -104,6 +108,7 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   await countFrames(page);
   s = await state(page);
   ok(s.equipment === 'snowboard', 'snowboard persists across reload');
+  await page.evaluate(() => window.__sendit.lobby.select('equipment'));
   await page.waitForFunction(() => window.__sendit.stage.pl?.equipment?.type === 'snowboard' && window.__sendit.stage.gearMode === 'native', null, { timeout: T });
   ok(await page.getAttribute('.eq-opt[data-type=snowboard]', 'aria-pressed') === 'true', 'toggle shows the saved choice');
 
@@ -135,8 +140,12 @@ const shot = async (page, name) => { if (shotDir) await page.screenshot({ path: 
   ok(await page.evaluate(() => document.body.classList.contains('device-gamepad')), 'hints switch to gamepad glyphs');
   await page.evaluate(() => { window.__padOn = false; });
 
+  // Esc goes back to Home.
+  await page.keyboard.press('Escape');
+  ok((await state(page)).tab === 'home', 'Esc returns to Home');
+  await page.evaluate(() => window.__sendit.lobby.select('equipment'));
   // Every tab mounts without errors.
-  for (const id of ['cases', 'locker', 'maps', 'multiplayer', 'leaderboards', 'profile', 'settings', 'equipment']) {
+  for (const id of ['home', 'cases', 'locker', 'maps', 'multiplayer', 'leaderboards', 'profile', 'settings', 'equipment']) {
     await page.evaluate((t) => window.__sendit.lobby.select(t), id);
     await page.waitForTimeout(150);
     const html = await page.evaluate(() => document.querySelector('.lb-panel').innerText.length);

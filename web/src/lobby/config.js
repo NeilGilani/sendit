@@ -43,3 +43,31 @@ export const TURNTABLE = {
   returnDelay: 7,                // s idle before easing back to the hero angle
   returnRate: 0.9,
 };
+
+/**
+ * Navigation (docs/lobby.md → Navigation). Five destinations in the top bar; tabs registered without a
+ * `group` / `nav` of their own are placed by NAV.tabs, and anything else becomes a destination of its
+ * own (so a new tab always shows up). Every feature is at most two clicks away: destination → sub-tab.
+ */
+export const NAV = {
+  groups: [
+    { id: 'home', label: 'Home', icon: 'home', order: 0 },
+    { id: 'locker', label: 'Locker', icon: 'character', order: 10 },
+    { id: 'cases', label: 'Cases', icon: 'crate', order: 15 },
+    { id: 'maps', label: 'Mountains', icon: 'maps', order: 30 },
+    { id: 'career', label: 'Career', icon: 'career', order: 45 },
+  ],
+  tabs: {
+    home: { group: 'home' },
+    equipment: { group: 'locker', short: 'Gear' },
+    locker: { group: 'locker', short: 'Skins' },
+    cases: { group: 'cases' },
+    maps: { group: 'maps' },
+    progress: { group: 'career', short: 'Progress' },
+    leaderboards: { group: 'career', short: 'Leaderboards' },
+    profile: { group: 'career', short: 'Profile' },
+    multiplayer: { nav: 'utility', short: 'Friends' },
+    settings: { nav: 'utility' },
+  },
+  home: 'home',          // where the lobby opens on a fresh profile and after every ride
+};
