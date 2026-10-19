@@ -108,7 +108,7 @@ body.device-touch .lb-key { display: none; }
 #lobby .lb-tab:hover svg { transform: translateY(-2px) rotate(-6deg); }
 #lobby .lb-tab.on { color: var(--c-paper-ink); }
 #lobby .lb-tab.on svg { color: var(--c-signal); transform: none; }
-#lobby .lb-tab:focus-visible { outline-offset: -2px; box-shadow: none; }
+#lobby .lb-tab:focus-visible { outline: 2px solid var(--c-signal); outline-offset: 0; box-shadow: none; }
 #lobby .lb-tab.soon:not(.on) { color: var(--c-snow-3); }
 /* Count badges (cases ready, new skins): patrol-red tag that pops when the number goes up. */
 #lobby .lb-badge { position: absolute; top: -0.35em; right: -0.35em; z-index: 2; min-width: 1.5em; height: 1.5em; padding: 0 0.35em; display: grid; place-items: center;
@@ -339,6 +339,19 @@ body.device-touch .lb-key { display: none; }
 .eq-note { margin: 0.9em 0 0; padding: 0.7em 0.9em; border-radius: var(--r1); font-size: 0.82em; line-height: 1.45; color: var(--c-snow);
   background: rgba(243, 193, 75, 0.08); border-left: 3px solid var(--c-gold); }
 
+/* ---------------------------------------------------------------- the chunky recipe on other tabs' primary controls
+   (Cases' Open, mountain cards, trail rows). Kept here so the tabs' own CSS stays about layout. */
+#lobby .cs-open:not(:disabled) { --lipc: var(--c-gold-lip); border-radius: var(--r2); background: linear-gradient(180deg, #ffd977 0%, var(--c-gold) 60%);
+  box-shadow: 0 var(--lip) 0 var(--lipc); margin-bottom: var(--lip); }
+#lobby .cs-open:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 calc(var(--lip) + 2px) 0 var(--lipc); background: linear-gradient(180deg, #ffe08a 0%, #f7c955 60%); }
+#lobby .cs-open:not(:disabled):active { transform: translateY(calc(var(--lip) - 1px)); box-shadow: 0 1px 0 var(--lipc); transition-duration: 40ms; }
+#lobby .cs-all { border-radius: var(--r2); }
+#lobby .mt-card { box-shadow: 0 var(--lip) 0 var(--c-ink-lip); transition: transform var(--t1) var(--e-out), box-shadow var(--t1), border-color var(--t1), background-color var(--t1); }
+#lobby .mt-card:hover { transform: translateY(-3px); box-shadow: 0 calc(var(--lip) + 3px) 0 var(--c-ink-lip); }
+#lobby .mt-card:active { transform: translateY(calc(var(--lip) - 1px)); box-shadow: 0 1px 0 var(--c-ink-lip); transition-duration: 40ms; }
+#lobby .mt-card.here { box-shadow: 0 var(--lip) 0 var(--c-signal-lip), inset 0 3px 0 var(--c-signal); }
+.mt-grid { padding-bottom: var(--lip); row-gap: calc(0.6em + var(--lip)); }
+
 /* ---------------------------------------------------------------- maps tab: tabs/maps.css */
 .mp-loading { font-size: 0.82em; color: var(--c-snow-2); }
 
@@ -443,7 +456,7 @@ body.device-touch .lb-ride-key { display: none; }
 #lobby .lb-mode-seg button small { font: 500 0.58em/1.1 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: inherit; opacity: 0.85; white-space: nowrap; }
 #lobby .lb-mode-seg button:hover { color: var(--c-snow); background: rgba(255,255,255,0.05); }
 #lobby .lb-mode-seg button[aria-checked="true"] { color: var(--c-paper-ink); background: var(--c-snow); box-shadow: inset 0.25em 0 0 var(--c-signal); }
-#lobby .lb-mode-seg button:focus-visible { outline-offset: -3px; box-shadow: none; }
+#lobby .lb-mode-seg button:focus-visible { outline: 3px solid var(--c-signal); outline-offset: -3px; box-shadow: none; }
 .lb-medal { display: inline-block; width: 0.75em; height: 0.75em; margin-left: 0.3em; border-radius: 50%; vertical-align: -0.05em; box-shadow: 0 0 0 1px rgba(0,0,0,0.4); }
 .lb-medal.gold { background: var(--c-gold); } .lb-medal.silver { background: #c9d1da; } .lb-medal.bronze { background: #c98a52; }
 
@@ -487,7 +500,7 @@ body.device-touch .lb-ride-key { display: none; }
   .lb-ink::before { transform: none; border-radius: 0 0 2px 2px; background: var(--c-signal); box-shadow: none; }
   #lobby .lb-tab.on { color: var(--c-snow); }
   #lobby .lb-tab.on svg { transform: translateY(-1px); }
-  .lb-side { grid-column: 1; grid-row: 3; max-height: 40vh; }
+  .lb-side, #lobby:not(.lb-home) .lb-side { grid-column: 1; grid-row: 3; max-height: 40vh; }
   .lb-panel { padding: 0.9em 1em; }
   .lb-subnav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   #lobby .lb-sub { flex: none; }
