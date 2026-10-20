@@ -504,3 +504,36 @@ have your kicker, so the clip brings its own snow:
   debug views.
 - `MAC=1 node web/scripts/clips-perf.mjs <url>`: the recorder's per-frame cost, frame times around a save,
   and 34 saves in a row (the cap holds, the heap stays flat).
+
+## Round 5 — launch polish (night 3, 2026-10-19/20)
+
+**The "heavy bokeh snowflakes" were not snowflakes.** The grade's first-person goggle lens (`lensFx`, snow flecks
+on the lens with refraction colour fringes) defaulted to `new THREE.Vector4()` — which is `(0, 0, 0, 1)`, so
+`w = 1`: full lens snow. The game clears it every frame (`post.setLens`), but the loading scene never did, so
+every loading shot, still and highlight thumbnail was covered in soft discs with rainbow rims (the "lens-ghost
+glints" on the night shots). Fixed at the source (`gfx/post.js`: default `(0, 0, 0, 0)`) and in the loading
+scene (`lensFx` cleared in `setupPost`). Found with `?loaddebug=no:bloom,grade,grain,smaa,snow,powder,sparkle`
+(switch parts of the frame off one at a time).
+
+Also toned down:
+
+| | before | after |
+|---|---|---|
+| real lens ghosts | 0.035, also with the sun just off-screen and from the moon | 0.45 × that, only while the sun is in frame, none at night |
+| snow bokeh | discs grew without limit near the lens, hard rim | capped at 3.2 × an in-focus flake, alpha ∝ 1 / area, soft edge, nothing within 0.7 m |
+| ice glints in the powder | up to 7.5 × sun (bloomed into coloured discs) | up to 3.3 × sun |
+| landing / slash mist | white-out when a close move ended in the cloud (storm, highlights) | puffs fade by on-screen size near the lens; landing cloud 220 puffs (was 300), carried slower so the rider rides out |
+| night mist | darker than the moonlit snow (grey smoke) | floored near lit-snow brightness |
+| CSS snow over the still | big layer at 50 % | 28 %, smaller discs |
+
+**Framing.** Every move is now planned up to five times (three framings of the chosen move, then two other
+moves) and scored by `shots.js terrainScore`: snow between lens and rider (+2), the camera tucked against a
+slope rising beside it (+1), crowding the rider (< 3.2 m, +1), and a snow wall within 15 m behind the rider
+(+1: the rider pressed against a gully wall). Highlights add it to the tree score (`clip.js scoreMove`).
+Shot info carries `frameScore`. The close orbit keeps 1.8 m (was 1.2 m) above the snow. `Shot.comAt(t)`
+gives the centre of mass on the in-run / ride-out too (for planning). Over 40 seeds × every trick (Node,
+the move's own time window): hero moves with the rider hidden 8 % → 0 %, orbit 44 % → 21 %, tele 80 % → 51 %
+(and those now fall back to another move), low 27 % → 20 %.
+
+**Stills** re-rendered on the final rider (in-between body, re-cut jackets): `assets/loading/*.webp`, 2.9 MB.
+Before / after sheets and capture rounds: `/tmp/claude-501/n3-visuals/` on the MacBook (not in the repo).

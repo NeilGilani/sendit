@@ -77,6 +77,13 @@ export class Shot {
 
   /** Ballistic COM at air time t (no drag; slow-mo hides it). */
   com(t, out) { return out.copy(this.p0).addScaledVector(this.v0, t).add(_v3.set(0, -0.5 * G * t * t, 0)); }
+  /** Centre of mass at any shot time (in-run, air, ride-out) without posing anything (camera planning). */
+  comAt(t, out) {
+    if (t < 0) { const z = -this.v0.z * -t, x = this.v0.x * t; return out.set(x, this.H(x, z) + this.pivot, z); }
+    if (t < this.Ta) return this.com(t, out);
+    const o = this.out[Math.min(this.out.length - 1, Math.floor((t - this.Ta) * 60))];
+    return out.set(o.x, this.H(o.x, o.z) + this.pivot, o.z);
+  }
 
   /** Real-time rate of the speed ramp at real time t (1 = real speed). */
   rate(t) {
