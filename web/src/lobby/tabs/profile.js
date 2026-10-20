@@ -17,10 +17,10 @@ registerLobbyTab({
       const me = ctx.services.identity.current();
       el.innerHTML = `
         <h2 class="lp-title">Profile</h2>
-        <p class="lp-sub">${me.isGuest ? 'Guest profile saved on this device. Accounts are coming soon.' : `Signed in with ${esc(me.provider)}`}</p>
+        <p class="lp-sub">${me.isGuest ? 'Your rider and stats, saved in this browser.' : `Signed in with ${esc(me.provider)}`}</p>
         <form class="pf-name" autocomplete="off">
           <label for="pf-name">Rider name</label>
-          <div class="pf-row"><input id="pf-name" type="text" maxlength="24" value="${esc(p.displayName)}" spellcheck="false" /><button type="submit" class="lp-btn">Save</button></div>
+          <div class="pf-row"><input id="pf-name" type="text" maxlength="24" aria-describedby="pf-name-hint" value="${esc(p.displayName)}" spellcheck="false" /><button type="submit" class="lp-btn">Save</button></div>
         </form>
         <div class="pf-stats">
           ${[
@@ -34,7 +34,7 @@ registerLobbyTab({
             ['Time riding', fmtDuration(s.playTime)],
           ].map(([k, v]) => `<div class="pf-stat"><small>${k}</small><b>${esc(v)}</b></div>`).join('')}
         </div>
-        <p class="lp-hint">Profile v${p.version} · ${esc(me.id.slice(0, 14))}</p>`;
+        <p class="lp-hint" id="pf-name-hint">Your name shows on your lift ticket, in Rankings and on challenge links you send.</p>`;
       el.querySelector('.pf-name').addEventListener('submit', (e) => {
         e.preventDefault();
         const v = el.querySelector('#pf-name').value.trim();

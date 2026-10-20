@@ -119,7 +119,7 @@ export function mountProgressionUi({ juice }) {
   on('cleanRun', () => juice?.hud?.callout('CLEAN RUN · NO CRASHES', '#2ff5d6'));
   on('challengeDone', () => sfx('medal', 0.55, 1.25));
   on('personalBest', () => { if (game.mode === Mode.RIDING) sfx('combo_bank', 0.45, 1.3); });
-  on('achievement', (a) => toast({ kind: 'Achievement unlocked', title: a.title, sub: `${a.desc}${a.xp ? ` · +${a.xp} XP` : ''}`, icon: a.icon || '★', c1: '#ffe14d', c2: '#ff9a3d', hold: 4.2 }));
+  on('achievement', (a) => toast({ kind: 'Achievement unlocked', title: a.title, sub: `${a.desc}${a.xp ? ` · +${a.xp} XP` : ''}`, icon: toastGlyph(a.icon), c1: '#ffe14d', c2: '#ff9a3d', hold: 4.2 }));
   on('challengeDone', ({ challenge: c }) => toast({ kind: 'Daily complete', title: c.title, sub: `+${c.xp} XP`, icon: '✓', c1: '#2ff5d6', c2: '#7a5cff', progress: 1, hold: 4.2 }));
   on('weeklyDone', ({ challenge: c }) => { sfx('medal', 0.8, 0.95); toast({ kind: 'Weekly complete', title: c.title, sub: `+${c.xp} XP`, icon: '★', c1: '#ffe14d', c2: '#ff5fb0', progress: 1, hold: 5 }); });
   on('dailySweep', ({ xp }) => toast({ kind: 'All dailies done', title: 'Clean sweep!', sub: `+${xp} XP · new ones at midnight`, icon: '✦', c1: '#ff9a3d', c2: '#ff3d9a', hold: 4.6 }));
@@ -203,3 +203,8 @@ function nextUnlockText(level) {
   const p = progression.getProgress();
   return `${p.xp.toLocaleString('en-US')} XP · ${(p.need - p.into).toLocaleString('en-US')} TO LEVEL ${level + 1}`;
 }
+
+// No colour emoji on screen (docs/lobby.md → Iconography): glyphs with a text form get the text-presentation
+// selector; the four that only exist as colour emoji get a plain symbol.
+const NO_TEXT_FORM = { '🥇': '◉', '📚': '❏', '📖': '❏', '🌲': '⇞' };
+function toastGlyph(g = '★') { return NO_TEXT_FORM[g] || `${g}\uFE0E`; }

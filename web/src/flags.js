@@ -16,7 +16,7 @@ const ENV = (typeof import.meta !== 'undefined' && import.meta.env) || null;
 export const DEBUG = !!ENV && ENV.MODE !== 'production';
 
 /** Query keys every build honours (player-facing, shareable). */
-export const PUBLIC_FLAGS = Object.freeze(['map', 'trail', 'ride', 'challenge', 'vs', 'equip', 'stance', 'quality', 'resort', 'run']);
+export const PUBLIC_FLAGS = Object.freeze(['map', 'trail', 'ride', 'challenge', 'vs', 'equip', 'stance', 'quality', 'resort', 'run', 'howto']);
 
 /**
  * The page's query as URLSearchParams, with dev / debug keys removed unless DEBUG. `search` defaults

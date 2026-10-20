@@ -70,7 +70,7 @@ mountain by reload â†’ riding; URL cheats ignored; no console errors, no HTTP â‰
 
 | Kind | Flags | Public build |
 |---|---|---|
-| Shareable / player-facing | `?map` `?trail` `?ride` `?challenge` `?vs` (versus links) `?equip` `?stance` `?quality` `?resort` `?run` | honoured |
+| Shareable / player-facing | `?map` `?trail` `?ride` `?challenge` `?vs` (versus links) `?equip` `?stance` `?quality` `?resort` `?run` `?howto` `?howto=0` (How to ride cards, lobby/help.js) | honoured |
 | Cheats | `?casegrant` `?caseforce` `?caseseries` `?variant` (wear any gear model) | **ignored** |
 | Dev / capture | `?proto` `?protobody` `?iconrebake` `?noicons` `?kicker` `?at` `?ragdoll=0` `?cam` `?atmo` `?sun` `?tm` `?exposure` `?goggles` `?shaderdebug` `?audiodebug` `?autoq` `?loadhold` `?loadnohold` `?loadscene` `?loadwhy` `?loadseed` `?loadclip` `?loadtrick` `?loadcam` `?loadtod` `?loadgear` `?loadmtn` `?loaddebug` `?loadq` `?loadfreeze` `?loadtrees` `?loadstill` `?nostill` | **ignored** |
 

@@ -161,10 +161,10 @@ registerLobbyTab({
         <div class="pg-adet">Hover or select a badge to see what it takes.</div>
         <div class="pg-h">Trick book <small>${book.length} landed</small></div>
         <div class="pg-book">${book.length ? book.sort((a, b) => b.n - a.n).slice(0, 14).map((t) => `<span title="landed ${t.n}×">${esc(t.name)}</span>`).join('') : '<small>Land tricks to fill the book: every new one pays XP.</small>'}</div>
-        <div class="pg-h">Map mastery <small>★ ridden · ★ clean run · ★ ×4 combo</small></div>
+        <div class="pg-h">Mountain mastery <small>★ ridden · ★ clean run · ★ ×4 combo</small></div>
         <div class="pg-maps">${maps.map((m) => { const st = progression.getMapStars(m.id); return `<div class="pg-map"><span>${esc(m.name)}</span><b>${st.stars.map((x) => `<i class="${x ? 'on' : ''}">★</i>`).join('')}</b></div>`; }).join('')}</div>
         ${spotsHtml(mapId, ctx.maps?.current?.()?.map?.name)}
-        <div class="pg-h">Personal bests <small>${esc(ctx.maps?.current?.()?.map?.name || 'this map')}</small></div>
+        <div class="pg-h">Personal bests <small>${esc(ctx.maps?.current?.()?.map?.name || 'this mountain')}</small></div>
         <div class="pg-pb">${Object.entries(PB_STATS).map(([k, S]) => `<span>${S.label}</span><b>${pb[k] ? S.fmt(pb[k]) : '—'}</b>`).join('')}</div>`;
       const det = el.querySelector('.pg-adet');
       const showAch = (i) => { const a = ach[i]; if (a) det.innerHTML = `<b>${esc(a.title)}</b> · ${esc(a.desc)}${a.xp ? ` · +${n(a.xp)} XP` : ''}${a.unlocked ? ' · <i>unlocked</i>' : ''}`; };
