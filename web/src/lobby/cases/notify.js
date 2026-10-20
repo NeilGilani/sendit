@@ -67,7 +67,14 @@ export function installCaseNotifications() {
   });
   on('profile', soon);
   on('lobbyTabs', soon);
-  on('mode', soon);
+  on('mode', (m) => {
+    soon();
+    // Back in the lobby: a ride's progress cards go (the bar lives on Home / Cases and they would sit over the
+    // panels, e.g. Career › Highlights' first play button); a "Case earned!" card stays and moves to the top right.
+    if (m !== Mode.MENU || !stack) return;
+    stack.classList.remove('ride');
+    for (const n of stack.querySelectorAll('.cn:not(.case)')) n.remove();
+  });
   soon();
   // A case that dropped while the page was closed (e.g. the ride ended on pagehide) still shows.
   if (profileStore.unopened.length) setTimeout(badges, 500);

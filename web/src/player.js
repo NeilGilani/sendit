@@ -30,7 +30,12 @@ export class Player {
     this.flow = terrain && terrain.course !== undefined && P.flow?.enabled ? new Flow(this) : null;   // SSX-style energy layer (opt-in)
     // Maps with drop zones say so once the ride is under way.
     if (terrain?.course?.dropZones?.length && typeof document !== 'undefined') {
-      on('rideStarted', () => setTimeout(() => emit('hint', `Drop zones: keys 1–${Math.min(9, terrain.course.dropZones.length)} or d-pad ◀ ▶`), 5000));
+      on('rideStarted', () => setTimeout(() => {
+        // Keys and a d-pad only: a touch screen has neither, so phones get no hint (it sat on the combo panel).
+        const dev = this.input?.device;
+        if (dev === 'touch') return;
+        emit('hint', dev === 'gamepad' ? 'Drop zones: d-pad ◀ ▶' : `Drop zones: keys 1–${Math.min(9, terrain.course.dropZones.length)} or d-pad ◀ ▶`);
+      }, 5000));
     }
     this.grind = terrain?.course?.rails?.length ? new Grind(this, terrain.course.rails) : null;   // rails, boxes, tubes (opt-in: course.rails)
     if (terrain?.course?.onPlayer) terrain.course.onPlayer(this);   // a map's own per-rider hooks (opt-in)
