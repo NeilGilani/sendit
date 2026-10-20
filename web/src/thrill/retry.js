@@ -15,7 +15,7 @@ export function installRetry({ player, input, activities, ui, cam }) {
   const C = THRILL.retry, R = THRILL.restart;
   // The trail's clock is the distance ridden (m), so the lead doesn't depend on the frame rate or hit-stop.
   const trail = new RetryTrail(C.keep);
-  let clock = 0, sampleAt = 0, lead = 30, pendingLead = 30;
+  let clock = 0, sampleAt = 0, lead = 30, pendingLead = 30, pendingSeg = 0;
   const last = { x: 0, z: 0, ok: false };
 
   /** Black flash, action, back in. Keeps the player's own fade-lock (_busy) so nothing double-fires. */
@@ -75,19 +75,19 @@ export function installRetry({ player, input, activities, ui, cam }) {
   const mark = (air = 9) => {
     // A bounce off the landing right after a bigger air (a knuckle, a roller) keeps the bigger air as the target.
     if (marked && clock - marked.landAt < C.bounceM && air < marked.air * 0.6) return;
-    trail.markTakeoff(pending); lead = pendingLead; marked = { air, landAt: clock };
+    trail.markTakeoff(pending, pendingSeg); lead = pendingLead; marked = { air, landAt: clock };
   };
   on('takeoff', () => {
     if (game.mode !== Mode.RIDING) return;
-    pending = clock;
+    pending = clock; pendingSeg = trail.seg;
     pendingLead = Math.min(C.leadMax, Math.max(C.leadMin, Math.hypot(player.velocity.x, player.velocity.z) * C.lead));   // C.lead s at the take-off speed, in m
   });
   on('landed', (e) => { if (pending !== null && (e.air >= C.minAir || e.result === 'crash')) mark(e.air); pending = null; });
   on('crashed', () => { if (pending !== null) mark(); pending = null; });
   on('rideStarted', () => { trail.clear(); clock = 0; pending = null; marked = null; last.ok = false; });
   on('dropZone', () => { trail.clear(); last.ok = false; });
-  on('resetTop', () => { last.ok = false; });
-  on('respawned', () => { last.ok = false; });
+  on('resetTop', () => { last.ok = false; trail.cut(); });
+  on('respawned', () => { last.ok = false; trail.cut(); });
 
   return {
     trail,
@@ -99,7 +99,7 @@ export function installRetry({ player, input, activities, ui, cam }) {
       const p = player.position, v = player.velocity;
       const step = last.ok ? Math.hypot(p.x - last.x, p.z - last.z) : 0;
       last.x = p.x; last.z = p.z; last.ok = true;
-      if (step > 25) return;   // a teleport (drop zone, a test placing the rider): not ridden distance
+      if (step > 25) { trail.cut(); return; }   // a teleport (drop zone, a test placing the rider): not ridden distance
       clock += step;           // air and tumbles count too
       if (player.state !== State.GROUNDED || clock < sampleAt) return;
       sampleAt = clock + C.sampleM;

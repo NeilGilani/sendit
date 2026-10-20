@@ -47,6 +47,8 @@ page.on('console', (m) => {
   errors.push(`[${step}] ${t.slice(0, 300)}`);
 });
 page.on('dialog', (d) => d.dismiss().catch(() => {}));
+page.on('crash', () => { console.log('PAGE CRASHED', step); errors.push(`[${step}] page crashed`); });
+page.on('framenavigated', (f) => { if (f === page.mainFrame()) console.log('NAV', step, f.url().replace(base, '/')); });
 const check = (name, ok, info = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${MAP}  ${name}${info ? `  (${info})` : ''}`);
   rows.push({ map: MAP, name, ok: !!ok, info: String(info).slice(0, 300) });
@@ -371,8 +373,8 @@ async function nearFinish() {
     let x = pl.position.x, z = pl.position.z, g = C.progress(x, z), it = 0;
     while (g < goal - 18 && it++ < 4000) {
       let best = null;
-      for (let k = 0; k < 24; k++) {
-        const a = k / 24 * Math.PI * 2, nx = x + Math.cos(a) * 6, nz = z + Math.sin(a) * 6;
+      for (let k = 0; k < 72; k++) {
+        const a = (k % 24) / 24 * Math.PI * 2, st = [6, 16, 40][k / 24 | 0], nx = x + Math.cos(a) * st, nz = z + Math.sin(a) * st;
         if (T.isInside && !T.isInside(nx, nz, 30)) continue;
         const ng = C.progress(nx, nz);
         if (!best || ng > best.g) best = { x: nx, z: nz, g: ng };
@@ -476,7 +478,8 @@ for (const [ei, equip] of EQUIPS.entries()) {
   const rt0 = await evCount('thrillRetry');
   await key('Backspace');
   await frames(60);
-  check(`${equip} retry (Backspace)`, (await evCount('thrillRetry')) > rt0, '');
+  const rtInfo = await S(() => { const s = window.__sendit, R = window.__thrill.retry; return { st: s.player.state, busy: s.player._busy, mode: s.activities.mode, tk: R.trail.takeoffT, seg: R.trail.takeoffSeg, n: R.trail.s.length, pick: !!R.trail.pick(30) }; });
+  check(`${equip} retry (Backspace)`, (await evCount('thrillRetry')) > rt0, JSON.stringify({ ...rtInfo, hint: (await evs('hint')).slice(-1)[0]?.[2] }));
   const rs0 = (await evCount('thrillRestart')) + (await evCount('resetTop'));
   await bot(60, {});
   await key('KeyR');
