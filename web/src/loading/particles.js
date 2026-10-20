@@ -40,7 +40,10 @@ void main() {
   // Fade in fast, out slow; clumps fade as they break up.
   vA = smoothstep(0.0, 0.06, life) * (1.0 - smoothstep(kind < 0.5 ? 0.35 : 0.6, 1.0, life));
   // A drone flying through the landing cloud: puffs bigger than their distance would white out the frame.
-  if (kind < 0.5) vA *= smoothstep(0.35 * s, 1.5 * s + 0.6, -mv.z);
+  // (Close moves end a few metres from the touchdown: the landing cloud thins out around the lens instead.)
+  if (kind < 0.5) vA *= smoothstep(0.5 * s, 2.2 * s + 0.8, -mv.z);
+  // Clumps and glints right at the lens became big hard discs (a screen of "bokeh"): fade them out.
+  else vA *= smoothstep(0.6, 2.6, -mv.z);
   gl_Position = projectionMatrix * mv;
 }`;
 
@@ -64,12 +67,13 @@ void main() {
     // powder read against sunlit snow). Backlit mist glows, capped so a cloud never piles into a disc.
     float lit = smoothstep(-0.7, 0.8, vUp + (n - 0.5) * 0.9);
     col = uSkyAmb * (0.55 + 0.35 * lit) + uSunCol * (0.06 + 0.42 * lit + min(hg * 3.2, 0.9) * (0.4 + 0.6 * lit));
+    col = max(col, (uSkyAmb * 0.9 + uSunCol * 0.35) * (0.8 + 0.2 * lit));   // a floor near lit snow: white powder, not smoke
   } else if (vKind < 1.5) {
-    a = smoothstep(1.0, 0.55, r) * 0.9;
+    a = smoothstep(1.0, 0.4, r) * 0.85;
     col = uSkyAmb * 0.8 + uSunCol * (0.5 + min(hg * 2.5, 0.8));
   } else {
     a = smoothstep(1.0, 0.0, r);
-    col = uSunCol * (1.5 + min(hg * 25.0, 6.0)) * (0.5 + 0.5 * sin(vSeed * 90.0 + vT * 60.0));
+    col = uSunCol * (1.1 + min(hg * 9.0, 2.2)) * (0.5 + 0.5 * sin(vSeed * 90.0 + vT * 60.0));
   }
   a *= vA * uOpacity;
   gl_FragColor = vec4(col * a, a);   // premultiplied
@@ -136,7 +140,7 @@ export class Powder {
 
 const SNOW_VERT = /* glsl */`
 attribute vec2 corner; attribute vec4 aSeed;
-uniform float uTime; uniform vec3 uBox; uniform vec3 uWind; uniform float uFocus; uniform float uCoc; uniform float uPx; uniform float uMinPx;
+uniform float uTime; uniform vec3 uBox; uniform vec3 uWind; uniform float uFocus; uniform float uCoc; uniform float uPx; uniform float uMinPx; uniform float uMaxK;
 varying vec2 vUv; varying float vA;
 void main() {
   vec3 p = aSeed.xyz * uBox;
@@ -150,11 +154,14 @@ void main() {
   float d = -mv.z;
   // Circle of confusion (in px) → quad size; energy spreads so big discs are faint.
   float coc = abs(1.0 / max(d, 0.05) - 1.0 / uFocus) * uCoc;
-  float px = max(uMinPx, coc) * (0.8 + aSeed.w * 0.6);
+  // Disc size relative to an in-focus flake, capped (uMaxK): out-of-focus flakes read as soft specks of
+  // light, not a screen of big discs. Alpha falls with the disc's area (the same light spread wider).
+  float k = clamp(coc / uMinPx, 1.0, uMaxK);
+  float px = uMinPx * k * (0.8 + aSeed.w * 0.6);
   float world = px / uPx * d;     // px → metres at this depth
   mv.xy += corner * world;
   vUv = corner;
-  vA = clamp(2.2 / (px * px * 0.18 + 1.0), 0.015, 1.0) * smoothstep(0.3, 1.2, d) * (1.0 - smoothstep(uBox.x * 0.35, uBox.x * 0.5, d));
+  vA = 0.8 / (1.0 + 1.1 * (k * k - 1.0)) * smoothstep(0.7, 2.2, d) * (1.0 - smoothstep(uBox.x * 0.35, uBox.x * 0.5, d));
   gl_Position = projectionMatrix * mv;
 }`;
 
@@ -164,7 +171,7 @@ varying vec2 vUv; varying float vA;
 void main() {
   float r = length(vUv);
   if (r > 1.0) discard;
-  float a = smoothstep(1.0, 0.6, r) * (0.75 + 0.25 * smoothstep(0.6, 0.9, r)) * vA * uAmount;   // slight bokeh rim
+  float a = smoothstep(1.0, 0.35, r) * vA * uAmount;   // soft disc (a hard bokeh rim read as lens dirt)
   gl_FragColor = vec4(uSnowCol * a, a);
 }`;
 
@@ -179,7 +186,7 @@ export class Snowfall {
     g.instanceCount = n;
     this.uniforms = {
       uTime: { value: 0 }, uBox: { value: new THREE.Vector3(36, 24, 36) }, uWind: { value: new THREE.Vector3(0.8, -0.9, 0.3) },
-      uFocus: { value: 10 }, uCoc: { value: 60 }, uPx: { value: 1000 }, uMinPx: { value: 1.6 }, uSnowCol: { value: new THREE.Vector3(1.4, 1.45, 1.6) }, uAmount: { value: 1 },
+      uFocus: { value: 10 }, uCoc: { value: 60 }, uPx: { value: 1000 }, uMinPx: { value: 1.6 }, uMaxK: { value: 3.2 }, uSnowCol: { value: new THREE.Vector3(1.4, 1.45, 1.6) }, uAmount: { value: 1 },
       ...uniforms,
     };
     const m = new THREE.ShaderMaterial({

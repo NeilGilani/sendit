@@ -21,7 +21,7 @@ import { makeHeight, buildTerrain, terrainMaterial, snowUniformsLite } from './t
 import { Powder, Snowfall } from './particles.js';
 import { PowderFX } from './powderfx.js';
 import { Shot } from './choreo.js';
-import { planMove, CameraRig } from './shots.js';
+import { planMove, CameraRig, terrainScore } from './shots.js';
 import { TreeSystem } from '../gfx/trees.js';
 import { StillOverlay } from './still.js';
 import { prepareClip, mapNodes, ClipShot, scoreMove } from './clip.js';
@@ -38,6 +38,8 @@ const PIXEL_BUDGET = 2400 * 1350;
 // Frames longer than this are GPU-process stalls (the game linking shaders on the shared GPU thread):
 // resolution doesn't change them, so they don't vote in the scaler (they used to drag it to 0.5).
 const STALL_MS = 90;
+const noDebug = (d) => (typeof d === 'string' && /(^|;)no:([a-z,]+)/.exec(d)?.[2].split(',')) || [];
+const smooth01 = (x) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
 const lum = (c) => 0.2126 * c.x + 0.7152 * c.y + 0.0722 * c.z;
 
 export class LoadingScene {
@@ -108,6 +110,7 @@ export class LoadingScene {
     // Terrain.
     const height = this.height = makeHeight(v);
     const su = snowUniformsLite(noise, rockTex);
+    if (noDebug(this.opts.debug).includes('sparkle')) su.uSparkle.value.x = 0;
     const nearMat = terrainMaterial(su, atmo);
     const farMat = terrainMaterial(su, atmo, { far: true });
     const terr = this.terrain = buildTerrain(height, sunDir, nearMat, farMat);
@@ -320,10 +323,17 @@ export class LoadingScene {
     this.grade.uniforms.get('vignette').value = 0.34;
     this.grade.uniforms.get('glare').value = POST.glare * 1.6;
     this.grade.uniforms.get('flare').value = POST.flare;
+    // No goggle lens here (first-person snow flecks on the lens): the default Vector4() has w = 1, which
+    // covered every loading shot in soft discs with colour fringes.
+    this.grade.uniforms.get('lensFx').value.set(0, 0, 0, 0);
     this.grain = new NoiseEffect({ blendFunction: BlendFunction.SOFT_LIGHT, premultiply: false });
     this.grain.blendMode.opacity.value = 0.12;
-    composer.addPass(new EffectPass(camera, this.bloom, this.grade, this.grain));
-    composer.addPass(new EffectPass(camera, new SMAAEffect({ preset: this.low ? SMAAPreset.LOW : SMAAPreset.HIGH })));
+    // ?loaddebug=no:bloom,grade,grain,smaa,snow,powder,sparkle — switch parts off to find what draws what.
+    const off = (k) => noDebug(this.opts.debug).includes(k);
+    if (off('snow')) this.snow.uniforms.uAmount.value = 0;
+    if (off('powder')) this.powder.mesh.visible = false;
+    composer.addPass(new EffectPass(camera, ...[!off('bloom') && this.bloom, !off('grade') && this.grade, !off('grain') && this.grain].filter(Boolean)));
+    if (!off('smaa')) composer.addPass(new EffectPass(camera, new SMAAEffect({ preset: this.low ? SMAAPreset.LOW : SMAAPreset.HIGH })));
   }
 
   resize({ width, height, dpr }) {
@@ -408,7 +418,21 @@ export class LoadingScene {
     if (!v.cam && cam === this.lastCam) cam = r.weighted(cams, 'w');
     this.lastTrick = trick; this.lastCam = cam;
     const shot = this.shot = new Shot({ H: this.height.H, line: this.height.line, trick, gear: v.gear, r });
-    this.move = planMove(cam, shot, this.sunDir, r, this.height.H);
+    // Plan the move a few times (new framing each time) and keep the one the terrain spoils least: no
+    // snow between lens and rider, no camera tucked against a rising slope (shots.js terrainScore).
+    let best = null;
+    for (let k = 0; k < 5; k++) {
+      const kind = k < 3 || v.cam ? cam : r.weighted(cams, 'w');
+      if (k >= 3 && kind === this.lastCam) continue;
+      const m = planMove(kind, shot, this.sunDir, r, this.height.H);
+      const sc = terrainScore(m, shot, this.height.H);
+      if (!best || sc < best.sc) best = { m, sc, kind };
+      if (sc === 0) break;
+    }
+    cam = best.kind;
+    this.lastCam = cam;
+    this.move = best.m;
+    this.moveScore = best.sc;
     if (this.move.t0 != null) shot.tStart = Math.max(shot.tStart, this.move.t0);
     if (first) shot.tStart = Math.max(shot.tStart, -1.2);
     if (this.move.endAfterLanding != null) shot.tEnd = Math.min(shot.tEnd, shot.Ta + this.move.endAfterLanding);
@@ -424,7 +448,7 @@ export class LoadingScene {
     this.mode = 'shot';
     this.dip = this.stillFadeT && this.stillFadeT < 0.1 ? 0 : 0.6;   // fade up from the cut (not under the still)
     const T = TRICKS[trick];
-    this.lastInfo = { trick: T.name, trickId: trick, cam, camera: CAMERAS[cam].name, place: v.place, time: TIMES[v.tod].name, tod: v.tod, mtn: v.mtn, gear: v.gear, seed: v.seed, own: !!v.own, rider: v.riderName };
+    this.lastInfo = { trick: T.name, trickId: trick, cam, camera: CAMERAS[cam].name, frameScore: this.moveScore, place: v.place, time: TIMES[v.tod].name, tod: v.tod, mtn: v.mtn, gear: v.gear, seed: v.seed, own: !!v.own, rider: v.riderName };
     this.post('shot', { info: this.lastInfo });
   }
 
@@ -443,7 +467,7 @@ export class LoadingScene {
       const kind = k === 0 || v.cam ? cam : r.weighted(CLIP_CAMS, 'w');
       if (k > 0 && !v.cam && kind === this.lastCam) continue;
       const m = planMove(kind, shot, this.sunDir, r, this.height.H);
-      const sc = scoreMove(m, shot, this.treePts || []);
+      const sc = scoreMove(m, shot, this.treePts || []) + terrainScore(m, shot, this.height.H);
       if (!best || sc < best.sc) best = { m, sc, kind };
       if (sc === 0) break;
     }
@@ -561,6 +585,10 @@ export class LoadingScene {
     const fwd = cam.getWorldDirection(new THREE.Vector3());
     const facing = Math.max(0, fwd.dot(this.sunDir));
     this.grade.uniforms.get('sunScreen').value.set(sp.x * 0.5 + 0.5, sp.y * 0.5 + 0.5, sp.z < 1 ? facing * facing : 0);
+    // Lens ghosts: faint, only while the sun itself is in frame (from a sun just off-screen they hung over
+    // the slope as coloured rings), and none from the moon.
+    const inFrame = sp.z < 1 ? (1 - smooth01((Math.abs(sp.x) - 0.85) / 0.25)) * (1 - smooth01((Math.abs(sp.y) - 0.85) / 0.25)) : 0;
+    this.grade.uniforms.get('flare').value = this.v.time.aurora ? 0 : POST.flare * 0.45 * inFrame;
     globals.uTime.value = this.screenT;
     this.trees?.update(cam.position);
     globals.uResolution.value.set(this.size.width, this.size.height);
