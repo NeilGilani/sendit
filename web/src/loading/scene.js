@@ -26,6 +26,7 @@ import { TreeSystem } from '../gfx/trees.js';
 import { StillOverlay } from './still.js';
 import { prepareClip, mapNodes, ClipShot, scoreMove } from './clip.js';
 import { nodeKeys } from '../thrill/clipcodec.js';
+import { assetUrl } from '../base.js';
 
 // Camera moves for a saved highlight (the made-up shots' weights, minus the ones built around a big cliff).
 const CLIP_CAMS = { hero: { w: 3 }, close: { w: 3.5 }, filmer: { w: 3 }, dolly: { w: 2.5 }, orbit: { w: 2 }, follow: { w: 1.4 }, low: { w: 0.8 }, reveal: { w: 0.5 } };   // no long lens: from 100 m up the slope a kicker air is a speck
@@ -102,7 +103,11 @@ export class LoadingScene {
     const rockTex = new THREE.DataTexture(new Uint8Array([128, 128, 118, 255]), 1, 1);
     rockTex.wrapS = rockTex.wrapT = THREE.RepeatWrapping;
     rockTex.needsUpdate = true;
-    this.loadRockTexture(rockTex);
+    // The photo rock (loadRockTexture) is off: it swapped an ImageBitmap into this DataTexture, which three.js
+    // uploads from image.data, so it never showed (WebKit logged "texSubImage2D: no pixels") and every
+    // loading still was rendered with the flat rock. To enable it, give it a fresh THREE.Texture and
+    // re-render the stills (scripts/loadingstills.mjs).
+    void this.loadRockTexture;
 
     this.sky = new SkyDome(atmo, noise);
     scene.add(this.sky.mesh);
@@ -246,7 +251,7 @@ export class LoadingScene {
 
   loadRockTexture(tex) {
     if (typeof createImageBitmap === 'undefined') return;
-    fetch('/textures/web/rock_face_03_packed_1k.jpg').then((r) => (r.ok ? r.blob() : Promise.reject(new Error(r.status))))
+    fetch(assetUrl('textures/web/rock_face_03_packed_1k.jpg')).then((r) => (r.ok ? r.blob() : Promise.reject(new Error(r.status))))
       .then((b) => createImageBitmap(b, { imageOrientation: 'flipY' }))
       .then((img) => {
         tex.image = img;

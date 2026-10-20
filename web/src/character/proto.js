@@ -13,8 +13,9 @@
 import * as THREE from 'three';
 import { jacketCut, PANT_FITS, GARMENTS, FAB, PSTYLE, JSTYLE } from './outfits.js';
 export { FAB, PSTYLE, JSTYLE };
+import { urlParams } from '../flags.js';
 
-const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
+const params = urlParams();   // dev builds only (flags.js)
 
 /** Prototype key from ?proto=N (1–10, round 1) or ?proto=r1…r6 (round 2); 0 = off. */
 export const PROTO = (() => {

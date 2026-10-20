@@ -27,7 +27,18 @@ import { listMaps } from '../maps/registry.js';
 export * from './core.js';
 
 const localStore = {
-  get(k) { try { const s = globalThis.localStorage?.getItem(k); return s ? JSON.parse(s) : null; } catch { return null; } },
+  get(k) {
+    let s = null;
+    try { s = globalThis.localStorage?.getItem(k); } catch { return null; }   // storage blocked
+    if (!s) return null;
+    let v = null;
+    try { v = JSON.parse(s); } catch { /* corrupt */ }
+    if (v && typeof v === 'object' && !Array.isArray(v)) return v;
+    // Unreadable: keep a copy before a fresh state replaces it (services/storage.js backupCorrupt).
+    console.warn(`[progression] ${k} is unreadable; starting fresh (kept as ${k}.backup)`);
+    try { globalThis.localStorage?.setItem(`${k}.backup`, s); } catch { /* quota */ }
+    return null;
+  },
   set(k, v) { try { globalThis.localStorage?.setItem(k, JSON.stringify(v)); } catch { /* private mode / quota */ } },
 };
 

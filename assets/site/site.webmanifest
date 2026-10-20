@@ -1,0 +1,16 @@
+{
+  "name": "SENDIT",
+  "short_name": "SENDIT",
+  "description": "Ski and snowboard eight mountains in your browser.",
+  "start_url": "../",
+  "scope": "../",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#141a2c",
+  "theme_color": "#141a2c",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

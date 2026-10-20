@@ -7,6 +7,7 @@
 import { registerMap } from './registry.js';
 import { Course } from '../course.js';
 import { RealCourse } from '../realcourse.js';
+import { assetUrl } from '../base.js';
 
 const svg = (body) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 90">${body}</svg>`)}`;
 
@@ -70,7 +71,7 @@ registerMap({
 let tahoeIndex = null;
 async function fetchTahoeIndex() {
   if (!tahoeIndex) {
-    tahoeIndex = fetch('/resorts/index.json').then((r) => (r.ok ? r.json() : [])).catch(() => []);
+    tahoeIndex = fetch(assetUrl('resorts/index.json')).then((r) => (r.ok ? r.json() : [])).catch(() => []);
   }
   return tahoeIndex;
 }

@@ -8,6 +8,7 @@ import { removeClip, setFavourite, setThumb, syncIndex, readIndex, getClipMeta, 
 import { ICONS } from '../icons.js';
 import { on } from '../../state.js';
 import { playClip, renderThumb, canPlayClips } from '../../loading/clipview.js';
+import { assetUrl } from '../../base.js';
 
 const ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor"/></svg>';
 const I = {
@@ -23,7 +24,7 @@ const I = {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const fmtDate = (t) => (t ? new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '');
 const fmtPts = (p) => (p ? `${Math.round(p).toLocaleString()} pts` : '');
-const mapArt = (id) => (id && /^[a-z0-9-]+$/.test(id) ? `/maps/${id}.webp` : '');
+const mapArt = (id) => (id && /^[a-z0-9-]+$/.test(id) ? assetUrl(`maps/${id}.webp`) : '');
 
 const STYLE = `
 #lobby .hl-head { display: flex; align-items: baseline; gap: 0.8em; flex-wrap: wrap; }

@@ -28,6 +28,7 @@ import { CanvasReel, reelMetrics } from './reelCanvas.js';
 import './cases.css';
 
 import { TIMING, TIMING_QUICK, REEL_EASE, cubicBezier } from './timing.js';
+import { urlParams, DEBUG } from '../../flags.js';
 
 export { TIMING, TIMING_QUICK, REEL_EASE, cubicBezier };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -65,7 +66,7 @@ export function cardHtml(key, rarity, { big = false, label = true, anon = false,
 const ALIAS = { grey: 'common', gray: 'common', blue: 'uncommon', purple: 'rare', pink: 'epic', red: 'legendary', covert: 'legendary', knife: 'gold' };
 export function forcedRng(series) {
   let want = null;
-  try { want = new URLSearchParams(location.search).get('caseforce'); } catch { return undefined; }
+  try { want = urlParams().get('caseforce'); } catch { return undefined; }   // dev builds only (flags.js)
   if (!want) return undefined;
   want = ALIAS[want] || want;
   if (!RARITIES.some((r) => r.id === want)) return undefined;
@@ -77,7 +78,7 @@ export function forcedRng(series) {
 
 let active = null;
 // Test / capture hook (scripts/casesshot.mjs, crateshot.mjs): open with a seeded RNG for a reproducible reel.
-if (typeof window !== 'undefined') window.__senditCasesApi = { open: (id, seed, o = {}) => openCaseShow(id, { ...o, rng: seed != null ? seeded(seed) : undefined }), seeded, crate: crateShow };
+if (typeof window !== 'undefined' && DEBUG) window.__senditCasesApi = { open: (id, seed, o = {}) => openCaseShow(id, { ...o, rng: seed != null ? seeded(seed) : undefined }), seeded, crate: crateShow };
 
 /** Is the opener on screen? */
 export const openerActive = () => !!active;

@@ -11,6 +11,7 @@ import { State } from './player.js';
 import { game, Mode, settings, on } from './state.js';
 import { lerpAngle, angleDiff, clamp, smoothstep } from './world.js';
 import { FPView } from './fpview.js';
+import { urlParams } from './flags.js';
 
 const _v = new THREE.Vector3();
 const LIFT_SMOOTH = 0.12;   // s, follow smoothing on a lift ride
@@ -38,7 +39,7 @@ export class CameraController {
     this.menuRadius = clamp(Math.hypot(to.x, to.z) * 0.8, 1300, 2400);
     this.wasMenu = true;
     this.intro = 1;
-    const camParam = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('cam') : null;
+    const camParam = typeof location !== 'undefined' ? urlParams().get('cam') : null;
     if (typeof window !== 'undefined') window.__cam = this;   // debug handle (inspect view)
     if (camParam) this.inspect = { yaw: { side: 90, front: 180, back: 0, top: 0 }[camParam] ?? (Number(camParam) || 0), height: camParam === 'top' ? 3 : 0.9 };
     on('landed', ({ impact }) => this.addTrauma(Math.max(0, impact - 4) * C.landTrauma));

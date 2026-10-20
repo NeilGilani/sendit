@@ -28,9 +28,17 @@ class ProfileStore {
 
   /** Load (and migrate) from storage. Safe to call again. */
   load() {
-    const raw = this.storage.get(PROFILE_KEY);
+    const text = this.storage.getRaw(PROFILE_KEY);
+    let raw = this.storage.get(PROFILE_KEY);
+    if (text != null && (!raw || typeof raw !== 'object' || Array.isArray(raw))) { this.storage.backupCorrupt(PROFILE_KEY, text, 'not a readable profile'); raw = null; }
     const legacy = { best: this.storage.getRaw('sendit.best'), settings: this.storage.get('sendit.settings', {}) };
-    const { profile, migrated, from } = migrateProfile(raw, legacy);
+    let res;
+    try { res = migrateProfile(raw, legacy); } catch (e) {
+      // Never let a bad save stop the game: keep it, start fresh.
+      this.storage.backupCorrupt(PROFILE_KEY, text, `unusable (${e?.message || e})`);
+      try { res = migrateProfile(null, legacy); } catch { res = { profile: defaultProfile(), migrated: true, from: 0 }; }
+    }
+    const { profile, migrated, from } = res;
     this.data = profile;
     if (migrated) {
       if (raw) console.info(`[profile] migrated v${from} → v${profile.version}`);
