@@ -184,6 +184,7 @@ export class FXManager {
     const pw = this.player.powder ?? 0.5;
     for (const c of cs) {
       if (!this.onSnow(c.p, 0.04)) continue;
+      if (c.lift > 0.05) continue;   // brushed the snow early in the frame and already off it again: no groove
       const w = CRASH_MARK[c.part] ?? 0.12;
       const k = Math.min(1, 0.25 + c.imp / 7 + c.speed / 14) * (0.45 + 0.55 * pw);
       this.track.stamp('rd:' + c.key, c.p, c.heading, w, k);
