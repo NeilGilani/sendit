@@ -55,7 +55,16 @@ const check = (name, ok, info = '') => {
 const shotN = { n: 0 };
 const shot = (name) => page.screenshot({ path: `${out}/${MAP}-${String(++shotN.n).padStart(3, '0')}-${name}.png` }).catch(() => {});
 const wait = (ms) => page.waitForTimeout(ms);
-const frames = async (n) => { const f0 = await page.evaluate(() => window.__qa?.f ?? 0); await page.waitForFunction((t) => (window.__qa?.f ?? 0) >= t, f0 + n, { timeout: Math.max(30000, n * 200) }); };
+const frames = async (n) => {
+  const f0 = await page.evaluate(() => window.__qa?.f ?? 0);
+  try { await page.waitForFunction((t) => (window.__qa?.f ?? 0) >= t, f0 + n, { timeout: Math.max(30000, n * 200), polling: 100 }); }
+  catch (e) {
+    // The frame clock stopped: is the page's main thread stuck, or did rendering stop? Dump what we can.
+    const st = await Promise.race([page.evaluate(() => { const s = window.__sendit, p = s?.player; return { f: window.__qa?.f, mode: s?.game.mode, st: p?.state, pos: p && [p.position.x, p.position.y, p.position.z].map((v) => +v.toFixed(2)), vel: p && [p.velocity.x, p.velocity.y, p.velocity.z].map((v) => +v.toFixed(2)), lost: s?.renderer.getContext().isContextLost(), hidden: document.hidden }; }), new Promise((r) => setTimeout(() => r('main thread not responding (10 s)'), 10000))]);
+    console.log('FREEZE', step, JSON.stringify(st), errors.slice(-3).join(' | '));
+    throw e;
+  }
+};
 const key = async (k) => { await page.keyboard.down(k); await frames(2); await page.keyboard.up(k); await frames(1); };
 const S = (fn, arg) => page.evaluate(fn, arg);
 
@@ -451,10 +460,11 @@ for (const [ei, equip] of EQUIPS.entries()) {
   const after = await S(() => ({ active: !!window.__thrill?.replay?.active, mode: window.__sendit.game.mode, st: window.__sendit.player.state }));
   check(`${equip} instant replay (Tab) plays and Tab ends it`, (replaying || (await evCount('thrillReplay')) > rp0) && !after.active && after.mode === 1, JSON.stringify({ replaying, after }));
   const hl0 = await S(async () => { const st = await import('/src/thrill/clipstore.js'); return (await st.listClips?.())?.length ?? null; }).catch(() => null);
+  const hs0 = await evCount('highlightSaved');
   await key('KeyF');
-  await frames(120);
-  await page.waitForFunction(() => !document.querySelector('.hl-saving, .thrill-saving'), null, { timeout: 30000 }).catch(() => {});
-  await wait(1500);
+  await frames(60);
+  await page.waitForFunction((n) => (window.__ev || []).filter((e) => e[0] === 'highlightSaved').length > n, hs0, { timeout: 30000 }).catch(() => {});
+  await wait(500);
   const hl1 = await S(async () => { const st = await import('/src/thrill/clipstore.js'); return (await st.listClips?.())?.length ?? null; }).catch(() => null);
   if (hl1 !== null && hl0 !== null && hl1 > hl0) clipsSaved++;
   const hints = (await evs('hint')).slice(-2).map((e) => e[2]);
