@@ -6,8 +6,12 @@
 //
 // To change the schema: bump PROFILE_VERSION, add MIGRATIONS[oldVersion] that returns the upgraded
 // object, update defaultProfile(), and extend sanitize() for the new fields.
-import { SLOTS, EQUIPMENT_TYPES, DEFAULT_EQUIPMENT, getItem, defaultItemFor, defaultVariantFor, unlockState } from './catalog.js';
+import { SLOTS, EQUIPMENT_TYPES, DEFAULT_EQUIPMENT, getItem, defaultItemFor, defaultVariantFor, unlockState, ownKey } from './catalog.js';
 import { defaultRewards, sanitizeRewards, grandfather } from './rewards.js';
+import { RETIRED_SKINS } from './items.js';
+
+/** 'item:variant' of a retired skin → its replacement (profile/items.js RETIRED_SKINS); others unchanged. */
+const retiredKey = (k) => RETIRED_SKINS[k] ?? k;
 import { SETTINGS_KEY } from '../state.js';
 
 export const PROFILE_KEY = 'sendit.profile';
@@ -97,19 +101,30 @@ export function sanitize(p) {
   out.stats = { ...d.stats, ...(p.stats || {}) };
   out.links = { ...d.links, ...(p.links || {}) };
   out.inventory = { items: {} };
-  for (const [k, v] of Object.entries(p.inventory?.items || {})) {
+  for (const [k0, v] of Object.entries(p.inventory?.items || {})) {
+    // A retired skin becomes its replacement (RETIRED_SKINS); owning both adds the counts.
+    const k = retiredKey(k0);
     const [id, vid] = k.split(':');
     const item = getItem(id);
-    if (item && item.variants.some((x) => x.id === vid)) out.inventory.items[k] = { at: Number(v?.at) || 0, n: Math.max(1, Number(v?.n) || 1), seen: !!v?.seen };
+    if (!item || !item.variants.some((x) => x.id === vid)) continue;
+    const prev = out.inventory.items[k], n = Math.max(1, Number(v?.n) || 1);
+    out.inventory.items[k] = prev ? { at: Math.min(prev.at, Number(v?.at) || 0), n: prev.n + n, seen: prev.seen && !!v?.seen } : { at: Number(v?.at) || 0, n, seen: k === k0 ? !!v?.seen : false };
   }
   out.rewards = sanitizeRewards(p.rewards);
+  for (const h of out.rewards.history) h.key = retiredKey(h.key);
+  if (out.rewards.best) out.rewards.best = { ...out.rewards.best, key: retiredKey(out.rewards.best.key) };
   delete out.fresh;
   out.unlocks = { items: Array.isArray(p.unlocks?.items) ? p.unlocks.items.filter((x) => typeof x === 'string') : [] };
   out.map = p.map && typeof p.map.id === 'string' ? { id: p.map.id, variant: p.map.variant ?? null, trail: typeof p.map.trail === 'string' ? p.map.trail : null } : d.map;
   const lo = p.loadout || {};
   const slots = {};
   for (const slot of Object.keys(SLOTS)) {
-    const want = lo.slots?.[slot];
+    let want = lo.slots?.[slot];
+    // Wearing a retired skin: wear its replacement (it is in the inventory now, see above).
+    if (want && RETIRED_SKINS[ownKey(want.item, want.variant)]) {
+      const [item, variant] = RETIRED_SKINS[ownKey(want.item, want.variant)].split(':');
+      want = { item, variant };
+    }
     const item = want && getItem(want.item);
     // Reward skins must be owned; anything else falls back to the slot's starter.
     const variant = item && (item.variants.find((v) => v.id === want.variant) ?? defaultVariantFor(item));

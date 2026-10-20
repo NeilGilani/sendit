@@ -15,6 +15,34 @@ const HEAD_SCALE = 1.06;   // character/index.js (not imported: it pulls in the 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const GLTF = JSON.parse(fs.readFileSync(path.join(here, '../../assets/models/skier/skier.gltf'), 'utf8'));
 
+const { bodyWarp, BODIES, DEFAULT_BODY } = await import('../src/character/proto.js');
+/**
+ * Move the joints like rider.js's morphBody() does for the game's body (BODIES[DEFAULT_BODY]): every
+ * bone's rest origin goes through bodyWarp() in the model's space, orientations kept, parents first.
+ */
+function warpJoints(model, armature) {
+  const B = BODIES[DEFAULT_BODY];
+  if (!B) return;
+  const f = bodyWarp(B);
+  model.updateMatrixWorld(true);
+  const toModel = model.matrixWorld.clone().invert();
+  const want = new Map();
+  armature.traverse((o) => {
+    if (!o.isBone) return;
+    const M = toModel.clone().multiply(o.matrixWorld);
+    M.setPosition(f(new THREE.Vector3().setFromMatrixPosition(M)));
+    want.set(o, model.matrixWorld.clone().multiply(M));
+  });
+  const p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+  armature.traverse((o) => {
+    if (!o.isBone) return;
+    const parentW = want.get(o.parent) || o.parent.matrixWorld;
+    parentW.clone().invert().multiply(want.get(o)).decompose(p, q, s);
+    o.position.copy(p); o.quaternion.copy(q);
+  });
+  model.updateMatrixWorld(true);
+}
+
 /** A rider-shaped object around the real skeleton. type 'ski' | 'snowboard'. */
 export function fakeRider(type = 'ski', stance = 'regular') {
   const N = GLTF.nodes;
@@ -35,6 +63,7 @@ export function fakeRider(type = 'ski', stance = 'regular') {
   r.root.add(r.chatter); r.chatter.add(r.visual); r.visual.add(r.body); r.body.add(r.model);
   r.model.rotation.y = Math.PI; r.model.add(armature);
   r.armature = armature;
+  warpJoints(r.model, armature);   // the game's body proportions (character/proto.js morphBody)
   r.bones = {}; r.restLocal = new Map();
   armature.traverse((o) => { if (o.isBone) { r.bones[o.name] = o; r.restLocal.set(o, { p: o.position.clone(), q: o.quaternion.clone(), s: o.scale.clone(), m: new THREE.Matrix4().compose(o.position, o.quaternion, o.scale) }); } });
   const hr = r.restLocal.get(r.bones.Head); hr.s.setScalar(HEAD_SCALE); hr.m.compose(hr.p, hr.q, hr.s);

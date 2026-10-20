@@ -109,54 +109,184 @@ export const PANT_FITS = {
   baggy: { rise: 1.08, crotch: 0.8, seat: { waist: [0.204, 0.152, 0.155], hip: [0.246, 0.156, 0.188] }, leg: { thigh: 0.138, knee: 0.132, hem: 0.13 }, cuffY: 0.09, stack: { y0: 0.1, y1: 0.33, n: 4, amp: 0.016 } },
 };
 
+// ------------------------------------------------------------------------------------------------
+// The round-2 silhouette (docs/character.md § Prototype round 2, § Catalogue jackets): every jacket in
+// the game is cut from R2's base shape on the in-between body:
+//   a) the shoulders are the widest point; never narrow shoulders over a wider waist, no flare at the hips
+//   b) the back falls straight from the shoulder blades (cut.straightBack): the hem never cups the seat
+//   c) length: just covering the seat (back hem ≈ crotch height), never longer
+//   d) chest → waist shaping and drape folds (no cylinder / box); sleeves set in with a soft slope
+//   e) puffers: normal length, slim, small baffles
+// ------------------------------------------------------------------------------------------------
+/** Fabric textures (cut.fab, jacket and pants; materials.js PROTO_GLSL). 0 = the plain nylon shell. */
+export const FAB = { nylon: 0, hardshell: 1, twill: 2, ripstop: 3, jersey: 4, wool: 5, canvas: 6, flannel: 7, satin: 8 };
+/** Pant leg layouts (pants cut.style). */
+export const PSTYLE = { plain: 0, shell: 1, cargo: 2, carpenter: 3, retro: 4 };
+/** Jacket layouts beyond the five fits' own (cut.style 5+). */
+export const JSTYLE = { varsity: 5, retro: 6, work: 7, shirt: 8, tee: 9 };
+
+export const R2_SHAPE = {
+  hemFront: 0.885, hemBack: 0.858, hemFlare: -0.004, folds: 0.8, shoulder: 0.009, seatClear: 0.022,
+  straightBack: { from: 1.44 }, smoothProfile: { from: 1.44 }, layerPants: { band: 0.07 }, hemThigh: 0.35, armBlend: 0.7, armSide: 0.45, pelvisRamp: [1.2, 0.94],
+  torso: { chest: [0.24, 0.166, 0.17], waist: [0.236, 0.163, 0.17], hem: [0.238, 0.165, 0.172], n: 2.25 },
+  sleeve: { upper: 0.08, elbow: 0.079, forearm: 0.076, cuff: 0.068 }, sleeveEnd: 0.698,
+};
+/** A jacket cut on the round-2 shape: a fit's shader layout and details, R2's proportions, then overrides. */
+export const r2Cut = (fit, over = {}) => jacketCut(fit, {
+  ...R2_SHAPE, ...over,
+  torso: { ...R2_SHAPE.torso, ...over.torso }, sleeve: { ...R2_SHAPE.sleeve, ...over.sleeve },
+});
+/** The trimmer pants seat under the straight-backed jackets (the seat no longer pushes the hem out). */
+export const SEAT = {
+  relaxed: { waist: [0.198, 0.148, 0.15], hip: [0.226, 0.145, 0.168] },
+  baggy: { waist: [0.2, 0.15, 0.152], hip: [0.232, 0.15, 0.172] },
+};
+/** A pants cut: a pant fit plus overrides (seat / leg / stack merged one level). */
+export const pantsCut = (fit, over = {}) => ({
+  ...PANT_FITS[fit], ...over, fit,
+  seat: { ...PANT_FITS[fit].seat, ...over.seat }, leg: { ...PANT_FITS[fit].leg, ...over.leg }, stack: { ...PANT_FITS[fit].stack, ...over.stack },
+});
+const COLLAR = { shirt: { collarTop: 1.605, collarEase: 0.03 }, varsity: { collarTop: 1.598, collarEase: 0.016 }, work: { collarTop: 1.612, collarEase: 0.026 } };
+
 /** Garment shapes, per slot. Lengths are metres in the rider's bind pose (1.8 m tall, feet at 0). */
 export const GARMENTS = {
   jacket: {
+    // The shipped jackets, re-cut on the round-2 shape (ids kept, so saves and items keep working).
     'tuff-shell': {
       name: 'Tuff Shell',
-      blurb: 'Relaxed 3-layer freeride shell: hangs straight from the chest, hip length with a slight drop tail, stowed hood.',
-      cut: jacketCut('relaxed'),
+      blurb: 'Relaxed 2-layer freeride shell: broad shoulders, straight back, hem just over the seat, stowed hood.',
+      cut: r2Cut('relaxed', { folds: 0.85, hoodRoll: [0.042, 0.064, 0.06] }),
     },
     'storm-shell': {
       name: 'Tuff Shell, hood up',
       blurb: 'The same relaxed shell with its helmet-compatible hood pulled up over the lid.',
-      cut: jacketCut('relaxed', { hood: 'up' }),
+      cut: r2Cut('relaxed', { folds: 0.85, hood: 'up' }),
     },
     // Reward cuts (profile/items.js). The one-piece's colours dress the pants too (resolveOutfit).
     'retro-suit': {
-      name: 'Retro One-Piece', blurb: 'A 90s one-piece suit with a hem belt and colour-blocked sleeves.',
-      cut: jacketCut('suit'),
+      name: 'Retro One-Piece', blurb: 'A 90s one-piece on the modern shape: a belted waist, colour-blocked sleeves, the legs in the suit colours.',
+      cut: r2Cut('suit', { folds: 0.8, hemFlare: -0.008, torso: { chest: [0.24, 0.165, 0.17], waist: [0.232, 0.16, 0.168], hem: [0.236, 0.163, 0.17] } }),
     },
     'ridge-shell': {
-      name: 'Ridge Shell', blurb: 'Slim technical hardshell: close at the shoulders, articulated sleeves, hip length.',
-      cut: jacketCut('shell'),
+      name: 'Ridge Shell', blurb: 'Technical hardshell: a little closer than the Tuff Shell, articulated sleeves, stowed hood.',
+      cut: r2Cut('shell', {
+        folds: 0.75, shoulder: 0.007,
+        torso: { chest: [0.234, 0.16, 0.166], waist: [0.228, 0.157, 0.166], hem: [0.232, 0.16, 0.168] },
+        sleeve: { upper: 0.074, elbow: 0.073, forearm: 0.07, cuff: 0.064 }, sleeveEnd: 0.698, hoodRoll: [0.036, 0.054, 0.05],
+      }),
     },
     'tall-anorak': {
-      name: 'Tall Anorak', blurb: 'Baggy new-school pullover: half zip, kangaroo pocket, cut loose to just cover the seat.',
-      cut: jacketCut('anorak'),
+      name: 'Tall Anorak', blurb: 'Roomy new-school pullover: half zip, kangaroo pocket, side zip, hem just over the seat.',
+      cut: r2Cut('anorak', {
+        fab: FAB.twill, folds: 1.05, seatClear: 0.024, hemFront: 0.878, hemBack: 0.852,
+        torso: { chest: [0.246, 0.168, 0.172], waist: [0.24, 0.166, 0.172], hem: [0.242, 0.168, 0.174] },
+        sleeve: { upper: 0.083, elbow: 0.082, forearm: 0.079, cuff: 0.071 }, sleeveEnd: 0.702,
+      }),
     },
     'cloud-puffer': {
-      name: 'Cloud Puffer', blurb: 'Insulated puffer with wide baffles and a high quilted collar, cinched at the hip.',
-      cut: jacketCut('puffer'),
+      name: 'Cloud Puffer', blurb: 'Hip-length insulated puffer on the slim shape: 10 cm baffles, quilted collar, matte face.',
+      cut: r2Cut('puffer', {
+        hemFront: 0.885, hemBack: 0.862, hemFlare: -0.008, fab: FAB.twill, folds: 0.35, shoulder: 0.011,
+        torso: { chest: [0.244, 0.17, 0.174], waist: [0.238, 0.167, 0.172], hem: [0.236, 0.166, 0.172], n: 2.2 },
+        sleeve: { upper: 0.082, elbow: 0.08, forearm: 0.077, cuff: 0.064 }, sleeveEnd: 0.694,
+        collarTop: 1.632, collarEase: 0.026, quilt: { pitch: 0.1, depth: 0.0085 },
+      }),
     },
     'layer-hoodie': {
-      name: 'Layer Hoodie', blurb: 'Tall cotton hoodie over a shell: ribbed hem, kangaroo pocket, the shell collar out the top.',
-      cut: jacketCut('hoodie'),
+      name: 'Layer Hoodie', blurb: 'Heavy cotton hoodie over a shell: rib hem bloused at the seat, kangaroo pocket, the shell collar out the top.',
+      cut: r2Cut('hoodie', {
+        hemFlare: -0.012, folds: 1.15, seatClear: 0.024,
+        torso: { chest: [0.242, 0.166, 0.17], waist: [0.234, 0.162, 0.168], hem: [0.234, 0.162, 0.168] },
+        sleeve: { upper: 0.08, elbow: 0.079, forearm: 0.075, cuff: 0.062 },
+      }),
+    },
+    // Round 2's six looks (docs/character.md § Prototype round 2), now real catalogue garments.
+    'sherpa-flannel': {
+      name: 'Sherpa Flannel', blurb: 'Sherpa-lined flannel shirt-jacket over a hoodie: button placket, flap pockets, hood on the back.',
+      cut: r2Cut('relaxed', {
+        style: JSTYLE.shirt, hemFront: 0.865, hemBack: 0.852, hemFlare: -0.003, fab: FAB.flannel, folds: 1.1,
+        torso: { chest: [0.242, 0.166, 0.17], waist: [0.238, 0.164, 0.17], hem: [0.242, 0.166, 0.174], n: 2.4 },
+        ...COLLAR.shirt, hood: 'hoodie', hoodSpan: 62, hoodRoll: null,
+      }),
+    },
+    'insulated-freedom': {
+      name: 'Insulated Freedom', blurb: 'Relaxed insulated 2L twill jacket with a contrast yoke: the base shape of every jacket.',
+      cut: r2Cut('relaxed', { fab: FAB.twill, folds: 0.7, quilt: { pitch: 0.24, depth: 0.004 } }),
+    },
+    'alpine-hardshell': {
+      name: 'Alpine Hardshell', blurb: '3-layer hardshell: clean taped seams, pit zips, stowed helmet hood.',
+      cut: r2Cut('relaxed', {
+        fab: FAB.hardshell, folds: 0.85, shoulder: 0.007,
+        torso: { chest: [0.236, 0.162, 0.168], waist: [0.232, 0.16, 0.168], hem: [0.234, 0.162, 0.17] },
+        sleeve: { upper: 0.076, elbow: 0.075, forearm: 0.072, cuff: 0.066 }, sleeveEnd: 0.7,
+        hoodRoll: [0.04, 0.062, 0.06],
+      }),
+    },
+    'varsity-coach': {
+      name: 'Varsity Coach', blurb: 'Snow varsity: wool body, contrast sleeves, snap front, striped rib collar, cuffs and hem.',
+      cut: r2Cut('relaxed', {
+        style: JSTYLE.varsity, hemFront: 0.895, hemBack: 0.875, hemFlare: -0.014, fab: FAB.wool, folds: 1.15,
+        torso: { chest: [0.248, 0.168, 0.17], waist: [0.228, 0.16, 0.168], hem: [0.228, 0.158, 0.166], n: 2.15 },
+        sleeve: { upper: 0.079, elbow: 0.078, forearm: 0.074, cuff: 0.056 }, sleeveEnd: 0.7,
+        ...COLLAR.varsity, hood: 'none', hoodRoll: null,
+      }),
+    },
+    'duck-canvas': {
+      name: 'Duck Canvas Work', blurb: 'Duck-canvas chore jacket: corduroy collar, patch pockets, brass snaps, triple stitching.',
+      cut: r2Cut('relaxed', {
+        style: JSTYLE.work, hemFront: 0.875, hemBack: 0.86, hemFlare: -0.002, fab: FAB.canvas, folds: 1.05,
+        torso: { chest: [0.244, 0.166, 0.17], waist: [0.232, 0.162, 0.17], hem: [0.236, 0.164, 0.172], n: 2.3 },
+        ...COLLAR.work, hood: 'none', hoodRoll: null,
+      }),
+    },
+    'mocha-puffer': {
+      name: 'Mocha Puffer', blurb: 'Slim hip-length puffer: 8.5 cm baffles, matte face, cinched hem, quilted collar.',
+      cut: r2Cut('puffer', {
+        hemFront: 0.88, hemBack: 0.858, hemFlare: -0.008, fab: FAB.twill, folds: 0.35, shoulder: 0.011,
+        torso: { chest: [0.244, 0.17, 0.174], waist: [0.238, 0.167, 0.172], hem: [0.236, 0.166, 0.172], n: 2.2 },
+        sleeve: { upper: 0.082, elbow: 0.08, forearm: 0.077, cuff: 0.064 }, sleeveEnd: 0.694,
+        collarTop: 1.636, collarEase: 0.026, quilt: { pitch: 0.085, depth: 0.0082 },
+      }),
     },
   },
   pants: {
     'tuff-bib': {
       name: 'Tuff Bib',
       blurb: 'Relaxed straight-leg bib that stacks over the boots, reinforced cuffs.',
-      cut: { ...PANT_FITS.relaxed, fit: 'relaxed' },
+      cut: pantsCut('relaxed', { seat: SEAT.relaxed }),
     },
     'cargo-pant': {
       name: 'Cargo Pant', blurb: 'Relaxed cargo pant tapering to the boot.',
-      cut: { ...PANT_FITS.tapered, fit: 'tapered' },
+      cut: pantsCut('tapered', { seat: SEAT.relaxed }),
     },
     'wide-pant': {
       name: 'Wide Pant', blurb: 'Wide new-school pant: straight leg, long inseam stacking over the boot.',
-      cut: { ...PANT_FITS.baggy, fit: 'baggy' },
+      cut: pantsCut('baggy', { seat: SEAT.baggy }),
+    },
+    // Round 2's pants (the round-1 pants the user liked, trimmed seat).
+    'baggy-pant': {
+      name: 'Baggy Pant', blurb: 'Baggy twill pant: dropped crotch, wide straight leg, soft stack over the boot.',
+      cut: pantsCut('baggy', { crotch: 0.805, style: PSTYLE.plain, fab: FAB.twill, seat: SEAT.baggy, leg: { thigh: 0.138, knee: 0.134, hem: 0.134 } }),
+    },
+    'relaxed-cargo': {
+      name: 'Relaxed Cargo', blurb: 'Insulated relaxed pant with bellows cargo pockets on the thighs.',
+      cut: pantsCut('relaxed', { bib: null, rise: 1.085, style: PSTYLE.cargo, fab: FAB.twill, cargo: 0.012, seat: SEAT.relaxed, leg: { thigh: 0.13, knee: 0.12, hem: 0.118 } }),
+    },
+    'stack-pant': {
+      name: 'Big Stack Pant', blurb: 'Baggy pant with a long inseam: five folds stacked over the boot.',
+      cut: pantsCut('baggy', { crotch: 0.79, fab: FAB.twill, seat: SEAT.baggy, leg: { thigh: 0.146, knee: 0.142, hem: 0.142 }, cuffY: 0.07, stack: { y0: 0.08, y1: 0.36, n: 5, amp: 0.019 } }),
+    },
+    'coach-bib': {
+      name: 'Coach Bib', blurb: 'Relaxed twill bib: straight leg, chest panel and straps.',
+      cut: pantsCut('relaxed', { style: PSTYLE.plain, fab: FAB.twill, seat: SEAT.relaxed }),
+    },
+    'carpenter-pant': {
+      name: 'Carpenter Pant', blurb: 'Double-knee canvas carpenter pant: hammer loop, rule pocket.',
+      cut: pantsCut('relaxed', { bib: null, rise: 1.085, style: PSTYLE.carpenter, fab: FAB.canvas, seat: SEAT.relaxed, leg: { thigh: 0.132, knee: 0.126, hem: 0.124 }, cuffY: 0.09, stack: { n: 3, amp: 0.013 } }),
+    },
+    'camo-cargo': {
+      name: 'Camo Cargo', blurb: 'Baggy cargo pant with raised bellows pockets.',
+      cut: pantsCut('baggy', { crotch: 0.8, style: PSTYLE.cargo, fab: FAB.twill, cargo: 0.016, seat: SEAT.baggy, leg: { thigh: 0.14, knee: 0.134, hem: 0.13 }, stack: { n: 4, amp: 0.017 } }),
     },
   },
   helmet: {
@@ -191,6 +321,14 @@ export const GARMENTS = {
     },
   },
 };
+/** Every catalogue jacket with the pants it is shown with (dev checks: garment-clip.mjs, jackets-sheet.mjs). */
+export const CATALOG_JACKET_LOOKS = [
+  ['tuff-shell', 'tuff-bib'], ['storm-shell', 'cargo-pant'], ['retro-suit', 'wide-pant'], ['ridge-shell', 'tuff-bib'],
+  ['tall-anorak', 'wide-pant'], ['cloud-puffer', 'cargo-pant'], ['layer-hoodie', 'wide-pant'],
+  ['sherpa-flannel', 'baggy-pant'], ['insulated-freedom', 'relaxed-cargo'], ['alpine-hardshell', 'stack-pant'],
+  ['varsity-coach', 'coach-bib'], ['duck-canvas', 'carpenter-pant'], ['mocha-puffer', 'camo-cargo'],
+];
+
 /**
  * Colourways. Each slot's colours are what a catalog variant carries in `colors`:
  *   jacket:  base (body), panel (yoke / side panels / hood), accent (zips, logo, lining), gaiter, style
