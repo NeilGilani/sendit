@@ -62,7 +62,21 @@ const DEFAULTS = { quality: 1, master: 0.8, music: 0.6, sfx: 0.8, mouseSens: 1.0
   // First person: fpStable = steadier helmet cam in flips (keeps the spin, damps flip / cork tilt);
   // fpLens = goggle lens effects strength (tint, fringe, fog / snow on the lens), 0 = clear view.
   fpStable: false, fpLens: 1 };
-export const settings = { ...DEFAULTS, ...safeParse(safeGet(SETTINGS_KEY)) };
+export const settings = sanitizeSettings(safeParse(safeGet(SETTINGS_KEY)));
+
+/** Saved settings → known keys with the default's type; quality an integer 0–2 (a bad value used to break the renderer). */
+export function sanitizeSettings(saved) {
+  const out = { ...DEFAULTS };
+  if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return out;
+  for (const [k, d] of Object.entries(DEFAULTS)) {
+    const v = saved[k];
+    if (typeof d === 'number' && (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) && Number.isFinite(Number(v))) out[k] = Number(v);
+    else if (typeof d === 'boolean' && typeof v === 'boolean') out[k] = v;
+  }
+  for (const [k, v] of Object.entries(saved)) if (!Object.hasOwn(DEFAULTS, k)) out[k] = v;   // keys other modules add
+  out.quality = Math.max(0, Math.min(2, Math.round(out.quality)));
+  return out;
+}
 
 export function setSetting(k, v) {
   settings[k] = v;

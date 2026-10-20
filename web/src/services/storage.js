@@ -38,6 +38,17 @@ export const storage = {
 
   set(key, value) { return this.setRaw(key, JSON.stringify(value)); },
 
+  /**
+   * A save that can't be read (corrupt JSON, wrong shape, a migration that threw) is about to be replaced
+   * by a fresh one: keep the original text under `<key>.backup` first, so nothing is lost silently
+   * (docs/launch.md § Saves). Logs a warning, never throws.
+   */
+  backupCorrupt(key, raw, why = 'unreadable') {
+    if (raw == null || raw === '') return;
+    console.warn(`[storage] ${key} is ${why}; starting fresh (the old save is kept as ${key}.backup)`);
+    this.setRaw(`${key}.backup`, typeof raw === 'string' ? raw : JSON.stringify(raw));
+  },
+
   remove(key) {
     memory.delete(key);
     try { ls?.removeItem(key); } catch { /* ignore */ }

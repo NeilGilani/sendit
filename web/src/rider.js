@@ -25,6 +25,7 @@ import { outfitSlotsFromProfile } from './character/profile.js';
 import { proportionRig } from './character/body.js';
 import { morphBody } from './character/proto.js';
 import { FP, FP_BOARD, FP_POLE, fpPoleGeometry, fpSkiArm, fpBoardArm, fpPoleDir, fpProtract, fpHand, fpShadow } from './fpview.js';
+import { assetUrl } from './base.js';
 
 const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4(), _v1 = new THREE.Vector3();
@@ -82,7 +83,7 @@ export class Rider {
   }
 
   async load(loader) {
-    const gltf = await loader.loadAsync('/models/skier/skier.gltf');
+    const gltf = await loader.loadAsync(assetUrl('models/skier/skier.gltf'));
     morphBody(gltf.scene);   // dev only: ?proto / ?protobody body proportions (character/proto.js); no-op otherwise
     this.model = new THREE.Group();
     this.model.rotation.y = Math.PI;       // rider faces down the skis (−Z)

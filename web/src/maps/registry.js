@@ -29,6 +29,7 @@
 //   course.trailSpawn(trailId) → { x, z, heading } | null    the trail's top (null/absent → default spawn)
 //   course.trailFinish(trailId) → { x, z, radius } | { progress } | null   optional custom finish
 import { DEFAULT_MAP_ID } from '../profile/schema.js';
+import { assetUrl } from '../base.js';
 
 const maps = new Map();
 
@@ -145,7 +146,7 @@ export function listMountains() {
  * The map's picture rendered by the game itself (scripts/mountainshots.mjs → assets/maps/<id>.webp,
  * docs/maps.md). Callers keep `thumbnail` underneath as the fallback when the file is missing.
  */
-export const mapShot = (mapId) => `/maps/${mapId}.webp`;
+export const mapShot = (mapId) => assetUrl(`maps/${mapId}.webp`);
 
 export const getMountain = (id) => listMountains().find((m) => m.id === id) ?? null;
 

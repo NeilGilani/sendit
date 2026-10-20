@@ -15,9 +15,11 @@
 import { TIPS } from './tips.js';
 import { readLoadHint, consumeTransition } from './hint.js';
 import { readIndex, pickLoadingClip, noteShown, forgetInIndex } from '../thrill/clipstore.js';
+import { assetUrl } from '../base.js';
+import { urlParams } from '../flags.js';
 
 const $ = (id) => (typeof document !== 'undefined' ? document.getElementById(id) : null);
-const params = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
+const params = urlParams();   // ?load* flags are dev-only (flags.js)
 const T0 = performance.now();
 // Hand-off hold (finish → holdForShot): wait at most waitMs for the first live trick shot, then keep it
 // up at least showMs before dissolving. ?loadnohold skips it (timing tests).
@@ -126,7 +128,7 @@ class LoadingScreen {
     const el = this.root.querySelector('.ld-still');
     const anim = el?.getAnimations?.()[0];
     const t = anim?.startTime ?? document.timeline?.currentTime ?? performance.now();
-    return { url: new URL(`/loading/${still.f}`, location.href).href, kbx: parseFloat(css.getPropertyValue('--kbx')) || 0, kby: parseFloat(css.getPropertyValue('--kby')) || 0, start: performance.timeOrigin + Number(t) };
+    return { url: new URL(assetUrl(`loading/${still.f}`), location.href).href, kbx: parseFloat(css.getPropertyValue('--kbx')) || 0, kby: parseFloat(css.getPropertyValue('--kby')) || 0, start: performance.timeOrigin + Number(t) };
   }
 
   /** index.html's painted still is up (or about to be): the live scene waits for the rider before showing. */

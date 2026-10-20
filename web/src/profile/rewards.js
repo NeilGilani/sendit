@@ -64,20 +64,20 @@ export function defaultRewards() {
 export function sanitizeRewards(r) {
   const d = defaultRewards();
   if (!r || typeof r !== 'object') return d;
-  const num = (v, f = 0) => (Number.isFinite(Number(v)) ? Number(v) : f);
+  const num = (v, f = 0) => ((typeof v === 'number' || typeof v === 'string') && Number.isFinite(Number(v)) ? Number(v) : f);
   const out = { ...d };
   for (const k of ['xp', 'xpTotal', 'earned', 'opened', 'seq', 'distance', 'milestone', 'dupeXp', 'sinceRed']) out[k] = Math.max(0, num(r[k]));
   out.xp = Math.min(out.xp, CASE_XP - 1e-6);
   out.distanceBy = { skis: Math.max(0, num(r.distanceBy?.skis)), snowboard: Math.max(0, num(r.distanceBy?.snowboard)) };
   // Keep the newest 500 cases; give id-less ones a fresh id so two cases never share one.
   out.distance = Math.min(out.distance, 1e9);
-  out.cases = (Array.isArray(r.cases) ? r.cases : []).filter((c) => c && SERIES[c.series]).slice(-500)
+  out.cases = (Array.isArray(r.cases) ? r.cases : []).filter((c) => c && typeof c.series === 'string' && Object.hasOwn(SERIES, c.series)).slice(-500)
     .map((c, i) => ({ id: c.id ? String(c.id) : `c${out.seq + i + 1}-fix`, series: c.series, at: num(c.at), source: String(c.source || '') }));
   // Milestones already passed count as paid (a garbled save must not back-pay hundreds of cases).
   while (nextMilestone(out).m <= out.distance) out.milestone = nextMilestone(out).m;
   out.maps = (Array.isArray(r.maps) ? r.maps : []).filter((x) => typeof x === 'string');
   out.trails = (Array.isArray(r.trails) ? r.trails : []).filter((x) => typeof x === 'string');
-  out.completed = (Array.isArray(r.completed) ? r.completed : []).filter((x) => SERIES[x]);
+  out.completed = (Array.isArray(r.completed) ? r.completed : []).filter((x) => typeof x === 'string' && Object.hasOwn(SERIES, x));
   out.history = (Array.isArray(r.history) ? r.history : []).filter((h) => h && typeof h.key === 'string').slice(-HISTORY);
   out.best = r.best && typeof r.best.key === 'string' ? r.best : null;
   out.lastDay = typeof r.lastDay === 'string' ? r.lastDay : null;
@@ -207,7 +207,7 @@ export function addXp(p, xp, source = 'ride', now = Date.now()) {
 /** Put one unopened case in the profile (series rotates so you see both). */
 export function grantCase(p, source = 'ride', now = Date.now(), series = null) {
   const r = p.rewards;
-  const c = { id: `c${++r.seq}-${now.toString(36)}`, series: series && SERIES[series] ? series : nextSeries(r), at: now, source };
+  const c = { id: `c${++r.seq}-${now.toString(36)}`, series: typeof series === 'string' && Object.hasOwn(SERIES, series) ? series : nextSeries(r), at: now, source };
   r.earned += 1;
   r.cases.push(c);
   return c;

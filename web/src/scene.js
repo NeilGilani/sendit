@@ -9,6 +9,7 @@
 // near-black snow-loaded spruce, deep blue zenith and layered blue-white haze in the distance.
 // =====================================================================================
 import * as THREE from 'three';
+import { urlParams } from './flags.js';
 
 // ------------------------------------------------------------------ LIGHTING (linear HDR)
 export const LIGHTING = {
@@ -37,7 +38,7 @@ export const LIGHTING = {
 
 // Debug: ?sun=bearing,elevation overrides the sun (degrees).
 if (typeof location !== 'undefined') {
-  const q = new URLSearchParams(location.search).get('sun');
+  const q = urlParams().get('sun');
   if (q) { const [b, e] = q.split(',').map(Number); if (Number.isFinite(b)) LIGHTING.sunBearing = b; if (Number.isFinite(e)) LIGHTING.sunElevation = e; }
 }
 
