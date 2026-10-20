@@ -42,6 +42,7 @@ function copyAssets() {
   };
 }
 
+let siteBase = '/';
 export default defineConfig(({ command }) => ({
   // Dev serves ../assets as the public folder; the build copies a filtered set (copyAssets).
   publicDir: command === 'serve' ? ASSETS : false,
@@ -49,6 +50,15 @@ export default defineConfig(({ command }) => ({
   build: { target: 'es2022', chunkSizeWarningLimit: 2500 },
   worker: { format: 'es' },   // module workers (src/loading/worker.js) may code-split / import()
   plugins: [copyAssets(), {
+    // Open Graph / Twitter cards need absolute URLs: SITE_URL=https://example.github.io/sendit/ npm run build.
+    // Without it they fall back to the base path (fine for the page, but link previews then show no image).
+    name: 'sendit-site-url',
+    configResolved(c) { siteBase = c.base; },
+    transformIndexHtml(html) {
+      const site = process.env.SITE_URL ? process.env.SITE_URL.replace(/\/?$/, '/') : (siteBase || '/');
+      return html.split('__SITE_URL__').join(site);
+    },
+  }, {
     name: 'credits',
     apply: 'serve',
     configureServer(server) {

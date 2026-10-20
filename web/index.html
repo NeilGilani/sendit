@@ -3,9 +3,29 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SENDIT</title>
-  <meta name="description" content="A peaceful skiing game on a real mountain at golden hour." />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f6c58e'/%3E%3Cstop offset='1' stop-color='%238fb3d9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='128' height='128' rx='24' fill='url(%23s)'/%3E%3Cpath d='M14 104 L52 40 L66 60 L80 30 L114 104 Z' fill='%23f4f7fb'/%3E%3C/svg%3E" />
+  <title>SENDIT — ski & snowboard in your browser</title>
+  <meta name="description" content="Ski and snowboard eight mountains in your browser: carve powder gullies, tree runs, big-mountain faces and a terrain park, land spins and flips, race your friends' ghosts. Free, no install." />
+  <meta name="theme-color" content="#141a2c" />
+  <meta name="color-scheme" content="dark" />
+  <!-- Icons and the share card: assets/site/ (scripts/social-card.mjs). %BASE_URL% = vite's base (docs/launch.md). -->
+  <link rel="icon" href="%BASE_URL%site/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="%BASE_URL%site/icon-192.png" type="image/png" sizes="192x192" />
+  <link rel="apple-touch-icon" href="%BASE_URL%site/apple-touch-icon.png" />
+  <link rel="manifest" href="%BASE_URL%site/site.webmanifest" />
+  <!-- Social cards need absolute URLs: __SITE_URL__ is SITE_URL at build time (e.g. https://example.github.io/sendit/), else the base path. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="SENDIT" />
+  <meta property="og:title" content="SENDIT — ski & snowboard in your browser" />
+  <meta property="og:description" content="Eight mountains, spins, flips, rails and powder. Free, plays in your browser — no install." />
+  <meta property="og:url" content="__SITE_URL__" />
+  <meta property="og:image" content="__SITE_URL__site/og-image.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="A snowboarder grabbing mid-air above snowy peaks at golden hour, with the SENDIT wordmark" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="SENDIT — ski & snowboard in your browser" />
+  <meta name="twitter:description" content="Eight mountains, spins, flips, rails and powder. Free, plays in your browser." />
+  <meta name="twitter:image" content="__SITE_URL__site/og-image.jpg" />
   <script>
     // Loading screen, first paint: pick one of the stills rendered by the loading scene itself
     // (scripts/loadingstills.mjs → assets/loading/*.webp) and start fetching it before anything else.
@@ -139,6 +159,23 @@
       #loading .ld-brand, #loading .ld-foot { z-index: 1; } #loading .ld-brand { top: 18px; } #loading .ld-foot { bottom: 22px; } }
     @media (max-width: 640px) { #loading .ld-foot { flex-direction: column; align-items: stretch; gap: 12px; } #loading .ld-progress { width: 100%; } #loading .ld-msg { text-align: left; } #loading .ld-cap { display: none; } }
     @media (prefers-reduced-motion: reduce) { #loading .ld-flakes, #loading .bar::after, #loading .ld-still { animation: none; } }
+    /* Boot failure / unsupported browser (the module script at the end of <body>, src/main.js): never a blank page. */
+    #bootfail { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; padding: clamp(20px, 5vw, 72px);
+      background: radial-gradient(ellipse at 20% 90%, rgba(5,6,10,.82), rgba(5,6,10,.55) 60%, rgba(5,6,10,.4)); color: #faf8f3;
+      font-family: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif; }
+    #bootfail[hidden] { display: none; }
+    #bootfail .bf-card { max-width: 560px; }
+    #bootfail small { display: block; font: 600 12px "IBM Plex Mono", ui-monospace, Menlo, monospace; letter-spacing: .16em; text-transform: uppercase; color: #ff7a45; }
+    #bootfail h1 { margin: 8px 0 14px; font-size: clamp(30px, 4.4vw, 54px); line-height: .95; font-weight: 900; font-stretch: 80%; text-transform: uppercase; letter-spacing: .005em; }
+    #bootfail p { margin: 0 0 12px; font-size: 16px; line-height: 1.5; color: rgba(250,248,243,.86); }
+    #bootfail code { display: block; margin: 4px 0 16px; font: 500 12px/1.4 "IBM Plex Mono", ui-monospace, Menlo, monospace; color: rgba(250,248,243,.5); overflow-wrap: anywhere; }
+    #bootfail .bf-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    #bootfail .bf-acts[hidden] { display: none; }
+    #bootfail button { font: 700 15px "Archivo", Helvetica, Arial, sans-serif; letter-spacing: .06em; text-transform: uppercase;
+      color: #faf8f3; background: rgba(250,248,243,.1); border: 1px solid rgba(250,248,243,.3); border-radius: 4px; padding: 11px 18px; cursor: pointer; }
+    #bootfail button.primary { background: #ff5a1f; border-color: #ff5a1f; color: #12141b; }
+    #bootfail button:focus-visible { outline: 2px solid #faf8f3; outline-offset: 2px; }
+    .bootfailed #loading .ld-foot, .bootfailed #loading .ld-dest { display: none; }
   </style>
 </head>
 <body>
@@ -175,6 +212,25 @@
       </div>
     </div>
   </div>
+
+  <!-- Shown instead of a blank page when the game can't start (no WebGL 2, a failed download, a boot error). -->
+  <div id="bootfail" role="alert" hidden>
+    <div class="bf-card">
+      <small>Sendit</small>
+      <h1 id="bf-title">Something went wrong</h1>
+      <p id="bf-text">The mountain didn't load. Reloading usually fixes it.</p>
+      <code id="bf-detail"></code>
+      <div class="bf-acts" id="bf-acts">
+        <button class="primary" type="button" data-bf="reload">Reload</button>
+        <button type="button" data-bf="low">Reload on low graphics</button>
+      </div>
+    </div>
+  </div>
+  <noscript>
+    <div style="position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:24px;background:#141a2c;color:#faf8f3;font:16px/1.5 Helvetica,Arial,sans-serif;text-align:center">
+      <div><b style="display:block;font-size:28px;letter-spacing:.04em">SENDIT needs JavaScript</b>It's a 3D game that runs in your browser: turn JavaScript on for this site and reload.</div>
+    </div>
+  </noscript>
 
   <!-- The lobby (first screen after loading) is built by src/lobby/Lobby.js. -->
   <div id="lobby" class="screen hidden"></div>
@@ -253,11 +309,49 @@
   </div>
 
   <div id="fade"></div>
-  <!-- The loading screen first; the game's own code is fetched once the loading worker has its modules
-       (or after 2.5 s at most), so the hero shot isn't stuck behind the game's downloads. -->
   <script type="module">
-    import('/src/loading/index.js').then(({ loadingScreen }) => loadingScreen.whenStarted(2500))
-      .catch((e) => console.error('[loading]', e)).then(() => import('/src/main.js'));
+    // Friendly failure screen (#bootfail): window.__senditBootFail(kind, error). kind: 'webgl' | 'error' | 'lost'.
+    const COPY = {
+      webgl: ['Your browser can\u2019t run 3D', 'Sendit needs WebGL 2 (3D graphics in the browser), and it isn\u2019t available here.',
+        'Turn on hardware acceleration in your browser settings, update the browser, or open the game in a recent Chrome, Edge, Firefox or Safari on a laptop or desktop.'],
+      error: ['Something went wrong', 'The mountain didn\u2019t finish loading. Reloading usually fixes it; if it keeps happening, try low graphics.', ''],
+      lost: ['Graphics stopped', 'The browser reset the 3D graphics (out of GPU memory, a driver update or the laptop waking up).', 'Reload to keep riding. Low graphics uses less GPU memory.'],
+    };
+    let failed = false;
+    window.__senditBootFail = (kind = 'error', err = null) => {
+      if (failed) return;
+      failed = true;
+      const el = document.getElementById('bootfail'), [title, text, more] = COPY[kind] || COPY.error;
+      document.getElementById('bf-title').textContent = title;
+      document.getElementById('bf-text').textContent = more ? `${text} ${more}` : text;
+      document.getElementById('bf-detail').textContent = err ? String((err && err.message) || err).slice(0, 240) : '';
+      if (kind === 'webgl') document.getElementById('bf-acts').hidden = true;
+      el.hidden = false;
+      document.documentElement.classList.add('bootfailed');
+      el.querySelector('button')?.focus?.();
+      el.onclick = (e) => {
+        const act = e.target.closest('[data-bf]')?.dataset.bf;
+        if (act === 'reload') location.reload();
+        if (act === 'low') {
+          try { const k = 'sendit.settings', v = JSON.parse(localStorage.getItem(k) || '{}') || {}; v.quality = 0; localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage off */ }
+          location.reload();
+        }
+      };
+    };
+    function hasWebGL2() {
+      try {
+        const gl = window.WebGL2RenderingContext && document.createElement('canvas').getContext('webgl2');
+        if (!gl) return false;
+        gl.getExtension('WEBGL_lose_context')?.loseContext();
+        return true;
+      } catch { return false; }
+    }
+    if (!hasWebGL2()) window.__senditBootFail('webgl');
+    // The loading screen first; the game's own code is fetched once the loading worker has its modules
+    // (or after 2.5 s at most), so the hero shot isn't stuck behind the game's downloads.
+    else import('/src/loading/index.js').then(({ loadingScreen }) => loadingScreen.whenStarted(2500))
+      .catch((e) => console.warn('[loading]', e)).then(() => import('/src/main.js'))
+      .catch((e) => { console.error('[boot]', e); window.__senditBootFail('error', e); });
   </script>
 </body>
 </html>

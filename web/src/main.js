@@ -52,7 +52,7 @@ profileStore.load();
 
 const params = urlParams();   // dev / debug flags only in dev builds (flags.js, docs/launch.md)
 const gearVariant = params.get('variant') || undefined;   // ?variant=<model id> (debug: overrides the equipped catalog item's model)
-if (params.has('quality')) settings.quality = Number(params.get('quality'));
+if (params.has('quality')) settings.quality = Math.max(0, Math.min(2, Math.round(Number(params.get('quality'))) || 0));   // ?quality=0|1|2
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false, depth: true });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -611,4 +611,15 @@ requestAnimationFrame(frame);
 boot().catch((e) => {
   console.error(e);
   ui.loading(1, `Something went wrong: ${e.message}`);
+  window.__senditBootFail?.('error', e);   // index.html: friendly screen with Reload / low graphics
 });
+
+// GPU context lost (driver reset, out of GPU memory, laptop wake): three.js tries to restore it; if it
+// hasn't come back after a few seconds, offer a reload instead of a frozen black canvas.
+let lostTimer = 0;
+canvas.addEventListener('webglcontextlost', () => {
+  console.warn('[gfx] WebGL context lost');
+  clearTimeout(lostTimer);
+  lostTimer = setTimeout(() => window.__senditBootFail?.('lost'), 4000);
+});
+canvas.addEventListener('webglcontextrestored', () => { clearTimeout(lostTimer); console.info('[gfx] WebGL context restored'); });
