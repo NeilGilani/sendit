@@ -17,6 +17,7 @@
 // (ui.js qualityHint, event 'qualityHeavy'). Nothing changes on its own. Same rules: steady riding only,
 // not with ?quality= or in automated browsers (unless ?autoq).
 import { settings, setSetting, SETTINGS_KEY, emit } from '../state.js';
+import { urlParams } from '../flags.js';
 
 /** Quality for a GPU name (lower-case match). Pure: unit-tested in scripts/unittest.mjs. */
 export function tierQuality(gpu = '', { pixels = 0, mobile = false } = {}) {
@@ -84,7 +85,7 @@ export function heavyHighWatch() {
  * Call once at boot, after the renderer exists and before quality is applied. Returns an object whose
  * sample(dt, riding) the frame loop calls every frame (cheap; does nothing once settled).
  */
-export function initAutoQuality(renderer, params = new URLSearchParams(globalThis.location?.search || '')) {
+export function initAutoQuality(renderer, params = urlParams()) {
   const off = { active: false, gpu: '', sample() {} };
   if (params.has('quality')) return off;
   if (typeof navigator === 'undefined') return off;
