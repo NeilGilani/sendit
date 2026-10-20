@@ -211,7 +211,7 @@ async function boot() {
     getName: () => profileStore.profile?.displayName || 'Rider',
   });
   applyQuality();
-  on('settings', ({ key }) => { if (key === 'quality') applyQuality(); });
+  on('settings', ({ key }) => { if (key === 'quality' || key === 'qualityLowest') applyQuality(); });
   addEventListener('resize', onResize);
   onResize();
   terrain.update(terrain.getSpawn().position, Infinity);   // full detail around the start before the first frame
@@ -391,7 +391,8 @@ function setupPost() {
 function applyQuality() {
   const q = settings.quality;
   const pr = PERF.pixelRatio[q], sh = PERF.shadow[q];   // perf tiers: gfx/perf.js
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, pr.cap) * pr.scale);
+  const lowest = q === 0 && settings.qualityLowest ? PERF.lowestScale / pr.scale : 1;   // auto quality's last step (gfx/autoquality.js)
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, pr.cap) * pr.scale * lowest);
   sky.setShadowBox(sh.box, sh.map);
   post.setQuality(q);
   terrain.setQuality(q);

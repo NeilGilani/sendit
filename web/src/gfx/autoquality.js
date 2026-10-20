@@ -4,7 +4,8 @@
 // phones / tablets and old integrated GPUs start on Low (0), everything else on Medium (1, the default).
 // High is never picked automatically (it doubles the pixels on a high-DPI screen). Then, during the first
 // ride only, a short frame-time check: if the median frame over ~8 s of steady riding is slower than ~36 fps,
-// it steps down one level (and checks once more at the new level). Once a check passes it never runs again.
+// it steps down one level and checks again; still slow at Low, it lowers the render scale (PERF.lowestScale)
+// once. Once a check passes (or nothing is left to lower) it never runs again.
 //
 // It never touches a setting the player chose: it only runs when the stored settings have no `quality`
 // yet (a first launch) or carry `qualityAuto: true` (set by this module). Clicking a quality button
@@ -86,6 +87,10 @@ export function initAutoQuality(renderer, params = new URLSearchParams(globalThi
       if (med > SLOW_MS && settings.quality > 0) {
         console.log(`[gfx] auto quality: median frame ${med.toFixed(1)} ms at quality ${settings.quality} → ${settings.quality - 1}`);
         setSetting('quality', settings.quality - 1);   // main.js applies it; checks again at the new level
+      } else if (med > SLOW_MS && !settings.qualityLowest) {
+        // Still slow at Low: one more step, a lower render scale (PERF.lowestScale), then settle.
+        console.log(`[gfx] auto quality: median frame ${med.toFixed(1)} ms at Low → lower render scale`);
+        setSetting('qualityLowest', true);
       } else {
         setSetting('qualityAutoDone', true);
         console.log(`[gfx] auto quality settled on ${settings.quality} (median frame ${med.toFixed(1)} ms)`);

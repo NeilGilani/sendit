@@ -32,7 +32,7 @@ export async function run(test, assert) {
     Object.defineProperty(g, 'navigator', { value: { userAgent: 'Mozilla/5.0 (Windows NT 10.0)', webdriver: false, maxTouchPoints: 0 }, configurable: true, writable: true });
     g.innerWidth = 1600; g.innerHeight = 900;
     const reset = (stored) => {
-      for (const k of ['quality', 'qualityAuto', 'qualityAutoDone']) delete st.settings[k];
+      for (const k of ['quality', 'qualityAuto', 'qualityAutoDone', 'qualityLowest']) delete st.settings[k];
       st.settings.quality = 1;
       if (stored) localStorage.setItem(st.SETTINGS_KEY, JSON.stringify(stored)); else localStorage.removeItem(st.SETTINGS_KEY);
       Object.assign(st.settings, stored || {});
@@ -49,6 +49,7 @@ export async function run(test, assert) {
       assert.equal(st.settings.quality, 1);
       for (let i = 0; i < 60 * 13; i++) a.sample(1 / 25, true);   // 40 ms frames
       assert.equal(st.settings.quality, 0, 'slow ride → low');
+      assert.equal(st.settings.qualityLowest, true, 'still slow at low → lower render scale');
       for (let i = 0; i < 60 * 13; i++) a.sample(1 / 60, true);
       assert.equal(st.settings.qualityAutoDone, true, 'settles');
       // Fast first ride: stays.
