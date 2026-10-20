@@ -276,9 +276,12 @@ export class Lobby {
   renderProfileChip() {
     const p = profileStore.profile;
     const me = services.identity.current();
+    this.el.chip.setAttribute('aria-label', `Profile: ${p.displayName}`);
     this.root.querySelector('.lb-avatar').textContent = (p.displayName || 'R').trim().charAt(0).toUpperCase();
     this.root.querySelector('.lb-pname').textContent = p.displayName;
-    this.root.querySelector('.lb-pmeta').textContent = `${me.isGuest ? 'Guest' : me.provider} · ${services.network.statusText} · best ${p.stats.bestScore.toLocaleString()}`;
+    // Public build: no "Guest · Offline" (accounts and servers aren't a thing yet); signed-in providers still show.
+    const best = p.stats.bestScore > 0 ? `Best ${Math.round(p.stats.bestScore).toLocaleString('en-US')}` : 'No runs yet';
+    this.root.querySelector('.lb-pmeta').textContent = me.isGuest ? best : `${me.provider} · ${best}`;
   }
 
   /** The rider plate under the rider on Home: name + the gear you ride, one tap to the Locker. */
@@ -423,6 +426,7 @@ export class Lobby {
       on: (name, fn) => { const off = on(name, fn); subs.push(off); return off; },
       toast: (msg, tone) => this.toast(msg, tone),
       ride: () => this.ride(),
+      setMode: (m) => this.setMode(m),
       select: (id) => this.select(id, { focus: true }),
       showCredits: () => this.ui.showCredits?.(),
       showHowTo: (o) => this.ui.showHowTo?.(o),

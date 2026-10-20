@@ -27,7 +27,8 @@
 #howto .vignette { background: rgba(6, 11, 16, 0.72); }
 #howto button { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; border-radius: 0; box-shadow: none; text-transform: none;
   letter-spacing: inherit; font-style: normal; cursor: pointer; transition: background-color var(--t1), color var(--t1), box-shadow var(--t1), transform var(--t1) var(--e-out); }
-#howto button:hover, #howto button:focus-visible { transform: none; background: none; box-shadow: none; }
+
+#howto button:hover { box-shadow: none; transform: none; }
 #howto :focus-visible { outline: 2px solid var(--c-snow); outline-offset: 2px; box-shadow: 0 0 0 5px rgba(255, 90, 31, 0.55) !important; }
 .hw-card { position: relative; width: min(640px, 100%); max-height: calc(100vh - 32px); overflow: auto; display: flex; flex-direction: column;
   background: rgba(10, 18, 26, 0.96); border: 1px solid var(--c-line); border-top: 3px solid var(--c-signal); border-radius: var(--r2);
@@ -115,7 +116,7 @@
 .kd-key:not(.on) b:empty { display: none; }
 
 /* controller diagram */
-.gd { width: min(100%, 700px); height: auto; font-family: var(--font); }
+.gd { width: min(100%, 900px); height: auto; font-family: var(--font); }
 .gd-body { fill: var(--c-ink-3); stroke: var(--c-line-2); stroke-width: 1.5; }
 .gd-bump { fill: var(--c-ink-4); stroke: var(--c-line-2); }
 .gd-stick { fill: var(--c-night); stroke: var(--c-snow-2); stroke-width: 2; }
@@ -123,7 +124,8 @@
 .gd-face { fill: var(--c-night); stroke: var(--c-snow-2); stroke-width: 1.5; }
 .gd-small { fill: var(--c-night); stroke: var(--c-snow-2); }
 .gd-btn { fill: var(--c-snow); font: 700 11px var(--font-mono); text-anchor: middle; }
-.gd-line { stroke: var(--c-signal); stroke-width: 1; fill: none; opacity: 0.7; }
+.gd-line { stroke: var(--c-signal); stroke-width: 1; fill: none; opacity: 0.55; }
+.gd-dot { fill: var(--c-signal); }
 .gd-label { fill: var(--c-snow-2); font-size: 12.5px; font-weight: 500; }
 .gd-name { fill: var(--c-snow); font-weight: 800; font-family: var(--font-mono); font-size: 11.5px; }
 
@@ -169,3 +171,21 @@ body.hw-open #pause .panel-left { visibility: hidden; }
 #lobby .hp-q > button[aria-expanded="true"]::after { content: '–'; }
 #lobby .hp-q > button:hover { background: var(--c-ink-3); }
 #lobby .hp-q p { margin: 0.35em 0.7em 0.6em; font-size: 0.86em; line-height: 1.45; color: var(--c-snow-2); }
+
+/* ---- Friends tab (lobby/tabs/multiplayer.js) ---- */
+#lobby .fr-steps { list-style: none; counter-reset: fr; margin: 0.4em 0 1em; padding: 0; display: grid; gap: 0.5em; }
+#lobby .fr-steps li { counter-increment: fr; display: grid; grid-template-columns: 2em 1fr; column-gap: 0.7em; padding: 0.6em 0.7em; background: var(--c-ink-2); border-radius: var(--r1); }
+#lobby .fr-steps li::before { content: counter(fr); grid-row: span 2; font: 900 1.7em/1 var(--font); font-stretch: 70%; color: var(--c-signal); }
+#lobby .fr-steps b { font-weight: 800; font-stretch: 80%; text-transform: uppercase; letter-spacing: 0.04em; }
+#lobby .fr-steps span { font-size: 0.88em; color: var(--c-snow-2); line-height: 1.4; }
+#lobby .fr-go { width: 100%; margin-bottom: calc(var(--lip) + 0.6em); }
+
+/* ---- Settings sections (ui.js organizeSettings; pause → Settings and the lobby's Settings tab) ---- */
+.grid .set-h { grid-column: 1 / -1; margin: 0.7em 0 -0.2em; padding-bottom: 0.35em; font: 700 12px var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--c-signal-2); border-bottom: 1px solid var(--c-line); }
+.grid .set-h:first-child { margin-top: 0; }
+.st-host .grid .set-h { font-size: 0.7em; }
+#settings .card { max-height: calc(100vh - 24px); overflow-y: auto; }
+#settings .grid { gap: 10px 28px; }
+#settings .grid label { font-size: 15px; }
+#lobby .st-foot { display: flex; gap: 0.6em; flex-wrap: wrap; }

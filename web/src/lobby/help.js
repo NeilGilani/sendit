@@ -15,7 +15,9 @@ import './help.css';
 const HOWTO_KEY = 'sendit.howto';
 
 /** True until the player has seen (or skipped) the How to ride cards once. Automated browsers skip it unless ?howto. */
+let seenNow = false;   // seen during this page load (?howto forces the cards only until then)
 export function needsHowTo() {
+  if (seenNow) return false;
   let q = '';
   try { q = location.search; } catch { /* no location */ }
   if (/[?&]howto=0/.test(q)) return false;
@@ -23,7 +25,7 @@ export function needsHowTo() {
   if (typeof navigator !== 'undefined' && navigator.webdriver) return false;   // test scripts ride straight away
   try { return localStorage.getItem(HOWTO_KEY) !== '1'; } catch { return false; }
 }
-export function markHowToSeen() { try { localStorage.setItem(HOWTO_KEY, '1'); } catch { /* private mode */ } }
+export function markHowToSeen() { seenNow = true; try { localStorage.setItem(HOWTO_KEY, '1'); } catch { /* private mode */ } }
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 
@@ -101,15 +103,16 @@ export function keyboardDiagram() {
 
 /** A controller outline with call-outs (Xbox layout; PlayStation: A = ✕, B = ○, X = □, Y = △). */
 export function gamepadDiagram() {
-  const L = [   // [label, x, y of the text, x, y of the button, anchor]
-    ['LT  brake', 40, 22, 128, 52, 'start'], ['LB  save clip', 40, 46, 140, 70, 'start'],
-    ['Left stick  steer · lean tricks', 6, 112, 132, 120, 'start'], ['D-pad  ▲ replay  ▼ retry jump  ◀ ▶ drop zone', 6, 236, 172, 168, 'start'],
-    ['View  camera', 6, 268, 205, 104, 'start'],
-    ['RT  speed up', 600, 22, 472, 52, 'end'], ['RB  tuck · grab', 600, 46, 460, 70, 'end'],
-    ['Y  restart', 600, 92, 462, 98, 'end'], ['B  brake', 600, 122, 490, 124, 'end'], ['A  hold to jump', 600, 152, 462, 148, 'end'],
-    ['X  tuck · grab', 600, 182, 436, 124, 'end'], ['Right stick  look · camera', 600, 236, 412, 168, 'end'], ['Start  pause', 600, 268, 395, 104, 'end'],
+  const X = 170;   // the controller is drawn at x 116–520 and shifted right by X; labels sit in the margins
+  const L = [   // [label, y of the text, x, y of the button (unshifted), side]
+    ['LT  brake', 34, 146, 52, 'l'], ['LB  save clip', 62, 140, 66, 'l'], ['View  camera', 96, 205, 103, 'l'],
+    ['Left stick  steer · lean into tricks', 128, 140, 120, 'l'], ['D-pad  ▲ replay · ▼ retry · ◀▶ drop zone', 186, 202, 162, 'l'],
+    ['RT  speed up', 30, 460, 52, 'r'], ['RB  tuck · grab', 58, 466, 66, 'r'], ['Y  restart', 86, 462, 98, 'r'], ['Start  pause', 112, 395, 103, 'r'],
+    ['B  brake', 138, 488, 124, 'r'], ['X  tuck · grab', 164, 436, 124, 'r'], ['A  hold to jump', 190, 462, 150, 'r'], ['Right stick  look around', 216, 412, 168, 'r'],
   ];
-  return `<svg class="gd" viewBox="0 0 606 284" role="img" aria-label="Controller: left stick steer, RT speed up, LT or B brake, A hold to jump, RB or X tuck and grab, Y restart, d-pad down retry the jump, d-pad up replay, LB save clip, View camera, right stick look, Start pause.">
+  const lx = 278, rx = 708;
+  return `<svg class="gd" viewBox="0 0 990 284" role="img" aria-label="Controller: left stick steer, RT speed up, LT or B brake, A hold to jump, RB or X tuck and grab, Y restart, d-pad down retry the jump, d-pad up replay, LB save clip, View camera, right stick look, Start pause.">
+    <g transform="translate(${X} 0)">
     <path class="gd-body" d="M196 66 h214 c40 0 62 18 76 56 l34 96 c10 30 -6 52 -32 52 c-18 0 -30 -10 -44 -30 l-26 -38 h-196 l-26 38 c-14 20 -26 30 -44 30 c-26 0 -42 -22 -32 -52 l34 -96 c14 -38 36 -56 76 -56 z"/>
     <rect class="gd-bump" x="118" y="44" width="56" height="16" rx="6"/><rect class="gd-bump" x="432" y="44" width="56" height="16" rx="6"/>
     <circle class="gd-stick" cx="160" cy="120" r="24"/><circle class="gd-stick" cx="412" cy="168" r="22"/>
@@ -117,10 +120,11 @@ export function gamepadDiagram() {
     <circle class="gd-face" cx="462" cy="98" r="11"/><circle class="gd-face" cx="488" cy="124" r="11"/><circle class="gd-face" cx="462" cy="150" r="11"/><circle class="gd-face" cx="436" cy="124" r="11"/>
     <text class="gd-btn" x="462" y="102">Y</text><text class="gd-btn" x="488" y="128">B</text><text class="gd-btn" x="462" y="154">A</text><text class="gd-btn" x="436" y="128">X</text>
     <rect class="gd-small" x="198" y="98" width="14" height="10" rx="3"/><rect class="gd-small" x="388" y="98" width="14" height="10" rx="3"/>
-    ${L.map(([t, tx, ty, bx, by, a]) => `<path class="gd-line" d="M${a === 'start' ? tx + 4 : tx - 4} ${ty + 6} L${bx} ${by}"/>`).join('')}
-    ${L.map(([t, tx, ty, , , a]) => {
+    </g>
+    ${L.map(([, ty, bx, by, side]) => `<path class="gd-line" d="M${side === 'l' ? lx + 6 : rx - 6} ${ty - 4} L${bx + X} ${by}"/><circle class="gd-dot" cx="${bx + X}" cy="${by}" r="2.4"/>`).join('')}
+    ${L.map(([t, ty, , , side]) => {
       const [btn, ...rest] = t.split('  ');
-      return `<text class="gd-label" x="${tx}" y="${ty}" text-anchor="${a}"><tspan class="gd-name">${esc(btn)}</tspan> ${esc(rest.join('  '))}</text>`;
+      return `<text class="gd-label" x="${side === 'l' ? lx : rx}" y="${ty}" text-anchor="${side === 'l' ? 'end' : 'start'}"><tspan class="gd-name">${esc(btn)}</tspan> ${esc(rest.join('  '))}</text>`;
     }).join('')}
   </svg>`;
 }
@@ -129,7 +133,7 @@ export function gamepadDiagram() {
 // Each card: a "hero" (big glyphs) and up to three lines. `kb` / `gp` give both devices.
 export const HOWTO_CARDS = [
   { id: 'ride', title: 'Ride', lead: 'Point your skis down the hill and go.',
-    hero: { kb: ['W', 'A', 'S', 'D'], gp: ['LS'] },
+    hero: { kb: ['W', 'A', 'S', 'D'], gp: ['LS', 'RT', 'LT'] },
     lines: [
       [bind(['A', 'D'], ['LS']), 'Steer. Lean into turns to carve.'],
       [bind(['W'], ['RT']), 'Skate for speed. ' + bind(['Shift'], ['RB']) + ' tucks on the straights.'],

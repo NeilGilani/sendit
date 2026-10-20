@@ -87,6 +87,7 @@ export class UI {
 
   openModal(name) {
     if (!this.screens[name]) return;
+    if (name === 'settings') organizeSettings();
     this.modalReturnFocus = document.activeElement;
     if (this.modal) this.screens[this.modal].classList.add('hidden');
     this.modal = name;
@@ -399,6 +400,40 @@ export class UI {
       this._credits = true;
     } catch { $('creditsText').textContent = 'Credits unavailable.'; }
   }
+}
+
+// Settings, in the order and words a player expects (the grid is shared by the lobby's Settings tab and the
+// pause menu; juice/settings.js and thrill/index.js append their own rows to it). [section, [key, label]…]
+const SETTINGS_LAYOUT = [
+  ['Graphics', [['quality', 'Graphics quality'], ['fullscreen', 'Fullscreen']]],
+  ['Sound', [['master', 'Master volume'], ['music', 'Music'], ['sfx', 'Sound effects']]],
+  ['Camera', [['mouseSens', 'Mouse look sensitivity'], ['camSens', 'Controller look sensitivity'], ['fpStable', 'Steady helmet cam in flips'],
+    ['fpLens', 'Goggle lens effects (first person)'], ['snowfall', 'Snow on the goggles (first person)']]],
+  ['Effects', [['juiceShake', 'Screen shake'], ['juiceHitstop', 'Slow motion on big moments'], ['juiceSpeedFx', 'Speed lines at top speed'],
+    ['thrillAdrenaline', 'Heartbeat near big drops'], ['thrillReplayPrompt', 'Offer a replay after big tricks'], ['thrillSpotMarkers', 'Show ? over undiscovered spots']]],
+];
+/** Sort the settings grid into sections with clear labels. Idempotent; rows it doesn't know stay at the end. */
+export function organizeSettings() {
+  const grid = document.querySelector('#settings .grid');
+  if (!grid) return;
+  const rowOf = (key) => {
+    const ctl = grid.querySelector(`[data-key="${key}"]`);
+    if (!ctl) return null;
+    const label = key === 'quality' ? grid.querySelector('#set-quality-label') : ctl.id && grid.querySelector(`label[for="${ctl.id}"]`);
+    return label ? { ctl, label } : null;
+  };
+  const known = new Set();
+  const frag = document.createDocumentFragment();
+  for (const [title, rows] of SETTINGS_LAYOUT) {
+    const found = rows.map(([k, text]) => [rowOf(k), text]).filter(([r]) => r);
+    if (!found.length) continue;
+    let h = grid.querySelector(`.set-h[data-sec="${title}"]`);
+    if (!h) { h = document.createElement('h3'); h.className = 'set-h'; h.dataset.sec = title; h.textContent = title; }
+    frag.append(h);
+    for (const [r, text] of found) { r.label.textContent = text; frag.append(r.label, r.ctl); known.add(r.ctl); known.add(r.label); }
+  }
+  const rest = [...grid.children].filter((el) => !known.has(el) && !el.classList.contains('set-h'));
+  grid.replaceChildren(frag, ...rest);
 }
 
 /** DOM that is not in index.html: the How to ride / Controls modal and the pause menu's Controls button. */
