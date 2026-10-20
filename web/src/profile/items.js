@@ -29,24 +29,16 @@ export const CLOTHING_ITEMS = [
         colors: { base: '#4d5a36', panel: '#3c4530', accent: '#d8c9a0', gaiter: '#3c4530', style: 0, pat: 'camo', patA: '#2b2a1f', patB: '#8a7650', patScale: 1 } },
       { id: 'heritage', name: 'Heritage', rarity: 'epic', series: 'first-chair',
         colors: { base: '#efe6d2', panel: '#c8392b', accent: '#f2a03a', gaiter: '#7a2a20', style: 1, pat: 'band', patA: '#c8392b', patB: '#f2a03a', finish: 'matte' } },
-      { id: 'reflective', name: 'Flashbulb', rarity: 'epic', series: 'night-park',
-        colors: { base: '#9aa1a8', panel: '#6f767d', accent: '#ff3d6e', gaiter: '#2a2c30', style: 0, finish: 'reflective' } },
-      { id: 'gold-lame', name: 'Gold Lamé', rarity: 'legendary', series: 'first-chair',
-        colors: { base: '#c9962e', panel: '#8a6418', accent: '#fff2c4', gaiter: '#3a2a10', style: 1, finish: 'metallic' } },
       { id: 'forest', name: 'Forest', rarity: 'common', series: 'first-chair',
         colors: { base: '#2f4a3a', panel: '#23382c', accent: '#e8d9a8', gaiter: '#23382c', style: 0 } },
       { id: 'bubblegum', name: 'Bubblegum', rarity: 'uncommon', series: 'night-park',
         colors: { base: '#ff8fc8', panel: '#ffd1e8', accent: '#7a3cff', gaiter: '#ffd1e8', style: 1 } },
       { id: 'checker', name: 'Board Shop', rarity: 'rare', series: 'night-park',
         colors: { base: '#f1f1ee', panel: '#141414', accent: '#ff3d6e', gaiter: '#141414', style: 0, pat: 'checker', patA: '#141414', patScale: 1 } },
-      { id: 'glacier', name: 'Glacier', rarity: 'rare', series: 'first-chair',
-        colors: { base: '#dff3ff', panel: '#7fb8e6', accent: '#1b4f8a', gaiter: '#7fb8e6', style: 0, pat: 'digital', patA: '#a9cfee', patB: '#5d8fbf', finish: 'gloss' } },
       { id: 'expedition', name: 'Expedition Red', rarity: 'common', series: 'backcountry',
         colors: { base: '#b3261e', panel: '#1b1e23', accent: '#f2efe6', gaiter: '#1b1e23', style: 0 } },
       { id: 'topo', name: 'Topo Map', rarity: 'rare', series: 'backcountry',
         colors: { base: '#c9b48a', panel: '#5a4a32', accent: '#ff5b14', gaiter: '#5a4a32', style: 0, pat: 'topo', patA: '#4a3a24', patScale: 1 } },
-      { id: 'beacon', name: 'Beacon', rarity: 'epic', series: 'backcountry',
-        colors: { base: '#ff6a00', panel: '#1b1e23', accent: '#f2efe6', gaiter: '#1b1e23', style: 1, finish: 'reflective' } },
     ],
   },
   {
@@ -62,8 +54,6 @@ export const CLOTHING_ITEMS = [
         colors: { base: '#ff8a3d', panel: '#ff3d9a', accent: '#fff36a', gaiter: '#5a1a4a', style: 0, pat: 'fade', patA: '#ff2f92', patB: '#ffb13d' } },
       { id: 'arctic', name: 'Arctic Camo', rarity: 'epic', series: 'first-chair',
         colors: { base: '#e9eef2', panel: '#b8c3cc', accent: '#3a7bd5', gaiter: '#c9d2d9', style: 0, pat: 'digital', patA: '#9aa8b4', patB: '#5d6c7a', patScale: 1 } },
-      { id: 'hologram', name: 'Hologram', rarity: 'legendary', series: 'night-park',
-        colors: { base: '#c8d4ff', panel: '#e0c8ff', accent: '#5ffbf1', gaiter: '#3b2a6a', style: 0, finish: 'iridescent' } },
       { id: 'tiger', name: 'Bengal', rarity: 'epic', series: 'night-park',
         colors: { base: '#ff8a1a', panel: '#141414', accent: '#fff3d6', gaiter: '#141414', style: 0, pat: 'tiger', patA: '#141414' } },
       { id: 'molten', name: 'Molten', rarity: 'legendary', series: 'first-chair',
@@ -72,8 +62,6 @@ export const CLOTHING_ITEMS = [
         colors: { base: '#2f7be0', panel: '#123766', accent: '#f2efe6', gaiter: '#123766', style: 0 } },
       { id: 'whiteout', name: 'Whiteout', rarity: 'rare', series: 'backcountry',
         colors: { base: '#f2f4f6', panel: '#c9d2d9', accent: '#2f7be0', gaiter: '#c9d2d9', style: 0, pat: 'digital', patA: '#d9e0e6', patB: '#aeb9c3' } },
-      { id: 'northern-lights', name: 'Northern Lights', rarity: 'legendary', series: 'backcountry',
-        colors: { base: '#0f2a2a', panel: '#103a3a', accent: '#5dffb0', gaiter: '#0f2a2a', style: 0, pat: 'fade', patA: '#5dffb0', patB: '#3b2a9a', finish: 'iridescent' } },
     ],
   },
   {
@@ -82,12 +70,6 @@ export const CLOTHING_ITEMS = [
     variants: [
       { id: 'ice-cream', name: 'Ice Cream', rarity: 'epic', series: 'night-park',
         colors: { base: '#fff1d6', panel: '#ff9ec7', accent: '#7fd6ff', gaiter: '#ff9ec7', style: 1, pat: 'band', patA: '#ff9ec7', patB: '#7fd6ff', onePiece: true } },
-      { id: 'miami-92', name: "Miami '92", rarity: 'legendary', series: 'first-chair',
-        colors: { base: '#16c2b0', panel: '#7a3cff', accent: '#ff3fa4', gaiter: '#7a3cff', style: 1, pat: 'zigzag', patA: '#ff3fa4', patB: '#7a3cff', onePiece: true } },
-      { id: 'hyperwave', name: 'Hyperwave', rarity: 'legendary', series: 'night-park',
-        colors: { base: '#1b1240', panel: '#2a1a6a', accent: '#2bf0ff', gaiter: '#1b1240', style: 1, pat: 'zigzag', patA: '#ff2fd2', patB: '#2bf0ff', finish: 'neon', onePiece: true } },
-      { id: 'expedition-86', name: "Expedition '86", rarity: 'legendary', series: 'backcountry',
-        colors: { base: '#0f6e6a', panel: '#b3261e', accent: '#ffd23f', gaiter: '#b3261e', style: 1, pat: 'zigzag', patA: '#ffd23f', patB: '#b3261e', finish: 'metallic', onePiece: true } },
       { id: 'alpine-78', name: "Alpine '78", rarity: 'epic', series: 'backcountry',
         colors: { base: '#f2efe6', panel: '#b3261e', accent: '#1f2a44', gaiter: '#b3261e', style: 1, pat: 'band', patA: '#b3261e', patB: '#1f2a44', onePiece: true } },
     ],
@@ -134,14 +116,10 @@ export const CLOTHING_ITEMS = [
         colors: { base: '#e9d9a0', panel: '#c8b28a', accent: '#4a3328', gaiter: '#c8b28a', style: 0 } },
       { id: 'cocoa', name: 'Cocoa', rarity: 'common', series: 'backcountry',
         colors: { base: '#4a3328', panel: '#2e211a', accent: '#e8e2d4', gaiter: '#2e211a', style: 0 } },
-      { id: 'midnight', name: 'Midnight Gloss', rarity: 'uncommon', series: 'night-park',
-        colors: { base: '#1c1f26', panel: '#2c3442', accent: '#2bf0c8', gaiter: '#1c1f26', style: 0, finish: 'gloss' } },
       { id: 'blush', name: 'Blush', rarity: 'uncommon', series: 'night-park',
         colors: { base: '#d9a9a3', panel: '#e8e2d4', accent: '#7a3cff', gaiter: '#e8e2d4', style: 1 } },
       { id: 'summit-orange', name: 'Summit Orange', rarity: 'rare', series: 'backcountry',
         colors: { base: '#ff6a13', panel: '#1c1c1e', accent: '#f2efe6', gaiter: '#1c1c1e', style: 1 } },
-      { id: 'silver', name: 'Silver Lining', rarity: 'epic', series: 'first-chair',
-        colors: { base: '#b8bcc2', panel: '#8a8f96', accent: '#ff3d6e', gaiter: '#3a3d42', style: 0, finish: 'metallic' } },
     ],
   },
   {
@@ -160,6 +138,104 @@ export const CLOTHING_ITEMS = [
         colors: { base: '#c6e03b', panel: '#1c1c1e', accent: '#1c1c1e', gaiter: '#1c1c1e', style: 0 } },
       { id: 'camo', name: 'Woodland Hoodie', rarity: 'rare', series: 'backcountry',
         colors: { base: '#4d5a36', panel: '#2b2a1f', accent: '#d8c9a0', gaiter: '#2b2a1f', style: 0, pat: 'camo', patA: '#2b2a1f', patB: '#8a7650', patScale: 1 } },
+    ],
+  },
+  // Round 2's six looks as catalogue jackets (character/outfits.js, docs/character.md § Catalogue jackets).
+  // All matte: earth tones, plaids, workwear, one colour per look as its Covert (legendary) pull.
+  {
+    id: 'jacket-sherpa-flannel', slot: 'jacket', garment: 'sherpa-flannel', name: 'Sherpa Flannel', unlock: 'case',
+    description: 'A sherpa-lined flannel shirt-jacket over a hoodie: the hoodie colour shows at the hood and collar.',
+    variants: [
+      { id: 'ash-plaid', name: 'Ash Plaid', rarity: 'common', series: 'night-park',
+        colors: { base: '#8f9194', panel: '#2e3034', accent: '#e9e0cc', gaiter: '#2e3034', layer: '#5a4438', style: 0 } },
+      { id: 'mustard-plaid', name: 'Mustard Plaid', rarity: 'uncommon', series: 'first-chair',
+        colors: { base: '#c4952e', panel: '#2a2420', accent: '#efe6d6', gaiter: '#2a2420', layer: '#3b3e43', style: 0 } },
+      { id: 'midnight-plaid', name: 'Midnight Plaid', rarity: 'rare', series: 'night-park',
+        colors: { base: '#2b3a5c', panel: '#121418', accent: '#e9e0cc', gaiter: '#121418', layer: '#8f9194', style: 0 } },
+      { id: 'forest-plaid', name: 'Forest Plaid', rarity: 'epic', series: 'backcountry',
+        colors: { base: '#2f5a3a', panel: '#1a1d1a', accent: '#e9e0cc', gaiter: '#1a1d1a', layer: '#2b2d30', style: 0 } },
+      { id: 'buffalo', name: 'Buffalo Rust', rarity: 'legendary', series: 'first-chair',
+        colors: { base: '#9e3d26', panel: '#1d1b1a', accent: '#e9e0cc', gaiter: '#8f9194', layer: '#8f9194', style: 0 } },
+    ],
+  },
+  {
+    id: 'jacket-insulated-freedom', slot: 'jacket', garment: 'insulated-freedom', name: 'Insulated Freedom', unlock: 'case',
+    description: 'Relaxed insulated twill with a contrast yoke and sleeves.',
+    variants: [
+      { id: 'olive-yoke', name: 'Olive', rarity: 'common', series: 'backcountry',
+        colors: { base: '#5e6140', panel: '#1b1c1e', accent: '#e9e0cc', gaiter: '#1b1c1e', style: 0 } },
+      { id: 'bone-yoke', name: 'Bone', rarity: 'uncommon', series: 'night-park',
+        colors: { base: '#e3dccb', panel: '#2b2c2e', accent: '#c4952e', gaiter: '#2b2c2e', style: 0 } },
+      { id: 'teal-yoke', name: 'Glacier Teal', rarity: 'rare', series: 'backcountry',
+        colors: { base: '#2f7f86', panel: '#1b1c1e', accent: '#f1ede4', gaiter: '#1b1c1e', style: 0 } },
+      { id: 'red-yoke', name: 'Expedition', rarity: 'epic', series: 'first-chair',
+        colors: { base: '#b3261e', panel: '#1b1c1e', accent: '#f1ede4', gaiter: '#1b1c1e', style: 0 } },
+      { id: 'saffron', name: 'Saffron Yoke', rarity: 'legendary', series: 'night-park',
+        colors: { base: '#d9982a', panel: '#1b1c1e', accent: '#f1ede4', gaiter: '#1b1c1e', style: 0 } },
+    ],
+  },
+  {
+    id: 'jacket-alpine-hardshell', slot: 'jacket', garment: 'alpine-hardshell', name: 'Alpine Hardshell', unlock: 'case',
+    description: 'A 3-layer hardshell with taped seams and a stowed helmet hood.',
+    variants: [
+      { id: 'stone', name: 'Stone', rarity: 'common', series: 'first-chair',
+        colors: { base: '#a59d8c', panel: '#6b6455', accent: '#ff6a13', gaiter: '#4a453b', style: 0 } },
+      { id: 'graphite', name: 'Graphite', rarity: 'uncommon', series: 'backcountry',
+        colors: { base: '#3a3d42', panel: '#26282c', accent: '#c9f25a', gaiter: '#1f2523', style: 0 } },
+      { id: 'glacier-shell', name: 'Glacier', rarity: 'rare', series: 'first-chair',
+        colors: { base: '#9fc3d9', panel: '#3d5a6e', accent: '#1b2a38', gaiter: '#3d5a6e', style: 0 } },
+      { id: 'ember', name: 'Ember', rarity: 'epic', series: 'night-park',
+        colors: { base: '#c2461f', panel: '#2a1c17', accent: '#f2d48a', gaiter: '#2a1c17', style: 0 } },
+      { id: 'spruce', name: 'Spruce', rarity: 'legendary', series: 'backcountry',
+        colors: { base: '#2b4f4c', panel: '#23403e', accent: '#c9f25a', gaiter: '#1f2523', style: 0 } },
+    ],
+  },
+  {
+    id: 'jacket-varsity-coach', slot: 'jacket', garment: 'varsity-coach', name: 'Varsity Coach', unlock: 'case',
+    description: 'A snow varsity jacket: the panel colour is the sleeves, the accent the rib stripes.',
+    variants: [
+      { id: 'charcoal-varsity', name: 'Charcoal', rarity: 'common', series: 'first-chair',
+        colors: { base: '#2e3034', panel: '#8f9194', accent: '#e9e0cc', gaiter: '#1d1e20', style: 0 } },
+      { id: 'maroon-varsity', name: 'Maroon', rarity: 'uncommon', series: 'backcountry',
+        colors: { base: '#5a1f22', panel: '#e8e1cf', accent: '#c4952e', gaiter: '#3a1416', style: 0 } },
+      { id: 'navy-varsity', name: 'Navy', rarity: 'rare', series: 'night-park',
+        colors: { base: '#1f2a44', panel: '#e8e1cf', accent: '#c8392b', gaiter: '#141b2e', style: 0 } },
+      { id: 'black-varsity', name: 'Black & Bone', rarity: 'epic', series: 'night-park',
+        colors: { base: '#1c1c1e', panel: '#e3dccb', accent: '#c9a25a', gaiter: '#1c1c1e', style: 0 } },
+      { id: 'letterman', name: 'Letterman', rarity: 'legendary', series: 'first-chair',
+        colors: { base: '#24452f', panel: '#e8e1cf', accent: '#d8a63a', gaiter: '#1c3324', style: 0 } },
+    ],
+  },
+  {
+    id: 'jacket-duck-canvas', slot: 'jacket', garment: 'duck-canvas', name: 'Duck Canvas Work', unlock: 'case',
+    description: 'A duck-canvas chore jacket: the panel colour is the corduroy collar.',
+    variants: [
+      { id: 'chalk', name: 'Chalk', rarity: 'common', series: 'first-chair',
+        colors: { base: '#d9d0bd', panel: '#5a4632', accent: '#8c6a3f', gaiter: '#4a3a2a', style: 0 } },
+      { id: 'tan-duck', name: 'Hamilton Tan', rarity: 'uncommon', series: 'backcountry',
+        colors: { base: '#b08a5a', panel: '#4a3224', accent: '#e3d3a8', gaiter: '#4a3224', style: 0 } },
+      { id: 'moss-duck', name: 'Moss', rarity: 'rare', series: 'night-park',
+        colors: { base: '#5f6440', panel: '#3a2a1e', accent: '#c8ab72', gaiter: '#3a2a1e', style: 0 } },
+      { id: 'black-duck', name: 'Black Duck', rarity: 'epic', series: 'first-chair',
+        colors: { base: '#2b2a28', panel: '#4a3a2a', accent: '#c8ab72', gaiter: '#2b2a28', style: 0 } },
+      { id: 'brown-duck', name: 'Brown Duck', rarity: 'legendary', series: 'backcountry',
+        colors: { base: '#8c6a3f', panel: '#43301f', accent: '#c8ab72', gaiter: '#4a3224', style: 0 } },
+    ],
+  },
+  {
+    id: 'jacket-mocha-puffer', slot: 'jacket', garment: 'mocha-puffer', name: 'Mocha Puffer', unlock: 'case',
+    description: 'A slim hip-length puffer with small baffles and a matte face.',
+    variants: [
+      { id: 'rust-puffer', name: 'Rust', rarity: 'common', series: 'backcountry',
+        colors: { base: '#9a4a2c', panel: '#7a3a22', accent: '#efe6d6', gaiter: '#3e2c23', style: 0 } },
+      { id: 'black-puffer', name: 'Matte Black', rarity: 'uncommon', series: 'night-park',
+        colors: { base: '#1f2023', panel: '#2a2b2e', accent: '#c9c2b0', gaiter: '#1f2023', style: 0 } },
+      { id: 'cream-puffer', name: 'Cream', rarity: 'rare', series: 'first-chair',
+        colors: { base: '#e6ddc8', panel: '#cfc4ad', accent: '#5a4438', gaiter: '#5a4438', style: 0 } },
+      { id: 'sage-puffer', name: 'Sage', rarity: 'epic', series: 'backcountry',
+        colors: { base: '#8e9c82', panel: '#6f7d64', accent: '#efe6d6', gaiter: '#3e4a37', style: 0 } },
+      { id: 'mocha', name: 'Mocha', rarity: 'legendary', series: 'night-park',
+        colors: { base: '#6b5244', panel: '#5a4438', accent: '#efe6d6', gaiter: '#3e2c23', style: 0 } },
     ],
   },
   {
@@ -208,6 +284,64 @@ export const CLOTHING_ITEMS = [
       { id: 'carob', name: 'Carob', rarity: 'uncommon', series: 'backcountry', colors: { base: '#4a3328', cuff: '#2e211a' } },
       { id: 'camo', name: 'Woodland', rarity: 'rare', series: 'first-chair',
         colors: { base: '#4d5a36', cuff: '#2b2a1f', pat: 'camo', patA: '#2b2a1f', patB: '#8a7650' } },
+    ],
+  },
+  // Round 2's pants (the ones worn under R1–R6).
+  {
+    id: 'pants-baggy', slot: 'pants', garment: 'baggy-pant', name: 'Baggy Pant', unlock: 'case',
+    variants: [
+      { id: 'charcoal', name: 'Charcoal', rarity: 'common', series: 'first-chair', colors: { base: '#2e3034', cuff: '#202226' } },
+      { id: 'washed-black', name: 'Washed Black', rarity: 'common', series: 'backcountry', colors: { base: '#26272a', cuff: '#18191b' } },
+      { id: 'bone', name: 'Bone', rarity: 'uncommon', series: 'night-park', colors: { base: '#e3d9c4', cuff: '#c9bea6' } },
+      { id: 'khaki', name: 'Khaki', rarity: 'rare', series: 'backcountry', colors: { base: '#a8956a', cuff: '#6e5f40' } },
+    ],
+  },
+  {
+    id: 'pants-relaxed-cargo', slot: 'pants', garment: 'relaxed-cargo', name: 'Relaxed Cargo', unlock: 'case',
+    variants: [
+      { id: 'black', name: 'Black', rarity: 'common', series: 'night-park', colors: { base: '#1b1c1e', cuff: '#111113' } },
+      { id: 'olive', name: 'Olive', rarity: 'common', series: 'first-chair', colors: { base: '#4f5434', cuff: '#353923' } },
+      { id: 'sand', name: 'Sand', rarity: 'uncommon', series: 'backcountry', colors: { base: '#c9b48a', cuff: '#8a7650' } },
+      { id: 'rust', name: 'Rust', rarity: 'rare', series: 'first-chair', colors: { base: '#8a3f24', cuff: '#4a2214' } },
+    ],
+  },
+  {
+    id: 'pants-stack', slot: 'pants', garment: 'stack-pant', name: 'Big Stack Pant', unlock: 'case',
+    variants: [
+      { id: 'black', name: 'Black', rarity: 'common', series: 'backcountry', colors: { base: '#1d1f22', cuff: '#131416' } },
+      { id: 'dark-olive', name: 'Dark Olive', rarity: 'common', series: 'night-park', colors: { base: '#2f3329', cuff: '#23261f' } },
+      { id: 'sage', name: 'Sage', rarity: 'uncommon', series: 'first-chair', colors: { base: '#8e9c82', cuff: '#5f6b55' } },
+      { id: 'lilac', name: 'Lilac', rarity: 'rare', series: 'night-park', colors: { base: '#9d8fb0', cuff: '#6a5d7e' } },
+    ],
+  },
+  {
+    id: 'pants-coach-bib', slot: 'pants', garment: 'coach-bib', name: 'Coach Bib', unlock: 'case',
+    variants: [
+      { id: 'charcoal', name: 'Charcoal', rarity: 'common', series: 'first-chair', colors: { base: '#2b2c2e', cuff: '#1c1d1f' } },
+      { id: 'forest', name: 'Forest', rarity: 'uncommon', series: 'night-park', colors: { base: '#2f4a3a', cuff: '#1f3226' } },
+      { id: 'cream', name: 'Cream', rarity: 'rare', series: 'backcountry', colors: { base: '#e8e1cf', cuff: '#bdb39c' } },
+      { id: 'brick', name: 'Brick', rarity: 'epic', series: 'first-chair', colors: { base: '#8f3a2a', cuff: '#2b1a16' } },
+    ],
+  },
+  {
+    id: 'pants-carpenter', slot: 'pants', garment: 'carpenter-pant', name: 'Carpenter Pant', unlock: 'case',
+    variants: [
+      { id: 'moss', name: 'Moss', rarity: 'common', series: 'backcountry', colors: { base: '#4a5236', cuff: '#3a4029' } },
+      { id: 'chalk', name: 'Chalk', rarity: 'common', series: 'night-park', colors: { base: '#d9d0bd', cuff: '#a89c84' } },
+      { id: 'brown-duck', name: 'Brown Duck', rarity: 'uncommon', series: 'first-chair', colors: { base: '#8c6a3f', cuff: '#5a4226' } },
+      { id: 'black-duck', name: 'Black Duck', rarity: 'rare', series: 'night-park', colors: { base: '#2b2a28', cuff: '#1a1918' } },
+    ],
+  },
+  {
+    id: 'pants-camo-cargo', slot: 'pants', garment: 'camo-cargo', name: 'Camo Cargo', unlock: 'case',
+    variants: [
+      { id: 'olive', name: 'Olive Drab', rarity: 'common', series: 'first-chair', colors: { base: '#59603f', cuff: '#3f4430' } },
+      { id: 'urban', name: 'Urban Camo', rarity: 'uncommon', series: 'night-park',
+        colors: { base: '#8e9399', cuff: '#3a3d42', pat: 'camo', patA: '#3a3d42', patB: '#c9ccd0', patScale: 1 } },
+      { id: 'woodland', name: 'Woodland Camo', rarity: 'rare', series: 'backcountry',
+        colors: { base: '#59603f', cuff: '#3f4430', pat: 'camo', patA: '#3a3f2a', patB: '#7d7656', patScale: 1 } },
+      { id: 'desert', name: 'Desert Camo', rarity: 'epic', series: 'first-chair',
+        colors: { base: '#d2b98c', cuff: '#6e5f40', pat: 'camo', patA: '#8a6a40', patB: '#efe0c0', patScale: 1 } },
     ],
   },
   {
@@ -319,7 +453,7 @@ export const CLOTHING_ITEMS = [
       { id: 'arcade', name: 'Arcade', rarity: 'common', series: 'night-park', colors: cw('arcade', 'gloves') },
       { id: 'woodland', name: 'Woodland', rarity: 'rare', series: 'first-chair', colors: { base: '#4d5a36', cuff: '#2b2a1f', pat: 'camo', patA: '#2b2a1f', patB: '#8a7650' } },
       { id: 'black', name: 'Black Leather', rarity: 'common', series: 'first-chair', colors: { base: '#1e1e1e', cuff: '#111112' } },
-      { id: 'gold-lame', name: 'Gold Lamé', rarity: 'legendary', series: 'first-chair', colors: { base: '#c9962e', cuff: '#3a2a10', finish: 'metallic' } },
+      { id: 'sherpa', name: 'Sherpa Cuff', rarity: 'legendary', series: 'first-chair', colors: { base: '#7a5236', cuff: '#e9e0cc' } },
       { id: 'brown', name: 'Saddle', rarity: 'common', series: 'backcountry', colors: { base: '#7a4a28', cuff: '#2a1d14' } },
       { id: 'expedition', name: 'Expedition', rarity: 'uncommon', series: 'backcountry', colors: { base: '#b3261e', cuff: '#1b1e23' } },
     ],
@@ -393,9 +527,31 @@ export const GOLD_ITEMS = [
   variant: { id: 'legend', name: skin, colors: { base: a, accent: b } },
 }));
 
+/**
+ * Skins taken out of the game (October 2026: the user removed every shiny / metallic / reflective /
+ * iridescent / gloss clothing finish and the zig-zag one-pieces). A rider who owned one gets the mapped
+ * skin instead: a new matte skin of the SAME grade from the SAME case series (schema.js sanitize(): the
+ * inventory, the equipped loadout and the case history / best pull are all rewritten; owning both just
+ * adds the counts). docs/rewards.md § Retired skins.
+ */
+export const RETIRED_SKINS = {
+  'jacket-tuff-shell:reflective': 'jacket-alpine-hardshell:ember',            // Flashbulb (epic, Night Park)
+  'jacket-tuff-shell:gold-lame': 'jacket-sherpa-flannel:buffalo',             // Gold Lamé (legendary, First Chair)
+  'jacket-tuff-shell:glacier': 'jacket-alpine-hardshell:glacier-shell',       // Glacier gloss (rare, First Chair)
+  'jacket-tuff-shell:beacon': 'jacket-mocha-puffer:sage-puffer',              // Beacon reflective (epic, Backcountry)
+  'jacket-tuff-shell-hood:hologram': 'jacket-insulated-freedom:saffron',      // Hologram (legendary, Night Park)
+  'jacket-tuff-shell-hood:northern-lights': 'jacket-alpine-hardshell:spruce', // Northern Lights (legendary, Backcountry)
+  'jacket-retro-suit:miami-92': 'jacket-varsity-coach:letterman',             // zig-zag (legendary, First Chair)
+  'jacket-retro-suit:hyperwave': 'jacket-mocha-puffer:mocha',                 // zig-zag + neon (legendary, Night Park)
+  'jacket-retro-suit:expedition-86': 'jacket-duck-canvas:brown-duck',         // zig-zag + metallic (legendary, Backcountry)
+  'jacket-cloud-puffer:midnight': 'jacket-mocha-puffer:black-puffer',         // Midnight Gloss (uncommon, Night Park)
+  'jacket-cloud-puffer:silver': 'jacket-duck-canvas:black-duck',              // Silver Lining metallic (epic, First Chair)
+  'gloves-tuff-mitt:gold-lame': 'gloves-tuff-mitt:sherpa',                    // Gold Lamé mitts (legendary, First Chair)
+};
+
 export const SERIES = {
-  'first-chair': { name: 'First Chair Case', blurb: 'Classic outerwear: heritage colourways, camo and chrome.', color: '#3a7bd5', accent: '#ffd23f' },
-  'night-park': { name: 'Night Park Case', blurb: 'Neon, reflective and 90s park kit under the lights.', color: '#c43cff', accent: '#2bf0ff' },
+  'first-chair': { name: 'First Chair Case', blurb: 'Classic outerwear: heritage plaids, varsity, camo and chrome lids.', color: '#3a7bd5', accent: '#ffd23f' },
+  'night-park': { name: 'Night Park Case', blurb: 'Park kit under the lights: puffers, prints and 90s colours.', color: '#c43cff', accent: '#2bf0ff' },
   backcountry: { name: 'Backcountry Case', blurb: 'Expedition colours, topo maps, beacon orange and copper.', color: '#d2691e', accent: '#f2efe6' },
 };
 export const SERIES_ORDER = ['first-chair', 'night-park', 'backcountry'];

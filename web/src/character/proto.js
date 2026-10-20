@@ -1,15 +1,18 @@
-// Jacket prototype round (docs/character.md § Prototype round). DEV ONLY: nothing here changes the
-// shipped look unless the page is opened with a URL flag:
+// The rider's body (BODIES / morphBody: every rider wears BODIES[DEFAULT_BODY], the in-between body the
+// user picked in round 2) and the jacket prototype rounds (docs/character.md § Prototype round, round 2).
+// The prototype looks are DEV ONLY (URL flags below); the catalogue garments made from R1–R6 live in
+// outfits.js.
 //
-//   ?proto=N            dress every rider on the page in prototype N (1–10) and use that prototype's body
+//   ?proto=N            dress every rider on the page in prototype N (1–10, r1–r6) and use that prototype's body
 //   ?protobody=natural  force the more natural male body (narrower shoulders / chest, slimmer arms,
-//   ?protobody=current  longer thigh) or the current Quaternius body, whatever the prototype says
+//   ?protobody=current  longer thigh), the original Quaternius body, or =mid (the default)
 //
 // The capture script (web/scripts/proto-sheet.mjs) loads one page per body and switches prototypes with
 // window.__senditProto.slots(n). Outfit cuts are passed to resolveOutfit() as inline garment definitions
 // (`def`), so no catalog item, profile or icon changes.
 import * as THREE from 'three';
-import { jacketCut, PANT_FITS } from './outfits.js';
+import { jacketCut, PANT_FITS, GARMENTS, FAB, PSTYLE, JSTYLE } from './outfits.js';
+export { FAB, PSTYLE, JSTYLE };
 
 const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
 
@@ -58,12 +61,15 @@ export const BODIES = {
   },
 };
 
-/** Body kind for this page: ?protobody overrides the prototype's own choice. */
+/** The body every rider wears in the game (the user picked round 2's in-between body, October 2026). */
+export const DEFAULT_BODY = 'mid';
+
+/** Body kind for this page: ?protobody overrides the prototype's own choice; otherwise DEFAULT_BODY. */
 export function protoBodyKind() {
   const forced = params.get('protobody');
   if (forced && forced in BODIES) return forced;
-  if (PROTO) return findProto(PROTO)?.body ?? 'current';
-  return 'current';
+  if (PROTO) return findProto(PROTO)?.body ?? DEFAULT_BODY;
+  return DEFAULT_BODY;
 }
 
 const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -198,9 +204,6 @@ export function morphBody(scene, kind = protoBodyKind()) {
 // Jacket `fab` / pants `fab` = fabric texture, jacket `style` 5+ / pants `style` = prototype layouts in
 // materials.js (fabricMaterial). Colours: jacket.layer = the hoodie worn under a layered look.
 // ------------------------------------------------------------------------------------------------
-export const FAB = { nylon: 0, hardshell: 1, twill: 2, ripstop: 3, jersey: 4, wool: 5, canvas: 6, flannel: 7, satin: 8 };
-export const PSTYLE = { plain: 0, shell: 1, cargo: 2, carpenter: 3, retro: 4 };
-export const JSTYLE = { varsity: 5, retro: 6, work: 7, shirt: 8, tee: 9 };
 
 const pants = (fit, over = {}) => ({ ...PANT_FITS[fit], ...over, fit: `proto-${fit}`, leg: { ...PANT_FITS[fit].leg, ...over.leg }, stack: { ...PANT_FITS[fit].stack, ...over.stack } });
 const mitt = { mittLength: 0.835, gauntlet: [0.618, 0.008] };
@@ -412,39 +415,18 @@ export const PROTOTYPES = [
 // R2 (round 1's P2) is the base shape the others are cut from. Pants are the user's favourite pants of
 // round 1, with the seat under the jacket trimmed (pants `seat`), so the jacket can hang straight.
 // ------------------------------------------------------------------------------------------------
-const R2_SHAPE = {
-  hemFront: 0.885, hemBack: 0.858, hemFlare: -0.004, folds: 0.8, shoulder: 0.009, seatClear: 0.022,
-  straightBack: { from: 1.44 },
-  torso: { chest: [0.24, 0.166, 0.17], waist: [0.236, 0.163, 0.17], hem: [0.238, 0.165, 0.172], n: 2.25 },
-  sleeve: { upper: 0.08, elbow: 0.079, forearm: 0.076, cuff: 0.068 }, sleeveEnd: 0.698,
-};
-const r2Cut = (fit, over = {}) => jacketCut(fit, {
-  ...R2_SHAPE, ...over,
-  torso: { ...R2_SHAPE.torso, ...over.torso }, sleeve: { ...R2_SHAPE.sleeve, ...over.sleeve },
-});
-// Round 1's pants (the ones the user liked), with a trimmer seat under the jacket.
-const SEAT = {
-  relaxed: { waist: [0.198, 0.148, 0.15], hip: [0.226, 0.145, 0.168] },
-  baggy: { waist: [0.2, 0.15, 0.152], hip: [0.232, 0.15, 0.172] },
-};
+// The round-2 cuts are the catalogue garments now (outfits.js GARMENTS): R1–R6 dress in exactly those.
+const GJ = GARMENTS.jacket, GP = GARMENTS.pants;
 const P_PANTS = {
-  baggy10: pants('baggy', { crotch: 0.805, style: PSTYLE.plain, fab: FAB.twill, seat: SEAT.baggy, leg: { thigh: 0.138, knee: 0.134, hem: 0.134 } }),
-  cargo2: pants('relaxed', { bib: null, rise: 1.085, style: PSTYLE.cargo, fab: FAB.twill, cargo: 0.012, seat: SEAT.relaxed, leg: { thigh: 0.13, knee: 0.12, hem: 0.118 } }),
-  stack3: pants('baggy', { crotch: 0.79, fab: FAB.twill, seat: SEAT.baggy, leg: { thigh: 0.146, knee: 0.142, hem: 0.142 }, cuffY: 0.07, stack: { y0: 0.08, y1: 0.36, n: 5, amp: 0.019 } }),
-  camo4: pants('baggy', { crotch: 0.8, style: PSTYLE.cargo, fab: FAB.twill, cargo: 0.016, seat: SEAT.baggy, leg: { thigh: 0.14, knee: 0.134, hem: 0.13 }, stack: { n: 4, amp: 0.017 } }),
-  bib7: pants('relaxed', { style: PSTYLE.plain, fab: FAB.twill, seat: SEAT.relaxed }),
-  carpenter9: pants('relaxed', { bib: null, rise: 1.085, style: PSTYLE.carpenter, fab: FAB.canvas, seat: SEAT.relaxed, leg: { thigh: 0.132, knee: 0.126, hem: 0.124 }, cuffY: 0.09, stack: { n: 3, amp: 0.013 } }),
+  baggy10: GP['baggy-pant'].cut, cargo2: GP['relaxed-cargo'].cut, stack3: GP['stack-pant'].cut,
+  camo4: GP['camo-cargo'].cut, bib7: GP['coach-bib'].cut, carpenter9: GP['carpenter-pant'].cut,
 };
 
 export const ROUND2 = [
   {
     id: 'r1', name: 'Sherpa Flannel', body: 'mid', pantsFrom: 'P10 baggy pant',
     fit: 'Sherpa-lined flannel shirt-jacket over a hoodie (P10, polished): straight back, no hip flare; P10 baggy pant',
-    jacket: r2Cut('relaxed', {
-      style: JSTYLE.shirt, hemFront: 0.865, hemBack: 0.852, hemFlare: -0.003, fab: FAB.flannel, folds: 1.1,
-      torso: { chest: [0.242, 0.166, 0.17], waist: [0.238, 0.164, 0.17], hem: [0.242, 0.166, 0.174], n: 2.4 },
-      collarTop: 1.605, collarEase: 0.03, hood: 'hoodie', hoodSpan: 62, hoodRoll: null,
-    }),
+    jacket: GJ['sherpa-flannel'].cut,
     pants: P_PANTS.baggy10,
     gloves: mitt,
     colors: PROTOTYPES[9].colors,
@@ -452,7 +434,7 @@ export const ROUND2 = [
   {
     id: 'r2', name: 'Insulated Freedom', body: 'mid', pantsFrom: 'P2 relaxed cargo',
     fit: 'Relaxed insulated 2L twill, contrast yoke (P2): the base shape of round 2; P2 relaxed cargo pant',
-    jacket: r2Cut('relaxed', { fab: FAB.twill, folds: 0.7, quilt: { pitch: 0.24, depth: 0.004 } }),
+    jacket: GJ['insulated-freedom'].cut,
     pants: P_PANTS.cargo2,
     gloves: mitt,
     colors: PROTOTYPES[1].colors,
@@ -460,12 +442,7 @@ export const ROUND2 = [
   {
     id: 'r3', name: 'Alpine Hardshell', body: 'mid', pantsFrom: 'P3 baggy big-stack pant',
     fit: '3L hardshell on the R2 shape: clean seams, satin sheen, stowed hood, no butt flare; P3 baggy big-stack pant',
-    jacket: r2Cut('relaxed', {
-      fab: FAB.hardshell, folds: 0.85, shoulder: 0.007,
-      torso: { chest: [0.236, 0.162, 0.168], waist: [0.232, 0.16, 0.168], hem: [0.234, 0.162, 0.17] },
-      sleeve: { upper: 0.076, elbow: 0.075, forearm: 0.072, cuff: 0.066 }, sleeveEnd: 0.7,
-      hoodRoll: [0.04, 0.062, 0.06],
-    }),
+    jacket: GJ['alpine-hardshell'].cut,
     pants: P_PANTS.stack3,
     gloves: mitt,
     colors: {
@@ -476,12 +453,7 @@ export const ROUND2 = [
   {
     id: 'r4', name: 'Varsity Coach', body: 'mid', pantsFrom: 'P7 relaxed bib',
     fit: 'Varsity / coach snow jacket on the R2 shape: shaped torso, rib hem bloused, striped rib, contrast sleeves; P7 relaxed bib',
-    jacket: r2Cut('relaxed', {
-      style: JSTYLE.varsity, hemFront: 0.895, hemBack: 0.875, hemFlare: -0.014, fab: FAB.wool, folds: 1.15,
-      torso: { chest: [0.248, 0.168, 0.17], waist: [0.228, 0.16, 0.168], hem: [0.228, 0.158, 0.166], n: 2.15 },
-      sleeve: { upper: 0.079, elbow: 0.078, forearm: 0.074, cuff: 0.056 }, sleeveEnd: 0.7,
-      collarTop: 1.598, collarEase: 0.016, hood: 'none', hoodRoll: null,
-    }),
+    jacket: GJ['varsity-coach'].cut,
     pants: P_PANTS.bib7,
     gloves: mitt,
     colors: PROTOTYPES[6].colors,
@@ -489,11 +461,7 @@ export const ROUND2 = [
   {
     id: 'r5', name: 'Duck Canvas Work', body: 'mid', pantsFrom: 'P9 double-knee carpenter',
     fit: 'Duck-canvas chore jacket on the R2 shape (no box): cord collar, patch pockets, brass snaps; P9 carpenter pant',
-    jacket: r2Cut('relaxed', {
-      style: JSTYLE.work, hemFront: 0.875, hemBack: 0.86, hemFlare: -0.002, fab: FAB.canvas, folds: 1.05,
-      torso: { chest: [0.244, 0.166, 0.17], waist: [0.232, 0.162, 0.17], hem: [0.236, 0.164, 0.172], n: 2.3 },
-      collarTop: 1.612, collarEase: 0.026, hood: 'none', hoodRoll: null,
-    }),
+    jacket: GJ['duck-canvas'].cut,
     pants: P_PANTS.carpenter9,
     gloves: mitt,
     colors: PROTOTYPES[8].colors,
@@ -501,12 +469,7 @@ export const ROUND2 = [
   {
     id: 'r6', name: 'Mocha Puffer', body: 'mid', pantsFrom: 'P4 camo cargo',
     fit: 'Hip-length puffer on the R2 shape: slim, 8.5 cm baffles, matte mocha, cinched hem, quilted collar; P4 camo cargo pant',
-    jacket: r2Cut('puffer', {
-      hemFront: 0.88, hemBack: 0.858, hemFlare: -0.008, fab: FAB.twill, folds: 0.35, shoulder: 0.011,
-      torso: { chest: [0.244, 0.17, 0.174], waist: [0.238, 0.167, 0.172], hem: [0.236, 0.166, 0.172], n: 2.2 },
-      sleeve: { upper: 0.082, elbow: 0.08, forearm: 0.077, cuff: 0.064 }, sleeveEnd: 0.694,
-      collarTop: 1.636, collarEase: 0.026, quilt: { pitch: 0.085, depth: 0.0082 },
-    }),
+    jacket: GJ['mocha-puffer'].cut,
     pants: P_PANTS.camo4,
     gloves: mitt,
     colors: {
