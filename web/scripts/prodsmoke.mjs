@@ -10,12 +10,13 @@
 //   nostorage  localStorage + IndexedDB throw (private mode / blocked cookies): lobby + ride still work
 //   corrupt    a corrupt saved profile: boots, keeps a backup copy, starts fresh
 //   nowebgl    no WebGL: the friendly "can't run here" screen, no blank page
+//   booterror  the game bundle fails to download: the friendly "Something went wrong" screen with Reload
 // Fails on console errors, page errors and any HTTP status >= 400 (e.g. a URL that ignores the base path).
 import { chromium, webkit, firefox } from '@playwright/test';
 
 const base = (process.argv[2] || 'http://localhost:4173/').replace(/\/?$/, '/');
 const shotDir = process.argv[3] || '';
-const only = (process.argv[4] || 'main,nostorage,corrupt,nowebgl').split(',');
+const only = (process.argv[4] || 'main,nostorage,corrupt,nowebgl,booterror').split(',');
 const engine = process.env.ENGINE || 'chromium';
 const T = 240000;
 const launchers = { chromium, webkit, firefox };
@@ -166,6 +167,19 @@ if (only.includes('nowebgl')) {
   ok(shown && /WebGL|graphics/i.test(text), `no WebGL: friendly screen ("${text.replace(/\s+/g, ' ').trim().slice(0, 80)}…")`);
   await shot(s.page, 'nowebgl');
   report('nowebgl', { errors: s.errors.filter((e) => !/WebGL|webgl/i.test(e)), bad: s.bad });
+  await ctx.close();
+}
+
+// ---------------------------------------------------------------- a failed download during boot
+if (only.includes('booterror')) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  // The game bundle (main-*.js in a build, src/main.js on the dev server) fails to download.
+  await ctx.route(/\/(assets\/main-[^/]+\.js|src\/main\.js)(\?|$)/, (r) => r.abort('failed'));
+  const s = await open(ctx, base);
+  const shown = await s.page.waitForSelector('#bootfail:not([hidden])', { timeout: 60000 }).then(() => true).catch(() => false);
+  const text = shown ? await s.page.textContent('#bootfail') : '';
+  ok(shown && /went wrong/i.test(text) && /Reload/.test(text), `boot error: friendly screen with Reload ("${text.replace(/\s+/g, ' ').trim().slice(0, 70)}…")`);
+  await shot(s.page, 'booterror');
   await ctx.close();
 }
 

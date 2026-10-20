@@ -101,7 +101,11 @@ export class LoadingScene {
     const rockTex = new THREE.DataTexture(new Uint8Array([128, 128, 118, 255]), 1, 1);
     rockTex.wrapS = rockTex.wrapT = THREE.RepeatWrapping;
     rockTex.needsUpdate = true;
-    this.loadRockTexture(rockTex);
+    // The photo rock (loadRockTexture) is off: it swapped an ImageBitmap into this DataTexture, which three.js
+    // uploads from image.data, so it never showed (WebKit logged "texSubImage2D: no pixels") and every
+    // loading still was rendered with the flat rock. To enable it, give it a fresh THREE.Texture and
+    // re-render the stills (scripts/loadingstills.mjs).
+    void this.loadRockTexture;
 
     this.sky = new SkyDome(atmo, noise);
     scene.add(this.sky.mesh);
