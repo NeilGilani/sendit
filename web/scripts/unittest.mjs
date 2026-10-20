@@ -347,6 +347,55 @@ await test('migration v1 → v2: keeps the worn colourway, adds a welcome case a
   assert.equal(schema.migrateProfile(null).profile.rewards.cases.length, 0);
 });
 
+await test('retired skins (shiny / zig-zag clothing): owned → the same-grade matte replacement, equipped → worn, no crash', async () => {
+  const { RETIRED_SKINS } = await import('../src/profile/items.js');
+  const keys = Object.keys(RETIRED_SKINS);
+  assert.ok(keys.length >= 12);
+  for (const [from, to] of Object.entries(RETIRED_SKINS)) {
+    const [fi, fv] = from.split(':'), [ti, tv] = to.split(':');
+    assert.ok(!catalog.getItem(fi)?.variants.some((v) => v.id === fv), `${from} is gone from the catalogue`);
+    const t = catalog.getItem(ti)?.variants.find((v) => v.id === tv);
+    assert.ok(t, `${to} exists`);
+    assert.ok(!t.colors.finish || t.colors.finish === 'matte', `${to} is matte`);
+  }
+  // No clothing skin keeps a shiny finish or a zig-zag print (helmets are hard shells: their gloss stays).
+  for (const item of catalog.listItems()) {
+    if (!['jacket', 'pants', 'gloves', 'face'].includes(item.slot)) continue;
+    for (const v of item.variants) {
+      assert.ok(!['metallic', 'reflective', 'iridescent', 'gloss', 'chrome', 'pearl'].includes(v.colors?.finish), `${item.id}:${v.id} finish ${v.colors?.finish}`);
+      assert.notEqual(v.colors?.pat, 'zigzag', `${item.id}:${v.id} zig-zag`);
+    }
+  }
+  const v2 = schema.defaultProfile();
+  v2.inventory.items = {
+    'jacket-retro-suit:hyperwave': { at: 5, n: 1, seen: true }, 'jacket-tuff-shell:gold-lame': { at: 6, n: 2, seen: true },
+    'jacket-sherpa-flannel:buffalo': { at: 9, n: 1, seen: true }, 'gloves-tuff-mitt:gold-lame': { at: 7, n: 1, seen: true },
+    'jacket-tuff-shell:woodland': { at: 8, n: 1, seen: true },
+  };
+  v2.loadout.slots.jacket = { item: 'jacket-retro-suit', variant: 'hyperwave' };
+  v2.loadout.slots.gloves = { item: 'gloves-tuff-mitt', variant: 'gold-lame' };
+  v2.rewards.history = [{ at: 1, key: 'jacket-tuff-shell:gold-lame', rarity: 'legendary' }];
+  v2.rewards.best = { key: 'jacket-retro-suit:hyperwave', rarity: 'legendary', at: 1 };
+  const { profile } = schema.migrateProfile(JSON.parse(JSON.stringify(v2)));
+  const inv = profile.inventory.items;
+  assert.ok(!inv['jacket-retro-suit:hyperwave'] && !inv['jacket-tuff-shell:gold-lame'] && !inv['gloves-tuff-mitt:gold-lame']);
+  assert.equal(inv['jacket-mocha-puffer:mocha'].n, 1);
+  assert.equal(inv['jacket-sherpa-flannel:buffalo'].n, 3, 'owned both: counts add up');
+  assert.equal(inv['gloves-tuff-mitt:sherpa'].n, 1);
+  assert.equal(inv['jacket-mocha-puffer:mocha'].seen, false, 'the replacement shows as new');
+  assert.ok(inv['jacket-tuff-shell:woodland'], 'other skins untouched');
+  assert.deepEqual(profile.loadout.slots.jacket, { item: 'jacket-mocha-puffer', variant: 'mocha' }, 'equipped retired skin → its replacement');
+  assert.deepEqual(profile.loadout.slots.gloves, { item: 'gloves-tuff-mitt', variant: 'sherpa' });
+  assert.equal(profile.rewards.history[0].key, 'jacket-sherpa-flannel:buffalo');
+  assert.equal(profile.rewards.best.key, 'jacket-mocha-puffer:mocha');
+  // Stable: a second load changes nothing.
+  assert.deepEqual(schema.migrateProfile(JSON.parse(JSON.stringify(profile))).profile.inventory, profile.inventory);
+  // A retired skin equipped but somehow not owned falls back to the starter, never crashes.
+  const v3 = schema.defaultProfile();
+  v3.loadout.slots.jacket = { item: 'jacket-tuff-shell', variant: 'reflective' };
+  assert.equal(schema.migrateProfile(v3).profile.loadout.slots.jacket.variant, 'basic');
+});
+
 await test('items: every reward skin is well formed (unique ids, known grade / case / print / finish, real models)', async () => {
   const { PATTERNS, FINISHES, DECALS, GARMENTS } = await import('../src/character/outfits.js');
   const { SERIES } = await import('../src/profile/items.js');

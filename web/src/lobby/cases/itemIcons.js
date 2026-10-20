@@ -25,7 +25,7 @@ import { skin } from '../../profile/rewards.js';
 import './icons.css';
 import { urlParams } from '../../flags.js';
 
-export const ICON_VERSION = 4;   // 4: hip-length jackets, full-rise pants and bibs (clothing pass 3)
+export const ICON_VERSION = 5;   // 5: round-2 jackets on the in-between body, R1–R6 items (4: clothing pass 3)
 export const GOLD_ICON = 'gold-star';
 const DB = 'sendit-icons', STORE = 'icons';
 

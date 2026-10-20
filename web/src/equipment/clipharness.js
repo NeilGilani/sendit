@@ -19,6 +19,7 @@ import { pickVariant, rng, tricksFor, TRICKS } from '../loading/variants.js';
 import { Shot } from '../loading/choreo.js';
 import { patchShaderChunks } from '../world.js';
 import { classify, measure, CLASS } from './clipmeasure.js';
+import { prepare as prepGarments, measureGarments } from './garmentclip.js';
 
 patchShaderChunks();
 
@@ -62,9 +63,24 @@ function snap(rider, views, label, w, h) {
     else if (v === 'side2') p = look.clone().addScaledVector(rider.board ? right : fwd, rider.board ? -3.4 : 3.4).addScaledVector(up, 0.2);
     else if (v === 'below') p = look.clone().addScaledVector(up, -2.4).addScaledVector(rider.board ? right : fwd, -1.3).addScaledVector(rider.board ? fwd : right, 1.0);
     else if (v === 'front') p = look.clone().addScaledVector(fwd, 2.6).addScaledVector(right, 1.6).addScaledVector(up, 0.7);
+    else if ('csh'.includes(v[0]) && v.length > 2) {
+      // Close-ups in the rider's own frame: c… torso, s… right shoulder / armpit, h… front hem; then
+      // front, q34, side (the rider's right), q34b, back, left. E.g. cfront, sq34, hside.
+      const L = rider.bones.thigh_l.getWorldPosition(new THREE.Vector3()).sub(rider.bones.thigh_r.getWorldPosition(new THREE.Vector3()));
+      L.y = 0; L.normalize();
+      const F = new THREE.Vector3().crossVectors(L, new THREE.Vector3(0, 1, 0));
+      const W = (n) => rider.bones[n].getWorldPosition(new THREE.Vector3());
+      const k = v[0], dist = { c: 1.55, s: 0.95, h: 1.05 }[k];
+      if (k === 'c') look.copy(W('spine_01')).add(new THREE.Vector3(0, 0.02, 0));
+      else if (k === 's') look.copy(W('spine_03')).lerp(W('upperarm_r'), 0.75).add(new THREE.Vector3(0, -0.06, 0));
+      else look.copy(W('pelvis')).lerp(W('thigh_r'), 0.3).add(new THREE.Vector3(0, -0.05, 0));
+      const yaw = { front: 0, q34: -45, side: -90, q34b: -135, back: 180, left: 90 }[v.slice(1)] * Math.PI / 180;
+      const d = F.clone().multiplyScalar(Math.cos(yaw)).addScaledVector(L, Math.sin(yaw));
+      p = look.clone().addScaledVector(d, dist).add(new THREE.Vector3(0, k === 'c' ? 0.12 : 0.05, 0));
+    }
     else p = look.clone().addScaledVector(fwd, -3.6).addScaledVector(up, 1.2);   // chase
     cam.aspect = w / h; cam.updateProjectionMatrix();
-    cam.position.copy(p); cam.up.copy(up); cam.lookAt(look);
+    cam.position.copy(p); cam.up.copy('csh'.includes(v[0]) && v.length > 2 ? new THREE.Vector3(0, 1, 0) : up); cam.lookAt(look);
     scene.add(rider.root);
     renderer.render(scene, cam);
     scene.remove(rider.root);
@@ -266,8 +282,70 @@ async function probe({ gear, variant, stance = 'regular', set = null, secs = 1 }
   return { ankleH: rider.ankleH, pelvisH: rider.pelvisH, parts: out };
 }
 
+// ------------------------------------------------------------------ garment ↔ garment (garment-clip.mjs)
+/** Point an arm bone (and so its child chain) along `dir` (armature space: +X the rider's left, +Y up, +Z forward). */
+function aimBone(bone, child, dir) {
+  rider.root.updateMatrixWorld(true);
+  const a = bone.getWorldPosition(new THREE.Vector3()), b = child.getWorldPosition(new THREE.Vector3());
+  // The rider's frame in world space: left (from the right hip to the left), world up, forward = left × up.
+  const L = rider.bones.thigh_l.getWorldPosition(new THREE.Vector3()).sub(rider.bones.thigh_r.getWorldPosition(new THREE.Vector3()));
+  L.y = 0; L.normalize();
+  const U = new THREE.Vector3(0, 1, 0), F = new THREE.Vector3().crossVectors(L, U);
+  const want = L.multiplyScalar(dir.x).addScaledVector(U, dir.y).addScaledVector(F, dir.z).normalize();
+  const dq = new THREE.Quaternion().setFromUnitVectors(b.sub(a).normalize(), want);
+  const qw = bone.getWorldQuaternion(new THREE.Quaternion());
+  const qp = bone.parent.getWorldQuaternion(new THREE.Quaternion());
+  bone.quaternion.copy(qp.invert().multiply(dq.multiply(qw)));
+  rider.root.updateMatrixWorld(true);
+}
+const ARMS = {
+  'arms down': [[0.22, -1, 0.06], [0, -1, 0.25]],
+  'arms forward': [[0.15, -0.3, 1], [0.05, -0.2, 1]],
+  'arms up': [[0.55, 1, 0.15], [0.35, 1, 0.1]],
+  'arms out': [[1, -0.15, 0.1], [1, -0.1, 0.1]],
+  'pole plant': [[0.18, -0.7, 0.75], [0.1, -0.9, 0.45]],
+};
+let gPrep = null, gKey = '';
+/** Garment clip over the game poses + arm poses. opts: { gear, variant, stance, slots, only } */
+async function runGarments({ gear = 'ski', variant = 'allmountain', stance = 'regular', slots = null, only = null, shots = false, views = ['front', 'side', 'side2'], w = 240, h = 260 }) {
+  await ensureRider(gear, variant, stance);
+  const k = JSON.stringify(slots);
+  if (k !== gKey || !gPrep) { gKey = k; rider.setOutfit(slots || {}); fitKey = 'null'; meshes = classify(rider); gPrep = prepGarments(rider); }
+  const rows = [];
+  const poses = gamePoses(gear).filter(([name]) => !only || only.some((o) => name.includes(o)));
+  for (const [name, set, secs, , style] of poses) {
+    PHYSICS.trickStyle = !!style;
+    resetPlayer();
+    for (let f = 0; f < 30; f++) rider.update(DT, null);
+    const n = Math.max(1, Math.round(secs / DT));
+    for (let f = 0; f < n; f++) { set(pl, f * DT, f); rider.update(DT, null); }
+    rider.root.updateMatrixWorld(true);
+    rows.push({ name, gear, ...measureGarments(gPrep) });
+    if (shots) snap(rider, views, `${gear} ${name}`, w, h);
+  }
+  PHYSICS.trickStyle = false;
+  // Arm poses on the standing pose (both arms aimed, the rest of the body as the game stands it).
+  if (gear === 'ski') {
+    for (const [name, [dl, dr]] of Object.entries(ARMS)) {
+      if (only && !only.some((o) => name.includes(o))) continue;
+      resetPlayer();
+      for (let f = 0; f < 90; f++) { pl.speed = 0; pl.velocity.set(0, 0, 0); rider.update(DT, null); }
+      for (const [sd, d] of [['l', dl], ['r', dr]]) {
+        const v = new THREE.Vector3(...d); if (sd === 'r') v.x *= -1;
+        aimBone(rider.bones['upperarm_' + sd], rider.bones['lowerarm_' + sd], v);
+        aimBone(rider.bones['lowerarm_' + sd], rider.bones['hand_' + sd], v.clone().add(new THREE.Vector3(0, 0, 0.6)));
+      }
+      rows.push({ name, gear, ...measureGarments(gPrep) });
+      if (shots) snap(rider, views, `${gear} ${name}`, w, h);
+    }
+  }
+  return rows;
+}
+
 window.__clip = {
   ready: true,
+  garments: (o) => runGarments(o),
+  gc: { prepare: prepGarments, measure: measureGarments, get prep() { return gPrep; } },
   probe,
   get rider() { return rider; },
   get pl() { return pl; },
