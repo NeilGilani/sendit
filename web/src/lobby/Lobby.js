@@ -425,6 +425,8 @@ export class Lobby {
       ride: () => this.ride(),
       select: (id) => this.select(id, { focus: true }),
       showCredits: () => this.ui.showCredits?.(),
+      showHowTo: (o) => this.ui.showHowTo?.(o),
+      device: () => this.input.device,
     };
   }
 

@@ -10,14 +10,17 @@ import { HUD } from './config.js';
 import { moveFocus, focusFirst, handleArrowKey, nudgeRange } from './lobby/nav.js';
 import { fmtTime } from './activities.js';
 import { loadingScreen } from './loading/index.js';
+import { howToHtml, controlsSheetHtml, markHowToSeen, HOWTO_CARDS } from './lobby/help.js';
+import { profileStore } from './profile/store.js';
 
 const $ = (id) => document.getElementById(id);
 const BASES = ['loading', 'lobby', 'pause'];
-const MODALS = ['settings', 'credits', 'results'];
+const MODALS = ['settings', 'credits', 'results', 'howto'];
 
 export class UI {
   constructor(handlers) {
     this.h = handlers;
+    buildExtraDom();
     this.screens = [...BASES, ...MODALS].reduce((o, k) => ((o[k] = $(k)), o), {});
     this.hud = $('hud');
     this.fadeEl = $('fade');
@@ -62,6 +65,7 @@ export class UI {
       case 'restart': this.h.restart(); break;
       case 'settings': this.openModal('settings'); break;
       case 'credits': this.showCredits(); break;
+      case 'controls': this.openHowTo({ sheet: 'controls' }); break;
       case 'resume': this.h.resume(); break;
       case 'top': this.h.resume(); this.h.top(); break;
       case 'menu': this.h.menu(); break;
@@ -92,6 +96,7 @@ export class UI {
 
   closeModal(restoreFocus = true) {
     if (!this.modal) return false;
+    if (this.modal === 'howto') { const f = this._howtoClose; this._howtoClose = null; f?.(); }
     this.screens[this.modal].classList.add('hidden');
     this.modal = null;
     if (restoreFocus && this.modalReturnFocus?.isConnected) this.modalReturnFocus.focus({ preventScroll: true });
@@ -114,6 +119,65 @@ export class UI {
   }
 
   showCredits() { this.loadCredits(); this.openModal('credits'); }
+
+  /**
+   * How to ride (lobby/help.js). sheet 'intro' = the four first-run cards; `onRide` (the first Ride) turns the
+   * last button into "Let's ride" and Skip into "skip and ride". sheet 'controls' = the diagrams + full list.
+   * Any way out marks the cards as seen (they come back from Help or pause → Controls).
+   */
+  openHowTo({ sheet = 'intro', onRide = null } = {}) {
+    const root = this.screens.howto;
+    const touch = this.input?.device === 'touch';
+    const card = root.querySelector('.hw-host');
+    card.innerHTML = sheet === 'controls' ? controlsSheetHtml() : howToHtml({ name: profileStore.profile?.displayName || 'Rider', touch });
+    const deck = card.firstElementChild;
+    const setDev = (d) => {
+      deck.dataset.dev = d;
+      deck.querySelectorAll('[data-dev]').forEach((b) => { b.classList.toggle('on', b.dataset.dev === d); b.setAttribute('aria-pressed', String(b.dataset.dev === d)); });
+    };
+    setDev(this.input?.device === 'gamepad' || touch ? 'gp' : 'kb');
+    deck.querySelectorAll('.hw-dev [data-dev]').forEach((b) => b.addEventListener('click', () => setDev(b.dataset.dev)));
+    const offDev = on('inputDevice', (d) => { if (d === 'gamepad') setDev('gp'); else if (d === 'keyboard') setDev('kb'); });
+    const n = HOWTO_CARDS.length;
+    let i = 0, done = false;
+    const pages = [...deck.querySelectorAll('.hw-page')];
+    const next = deck.querySelector('[data-hw=next]'), back = deck.querySelector('[data-hw=back]'), skip = deck.querySelector('[data-hw=skip]');
+    const nameEl = deck.querySelector('.hw-name input');
+    if (skip) { skip.textContent = onRide ? 'Skip' : 'Close'; }
+    const show = (j) => {
+      i = Math.max(0, Math.min(n - 1, j));
+      pages.forEach((p, k) => { p.hidden = k !== i; });
+      deck.querySelectorAll('.hw-dots i').forEach((d, k) => d.classList.toggle('on', k === i));
+      if (back) back.hidden = i === 0;
+      if (next) next.textContent = i < n - 1 ? 'Next' : onRide ? "Let's ride" : 'Done';
+    };
+    const finish = (ride) => {
+      if (done) return;
+      done = true;
+      const v = nameEl?.value.trim();
+      if (v && v !== profileStore.profile?.displayName) profileStore.setDisplayName(v);
+      this.closeModal(!ride);
+      if (ride) onRide?.();
+    };
+    this._howtoClose = () => { markHowToSeen(); offDev(); document.body.classList.remove('hw-open'); done = true; };
+    if (sheet === 'intro') {
+      show(0);
+      next.addEventListener('click', () => { if (i < n - 1) { show(i + 1); next.focus({ preventScroll: true }); } else finish(!!onRide); });
+      back?.addEventListener('click', () => { show(i - 1); (i ? back : next).focus({ preventScroll: true }); });
+      skip?.addEventListener('click', () => finish(!!onRide));
+      nameEl?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); finish(!!onRide); } });
+      // Arrow keys page through the cards (focus stays on Next); the name field keeps its arrows.
+      deck.addEventListener('keydown', (e) => {
+        if (e.target === nameEl) return;
+        if (e.key === 'ArrowRight' && i < n - 1) { e.preventDefault(); e.stopPropagation(); show(i + 1); next.focus({ preventScroll: true }); }
+        else if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); e.stopPropagation(); show(i - 1); next.focus({ preventScroll: true }); }
+      });
+    } else {
+      deck.querySelector('[data-hw=close]')?.addEventListener('click', () => this.closeModal());
+    }
+    document.body.classList.add('hw-open');
+    this.openModal('howto');
+  }
 
   /** Challenge HUD (timer, gates, best, combo) + snowflake counter, every frame. */
   updateActivity(a) {
@@ -334,6 +398,24 @@ export class UI {
       $('creditsText').innerHTML = markdown(md);
       this._credits = true;
     } catch { $('creditsText').textContent = 'Credits unavailable.'; }
+  }
+}
+
+/** DOM that is not in index.html: the How to ride / Controls modal and the pause menu's Controls button. */
+function buildExtraDom() {
+  if (!document.getElementById('howto')) {
+    const el = document.createElement('div');
+    el.id = 'howto';
+    el.className = 'screen modal hidden';
+    el.innerHTML = '<div class="vignette dim"></div><div class="hw-host"></div>';
+    (document.getElementById('fade') || document.body.lastChild).before(el);
+  }
+  const nav = document.querySelector('#pause nav');
+  if (nav && !nav.querySelector('[data-act=controls]')) {
+    const b = document.createElement('button');
+    b.dataset.act = 'controls';
+    b.textContent = 'Controls';
+    nav.insertBefore(b, nav.querySelector('[data-act=settings]'));
   }
 }
 
