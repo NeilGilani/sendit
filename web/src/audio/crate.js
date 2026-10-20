@@ -60,6 +60,7 @@ function noise() {
 }
 
 function tone(freq, t, { type = 'sine', a = 0.005, d = 0.3, gain = 0.2, detune = 0, glide = 0, rev = 0, lp = 0 } = {}) {
+  if (freq > 20000) return;   // a high bell partial above hearing (it was clamped with a console warning)
   const o = ctx.createOscillator(), g = ctx.createGain();
   o.type = type; o.frequency.setValueAtTime(freq, t); o.detune.value = detune;
   if (glide) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq * glide), t + a + d);

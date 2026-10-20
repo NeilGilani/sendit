@@ -32,6 +32,8 @@ body:has(#pause:not(.hidden)) #lvlUp, body:has(#flowHud .rs.on) #lvlUp, body:has
 #xpLv { position: absolute; left: 50%; bottom: 17px; transform: translateX(calc(-50% - 104px)); text-shadow: 0 1px 4px rgba(0,0,0,.6); font: 800 11px var(--font); letter-spacing: .14em; color: rgba(250,248,243,.7); opacity: 0; transition: opacity .6s; }
 #xpLv.on { opacity: 1; }
 body.fp #xpMini, body.fp #xpLv { display: none; }
+/* Short screens (phones sideways): the speed read-out sits lower (style.css), so the bar goes under it, not through it. */
+@media (max-height: 500px) { #xpMini { bottom: 7px; } #xpLv { bottom: 2px; } }
 body.lvlup #juiceHud .cb { opacity: 0 !important; transition: opacity .2s; }
 #rideRecap { position: fixed; right: clamp(16px, 3vw, 40px); top: 50%; z-index: 35; width: min(330px, 86vw); padding: 18px 20px 16px; border-radius: 4px;
   background: rgba(10,18,26,.94); border: 1px solid rgba(214,228,240,.14); border-top: 3px solid var(--c-signal); box-shadow: 0 18px 60px rgba(0,0,0,.4);

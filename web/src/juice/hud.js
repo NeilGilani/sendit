@@ -176,9 +176,9 @@ const CSS = /* css */`
 /* With the combo panel up (it ends ~225 px down), the live air and the announcer go under it instead of on it:
    at 720p 24 % / 30 % sat on its last lines. From ~1000 px tall the percentages already clear it. */
 #juiceHud .cb.on ~ .air { top: max(24%, 232px); }
-#juiceHud .cb.on ~ .an { top: max(30%, 290px); }
+#juiceHud .cb.on ~ .an { top: max(30%, 302px); }
 #chal:not(.hidden) ~ #juiceHud .cb.on ~ .air { top: max(24%, 258px); }
-#chal:not(.hidden) ~ #juiceHud .cb.on ~ .an { top: max(30%, 316px); }
+#chal:not(.hidden) ~ #juiceHud .cb.on ~ .an { top: max(30%, 328px); }
 body.fp #juiceHud .an { top: 42%; }   /* helmet cam: no rider in the middle, keep clear of the combo panel */
 /* Short screens (phones in landscape): the combo panel moves to the right under the score, everything shrinks, so
    the announcer, live air and the rider in the middle stay clear of each other. */
@@ -201,6 +201,9 @@ body.fp #juiceHud .an { top: 42%; }   /* helmet cam: no rider in the middle, kee
   #juiceHud .co { font-size: 18px; }
   #juiceHud .bn { top: 120px; font-size: 26px; }
   #juiceHud .bn.hi, #chal:not(.hidden) ~ #juiceHud .bn.hi { top: 46%; font-size: 22px; }
+  /* COMBO LOST comes with the crash call-out (ui.js .bigpop at 34%): above it, or under it when a race timer has the top. */
+  #juiceHud .bn.lost { top: 44px; font-size: 22px; }
+  #chal:not(.hidden) ~ #juiceHud .bn.lost { top: calc(34% + 30px); font-size: 20px; }
   #juiceHud .ts { top: 92px; transform: scale(.8); transform-origin: top left; }
   body.fp #juiceHud .an { top: 34%; }
 }

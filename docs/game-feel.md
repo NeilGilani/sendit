@@ -873,6 +873,23 @@ Fixed:
 - **Crash marks**: no groove under a ragdoll part that brushed the snow early in a frame and is already off it
   (track-ghost `ravenspire-cliff`).
 
+### Fresh-eyes pass, night 3 (launch eve)
+
+A new and a returning player's whole journey (fresh profile → How to ride → three mountains / both gears /
+Challenge → cases, Locker, Mountains, Career, Help, Settings; 1440×900, 1280×720, 390×844, 844×390; a synthetic
+save with retired skins and old records; the production build under `/sendit/`). Fixed:
+- In-ride case cards (RUN COMPLETE · x % to the next case) are cleared on lobby entry (they covered Career ›
+  Highlights' first play button) and hidden while paused (they sat on "Back to lobby"); a "Case earned!" card stays
+  and moves to the top right (`lobby/cases/notify.js`).
+- The drop-zone hint isn't shown on touch screens (no keys, no d-pad); a controller gets "d-pad ◀ ▶" only.
+- Phones: the flow meter sits under the touch pause button and clear of a race timer (`flowhud.js`); sideways, the
+  XP mini-bar goes under the speed read-out, and COMBO LOST above the crash call-out instead of through it.
+- 720p: the announcer sits 12 px lower under an open combo panel (the SKETCHY badge touched its last line).
+- Replay key hint lives in the bottom letterbox bar (grey on snow before), wraps on phones; highlight-player and
+  mountain-load captions get a shadow so they read on bright snow; Career's four sub-tabs size to their labels
+  (HIGHLIGHTS was cut to "HIGHLIGH…").
+- Case-opening bell partials above 20 kHz are skipped (they were clamped with a console warning each).
+
 ## Tests and tools
 
 - `node web/scripts/unittest.mjs` includes `progression-unit.mjs`. It covers:

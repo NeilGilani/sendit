@@ -52,6 +52,8 @@ body.fp #flowHud .fm { bottom: 46px; }
    and the end-of-run card goes compact and low so the achievement toasts above it stay readable. */
 @media (max-width: 600px) {
   #flowHud .fm, body.fp #flowHud .fm { left: 16px; top: 22px; bottom: auto; width: min(150px, 34vw); }
+  /* Under the touch pause button, and clear of a race's timer (it ran under both at 390 px). */
+  body.device-touch #flowHud .fm, body:has(#chal:not(.hidden)) #flowHud .fm { top: 72px; width: min(118px, 30vw); }
   #flowHud .fm .lab { font-size: 11px; margin-bottom: 4px; }
   #flowHud .fm .bar { height: 8px; }
   #flowHud .fm .send { top: 100%; bottom: auto; font-size: 30px; }
