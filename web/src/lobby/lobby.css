@@ -156,6 +156,11 @@ body.device-touch .lb-key { display: none; }
 #lobby .lb-sub.on { --lipc: var(--c-snow-lip); color: var(--c-paper-ink); background: var(--c-snow); border-color: var(--c-snow); }
 #lobby .lb-sub.on svg { color: var(--c-signal); }
 #lobby .lb-sub.soon:not(.on) { color: var(--c-snow-3); }
+/* Four sub-tabs (Career) must all show, never behind a hidden scroll: they share the width and drop the icons. */
+.lb-subnav:has(> .lb-sub:nth-child(4)) { overflow: visible; }
+#lobby .lb-subnav:has(> .lb-sub:nth-child(4)) .lb-sub { flex: 1 1 0; min-width: 0; justify-content: center; padding-left: 0.3em; padding-right: 0.3em; }
+#lobby .lb-subnav:has(> .lb-sub:nth-child(4)) .lb-sub svg { display: none; }
+#lobby .lb-subnav:has(> .lb-sub:nth-child(4)) .lb-sub > span { overflow: hidden; text-overflow: ellipsis; }
 .lb-panel { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   padding: 1.25em 1.4em 1.4em; border-radius: var(--r2); background: rgba(11, 19, 27, 0.95);
   border: 1px solid var(--c-line); border-top-color: var(--c-line-2);
@@ -521,12 +526,8 @@ body.device-touch .lb-ride-key { display: none; }
   .hm-daily .hm-q:nth-child(n+3) { display: none; }
 }
 @keyframes lbSheetIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-@media (max-width: 420px), (max-height: 560px) and (min-aspect-ratio: 4/5) {
+@media (max-width: 420px) {
   #lobby .lb-chip { max-width: 60vw; }
-  /* Four sub-tabs (Career) must fit without a hidden scroll: share the width, drop the icons. */
-  #lobby .lb-sub { flex: 1 1 0; min-width: 0; justify-content: center; padding: 0.55em 0.3em; }
-  #lobby .lb-sub svg { display: none; }
-  #lobby .lb-sub > span { overflow: hidden; text-overflow: ellipsis; }
 }
 /* Short landscape windows (phones sideways, small laptops). */
 @media (max-height: 560px) and (min-aspect-ratio: 4/5) {

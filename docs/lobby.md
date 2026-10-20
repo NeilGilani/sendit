@@ -8,8 +8,8 @@ right (the selected trail, the **Zen / Challenge** switch and the big **Ride** b
 **Race** in Challenge; the choice is saved in `sendit.mode`). Five destinations in the top bar lead to
 everything else in at most two clicks: **Locker** (Gear = Skis / Snowboard with every owned piece rated, compared and a ★ pick, see [equipment.md](equipment.md) "Gear stats in the Locker"; Skins = earned outfits,
 see [character.md](character.md) and [rewards.md](rewards.md)), **Cases**, **Mountains**, **Career**
-(Progress, Rankings, Profile), plus **Friends** (multiplayer, coming soon) and **Settings** as icon
-buttons. See "Navigation (v2)" and "Design system v2" below.
+(Progress, Highlights, Rankings, Profile), plus **Friends** (challenge links), **Help** (?) and **Settings** as icon
+buttons. A first-time player sees the **How to ride** cards on their first Ride (see "First run and Help"). See "Navigation (v2)" and "Design system v2" below.
 
 ```
 npm --prefix web run dev                → http://localhost:5173/        (lobby)
@@ -266,7 +266,7 @@ What they share, and the rules we built v2 on:
 top bar:  SENDIT · [Q] HOME  LOCKER  CASES  MOUNTAINS  CAREER [E] · Friends  Settings  [lift ticket]
           Locker  = Gear (Equipment) · Skins (Locker)
           Career  = Progress · Rankings (Leaderboards) · Profile
-          Friends = Multiplayer (utility button)        Settings = Settings (utility button)
+          Friends = challenge a friend (utility)   Help = How to ride, Controls, questions (utility)   Settings (utility)
 bottom right, on every screen:  trail sign  /  Zen · Challenge  +  RIDE
 ```
 
@@ -285,6 +285,36 @@ bottom right, on every screen:  trail sign  /  Zen · Challenge  +  RIDE
   `.hm-tile` (Highlights adds "Latest highlight").
 - Badges: `setLobbyBadge(tabId, n)` (lobby/tabs.js). The lobby draws the count on the sub-tab, the
   destination (sum of its tabs) and the rider plate (Skins). `cases/notify.js` feeds Cases and Skins.
+
+## First run and Help (launch pass, October 2026)
+
+What a brand-new player gets, and where it lives (`lobby/help.js` holds every binding once; keep it true to
+`input.js`, `physics/edge.js` and `thrill/`, like `loading/tips.js`):
+
+- **How to ride cards** (`UI.openHowTo({ sheet: 'intro', onRide })`, `#howto` modal built by `ui.js`): four
+  cards, Ride · Jump · Tricks · Run it back, each with a big glyph "hero" and up to three lines; the last card
+  also explains Zen vs Challenge and takes a rider name. Keyboard / Controller switch at the top (defaults to
+  the last-used device and follows it). Shown **once**, on the first Ride from the lobby or a trail
+  (`main.js startRide` → `needsHowTo()`), or right after boot on a `?ride` / `?challenge` / challenge link
+  (the ride starts paused under the cards). Next / Back / Skip / Esc (B); arrows page. Any way out marks
+  `localStorage sendit.howto = 1`; Skip and "Let's ride" start the ride. On a touch-only device the first
+  card says plainly that the game needs a keyboard or a controller (there are no touch controls).
+  Automated browsers (`navigator.webdriver`) skip it so test scripts ride straight away; `?howto` forces it
+  (once per page load), `?howto=0` turns it off.
+- **Controls sheet** (`openHowTo({ sheet: 'controls' })`): keyboard diagram (keys labelled with what they
+  do), controller diagram (call-outs, PlayStation names underneath) and the full list. From Help, Settings
+  and **pause → Controls**.
+- **Help tab** (utility, `?` icon, `tabs/help.js`): How to ride / Controls buttons, six one-sentence answers
+  (modes, picking a run, cases and gear, dailies, saving clips, racing friends), controls at a glance.
+- **Friends** is not a "coming soon" stub any more: it explains challenge links (thrill/versus.js), the
+  multiplayer that works today without a server, with a "Race <trail>" button (Challenge + Ride). Live
+  multiplayer is one quiet line. The lift ticket shows `Best <score>` / `No runs yet` instead of
+  `Guest · Offline`; Profile and Rankings no longer mention accounts or servers.
+- **Settings** are sorted into Graphics · Sound · Camera · Effects (`ui.js organizeSettings`, run when the
+  pause Settings or the lobby tab opens; rows other modules add to `#settings .grid` keep working and unknown
+  rows stay at the end). "Light snowfall" was renamed to what it does: snow on the goggles in first person.
+- Names: the top-bar words are the names everywhere (Locker → Gear / Skins, Career → Rankings, Mountains,
+  Cases). Player copy says *mountain* and *trail*, not *map*.
 
 ## Design system v2: "trail sign, with depth"
 
@@ -466,8 +496,10 @@ Hint glyphs follow the last-used device (`body.device-*`).
   rider's default (`?stance=goofy` still works in a ride).
 - Home's tiles read `progression` directly (level, dailies) and `profileStore` (cases); if
   progression ever fails to load, those tiles are simply left out.
-- Multiplayer and global leaderboards are "coming soon" stubs. Leaderboards are per
-  browser (`LocalLeaderboard`).
+- Live multiplayer and global rankings need a server. Friends explains challenge links instead; Rankings
+  are per browser (`LocalLeaderboard`).
+- There are no touch riding controls: phones can browse the lobby, and the How to ride card says a
+  keyboard or controller is needed.
 - Starting a ride with the gamepad can't take pointer lock (browsers need a mouse or keyboard
   gesture). Mouse look starts after the first click; the gamepad's right stick works anyway.
 - `?ride` builds the lobby stage only on the first return to the lobby, which adds a short wait

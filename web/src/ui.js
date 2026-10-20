@@ -67,6 +67,7 @@ export class UI {
       case 'credits': this.showCredits(); break;
       case 'controls': this.openHowTo({ sheet: 'controls' }); break;
       case 'resume': this.h.resume(); break;
+      case 'pause': this.h.pause?.(); break;
       case 'top': this.h.resume(); this.h.top(); break;
       case 'menu': this.h.menu(); break;
       case 'back': this.closeModal(); break;
@@ -445,6 +446,17 @@ function buildExtraDom() {
     el.className = 'screen modal hidden';
     el.innerHTML = '<div class="vignette dim"></div><div class="hw-host"></div>';
     (document.getElementById('fade') || document.body.lastChild).before(el);
+  }
+  // Touch screens have no Esc / Start: a small pause button in the HUD (shown only on body.device-touch).
+  const hud = document.getElementById('hud');
+  if (hud && !document.getElementById('touchpause')) {
+    const p = document.createElement('button');
+    p.id = 'touchpause';
+    p.type = 'button';
+    p.dataset.act = 'pause';
+    p.setAttribute('aria-label', 'Pause');
+    p.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M8 5h3v14H8zM13 5h3v14h-3z" fill="currentColor"/></svg>';
+    hud.appendChild(p);
   }
   const nav = document.querySelector('#pause nav');
   if (nav && !nav.querySelector('[data-act=controls]')) {

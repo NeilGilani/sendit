@@ -72,7 +72,7 @@ const ui = new UI({
   retry: () => startRide(true, 'challenge'),
   zen: () => startRide(true, 'zen'),
   restart: () => { resume(); startRide(true, activities?.mode || 'zen'); },
-  resume: () => resume(), top: () => player.resetToTop(), menu: () => toMenu(),
+  resume: () => resume(), pause: () => pause(), top: () => player.resetToTop(), menu: () => toMenu(),
 });
 
 let activities, life;

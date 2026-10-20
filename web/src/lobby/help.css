@@ -189,3 +189,8 @@ body.hw-open #pause .panel-left { visibility: hidden; }
 #settings .grid { gap: 10px 28px; }
 #settings .grid label { font-size: 15px; }
 #lobby .st-foot { display: flex; gap: 0.6em; flex-wrap: wrap; }
+
+/* Touch: a pause button in the HUD (ui.js), since there is no Esc / Start. */
+#touchpause { display: none; }
+body.device-touch #touchpause { display: grid; place-items: center; position: absolute; left: 14px; top: 14px; width: 44px; height: 44px; padding: 0;
+  pointer-events: auto; color: var(--c-snow); background: rgba(10, 18, 26, 0.7); border: 1px solid var(--c-line-2); border-radius: var(--r2); box-shadow: none; }
