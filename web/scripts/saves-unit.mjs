@@ -109,15 +109,11 @@ export async function run(test, assert) {
     assert.equal(sanitizeSettings({ quality: 'high' }).quality, 1);
   });
 
-  await test('launch: URL flags — public build keeps only shareable keys; GPU tiers for the quality auto-pick', async () => {
+  await test('launch: URL flags — a public build keeps only the shareable keys', async () => {
     const { urlParams } = await import('../src/flags.js');
     const pub = urlParams('?map=blackspruce&trail=x&ride&casegrant=5&caseforce=gold&proto=3&variant=y&vs=abc&quality=2&loadhold', false);
     assert.deepEqual([...pub.keys()].sort(), ['map', 'quality', 'ride', 'trail', 'vs']);
     assert.ok(urlParams('?casegrant=5', true).has('casegrant'), 'debug keeps dev flags');
-    const { lowTierGpu } = await import('../src/gfx/autoquality.js');
-    for (const n of ['Google SwiftShader', 'llvmpipe (LLVM 15)', 'Intel(R) UHD Graphics 620', 'Intel HD Graphics 4000', 'Adreno (TM) 640', 'Mali-G78']) assert.equal(lowTierGpu(n), 0, n);
-    for (const n of ['Apple M2', 'Intel(R) Iris(R) Xe Graphics', 'Intel(R) Arc(TM) 130V GPU', 'NVIDIA GeForce RTX 3060', 'AMD Radeon RX 6600', '']) assert.equal(lowTierGpu(n), null, n);
-    assert.equal(lowTierGpu('Apple GPU', { touch: true, small: true }), 0);
   });
 
   await test('saves: a corrupt profile is backed up, then replaced by a fresh one', async () => {

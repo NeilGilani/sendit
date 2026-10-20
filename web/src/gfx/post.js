@@ -166,7 +166,7 @@ export class GradeEffect extends Effect {
         ['goggles', new THREE.Uniform(POST.goggles)],
         ['sunScreen', new THREE.Uniform(new THREE.Vector3())], ['glare', new THREE.Uniform(POST.glare)],
         ['flare', new THREE.Uniform(POST.flare)],
-        ['lensTint', new THREE.Uniform(new THREE.Color(1, 1, 1))], ['lensFx', new THREE.Uniform(new THREE.Vector4())],
+        ['lensTint', new THREE.Uniform(new THREE.Color(1, 1, 1))], ['lensFx', new THREE.Uniform(new THREE.Vector4(0, 0, 0, 0))],   // (Vector4() is w = 1: full lens snow until setLens)
       ]),
     });
   }

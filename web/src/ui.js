@@ -406,7 +406,8 @@ export class UI {
     });
     const seg = root.querySelector('.seg');
     const mark = () => seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', Number(b.dataset.v) === settings.quality));
-    seg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { setSetting('quality', Number(b.dataset.v)); mark(); }));
+    seg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { setSetting('qualityAuto', false); setSetting('qualityLowest', false); setSetting('quality', Number(b.dataset.v)); mark(); }));   // the player's choice: auto quality never changes it again
+    on('settings', ({ key }) => { if (key === 'quality') mark(); });
     mark();
   }
 

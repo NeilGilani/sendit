@@ -6,9 +6,9 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PostStack, POST } from './gfx/post.js';
 import { urlParams } from './flags.js';
-import { autoPickQuality, watchFrameRate } from './gfx/autoquality.js';
 const POST_EXPOSURE = POST.exposure;
 import { PERF } from './gfx/perf.js';
+import { initAutoQuality } from './gfx/autoquality.js';
 import { prewarm, warmQualityVariants } from './gfx/prewarm.js';
 import { rockTextureReady } from './gfx/snow.js';
 import { patchShaderChunks, globals, makeNoiseTexture, applyMapAtmosphere } from './world.js';
@@ -60,7 +60,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.NoToneMapping;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-autoPickQuality(renderer, params);   // weak / software GPUs start on Low unless the player chose (gfx/autoquality.js)
+const autoQ = initAutoQuality(renderer, params);   // first launch: quality from the GPU + a frame check in the first ride (gfx/autoquality.js)
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(col(ATMOSPHERE.aerialColor), ATMOSPHERE.aerialDensity);
@@ -213,7 +213,7 @@ async function boot() {
     getName: () => profileStore.profile?.displayName || 'Rider',
   });
   applyQuality();
-  on('settings', ({ key }) => { if (key === 'quality') applyQuality(); });
+  on('settings', ({ key }) => { if (key === 'quality' || key === 'qualityLowest') applyQuality(); });
   addEventListener('resize', onResize);
   onResize();
   terrain.update(terrain.getSpawn().position, Infinity);   // full detail around the start before the first frame
@@ -235,7 +235,6 @@ async function boot() {
     // A first-time player who arrives on a ride link (e.g. a friend's challenge) gets the How to ride cards first.
     if (needsHowTo()) { pause(); ui.openHowTo({ onRide: () => resume() }); }
   } else { setMode(Mode.MENU); ui.refresh(); }
-  watchFrameRate(params);   // still too slow in the lobby → one step lower (gfx/autoquality.js)
   window.__sendit = {
     activities, life,
     fx, course, player, rider, terrain, camera, game, scene, renderer, features, scatter,
@@ -397,7 +396,8 @@ function setupPost() {
 function applyQuality() {
   const q = settings.quality;
   const pr = PERF.pixelRatio[q], sh = PERF.shadow[q];   // perf tiers: gfx/perf.js
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, pr.cap) * pr.scale);
+  const lowest = q === 0 && settings.qualityLowest ? PERF.lowestScale / pr.scale : 1;   // auto quality's last step (gfx/autoquality.js)
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, pr.cap) * pr.scale * lowest);
   sky.setShadowBox(sh.box, sh.map);
   post.setQuality(q);
   terrain.setQuality(q);
@@ -611,6 +611,7 @@ function frame(now) {
   juice?.update(paused || replaying ? 0 : dt, time);
   if (!replaying) progressUpdate?.(dt);
   if (!paused && !replaying) thrill?.update(dt);
+  autoQ.sample(dt, riding && !replaying);
   input.endFrame();
   composer.render(dt);
 }

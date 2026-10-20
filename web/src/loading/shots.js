@@ -80,7 +80,11 @@ export function planMove(kind, shot, sun, r, H) {
     case 'reveal': {
       m.a = V(side * 4.5, lip.y + 1.8, 7);
       // Pulls back and up over the shoulder, but not so far that the rider becomes a speck.
-      m.b = V(side * r.range(15, 22), A.y + r.range(11, 17), r.range(16, 26));
+      // Out to the side rather than back up the ridge: from behind the lip the line-of-sight lift had to
+      // climb 50 m+ to see the ride-out, and the rider ended a speck (was 15–22 / 11–17 / 16–26).
+      m.b = V(side * r.range(15, 21), A.y + r.range(5, 9), r.range(2, 9));
+      m.endAfterLanding = 1.6;
+      m.targets = [A, M, Lp.clone().add(V(0, 0.5, 0))];
       m.fov = 44;
       m.fov1 = 52;
       m.pos = (s) => m.a.clone().lerp(m.b, ease(smooth(0.05, 1.0, s)));
@@ -94,7 +98,7 @@ export function planMove(kind, shot, sun, r, H) {
       m.pos = (s, com, t) => {
         const a = a0 + sweep * ease(s);
         const p = V(com.x + Math.sin(a) * R, com.y + h, com.z + Math.cos(a) * R);
-        p.y = Math.max(p.y, H(p.x, p.z) + 1.2);
+        p.y = Math.max(p.y, H(p.x, p.z) + 1.8);   // not skimming the snow (a wall of white behind the rider)
         return p;
       };
       m.look = (s, com) => com.clone();
@@ -182,6 +186,50 @@ export function planMove(kind, shot, sun, r, H) {
   if (lift > 0) { const pos = m.pos; m.pos = (s, com, t) => pos(s, com, t).add(V(0, lift, 0)); }
   m.lift = lift;
   return m;
+}
+
+/**
+ * How badly the terrain spoils a planned move (0 = clean), sampled over the shot: the snow hiding the
+ * rider (+2), the camera tucked against a slope that rises beside it — the frame becomes a blurred wall
+ * of snow with the rider pressed against it (+1), or the camera crowding the rider (+1).
+ */
+export function terrainScore(m, shot, H, n = 12) {
+  // Over the part of the shot this move actually films (scene.js trims the shot to the move's window).
+  const t0 = Math.max(shot.tStart, m.t0 ?? -Infinity), t1 = m.endAfterLanding != null ? Math.min(shot.tEnd, shot.Ta + m.endAfterLanding) : shot.tEnd;
+  const com = new THREE.Vector3(), q = new THREE.Vector3();
+  let score = 0;
+  for (let i = 0; i <= n; i++) {
+    const s = i / n, t = t0 + (t1 - t0) * s;
+    if (shot.comAt) shot.comAt(t, com); else shot.com(t, com);   // made-up Shot: com() is the air arc only
+    const p = m.pos(s, com, t);
+    const d = p.distanceTo(com);
+    for (let k = 2; k < 10; k++) {
+      q.copy(p).lerp(com, k / 11);
+      if (q.y < H(q.x, q.z) + 0.15) { score += 2; break; }
+    }
+    // A slope rising above the lens close beside it (on ≥ 3 of 8 bearings, 3 m out).
+    let walls = 0;
+    for (let a = 0; a < 8; a++) {
+      const x = p.x + Math.cos(a * Math.PI / 4) * 3, z = p.z + Math.sin(a * Math.PI / 4) * 3;
+      if (H(x, z) > p.y + 0.4) walls++;
+    }
+    if (walls >= 3) score += 1;
+    if (d < 3.2) score += 1;
+    // A lump of snow / rock right in front of the lens under the rider (a dark blur over the bottom of the frame).
+    for (let k = 1; k <= 4; k++) {
+      const f = k / 11;
+      const x = p.x + (com.x - p.x) * f, y = p.y + (com.y - 1.4 - p.y) * f, z = p.z + (com.z - p.z) * f;
+      if (y < H(x, z)) { score += 1; break; }
+    }
+    // Rider pressed against a wall of snow: the slope rises into the line of sight within ~15 m behind
+    // the rider (a gully wall filling the frame instead of sky / range).
+    const dir = q.copy(com).sub(p).normalize();
+    for (let k = 3; k <= 15; k += 3) {
+      const x = com.x + dir.x * k, y = com.y + dir.y * k, z = com.z + dir.z * k;
+      if (H(x, z) > y + 0.3) { score += 1; break; }
+    }
+  }
+  return score;
 }
 
 /** Drives a camera with a planned move. */

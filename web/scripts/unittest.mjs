@@ -32,6 +32,8 @@ await (await import('./clips-unit.mjs')).run(test, assert);
 await (await import('./gear-advisor-unit.mjs')).run(test, assert);
 // Save robustness (old versions, retired skins, corrupt / hostile JSON, backups): scripts/saves-unit.mjs.
 await (await import('./saves-unit.mjs')).run(test, assert);
+// First-launch auto quality (gfx/autoquality.js): scripts/autoquality-unit.mjs.
+await (await import('./autoquality-unit.mjs')).run(test, assert);
 
 // ---------------------------------------------------------------- schema
 await test('default profile is valid with a full loadout', () => {
