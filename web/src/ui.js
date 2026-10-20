@@ -39,6 +39,7 @@ export class UI {
     });
     on('score', ({ label, points }) => this.note(label, points));
     on('hint', (t) => this.hint(t));
+    on('qualityHeavy', () => this.qualityHint());   // gfx/autoquality.js: the player's High runs < ~30 fps here
     on('liftBoarded', (name) => { $('liftlabel').textContent = `${name}  ·  hold W / RT to hurry`; });
     on('mode', () => this.refresh());
     // Landing grades, close shaves and combo banks are announced by the juice HUD (juice/hud.js).
@@ -404,10 +405,46 @@ export class UI {
       if (fs) fs.checked = !!document.fullscreenElement;
     });
     const seg = root.querySelector('.seg');
+    const hi = seg.querySelector('button[data-v="2"]');
+    if (hi) { hi.textContent = 'High (strong GPUs)'; hi.title = 'Ambient occlusion, sharper shadows, more detail. Needs a strong GPU.'; }
     const mark = () => seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', Number(b.dataset.v) === settings.quality));
     seg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { setSetting('qualityAuto', false); setSetting('qualityLowest', false); setSetting('quality', Number(b.dataset.v)); mark(); }));   // the player's choice: auto quality never changes it again
     on('settings', ({ key }) => { if (key === 'quality') mark(); });
     mark();
+  }
+
+  /**
+   * One-time notice when the player's own High choice runs slower than ~30 fps (gfx/autoquality.js
+   * heavyHighWatch): a one-click switch to Medium, or keep High. Never changes anything by itself.
+   */
+  qualityHint() {
+    if (document.getElementById('qhint') || settings.quality !== 2) return;
+    if (!document.getElementById('qhint-css')) {
+      const css = document.createElement('style');
+      css.id = 'qhint-css';
+      css.textContent = `#qhint { position: fixed; top: 14px; left: 50%; transform: translate(-50%, -8px); z-index: 60; display: flex; align-items: center; gap: 10px;
+  max-width: calc(100vw - 32px); padding: 8px 8px 8px 14px; background: var(--c-ink, #0f1a24); color: var(--c-snow, #f2f4f1); border: 1px solid var(--c-line-2, rgba(214,228,240,.3));
+  border-radius: var(--r2, 4px); font: 14px/1.3 var(--font, sans-serif); box-shadow: 0 6px 24px rgba(0,0,0,.35); opacity: 0; transition: opacity .3s, transform .3s; pointer-events: auto; }
+#qhint.on { opacity: 1; transform: translate(-50%, 0); }
+#qhint button { font: 600 13px/1 var(--font, sans-serif); padding: 7px 10px; border-radius: var(--r1, 2px); cursor: pointer; white-space: nowrap; border: 1px solid var(--c-line-2, rgba(214,228,240,.3)); background: transparent; color: var(--c-snow-2, #b3bfca); }
+#qhint button.go { background: var(--c-signal, #ff5a1f); border-color: var(--c-signal, #ff5a1f); color: #fff; }
+@media (max-width: 560px) { #qhint { flex-wrap: wrap; font-size: 13px; } }`;
+      document.head.appendChild(css);
+    }
+    const el = document.createElement('div');
+    el.id = 'qhint';
+    el.setAttribute('role', 'status');
+    el.innerHTML = '<span>High is heavy on this device — Medium recommended</span><button class="go" type="button">Switch to Medium</button><button type="button" aria-label="Keep High">Keep High</button>';
+    let unsub = null;
+    const close = () => { el.classList.remove('on'); setTimeout(() => el.remove(), 350); unsub?.(); unsub = null; };
+    const [go, keep] = el.querySelectorAll('button');
+    go.addEventListener('click', () => { setSetting('qualityAuto', false); setSetting('qualityLowest', false); setSetting('quality', 1); close(); });
+    keep.addEventListener('click', close);
+    const onQ = ({ key }) => { if (key === 'quality' && settings.quality !== 2) close(); };
+    unsub = on('settings', onQ);
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('on'));
+    setTimeout(() => { if (el.isConnected) close(); }, 45000);
   }
 
   async loadCredits() {

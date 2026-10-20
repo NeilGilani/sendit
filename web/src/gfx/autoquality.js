@@ -11,7 +11,12 @@
 // yet (a first launch) or carry `qualityAuto: true` (set by this module). Clicking a quality button
 // clears `qualityAuto` (ui.js), and `?quality=` in the URL turns the whole thing off. Automated browsers
 // (navigator.webdriver: the test scripts) are left alone unless the URL has `?autoq`.
-import { settings, setSetting, SETTINGS_KEY } from '../state.js';
+//
+// Heavy-High hint: a player who picks High on a GPU that can't carry it (an M1 Air at 2x) gets one small
+// notice, once per device: "High is heavy on this device — Medium recommended", with a one-click switch
+// (ui.js qualityHint, event 'qualityHeavy'). Nothing changes on its own. Same rules: steady riding only,
+// not with ?quality= or in automated browsers (unless ?autoq).
+import { settings, setSetting, SETTINGS_KEY, emit } from '../state.js';
 
 /** Quality for a GPU name (lower-case match). Pure: unit-tested in scripts/unittest.mjs. */
 export function tierQuality(gpu = '', { pixels = 0, mobile = false } = {}) {
@@ -46,6 +51,34 @@ function storedSettings() {
 
 // Frame check: ignore the first WARM s of the ride (LOD streaming, shader warm-up), then sample WINDOW s.
 const WARM = 4, WINDOW = 8, SLOW_MS = 27.5;
+// Heavy-High hint: median frame over HEAVY_WINDOW s of steady riding (after WARM) slower than HEAVY_MS (~30 fps).
+const HEAVY_WINDOW = 4, HEAVY_MS = 33;
+
+/**
+ * The heavy-High watcher: sample(dt, riding) per frame; emits 'qualityHeavy' (once per device, flag
+ * `qualityHeavyHinted`) when the player's own High choice runs slower than ~30 fps. Pure state machine.
+ */
+export function heavyHighWatch() {
+  let riding = 0, frames = [];
+  return {
+    sample(dt, isRiding) {
+      if (settings.quality !== 2 || settings.qualityAuto || settings.qualityHeavyHinted) { riding = 0; frames = []; return; }
+      if (!isRiding) { riding = 0; frames = []; return; }
+      riding += dt;
+      if (riding < WARM) return;
+      frames.push(dt * 1000);
+      if (riding < WARM + HEAVY_WINDOW) return;
+      const sorted = frames.slice().sort((a, b) => a - b);
+      const med = sorted[sorted.length >> 1];
+      frames = []; riding = WARM;   // keep watching in rolling windows while riding
+      if (med > HEAVY_MS) {
+        setSetting('qualityHeavyHinted', true);
+        console.log(`[gfx] High is heavy here: median frame ${med.toFixed(1)} ms`);
+        emit('qualityHeavy', { median: med });
+      }
+    },
+  };
+}
 
 /**
  * Call once at boot, after the renderer exists and before quality is applied. Returns an object whose
@@ -59,7 +92,8 @@ export function initAutoQuality(renderer, params = new URLSearchParams(globalThi
   if (webdriver && !params.has('autoq')) return off;
   const stored = storedSettings();
   const gpu = gpuName(renderer);
-  if ('quality' in stored && !stored.qualityAuto) return { ...off, gpu };   // the player's own choice
+  const heavy = heavyHighWatch();
+  if ('quality' in stored && !stored.qualityAuto) return { ...off, gpu, sample: heavy.sample };   // the player's own choice
   if (!('quality' in stored)) {
     const ua = navigator.userAgent || '';
     const mobile = /Android|iPhone|iPad|iPod/i.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua) && !/Chrome/.test(ua));   // iPadOS reports a Mac
@@ -70,12 +104,12 @@ export function initAutoQuality(renderer, params = new URLSearchParams(globalThi
     setSetting('qualityAuto', true);   // saves the whole settings object (quality included)
     console.log(`[gfx] auto quality ${q} (${gpu || 'GPU unknown'})`);
   }
-  if (stored.qualityAutoDone || settings.qualityAutoDone) return { active: true, gpu, sample() {} };
+  if (stored.qualityAutoDone || settings.qualityAutoDone) return { active: true, gpu, sample: heavy.sample };
   let riding = 0, frames = [];
   const st = {
     active: true, gpu,
     sample(dt, isRiding) {
-      if (!settings.qualityAuto || settings.qualityAutoDone) return;
+      if (!settings.qualityAuto || settings.qualityAutoDone) { heavy.sample(dt, isRiding); return; }   // the player picked a level since
       if (!isRiding) { riding = 0; frames = []; return; }   // only steady riding counts (not lobby, pause, replay)
       riding += dt;
       if (riding < WARM) return;
