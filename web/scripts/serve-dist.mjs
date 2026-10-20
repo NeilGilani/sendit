@@ -41,12 +41,13 @@ http.createServer((req, res) => {
   const st = fs.statSync(file);
   const etag = `"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}"`;
   headers.ETag = etag;
-  if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers); res.end(); return; }
+  if (req.headers["if-none-match"] === etag) { if (process.env.LOG) console.log(`304 ${url.pathname}`); res.writeHead(304, headers); res.end(); return; }
   const ae = String(req.headers['accept-encoding'] || '');
   let send = file;
   if (/\bbr\b/.test(ae) && fs.existsSync(file + '.br')) { send = file + '.br'; headers['Content-Encoding'] = 'br'; }
   else if (/\bgzip\b/.test(ae) && fs.existsSync(file + '.gz')) { send = file + '.gz'; headers['Content-Encoding'] = 'gzip'; }
   headers['Content-Length'] = fs.statSync(send).size;
+  if (process.env.LOG) console.log(`200 ${headers["Content-Length"]} ${url.pathname}`);   // LOG=1: every full response
   res.writeHead(200, headers);
   if (req.method === 'HEAD') { res.end(); return; }
   fs.createReadStream(send).pipe(res);

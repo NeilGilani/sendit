@@ -111,16 +111,22 @@ mountain by reload → riding; URL cheats ignored; no console errors, no HTTP �
 - First paint: index.html's inline script picks a loading still and preloads it before any bundle — decoded
   ~40–60 ms after navigation on a warm local server (Chromium). The live loading scene starts in a worker.
 - Lobby ready from a local server (MacBook Air, Chromium/Metal, other workloads running): 8–14 s; WebKit
-  24–30 s. First visit before the lobby: ~55 requests, ~16 MB uncompressed (the JS is ~3.7 MB of that,
-  ~0.9 MB gzipped). On a real connection add download time: ~16 MB is ~13 s at 10 Mbit/s, so the
-  loading screen (still at once, live scene from the worker) covers it.
+  24–30 s. First visit, measured at the server (`LOG=1 node web/scripts/serve-dist.mjs …`): **35 network
+  transfers, 14.0 MB** up to the lobby plus the first click (music); about 11 MB on a host that gzips the
+  JS (3.5 MB → ~0.9 MB). The browser shows ~55 requests / 25 MB because the rider's files are requested by
+  the loading worker, the game, the lobby stage and the icon baker — the repeats are HTTP-cache hits
+  (needs `max-age` / ETag on the host, which every static host sends). ~11 MB is ~9 s at 10 Mbit/s, covered
+  by the loading screen (still at once, live scene from the worker). A second visit transfers only what
+  changed.
+- Biggest single items: the rider's PNG textures (4.9 MB: hair and body normal maps 1.2 + 1.1 MB) — converting
+  them to WebP / KTX2 (character area) would cut first load by ~3–4 MB; the two music .ogg (4 MB, after the
+  first click); main + loading-scene bundles (3.5 MB raw).
 - **Quality auto-pick** (`gfx/autoquality.js`): players who never chose a quality start on Low on software
   renderers (SwiftShader / llvmpipe), older Intel HD / UHD iGPUs and phone / tablet GPUs; if the lobby still
   averages > 42 ms per frame for ~150 frames, it steps down (max twice). Off under automation
   (`navigator.webdriver`), with `?quality`, or once the player picked a quality.
-- Heaviest downloads: the rider's PNG textures (~5 MB, models/skier), the two music tracks (~4 MB each as
-  .ogg; only the .ogg is fetched where supported), the Lake Tahoe elevation (~1.8 MB per resort, only when
-  that mountain loads).
+- Only the .ogg of each sound is fetched where the browser decodes it (the .mp3 is the fallback). Lake Tahoe
+  elevation (~1.8 MB per resort) loads only with that mountain.
 
 ## Known limits
 
