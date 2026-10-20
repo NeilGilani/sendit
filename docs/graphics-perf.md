@@ -416,9 +416,18 @@ rock-detail range, nearer frond trees (80 m vs 58 m), SMAA High, lens ghosts, fu
 chase cam, carving; `perf3.mjs` in the night-3 scratchpad). The machine was shared with four other workers'
 browsers, so absolute values swing ±50 %; compare within a run. In quiet stretches Medium measured 20–25 ms.
 
-| | Medium | High before (cap 1.5) | High after |
-|---|---|---|---|
-| Valcrest | 21 ms | 167–237 ms | see final table below |
+Final run, quiet machine (04:08, load 1.3), 120 frames each:
+
+| map | Medium GPU med / p95 | High before (cap 1.5) | **High after** GPU med / p95 | High / Medium | rAF > 33 ms (High) |
+|---|---|---|---|---|---|
+| Valcrest | 20.0 / 20.6 ms | 167–237 ms | **29.4 / 39.4 ms** | 1.47× | 0 / 125 |
+| Blackspruce | 24.6 / 26.1 | 196–279 (cap 2) | **50.1 / 53.4** | 2.0× | 0 / 128 |
+| Ravenspire | 20.5 / 21.6 | 242–274 (cap 2) | **33.4 / 46.0** | 1.63× | 0 / 248 |
+
+Main-thread CPU is 3–4 ms a frame at both levels. Caveat: on this Mac the Metal timer values cluster at
+multiples of the 16.7 ms display interval (33, 49 ms), so they read as "1, 2 or 3 vsyncs" more than exact
+GPU time; Blackspruce (dense forest) sits at 3 intervals on High. A player on an M1 Air who picks High now gets
+a playable 20–35 fps instead of 4–5; if it's under ~30 fps the notice below offers Medium.
 
 In-page A/B on Valcrest (one High page, knobs switched to Medium values, 5 interleaved rounds): High / Medium
 ≈ 1.5 after this pass (base 65.5 vs Medium-equivalent 43.5 ms under load); AO now costs ~6 % of the High
