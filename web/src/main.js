@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PostStack, POST } from './gfx/post.js';
 import { urlParams } from './flags.js';
+import { autoPickQuality, watchFrameRate } from './gfx/autoquality.js';
 const POST_EXPOSURE = POST.exposure;
 import { PERF } from './gfx/perf.js';
 import { prewarm, warmQualityVariants } from './gfx/prewarm.js';
@@ -58,6 +59,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.NoToneMapping;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+autoPickQuality(renderer, params);   // weak / software GPUs start on Low unless the player chose (gfx/autoquality.js)
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(col(ATMOSPHERE.aerialColor), ATMOSPHERE.aerialDensity);
@@ -229,6 +231,7 @@ async function boot() {
   ui.fade(false, 2.0);
   if (params.has('ride') || params.has('challenge')) startRide(true, params.has('challenge') ? 'challenge' : 'zen');
   else { setMode(Mode.MENU); ui.refresh(); }
+  watchFrameRate(params);   // still too slow in the lobby → one step lower (gfx/autoquality.js)
   window.__sendit = {
     activities, life,
     fx, course, player, rider, terrain, camera, game, scene, renderer, features, scatter,
