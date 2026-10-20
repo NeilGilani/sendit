@@ -50,6 +50,7 @@ patchShaderChunks();
 profileStore.load();
 
 const params = new URLSearchParams(location.search);
+const GEAR_SWAP_KEY = params.has('gearswap');
 const gearVariant = params.get('variant') || undefined;   // ?variant=<model id> (debug: overrides the equipped catalog item's model)
 if (params.has('quality')) settings.quality = Number(params.get('quality'));
 const canvas = document.getElementById('game');
@@ -547,7 +548,9 @@ function frame(now) {
   if (!composer || warming) return;
   input.poll(dt);
   const replaying = !!thrill?.input();   // instant replay (thrill/replay.js): the ride is frozen while it plays
-  if (!replaying && game.mode === Mode.RIDING && input.pressed.has('KeyE') && rider) profileStore.setEquipment(profileStore.equipment === 'snowboard' ? 'skis' : 'snowboard');   // debug: swap gear while riding (via the profile, so the lobby stays in sync)
+  // Debug only (?gearswap): E swaps the gear mid-ride (via the profile, so the lobby stays in sync). For players E is
+  // the lobby's next-tab key and swapping skis / board mid-run by accident was confusing.
+  if (GEAR_SWAP_KEY && !replaying && game.mode === Mode.RIDING && input.pressed.has('KeyE') && rider) profileStore.setEquipment(profileStore.equipment === 'snowboard' ? 'skis' : 'snowboard');
   if (!replaying && input.justPressed('view') && (game.mode === Mode.RIDING || game.mode === Mode.LIFT)) {
     setSetting('view', settings.view === 'fp' ? 'tp' : 'fp');
     ui.pop(settings.view === 'fp' ? 'FIRST PERSON' : 'CHASE CAM', 'cyan', true);
