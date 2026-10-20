@@ -365,7 +365,8 @@ median. No console errors. Boot to riding 10–24 s on this loaded machine.
   the parallax terrain: 200–280 ms a frame (4–5 fps). Even at 1× High costs ~85–99 ms here (AO ≈ 40 ms,
   terrain q2 ≈ 30 ms, 3072 → 2048 shadow ≈ 20 ms in single-knob A/B; noisy). High's cap is now **1.5**
   (2.25× fewer pixels on 2× screens; 167–237 ms measured right after, machine still busy). High remains a
-  setting for discrete GPUs; the auto pick never chooses it.
+  setting for discrete GPUs; the auto pick never chooses it. **Fixed later the same night: see "High on an
+  M1 Air" below (High is now ~1.5–2.5× Medium, not 10×).**
 - **Low** is mostly a pixel-count saving (0.75 scale, 1.6× cheaper than Medium here). For a weak laptop
   (Intel UHD class, ~4× slower than an M1) that is still ~50 ms, so auto quality has one more step:
   render scale 0.6 at Low (`PERF.lowestScale`), only for automatic settings.
@@ -384,3 +385,62 @@ First launch only (no `quality` stored yet, or `qualityAuto: true` from an earli
 3. **Never overrides a choice**: clicking a quality button clears `qualityAuto` (and the lowest scale);
    `?quality=` turns it off; automated browsers (`navigator.webdriver`, i.e. the test scripts) are left alone
    unless the URL has `?autoq`. Console: `[gfx] auto quality …`.
+
+## High on an M1 Air (night 3, 2026-10-20)
+
+**Root cause.** N8AO's `autoDetectTransparency` (on by default) finds any transparent material in the scene
+(spray, mist, sky bits), turns on `transparencyAware`, and from then on renders **the whole scene twice more
+every frame** for its transparency targets, and each of those `renderer.render()` calls re-renders the sun
+shadow map too. That is why "AO ≈ 40 ms" and "3072 shadow ≈ 20 ms" looked so expensive in single-knob tests:
+both were the same extra scene passes. `gfx/post.js` now sets `autoDetectTransparency = false` and
+`transparencyAware = false`. Spray / mist get a faint AO tint from the snow behind them; not visible in play.
+
+**What High is now** (`PERF[2]` in `gfx/perf.js`, `terrain.js qualityDefines`, `gfx/snow.js`):
+
+| knob | before | now | why |
+|---|---|---|---|
+| N8AO transparency pass | auto (on) | off | 2 extra scene + shadow renders a frame |
+| pixel ratio cap | 1.5 (was 2) | 1 (CSS resolution, like Medium) | 0.5 of cap ≈ 2× pixels on a 2× screen; High's look is AO / shadows / terrain, not pixel count |
+| AO | Medium mode, 2 denoise passes, half res | Performance mode, 1 denoise pass, half res | same soft contact AO at intensity 1.15 |
+| shadow map | 3072, ±85 m | 2560, ±72 m | same texel size (5.6 cm), less depth fill |
+| terrain LOD distances | ×1.5 | ×1.25 | |
+| near rock | full (fine fracture cells, 3 projections) | lite (as Medium) + macro facets | |
+| flutes (steep snow) | 2 scales × 4 cells × 5 normal taps | both scales in one pass, cell normal from one tap of a ~32 m mip | same runnels, ~⅓ of the fetches |
+| parallax tracks | 10 + 4 steps, out to 45 m | 7 + 3 steps, out to 36 m | sub-pixel beyond |
+| far ring / backdrop | full rock + flutes everywhere | macro buttresses, rock blocks out to 2.7 km (Medium 1.5 km), plain tone beyond | |
+
+Still High-only vs Medium: AO, wider shadow box, parallax track trenches, flutes, far buttresses, longer
+rock-detail range, nearer frond trees (80 m vs 58 m), SMAA High, lens ghosts, full spray budget.
+
+**Numbers** (headless Chrome, ANGLE Metal, 1440×900 CSS at 2×, GPU timer queries around the whole frame,
+chase cam, carving; `perf3.mjs` in the night-3 scratchpad). The machine was shared with four other workers'
+browsers, so absolute values swing ±50 %; compare within a run. In quiet stretches Medium measured 20–25 ms.
+
+Final run, quiet machine (04:08, load 1.3), 120 frames each:
+
+| map | Medium GPU med / p95 | High before (cap 1.5) | **High after** GPU med / p95 | High / Medium | rAF > 33 ms (High) |
+|---|---|---|---|---|---|
+| Valcrest | 20.0 / 20.6 ms | 167–237 ms | **29.4 / 39.4 ms** | 1.47× | 0 / 125 |
+| Blackspruce | 24.6 / 26.1 | 196–279 (cap 2) | **50.1 / 53.4** | 2.0× | 0 / 128 |
+| Ravenspire | 20.5 / 21.6 | 242–274 (cap 2) | **33.4 / 46.0** | 1.63× | 0 / 248 |
+
+Main-thread CPU is 3–4 ms a frame at both levels. Caveat: on this Mac the Metal timer values cluster at
+multiples of the 16.7 ms display interval (33, 49 ms), so they read as "1, 2 or 3 vsyncs" more than exact
+GPU time; Blackspruce (dense forest) sits at 3 intervals on High. A player on an M1 Air who picks High now gets
+a playable 20–35 fps instead of 4–5; if it's under ~30 fps the notice below offers Medium.
+
+In-page A/B on Valcrest (one High page, knobs switched to Medium values, 5 interleaved rounds): High / Medium
+≈ 1.5 after this pass (base 65.5 vs Medium-equivalent 43.5 ms under load); AO now costs ~6 % of the High
+frame, flutes ~3 %, the 2560 shadow ~15 %.
+
+Note for measuring on Apple GPUs: timer queries in ANGLE Metal time whole command buffers, so per-pass
+queries (as `gfxgpu.mjs` does on D3D11) return ~the whole frame for every pass; only whole-frame numbers and
+in-page A/B ratios are meaningful there.
+
+**Safety net.** If a player picks High and the median frame over 4 s of steady riding (after 4 s warm-up) is
+slower than 33 ms, a one-time notice appears (`gfx/autoquality.js heavyHighWatch` → event `qualityHeavy` →
+`ui.js qualityHint`): "High is heavy on this device — Medium recommended" with **Switch to Medium** and
+**Keep High**. Nothing changes on its own; the flag `qualityHeavyHinted` keeps it to once per device. Off with
+`?quality=` and in automated browsers (unless `?autoq`). The settings button reads "High (strong GPUs)".
+The first-launch auto pick still never chooses High.
+

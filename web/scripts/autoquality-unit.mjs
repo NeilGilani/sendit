@@ -1,7 +1,7 @@
 // First-launch auto quality (src/gfx/autoquality.js): GPU tiers and "never override the player's choice".
 // Run by unittest.mjs (needs its localStorage stub).
 export async function run(test, assert) {
-  const { tierQuality, initAutoQuality } = await import('../src/gfx/autoquality.js');
+  const { tierQuality, initAutoQuality, heavyHighWatch } = await import('../src/gfx/autoquality.js');
   const st = await import('../src/state.js');
 
   await test('auto quality: GPU tiers', () => {
@@ -32,7 +32,7 @@ export async function run(test, assert) {
     Object.defineProperty(g, 'navigator', { value: { userAgent: 'Mozilla/5.0 (Windows NT 10.0)', webdriver: false, maxTouchPoints: 0 }, configurable: true, writable: true });
     g.innerWidth = 1600; g.innerHeight = 900;
     const reset = (stored) => {
-      for (const k of ['quality', 'qualityAuto', 'qualityAutoDone', 'qualityLowest']) delete st.settings[k];
+      for (const k of ['quality', 'qualityAuto', 'qualityAutoDone', 'qualityLowest', 'qualityHeavyHinted']) delete st.settings[k];
       st.settings.quality = 1;
       if (stored) localStorage.setItem(st.SETTINGS_KEY, JSON.stringify(stored)); else localStorage.removeItem(st.SETTINGS_KEY);
       Object.assign(st.settings, stored || {});
@@ -68,6 +68,36 @@ export async function run(test, assert) {
       a = initAutoQuality(fake('Intel(R) UHD Graphics 620'), new URLSearchParams(''));
       for (let i = 0; i < 60 * 13; i++) a.sample(1 / 20, true);
       assert.equal(st.settings.quality, 2);
+      // …but a slow High gets the one-time "Medium recommended" notice (event, no change).
+      let heavy = 0;
+      const unsub = st.on('qualityHeavy', () => heavy++);
+      reset({ quality: 2 });
+      a = initAutoQuality(fake('Apple M1'), new URLSearchParams(''));
+      for (let i = 0; i < 60 * 3; i++) a.sample(1 / 20, false);
+      assert.equal(heavy, 0, 'not in the lobby');
+      for (let i = 0; i < 20 * 3; i++) a.sample(1 / 20, true);
+      assert.equal(heavy, 0, 'not during warm-up');
+      for (let i = 0; i < 20 * 6; i++) a.sample(1 / 20, true);
+      assert.equal(heavy, 1, 'slow High → one notice');
+      assert.equal(st.settings.quality, 2, 'High kept');
+      assert.equal(st.settings.qualityHeavyHinted, true);
+      for (let i = 0; i < 20 * 30; i++) a.sample(1 / 20, true);
+      assert.equal(heavy, 1, 'once per device');
+      // Fast High, or Medium: no notice.
+      reset({ quality: 2 });
+      let w = heavyHighWatch();
+      for (let i = 0; i < 60 * 30; i++) w.sample(1 / 50, true);
+      assert.equal(heavy, 1, 'fast High: quiet');
+      reset({ quality: 1 });
+      w = heavyHighWatch();
+      for (let i = 0; i < 20 * 30; i++) w.sample(1 / 20, true);
+      assert.equal(heavy, 1, 'slow Medium: not this notice (auto quality handles first launches)');
+      // ?quality= in the URL: off.
+      reset({ quality: 2 });
+      a = initAutoQuality(fake('Apple M1'), new URLSearchParams('quality=2'));
+      for (let i = 0; i < 20 * 30; i++) a.sample(1 / 20, true);
+      assert.equal(heavy, 1, '?quality=: quiet');
+      unsub();
       // Choosing in the settings clears qualityAuto (ui.js) → the frame check stops.
       reset({ quality: 1, qualityAuto: true });
       a = initAutoQuality(fake('Apple M1'), new URLSearchParams(''));

@@ -244,6 +244,11 @@ export class PostStack {
     ao.configuration.color = new THREE.Color(POST.ao.color);
     ao.configuration.gammaCorrection = false;
     ao.setQualityMode('Medium');
+    // No transparency pass: by default N8AO finds any transparent material in the scene (spray, mist,
+    // sky bits) and then re-renders the whole scene twice more per frame (and with it the sun shadow
+    // map). On an M1 Air that was ~100 ms a frame on High. Soft spray over a faint AO tint is fine.
+    ao.autoDetectTransparency = false;
+    ao.configuration.transparencyAware = false;
     composer.addPass(ao);
     const B = POST.bloom;
     this.bloom = new BloomEffect({ intensity: B.intensity, luminanceThreshold: B.threshold, luminanceSmoothing: B.smoothing, mipmapBlur: true, radius: B.radius });
@@ -267,7 +272,7 @@ export class PostStack {
     q = perfQ(q);
     const ao = PERF.ao[q];
     this.ao.enabled = !!ao;
-    if (ao) { this.ao.setQualityMode(ao.mode); this.ao.configuration.halfRes = !!ao.halfRes; }
+    if (ao) { this.ao.setQualityMode(ao.mode); this.ao.configuration.halfRes = !!ao.halfRes; this.ao.configuration.denoiseIterations = ao.denoise ?? 2; }
     this.bloom.intensity = POST.bloom.intensity * PERF.bloomScale[q];
     this.smaaEffect.applyPreset(SMAAPreset[PERF.smaa[q]]);
     // MSAA on the scene pass (WebGL2 multisampled render target): geometry edges + alpha-to-coverage

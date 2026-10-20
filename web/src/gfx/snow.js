@@ -318,6 +318,40 @@ vec3 flutesCells(vec3 p, vec3 N, float fp, float S, float amp) {
   tFlute = tr * on;
   return normalize(N - g * amp * on);
 }
+// Both flute scales in one pass (high quality): the per-cell fall lines (5 normal taps each) are found
+// once and shared, instead of once per scale. The fine scale's pattern is offset by 7.3 m as before;
+// tr1 = the coarse scale's trough, tFlute = the fine one's.
+vec3 flutesCells2(vec3 p, vec3 N, float fp, float S1, float S2, float amp, out float tr1) {
+  float slope = 1.0 - N.y;
+  float sl = smoothstep(0.2, 0.36, slope) * (1.0 - smoothstep(0.62, 0.8, slope));
+  vec3 q = p + 7.3;
+  float on1 = sl * smoothstep(0.35, 0.6, texture2D(noiseTex, p.xz * 0.0031 + 0.27).r) * (1.0 - smoothstep(0.07, 0.2, fp / S1));
+  float on2 = sl * smoothstep(0.35, 0.6, texture2D(noiseTex, q.xz * 0.0031 + 0.27).r) * (1.0 - smoothstep(0.07, 0.2, fp / S2));
+  tr1 = 0.0; tFlute = 0.0;
+  if (on1 <= 0.0 && on2 <= 0.0) return N;
+  const float C = 64.0;
+  vec2 cg = p.xz / C - 0.5;
+  vec2 cb = floor(cg), cf = fract(cg);
+  cf = cf * cf * (3.0 - 2.0 * cf);
+  vec3 g1 = vec3(0.0), g2 = vec3(0.0);
+  float t1 = 0.0, t2 = 0.0;
+  // Smoothed cell normal from one tap of a ~32 m mip (the old 5-tap cross at ±18 m, 5x the fetches).
+  float lodC = log2(32.0 / terrainSpacing);
+  for (int j = 0; j < 2; j++) for (int i = 0; i < 2; i++) {
+    vec2 cc = (cb + vec2(float(i), float(j)) + 0.5) * C;
+    vec2 nn = textureLod(normalTex, tUV(cc), lodC).rg * 2.0 - 1.0;
+    vec2 fl = normalize(nn + vec2(1e-4, 0.0));
+    vec2 ac = vec2(-fl.y, fl.x);
+    vec3 ac3 = vec3(ac.x, 0.0, ac.y);
+    float w = (i == 0 ? 1.0 - cf.x : cf.x) * (j == 0 ? 1.0 - cf.y : cf.y);
+    float h = hash12(cc) * 40.0;
+    float tt;
+    if (on1 > 0.0) { float d = fluteD(dot(p.xz - cc, ac) + h, p.y, S1, tt); g1 += ac3 * d * w; t1 += tt * w; }
+    if (on2 > 0.0) { float d = fluteD(dot(q.xz - cc, ac) + h, q.y, S2, tt); g2 += ac3 * d * w; t2 += tt * w; }
+  }
+  tr1 = t1 * on1; tFlute = t2 * on2;
+  return normalize(normalize(N - g1 * amp * on1) - g2 * amp * on2);
+}
 `;
 
 /** Albedo + normals + classification. Runs after map_fragment (vW / vWN available). */
@@ -462,9 +496,8 @@ export const SNOW_FRAG_GLSL = /* glsl */`
 
   // ---- sluff flutes on steep snow (walls, valley sides)
   #ifdef SNOW_FLUTES
-  Ns = flutesCells(vW, Ns, tFP, 15.0, 0.12);
-  float fl1 = tFlute;
-  Ns = flutesCells(vW + 7.3, Ns, tFP, 4.0, 0.12);
+  float fl1;
+  Ns = flutesCells2(vW, Ns, tFP, 15.0, 4.0, 0.12, fl1);
   tCavity *= 1.0 - 0.1 * max(tFlute, fl1);
   #endif
 
@@ -474,25 +507,25 @@ export const SNOW_FRAG_GLSL = /* glsl */`
   #ifdef SNOW_TRACKS
   if (dist < uTrackRegion.z * 0.5 + 10.0) {
     #if SNOW_TRACKS > 1
-    if (dist < 45.0) {
+    if (dist < 36.0) {
       // Parallax occlusion: march the view ray down into the trench height field, then refine the
       // crossing with a short binary search (no stepped "contour" layers).
       float ndv = max(dot(-Vd, N), 0.18);
       vec2 perDepth = (Vd.xz - N.xz * dot(Vd, N)) / ndv;
       float lo = 0.0, hi = -1.0;
-      for (int i = 1; i <= 10; i++) {
-        float d = float(i) / 10.0 * trD;
+      for (int i = 1; i <= 7; i++) {
+        float d = float(i) / 7.0 * trD;
         if (trackAtLod(xz + perDepth * d) * trD < d) { hi = d; break; }
         lo = d;
       }
       if (hi > 0.0) {
-        for (int k = 0; k < 4; k++) {
+        for (int k = 0; k < 3; k++) {
           float m = 0.5 * (lo + hi);
           if (trackAtLod(xz + perDepth * m) * trD < m) hi = m; else lo = m;
         }
         lo = 0.5 * (lo + hi);
       }
-      tp = xz + perDepth * lo * (1.0 - smoothstep(32.0, 45.0, dist));   // fades out, never switches off
+      tp = xz + perDepth * lo * (1.0 - smoothstep(24.0, 36.0, dist));   // fades out, never switches off (sub-pixel beyond)
     }
     #endif
     // Stencils grow with the pixel footprint: the track map has no mips, so distant grooves would
