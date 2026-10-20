@@ -28,7 +28,7 @@ import { prepareClip, mapNodes, ClipShot, scoreMove } from './clip.js';
 import { nodeKeys } from '../thrill/clipcodec.js';
 
 // Camera moves for a saved highlight (the made-up shots' weights, minus the ones built around a big cliff).
-const CLIP_CAMS = { hero: { w: 3 }, close: { w: 3.5 }, filmer: { w: 3 }, dolly: { w: 2.5 }, orbit: { w: 2 }, follow: { w: 1.4 }, low: { w: 0.8 }, reveal: { w: 1 } };   // no long lens: from 100 m up the slope a kicker air is a speck
+const CLIP_CAMS = { hero: { w: 3 }, close: { w: 3.5 }, filmer: { w: 3 }, dolly: { w: 2.5 }, orbit: { w: 2 }, follow: { w: 1.4 }, low: { w: 0.8 }, reveal: { w: 0.5 } };   // no long lens: from 100 m up the slope a kicker air is a speck
 const CAM_NAMES = { filmer: 'Tripod filmer' };
 
 // Max rendered pixels (CSS px × ratio²). A 1440×900 @2× laptop would ask for 5.2 MP; ~3.2 MP + SMAA is
@@ -136,6 +136,7 @@ export class LoadingScene {
     // Powder + falling snow.
     const pu = { noiseTex: { value: noise }, uSunCol: globals.uSunCol, uSkyAmb: globals.uSkyAmb, uSunDirA: atmo.uSunDirA };
     this.powder = new Powder(5000, pu);
+    this.powder.uniforms.uMistK.value = T.moon ? 2.2 : 1;   // moonlit snow is lit by more than the mist's sun + sky terms: lift it
     this.fx = new PowderFX(this.powder, r);
     scene.add(this.powder.mesh);
     this.snow = new Snowfall(Math.round(900 + 4200 * T.snowfall), {});

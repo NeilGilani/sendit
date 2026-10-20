@@ -45,12 +45,12 @@ void main() {
   // camera following the rider through the slash sees spray around it, not a white screen.
   if (kind < 0.5) vA *= smoothstep(0.5 * s, 1.5 * s + 0.6, -mv.z) * (1.0 - smoothstep(0.18, 0.5, s / max(-mv.z, 0.01)));
   // Clumps and glints right at the lens became big hard discs (a screen of "bokeh"): fade them out.
-  else vA *= smoothstep(0.6, 2.6, -mv.z);
+  else vA *= smoothstep(0.6, 2.6, -mv.z) * (1.0 - smoothstep(0.012, 0.03, s / max(-mv.z, 0.01)));   // and by on-screen size (no 30 px hard discs)
   gl_Position = projectionMatrix * mv;
 }`;
 
 const POWDER_FRAG = /* glsl */`
-uniform sampler2D noiseTex; uniform vec3 uSunCol; uniform vec3 uSkyAmb; uniform vec3 uSunDirA; uniform float uOpacity;
+uniform sampler2D noiseTex; uniform vec3 uSunCol; uniform vec3 uSkyAmb; uniform vec3 uSunDirA; uniform float uOpacity; uniform float uMistK;
 varying vec2 vUv; varying float vA; varying float vKind; varying vec3 vWp; varying float vSeed; varying float vT; varying float vUp;
 void main() {
   float r = length(vUv);
@@ -69,7 +69,7 @@ void main() {
     // powder read against sunlit snow). Backlit mist glows, capped so a cloud never piles into a disc.
     float lit = smoothstep(-0.7, 0.8, vUp + (n - 0.5) * 0.9);
     col = uSkyAmb * (0.55 + 0.35 * lit) + uSunCol * (0.06 + 0.42 * lit + min(hg * 3.2, 0.9) * (0.4 + 0.6 * lit));
-    col = max(col, (uSkyAmb * 0.9 + uSunCol * 0.35) * (0.8 + 0.2 * lit));   // a floor near lit snow: white powder, not smoke
+    col = max(col, (uSkyAmb + uSunCol * 0.6) * (0.45 + 0.35 * lit) * uMistK);   // a floor near lit snow: white powder, not smoke (uMistK: more at night)
   } else if (vKind < 1.5) {
     a = smoothstep(1.0, 0.4, r) * 0.85;
     col = uSkyAmb * 0.8 + uSunCol * (0.5 + min(hg * 2.5, 0.8));
@@ -93,7 +93,7 @@ export class Powder {
     for (let i = 0; i < max; i++) this.a.aLife.array[i * 4 + 1] = -1;   // dead
     for (const [k, v] of Object.entries(this.a)) g.setAttribute(k, v);
     g.instanceCount = max;
-    this.uniforms = { uTime: { value: 0 }, uWindP: { value: new THREE.Vector3(0.6, 0, 0.2) }, uOpacity: { value: 1 }, ...uniforms };
+    this.uniforms = { uTime: { value: 0 }, uWindP: { value: new THREE.Vector3(0.6, 0, 0.2) }, uOpacity: { value: 1 }, uMistK: { value: 1 }, ...uniforms };
     const m = new THREE.ShaderMaterial({
       uniforms: this.uniforms, vertexShader: POWDER_VERT, fragmentShader: POWDER_FRAG,
       transparent: true, depthWrite: false, blending: THREE.CustomBlending,

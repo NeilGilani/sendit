@@ -80,7 +80,11 @@ export function planMove(kind, shot, sun, r, H) {
     case 'reveal': {
       m.a = V(side * 4.5, lip.y + 1.8, 7);
       // Pulls back and up over the shoulder, but not so far that the rider becomes a speck.
-      m.b = V(side * r.range(15, 22), A.y + r.range(11, 17), r.range(16, 26));
+      // Out to the side rather than back up the ridge: from behind the lip the line-of-sight lift had to
+      // climb 50 m+ to see the ride-out, and the rider ended a speck (was 15–22 / 11–17 / 16–26).
+      m.b = V(side * r.range(15, 21), A.y + r.range(5, 9), r.range(2, 9));
+      m.endAfterLanding = 1.6;
+      m.targets = [A, M, Lp.clone().add(V(0, 0.5, 0))];
       m.fov = 44;
       m.fov1 = 52;
       m.pos = (s) => m.a.clone().lerp(m.b, ease(smooth(0.05, 1.0, s)));
