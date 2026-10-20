@@ -133,6 +133,10 @@ registerLobbyTab({
       const hero = root.querySelector('.cs-hero .cb');
       hero.style.cursor = 'pointer';
       hero.title = `${S.name}: contents and odds`;
+      hero.tabIndex = 0;
+      hero.setAttribute('role', 'button');
+      hero.setAttribute('aria-label', `${S.name}: contents and odds`);
+      hero.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hero.click(); } });
       hero.addEventListener('click', () => { showSeries = series; render(); root.querySelector('.cs-odds')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); });
       root.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => { pickId = b.dataset.pick; caseSfx.click(); render(); }));
       root.querySelectorAll('[data-show]').forEach((b) => b.addEventListener('click', () => { showSeries = showSeries === b.dataset.show ? null : b.dataset.show; render(); root.querySelector(`[data-show="${b.dataset.show}"]`)?.focus(); }));
