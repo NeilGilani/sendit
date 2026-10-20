@@ -407,7 +407,7 @@ export class UI {
     });
     const seg = root.querySelector('.seg');
     const hi = seg.querySelector('button[data-v="2"]');
-    if (hi) { hi.textContent = 'High (strong GPUs)'; hi.title = 'Ambient occlusion, sharper shadows, more detail. Needs a strong GPU.'; }
+    if (hi) { hi.innerHTML = 'High<span style="display:block;font-size:0.72em;opacity:0.75;margin-top:2px;white-space:nowrap">(strong GPUs)</span>'; hi.setAttribute('aria-label', 'High (strong GPUs)'); hi.title = 'Ambient occlusion, sharper shadows, more detail. Needs a strong GPU.'; }
     const mark = () => seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', Number(b.dataset.v) === settings.quality));
     seg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { setSetting('qualityAuto', false); setSetting('qualityLowest', false); setSetting('quality', Number(b.dataset.v)); mark(); }));   // the player's choice: auto quality never changes it again
     on('settings', ({ key }) => { if (key === 'quality') mark(); });
@@ -429,7 +429,7 @@ export class UI {
 #qhint.on { opacity: 1; transform: translate(-50%, 0); }
 #qhint button { font: 600 13px/1 var(--font, sans-serif); padding: 7px 10px; border-radius: var(--r1, 2px); cursor: pointer; white-space: nowrap; border: 1px solid var(--c-line-2, rgba(214,228,240,.3)); background: transparent; color: var(--c-snow-2, #b3bfca); }
 #qhint button.go { background: var(--c-signal, #ff5a1f); border-color: var(--c-signal, #ff5a1f); color: #fff; }
-@media (max-width: 560px) { #qhint { flex-wrap: wrap; font-size: 13px; } }`;
+@media (max-width: 560px) { #qhint { flex-wrap: wrap; font-size: 13px; left: 16px; right: 16px; max-width: none; transform: translateY(-8px); top: 100px; } #qhint.on { transform: none; } #qhint span { flex-basis: 100%; } }`;
       document.head.appendChild(css);
     }
     const el = document.createElement('div');
