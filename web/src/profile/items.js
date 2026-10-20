@@ -66,7 +66,7 @@ export const CLOTHING_ITEMS = [
   },
   {
     id: 'jacket-retro-suit', slot: 'jacket', garment: 'retro-suit', name: 'Retro One-Piece', unlock: 'case',
-    description: 'A 90s one-piece: the suit dresses your legs too.',
+    description: 'A 90s one-piece: jacket and pants in one suit.',
     variants: [
       { id: 'ice-cream', name: 'Ice Cream', rarity: 'epic', series: 'night-park',
         colors: { base: '#fff1d6', panel: '#ff9ec7', accent: '#7fd6ff', gaiter: '#ff9ec7', style: 1, pat: 'band', patA: '#ff9ec7', patB: '#7fd6ff', onePiece: true } },
@@ -110,7 +110,7 @@ export const CLOTHING_ITEMS = [
   },
   {
     id: 'jacket-cloud-puffer', slot: 'jacket', garment: 'cloud-puffer', name: 'Cloud Puffer', unlock: 'case',
-    description: 'The one round cut: an insulated puffer with wide baffles.',
+    description: 'A roomy insulated puffer with wide baffles.',
     variants: [
       { id: 'butter', name: 'Butter', rarity: 'common', series: 'first-chair',
         colors: { base: '#e9d9a0', panel: '#c8b28a', accent: '#4a3328', gaiter: '#c8b28a', style: 0 } },
@@ -124,7 +124,7 @@ export const CLOTHING_ITEMS = [
   },
   {
     id: 'jacket-layer-hoodie', slot: 'jacket', garment: 'layer-hoodie', name: 'Layer Hoodie', unlock: 'case',
-    description: 'A tall hoodie worn over a shell: the shell is the panel colour at the collar.',
+    description: 'A tall hoodie layered over a shell jacket.',
     variants: [
       { id: 'heather', name: 'Heather', rarity: 'common', series: 'night-park',
         colors: { base: '#8c8a82', panel: '#1c1c1e', accent: '#e8e2d4', gaiter: '#3a3936', style: 0 } },
@@ -144,7 +144,7 @@ export const CLOTHING_ITEMS = [
   // All matte: earth tones, plaids, workwear, one colour per look as its Covert (legendary) pull.
   {
     id: 'jacket-sherpa-flannel', slot: 'jacket', garment: 'sherpa-flannel', name: 'Sherpa Flannel', unlock: 'case',
-    description: 'A sherpa-lined flannel shirt-jacket over a hoodie: the hoodie colour shows at the hood and collar.',
+    description: 'A sherpa-lined flannel shirt-jacket layered over a hoodie.',
     variants: [
       { id: 'ash-plaid', name: 'Ash Plaid', rarity: 'common', series: 'night-park',
         colors: { base: '#8f9194', panel: '#2e3034', accent: '#e9e0cc', gaiter: '#2e3034', layer: '#5a4438', style: 0 } },
@@ -192,7 +192,7 @@ export const CLOTHING_ITEMS = [
   },
   {
     id: 'jacket-varsity-coach', slot: 'jacket', garment: 'varsity-coach', name: 'Varsity Coach', unlock: 'case',
-    description: 'A snow varsity jacket: the panel colour is the sleeves, the accent the rib stripes.',
+    description: 'A snow varsity jacket with contrast sleeves and striped rib cuffs.',
     variants: [
       { id: 'charcoal-varsity', name: 'Charcoal', rarity: 'common', series: 'first-chair',
         colors: { base: '#2e3034', panel: '#8f9194', accent: '#e9e0cc', gaiter: '#1d1e20', style: 0 } },
@@ -208,7 +208,7 @@ export const CLOTHING_ITEMS = [
   },
   {
     id: 'jacket-duck-canvas', slot: 'jacket', garment: 'duck-canvas', name: 'Duck Canvas Work', unlock: 'case',
-    description: 'A duck-canvas chore jacket: the panel colour is the corduroy collar.',
+    description: 'A duck-canvas chore jacket with a corduroy collar.',
     variants: [
       { id: 'chalk', name: 'Chalk', rarity: 'common', series: 'first-chair',
         colors: { base: '#d9d0bd', panel: '#5a4632', accent: '#8c6a3f', gaiter: '#4a3a2a', style: 0 } },

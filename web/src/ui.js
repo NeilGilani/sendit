@@ -222,10 +222,11 @@ export class UI {
     if (game.mode === Mode.MENU) this.showBase('lobby');
     else if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) this.showBase(null);
     else if (game.mode === Mode.PAUSED) {
-      $('stats').textContent = `${(game.distance / 1000).toFixed(1)} km ridden · ${game.smoothTurns} smooth turns · ${game.airTotal.toFixed(0)} s of air · score ${game.score}`;
       $('stats').style.whiteSpace = 'pre-line';
       const p = progression.getProgress(), left = progression.getChallenges().filter((c) => !c.done);
-      $('stats').textContent += `\nLevel ${p.level} ${p.rank.name} · ${p.need - p.into} XP to ${p.level + 1} · ${left.length ? `dailies: ${left.map((c) => c.title).join(', ')}` : 'all dailies done'}`;
+      $('stats').textContent = `Score ${Math.round(game.score).toLocaleString('en-US')} · ${(game.distance / 1000).toFixed(1)} km · ${game.airTotal.toFixed(0)} s of air`
+        + `\nLevel ${p.level} ${p.rank.name} · ${Math.max(0, Math.round(p.need - p.into)).toLocaleString('en-US')} XP to level ${p.level + 1}`
+        + `\n${left.length ? `${left.length} daily challenge${left.length === 1 ? '' : 's'} left` : 'All dailies done'}`;
       this.showBase('pause');
     }
   }

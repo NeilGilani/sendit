@@ -90,7 +90,7 @@ registerLobbyTab({
           <span>Finish a run (reach the bottom, ${EARN.minRun} m or more)</span><b>+${EARN.finish} XP</b>
           <span>First finished run of the day</span><b>+${EARN.firstToday} XP</b>
           <span>Challenge medal bronze / silver / gold</span><b>+${EARN.medal.bronze} / ${EARN.medal.silver} / ${EARN.medal.gold}</b>
-          <span>First run on each map · new trail</span><b>+${EARN.firstMap} · +${EARN.firstTrail}</b>
+          <span>First run on each mountain · new trail</span><b>+${EARN.firstMap} · +${EARN.firstTrail}</b>
           <span>Next milestone: ${esc(ms.label)} (${fmtKm(Math.max(0, ms.m - r.distance))} to go)</span><b>+${ms.xp} XP</b>
           <span>Duplicates turn into progress</span><b>+10 % to a whole case</b>
           <span>Collect every skin of a case (gold not needed)</span><b>${COLLECTION_BONUS} cases</b>

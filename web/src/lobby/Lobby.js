@@ -564,7 +564,7 @@ export class Lobby {
 
   onRideRecorded(r) {
     if (!r || r.score <= 0) return;
-    const best = r.isNewBest ? ' · New personal best!' : r.rank ? ` · #${r.rank} on this map` : '';
+    const best = r.isNewBest ? ' · New personal best!' : r.rank ? ` · #${r.rank} on this mountain` : '';
     // Shown when the lobby comes back.
     setTimeout(() => this.toast(`Ride saved · ${Math.round(r.score).toLocaleString()} pts${best}`, r.isNewBest ? 'gold' : ''), 700);
   }
