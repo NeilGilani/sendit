@@ -62,6 +62,8 @@ const CSS = /* css */`
 #juiceHud .sp { position: absolute; left: calc(50% + 118px); top: 30px; font-size: 26px; -webkit-text-stroke: 1.5px #1b1446; paint-order: stroke fill; opacity: 0; white-space: nowrap; }
 #juiceHud .sp.show { animation: jhSplit 2.2s ease-out forwards; }
 #juiceHud .sp small { display: block; font-family: var(--font); font-style: normal; font-weight: 800; font-size: 10px; letter-spacing: .28em; color: rgba(250,248,243,.75); -webkit-text-stroke: 0; }
+/* Phones (portrait): right of the timer is where the score sits; the split goes to the free top-left corner. */
+@media (max-width: 600px) { #juiceHud .sp { left: 14px; top: 26px; font-size: 20px; } }
 @keyframes jhSplit { 0% { opacity: 0; transform: translateX(-12px); } 10% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
 /* announcer */
 #juiceHud .an { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; opacity: 0; }

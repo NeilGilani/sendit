@@ -13,7 +13,7 @@ import { patchShaderChunks, globals, makeNoiseTexture, applyMapAtmosphere } from
 import { HUD } from './config.js';
 import { ATMOSPHERE, col, createSnowfall } from './scene.js';
 import { Terrain } from './terrain.js';
-import { Activities, bestFor, courseKey } from './activities.js';
+import { Activities, bestFor, trailKeyFor } from './activities.js';
 import { Life } from './life.js';
 import { Sky } from './sky.js';
 import { Scatter } from './scatter.js';
@@ -430,12 +430,13 @@ async function startRide(instant = false, mode = 'zen') {
   setMode(Mode.RIDING);
   if (!instant) { aerialAboveTrail(); cam.startIntro(); } else cam.snap();
   ui.refresh();
+  activities.setTrail(currentMap.map, currentMap.trail);
   activities.start(mode);
   finishing = false;
   emit('rideStarted', { mapId: currentMap.map.id, trailId: currentMap.trail, equipment: profileStore.equipment });
   if (!instant) ui.fade(false, 0.9);
   const trail = getTrail(currentMap.map, currentMap.trail);
-  if (trail) setTimeout(() => { if (game.mode === Mode.RIDING) showTrailToast(currentMap.map, trail, { best: bestFor(courseKey(course)) }); }, instant ? 150 : 650);
+  if (trail) setTimeout(() => { if (game.mode === Mode.RIDING) showTrailToast(currentMap.map, trail, { best: bestFor(trailKeyFor(course, currentMap.map, currentMap.trail)) }); }, instant ? 150 : 650);
   busy = false;
 }
 

@@ -30,6 +30,17 @@ const store = {
 };
 
 export function courseKey(course) { return course.key ?? (course.meta ? `${course.meta.id}.${course.runIndex ?? 0}` : 'gully'); }
+/**
+ * The Challenge record key of a trail: the course's own key for the mountain's main trail (saves from before
+ * trails had their own records stay with it), `<courseKey>~<trailId>` for any other trail — a short trail that
+ * starts half-way down has its own best time, medal, ghost and splits instead of sharing the main trail's.
+ */
+export function trailKey(course, trailId, isMain = true) { return !trailId || isMain ? courseKey(course) : `${courseKey(course)}~${trailId}`; }
+/** trailKey for a map's trail (a trail with its own course variant, e.g. a Lake Tahoe run, is that course's main trail). */
+export function trailKeyFor(course, map, trailId) {
+  const t = map?.trails?.find((x) => x.id === trailId);
+  return trailKey(course, trailId, !t || t.variant != null || t.id === map.trails[0]?.id);
+}
 export function bestFor(key) { return store.get(`sendit.best.${key}`, null); }
 export function flakesFound(key) { return store.get(`sendit.flakes.${key}`, []).length; }
 export function medalFor(time, length, M = CHALLENGE.medalSpeeds) {
@@ -69,7 +80,8 @@ function glowTexture() {
 export class Activities {
   constructor({ scene, course, features, terrain, player, fx }) {
     Object.assign(this, { scene, course, features, terrain, player, fx });
-    this.key = courseKey(course);
+    this.baseKey = courseKey(course);   // snowflakes and the gate layout belong to the mountain's course
+    this.key = this.baseKey;            // best time / medal / ghost / splits: per trail (setTrail)
     this.group = new THREE.Group();
     this.group.name = 'Activities';
     scene.add(this.group);
@@ -85,9 +97,9 @@ export class Activities {
 
   // ---------------------------------------------------------------- snowflakes
   buildFlakes() {
-    const rnd = mulberry32(hashStr(this.key));
+    const rnd = mulberry32(hashStr(this.baseKey));
     const f = this.features, T = this.terrain, N = CHALLENGE.flakes;
-    this.found = new Set(store.get(`sendit.flakes.${this.key}`, []));
+    this.found = new Set(store.get(`sendit.flakes.${this.baseKey}`, []));
     const geo = starGeometry();
     const mat = toonMaterial({ name: 'flake', color: 0xffcf4a, rim: 1.0, frag: 'toonEmissive = vec3(1.0, 0.72, 0.2) * 0.55;' });
     const halo = new THREE.SpriteMaterial({ map: glowTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
@@ -124,7 +136,7 @@ export class Activities {
 
   // ---------------------------------------------------------------- gates (challenge only)
   buildGates() {
-    const rnd = mulberry32(hashStr(this.key) + 7);
+    const rnd = mulberry32(hashStr(this.baseKey) + 7);
     const f = this.features, T = this.terrain, C = CHALLENGE;
     this.gates = [];
     const avoid = [...(this.course.dropsAt || []), ...f.kickers.map((k) => this.course.progress ? -1 : -1)];
@@ -187,6 +199,12 @@ export class Activities {
   }
 
   // ---------------------------------------------------------------- run lifecycle
+  /** The trail being ridden (main.js, before start): its own Challenge records (trailKey). */
+  setTrail(map, trailId) {
+    this.key = trailKeyFor(this.course, map, trailId);
+    this.bestGhost = store.get(`sendit.ghost.${this.key}`, null);
+  }
+
   start(mode) {
     this.mode = mode;
     this.setGatesVisible(mode === 'challenge');
@@ -199,6 +217,8 @@ export class Activities {
     this.time = 0;
     this.penalty = 0;
     this.nextGate = 0;
+    this.firstGate = 0;
+    this.startProg = 0;
     this.gatesPassed = 0;
     this.lastProg = 0;
     this.runScore = 0;
@@ -243,7 +263,15 @@ export class Activities {
       this.count -= dt;
       const n = Math.ceil(this.count - 0.6);
       if (n !== this.lastCount && n >= 0) { this.lastCount = n; emit('countdown', n); }
-      if (this.count <= 0.6) { this.state = 'running'; pl.state = State.GROUNDED; }
+      if (this.count <= 0.6) {
+        this.state = 'running'; pl.state = State.GROUNDED;
+        // A trail that starts part-way down the course: the gates above its start aren't part of this run
+        // (they used to count as missed, +2 s each, the moment the clock started).
+        const p0 = this.course.progress(pl.position.x, pl.position.z);
+        this.startProg = p0 > 0 ? p0 : 0;
+        while (this.nextGate < this.gates.length && this.gates[this.nextGate].s < this.startProg + 5) this.nextGate++;
+        this.firstGate = this.nextGate;
+      }
       return;
     }
     if (this.state !== 'running') return;
@@ -291,7 +319,7 @@ export class Activities {
 
   collect(fl) {
     this.found.add(fl.i);
-    store.set(`sendit.flakes.${this.key}`, [...this.found]);
+    store.set(`sendit.flakes.${this.baseKey}`, [...this.found]);
     fl.taken = 0.35;
     this.runFlakes++;
     this.fx?.burst(fl.m.position, 30, 3, 0.8, 0.25);
@@ -328,7 +356,8 @@ export class Activities {
     this.bankCombo();
     this.state = 'finished';
     const total = this.time + this.penalty;
-    const length = this.course.finishAt;
+    // Medal targets over the distance this trail really covers (a mid-course start rides less of the course).
+    const length = this.course.finishAt - (this.startProg > 30 ? Math.min(this.startProg, this.course.finishAt * 0.8) : 0);
     const speeds = this.course.challenge?.medalSpeeds || CHALLENGE.medalSpeeds;   // a map may set its own
     // A map may judge the run instead of timing it (course.challenge.judge() → { total, medal, rows? }).
     const judged = this.course.challenge?.judge?.() ?? null;
@@ -344,7 +373,7 @@ export class Activities {
     if (isBestTime) store.set(`sendit.ghost.${this.key}`, { time: total, frames: this.rec });
     const res = {
       time: total, raw: this.time, penalty: this.penalty, medal, best, isBestTime, isBestScore: this.runScore >= best.score && this.runScore > 0,
-      score: this.runScore, gates: this.gatesPassed, gateTotal: this.gates.length, flakes: this.found.size, flakeTotal: this.flakes.length,
+      score: this.runScore, gates: this.gatesPassed, gateTotal: this.gates.length - (this.firstGate || 0), flakes: this.found.size, flakeTotal: this.flakes.length,
       targets: Object.fromEntries(Object.entries(speeds).map(([k, v]) => [k, length / v])),
       judged,
     };
@@ -356,7 +385,7 @@ export class Activities {
   hud() {
     return {
       mode: this.mode, state: this.state, time: (this.time || 0) + (this.penalty || 0), penalty: this.penalty || 0,
-      gates: this.gatesPassed || 0, gateTotal: this.gates.length, nextGate: this.nextGate || 0,
+      gates: this.gatesPassed || 0, gateTotal: this.gates.length - (this.firstGate || 0), nextGate: this.nextGate || 0,
       flakes: this.found.size, flakeTotal: this.flakes.length, combo: this.combo?.n ? this.comboState() : null, score: this.runScore || 0,
       best: bestFor(this.key),
     };

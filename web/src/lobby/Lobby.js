@@ -17,7 +17,7 @@ import { difficultyBadge, trailStats } from '../maps/badges.js';
 import { services } from '../services/index.js';
 import { listLobbyTabs, getLobbyTab, listLobbyGroups, registerLobbyGroup, getLobbyGroup, getLobbyBadge } from './tabs.js';
 import { focusFirst } from './nav.js';
-import { courseKey, bestFor, fmtTime } from '../activities.js';
+import { trailKeyFor, bestFor, fmtTime } from '../activities.js';
 import { ICONS } from './icons.js';
 import { NAV } from './config.js';
 import { hoverTicks } from './motion.js';
@@ -326,7 +326,7 @@ export class Lobby {
     this.root.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mode === this.mode)));
     this.el.ride.querySelector('.lb-ride-label').textContent = this.mode === 'challenge' ? 'Race' : 'Ride';
     this.el.ride.classList.toggle('race', this.mode === 'challenge');
-    const best = this.mapInfo?.course ? bestFor(courseKey(this.mapInfo.course)) : null;
+    const best = this.mapInfo?.course ? bestFor(trailKeyFor(this.mapInfo.course, this.mapInfo.map, this.mapInfo.trail?.id)) : null;
     const medal = ['gold', 'silver', 'bronze'].includes(best?.medal) ? `<i class="lb-medal ${best.medal}" title="${best.medal}"></i>` : '';
     this.el.modeInfo.innerHTML = best ? `Best ${esc(fmtTime(best.time))}${medal}` : 'Gates · medals';
   }

@@ -36,7 +36,15 @@ const page = await ctx.newPage();
 const errors = [], rows = [];
 let failed = 0, step = '';
 page.on('pageerror', (e) => errors.push(`[${step}] ${e.message}`));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(`[${step}] ${m.text().slice(0, 300)}`); });
+// (Google Fonts can't be reached from this sandbox: those failures are logged, not counted.)
+const failedReq = [];
+page.on('requestfailed', (r) => failedReq.push(r.url()));
+page.on('console', (m) => {
+  if (m.type() !== 'error') return;
+  const t = m.text();
+  if (/Failed to load resource/.test(t) && failedReq.length && failedReq.every((u) => /fonts\.(googleapis|gstatic)\.com/.test(u))) return;
+  errors.push(`[${step}] ${t.slice(0, 300)}`);
+});
 page.on('dialog', (d) => d.dismiss().catch(() => {}));
 const check = (name, ok, info = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${MAP}  ${name}${info ? `  (${info})` : ''}`);
@@ -81,15 +89,17 @@ async function installMonitor() {
       if (s.rider?.root && bad(s.rider.root.position)) { Q.nan++; issue('nan', 'rider root'); }
       if (m === 1 || m === 3) {
         const replaying = !!window.__thrill?.replay?.active;
+        if (Q.wasRp && !replaying) Q.rpEnd = Q.f;
+        Q.wasRp = replaying;
         // Camera inside the terrain (the snow above the lens) — the replay drone and the fp view included.
         const h = T.getHeight(cam.position.x, cam.position.z);
-        if (Number.isFinite(h) && T.isInside?.(cam.position.x, cam.position.z, 0) !== false && cam.position.y < h + 0.05) {
+        if (Q.f - (window.__qaTeleport ?? -999) > 45 && Number.isFinite(h) && T.isInside?.(cam.position.x, cam.position.z, 0) !== false && cam.position.y < h + 0.05) {
           Q.camLow++; if (Q.camLow % 30 === 1) issue('camInTerrain', `${(h - cam.position.y).toFixed(2)} m under snow st${pl.state} fp${+!!s.rider.fp} rp${+replaying} f${Q.f}`);
         }
         // Chase camera inside the rider's body (third person only, not the crash / replay drone).
-        if (!s.rider.fp && !replaying && pl.state !== 3 && pl.state !== 0) {
+        if (!s.rider.fp && !replaying && pl.state !== 3 && pl.state !== 0 && Q.f - (window.__qaTeleport ?? -999) > 45) {
           const d = cam.position.distanceTo(pl.renderPos || pl.position);
-          if (d < 0.8) { Q.camBody++; if (Q.camBody % 30 === 1) issue('camInBody', `${d.toFixed(2)} m st${pl.state} f${Q.f}`); }
+          if (d < 0.8) { Q.camBody++; if (Q.camBody % 30 === 1) issue('camInBody', `${d.toFixed(2)} m st${pl.state} sp${pl.speed.toFixed(1)} f${Q.f} afterReplay${Q.f - (Q.rpEnd ?? -1e9)} afterTp${Q.f - (window.__qaTeleport ?? -1e9)}`); }
         }
         if (pl.state === 3) { Q.crashF++; Q.maxCrash = Math.max(Q.maxCrash, Q.crashF); if (Q.crashF === 60 * 14) issue('crashStuck', `still crashed after 14 s f${Q.f}`); }
         else Q.crashF = 0;
@@ -178,6 +188,7 @@ async function hudCheck(name) {
       if (!vis || op < 0.35) continue;
       const b = el.getBoundingClientRect();
       if (b.width < 4 || b.height < 4) continue;
+      if (b.width * b.height > 0.45 * W * H) continue;   // a full-screen layer (#hud, a modal's backdrop): look inside it
       boxes.push({ el, id: el.id || el.className?.toString?.().split(' ')[0] || el.tagName, b, txt: txt.slice(0, 30) });
     }
     // Only the outermost positioned boxes (a child inside its own panel is fine).
@@ -228,6 +239,8 @@ async function keepResumed(on) {
 async function toLobby() {
   await keepResumed(false);
   const m = await S(() => window.__sendit.game.mode);
+  const res0 = await S(() => !document.getElementById('results').classList.contains('hidden'));
+  if (res0) { await page.click('#results [data-act=menu]'); await lobbyReady(); return; }
   if (m === 1 || m === 3) { await page.keyboard.press('Escape'); await page.waitForFunction(() => window.__sendit.game.mode === 2, null, { timeout: 10000 }).catch(() => {}); }
   const res = await S(() => !document.getElementById('results').classList.contains('hidden'));
   if (res) await page.click('#results [data-act=menu]');
@@ -268,6 +281,7 @@ async function placeDown(v = 12, ahead = 0) {
   await S(({ v, ahead }) => {
     const s = window.__sendit, pl = s.player, T = s.terrain, sp = T.getSpawn();
     const fx = -Math.sin(sp.heading), fz = -Math.cos(sp.heading);
+    window.__qaTeleport = window.__qa.f;
     pl.place({ x: sp.position.x + fx * ahead, z: sp.position.z + fz * ahead }, sp.heading);
     pl.velocity.copy(pl.forward()).multiplyScalar(v);
   }, { v, ahead });
@@ -334,6 +348,7 @@ async function nearFinish() {
     const s = window.__sendit, pl = s.player, C = s.course, T = s.terrain;
     const { trailFinishFor } = await import('/src/maps/registry.js');
     const tf = trailFinishFor(C, s.map.trail);
+    window.__qaTeleport = window.__qa.f;
     if (tf?.radius) {
       const dx = tf.x - pl.position.x, dz = tf.z - pl.position.z, l = Math.hypot(dx, dz) || 1;
       const back = tf.radius + 22;
@@ -392,8 +407,7 @@ const runRows = [];
 for (const [ei, equip] of EQUIPS.entries()) {
   step = `${equip} features`;
   await setEquip(equip);
-  const mode0 = ei % 2 ? 'challenge' : 'zen';
-  await rideFromLobby(mode0);
+  await rideFromLobby('zen');   // (replay and retry are Zen features: in a Challenge, Backspace restarts the race)
   await mem(`${equip} start`);
   await clearIssues();
   await shot(`${equip}-start`);
@@ -461,7 +475,7 @@ for (const [ei, equip] of EQUIPS.entries()) {
 
   // Crashes of each severity (ragdoll) → respawn.
   const cr = [];
-  for (const [v, tw] of [[5, 'small'], [16, 'medium'], [14, 'big']]) {
+  for (const [v, tw] of [[3, 'small'], [16, 'medium'], [14, 'big']]) {
     step = `${equip} crash ${tw}`;
     const r = await crashAt(v, tw);
     cr.push(`${tw}:${r.crashed ? r.tier : 'no crash'}${r.respawned ? '' : ' NO RESPAWN'}`);
@@ -532,10 +546,19 @@ for (const [ei, equip] of EQUIPS.entries()) {
     await waitRiding();
     const here = await S((id) => window.__sendit.map.trail === id, t.id);
     await S(() => { window.__rc0 = (window.__ev || []).filter((e) => e[0] === 'runComplete').length; });
+    if (mode === 'challenge' && ti < 2) {
+      // R in a race: back to the top, countdown, clock from zero, no gate penalty from the start.
+      await bot(60 * 3, {});
+      await key('KeyR');
+      await frames(60 * 5);
+      const a = await S(() => window.__sendit.activities.hud());
+      check(`${equip} ${t.id} challenge: R restarts the race clean`, a.state === 'running' && a.penalty === 0 && a.time < 3, JSON.stringify({ st: a.state, t: +a.time.toFixed(2), pen: a.penalty, gates: `${a.gates}/${a.gateTotal}` }));
+    }
     await bot(60 * 4, { jumpEvery: 150, trick: { spin: 2 } });
     if (ti === 0) await hudCheck(`${equip} ${t.id} ${mode} riding`);
     const fin = await rideToFinish(mode, t.name);
     await frames(30);
+    if (mode === 'challenge') await wait(2500);   // (the results rows cascade in on the real clock)
     await shot(`${equip}-${t.id}-${mode}-finish`);
     if (mode === 'challenge' && fin.okF) await hudCheck(`${equip} ${t.id} results card`);
     const q = await qa();

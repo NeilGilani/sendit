@@ -170,6 +170,9 @@ button.primary { border-left: 4px solid #2ff5d6; }
 #flakesHud { position: absolute; right: 26px; top: 22px; font-weight: 900; font-style: italic; font-size: 20px; color: #ffd34d;
   -webkit-text-stroke: 1.5px #141a3c; paint-order: stroke fill; text-shadow: 2px 2px 0 #141a3c; pointer-events: none; }
 .card.results { text-align: center; }
+/* The results card owns the screen: the riding HUD (timer, splits, speed, score, combo, trail sign) steps back
+   instead of showing through and around the card. */
+body:has(#results:not(.hidden)) #hud, body:has(#results:not(.hidden)) #trail-toast, body:has(#results:not(.hidden)) #thrill-pills { opacity: 0 !important; transition: opacity .3s; }
 .medal { width: 92px; height: 92px; border-radius: 50%; margin: 0 auto 6px; display: none; box-shadow: 0 6px 0 rgba(20,26,60,0.6), inset 0 -8px 0 rgba(0,0,0,0.15);
   font: 900 italic 30px "Arial Black", Impact, sans-serif; color: rgba(20,26,60,0.75); line-height: 92px; }
 .medal.gold { display: block; background: radial-gradient(circle at 35% 30%, #fff6c4, #ffd34d 45%, #c8901a); }
