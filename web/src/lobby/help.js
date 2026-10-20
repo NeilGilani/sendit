@@ -132,7 +132,7 @@ export function gamepadDiagram() {
 // ---------------------------------------------------------------- the first-run cards
 // Each card: a "hero" (big glyphs) and up to three lines. `kb` / `gp` give both devices.
 export const HOWTO_CARDS = [
-  { id: 'ride', title: 'Ride', lead: 'Point your skis down the hill and go.',
+  { id: 'ride', title: 'Ride', lead: 'Point downhill and go.',
     hero: { kb: ['W', 'A', 'S', 'D'], gp: ['LS', 'RT', 'LT'] },
     lines: [
       [bind(['A', 'D'], ['LS']), 'Steer. Lean into turns to carve.'],
@@ -143,7 +143,7 @@ export const HOWTO_CARDS = [
     hero: { kb: ['Space'], gp: ['A'] },
     lines: [
       [bind(['Space'], ['A']), 'Hold to crouch, let go right at the lip for the biggest pop.'],
-      ['', 'Land with your skis pointing down the hill. Let go of every key before touchdown to stomp it.'],
+      ['', 'Land facing down the hill. Let go of every key before touchdown to stomp it.'],
     ] },
   { id: 'tricks', title: 'Tricks', lead: 'Tricks start at the take-off.',
     hero: { kb: ['Space', '+', 'A', 'D'], gp: ['A', '+', 'LS'] },

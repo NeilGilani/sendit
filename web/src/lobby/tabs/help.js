@@ -33,9 +33,10 @@ registerLobbyTab({
         <button type="button" class="lp-btn" data-howto data-autofocus>How to ride<small>Steer, jump, tricks, restart</small></button>
         <button type="button" class="lp-btn" data-controls>Controls<small>Keyboard and controller</small></button>
       </div>
-      <div class="hp-quick" data-dev="${dev()}">${controlsList({ groups: CONTROLS.map((g) => ({ ...g, rows: g.rows.slice(0, g.id === 'run' ? 5 : 4) })), notes: false })}</div>
       <h3 class="lp-h3">Questions</h3>
       <div class="hp-faq">${FAQ.map(([q, a], i) => `<div class="hp-q"><button type="button" aria-expanded="false" aria-controls="hp-a${i}">${q}</button><p id="hp-a${i}" hidden>${a}</p></div>`).join('')}</div>
+      <h3 class="lp-h3">Controls at a glance</h3>
+      <div class="hp-quick" data-dev="${dev()}">${controlsList({ groups: CONTROLS.map((g) => ({ ...g, rows: g.rows.slice(0, g.id === 'run' ? 5 : 4) })), notes: false })}</div>
       <p class="lp-hint">Settings has volume, quality and camera options.</p>`;
     el.querySelector('[data-howto]').addEventListener('click', () => ctx.showHowTo?.({ sheet: 'intro' }));
     el.querySelector('[data-controls]').addEventListener('click', () => ctx.showHowTo?.({ sheet: 'controls' }));

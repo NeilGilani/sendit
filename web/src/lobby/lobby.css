@@ -521,7 +521,7 @@ body.device-touch .lb-ride-key { display: none; }
   .hm-daily .hm-q:nth-child(n+3) { display: none; }
 }
 @keyframes lbSheetIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-@media (max-width: 420px) {
+@media (max-width: 420px), (max-height: 560px) and (min-aspect-ratio: 4/5) {
   #lobby .lb-chip { max-width: 60vw; }
   /* Four sub-tabs (Career) must fit without a hidden scroll: share the width, drop the icons. */
   #lobby .lb-sub { flex: 1 1 0; min-width: 0; justify-content: center; padding: 0.55em 0.3em; }
