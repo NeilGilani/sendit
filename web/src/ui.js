@@ -177,6 +177,16 @@ export class UI {
     } else {
       deck.querySelector('[data-hw=close]')?.addEventListener('click', () => this.closeModal());
     }
+    // Keep Tab inside the dialog (it is modal: the lobby behind must not take focus).
+    deck.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      const f = [...deck.querySelectorAll('button:not([hidden]), input')].filter((el) => el.offsetParent !== null);
+      if (!f.length) return;
+      const i0 = f.indexOf(document.activeElement);
+      const j = e.shiftKey ? (i0 <= 0 ? f.length - 1 : i0 - 1) : (i0 < 0 || i0 === f.length - 1 ? 0 : i0 + 1);
+      e.preventDefault();
+      f[j].focus();
+    });
     document.body.classList.add('hw-open');
     this.openModal('howto');
   }
