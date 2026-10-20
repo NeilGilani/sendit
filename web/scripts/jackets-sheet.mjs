@@ -175,7 +175,7 @@ const page = await browser.newPage({ viewport: { width: 1000, height: 800 } });
 const img = (f) => (fs.existsSync(f) ? `data:image/png;base64,${fs.readFileSync(f).toString('base64')}` : '');
 const css = `body{margin:0;background:#15171b;color:#e8e6e1;font-family:-apple-system,system-ui,Segoe UI,sans-serif}
 .h{display:flex;align-items:baseline;gap:22px;padding:22px 28px 6px}.t{font-size:52px;font-weight:800}.f{font-size:22px;color:#b9b5ab;padding:0 28px 14px}
-.row{display:flex;gap:8px;padding:6px 28px;flex-wrap:wrap}.c{position:relative}.c img{display:block;border-radius:6px}
+.row{display:flex;gap:8px;padding:6px 28px}.c{position:relative}.c img{display:block;border-radius:6px}
 .l{position:absolute;left:10px;top:8px;font-size:20px;font-weight:600;text-shadow:0 0 4px #000,0 0 2px #000}
 .rl{font-size:18px;color:#9a968e;padding:10px 28px 0;text-transform:uppercase;letter-spacing:2px}
 .big{position:absolute;left:12px;bottom:10px;font-size:30px;font-weight:800;text-shadow:0 0 6px #000,0 0 3px #000}`;
@@ -184,7 +184,8 @@ const cell = (f, label, w = FW) => `<div class="c"><img src="${img(f)}" width="$
 const VN = { front: 'front', q34: 'front 3/4', side: 'side', back: 'back', q34b: 'back 3/4', y240: 'front 3/4', q34l: 'front 3/4 (left)' };
 const PN = { carve: 'carve (right turn)', carveL: 'carve (left turn)', tuck: 'tuck', grab: 'air grab', armsup: 'arms up' };
 async function render(html, file) {
-  await page.setContent(`<html><head><style>${css}</style></head><body>${html}</body></html>`);
+  await page.setViewportSize({ width: 4200, height: 800 });
+  await page.setContent(`<html><head><style>${css}</style></head><body style="width:max-content">${html}</body></html>`);
   const h = await page.evaluate(() => document.body.scrollHeight), w = await page.evaluate(() => document.body.scrollWidth);
   await page.setViewportSize({ width: Math.max(1000, w), height: h });
   await page.screenshot({ path: file, fullPage: true });

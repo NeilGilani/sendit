@@ -534,9 +534,9 @@ through the front hem (and the hem sank into the pants at the sides).
 Measured by `garment-clip.mjs` (below) on every catalogue jacket with its pants, skis and board, 69 poses
 each (stand, cruise, carves both edges, squats, press, stop, airs, tucks, flips, spins, corks, landings,
 all grabs and tweaks, chairlift, grind, arms down / forward / up / out, pole plant): vertices of the pants
-drawn in front of the jacket fell from Σ 445–2832 per look and gear to Σ 2–280, the worst single pose
-from 45–130 to ≤ 23 vertices (a speck in the deepest grab + flip); the hem sunk behind the pants from Σ
-1420–2663 to Σ 80–420.
+drawn in front of the jacket fell from Σ 445–2832 per look and gear to Σ 2–241, the worst single pose
+from 45–130 to ≤ 20 vertices (a speck in the deepest grab + flip); the hem sunk behind the pants from Σ
+1420–2663 to Σ 81–374 (worst pose 66–139 → ≤ 34).
 
 ### 5. A gentle torso profile (`cut.smoothProfile`)
 
@@ -555,10 +555,14 @@ share low on the side (§ 6) keep it gentle. `jacket-profile.mjs` plots it (side
 half width; bind pose and standing on skis) and measures the deepest inward dip of each edge below its
 chord over ±8 cm in the waist zone (hem + 10 cm … 1.32):
 
-| | bind front | bind side | standing front | standing side |
+| deepest inward dip (13 catalogue jackets) | bind front | bind side | standing front | standing side |
 |---|---|---|---|---|
-| before (every jacket) | 0.6–1.0 cm | 0.3–1.0 cm | 1.0–1.9 cm | 0.4–1.3 cm |
-| after | 0.1–0.4 cm | 0.3–0.9 cm | see `profile.json` | see `profile.json` |
+| before (round-2 cut as merged) | 0.6–0.9 cm | 0.3–1.0 cm | 1.0–1.9 cm | 0.5–1.1 cm |
+| after | 0.1–0.4 cm | 0.3–0.9 cm | 0.4–1.1 cm | 0.4–0.7 cm |
+
+(the back is straight in both: `straightBack`). Sherpa Flannel, the user's example: standing front
+1.9 → 0.9 cm, bind front 0.9 → 0.2 cm, side 0.9 → 0.6 cm, with the waist as slim as before (the profile only
+ever moves out, never in, and only where it dipped).
 
 ### 6. One-piece armhole (`cut.armBlend`)
 
@@ -572,13 +576,18 @@ the seam read as a tube stuck into a box.
   line follows the arm down and the side panel gives way under a lowered arm.
 - **The sleeve head takes the shell's weights where they meet** (|x| < 0.25, blending to its own by 0.33,
   `layerWeights`), so the seam ring moves as one piece in every pose.
+- **The sleeve head is laid over the shell's shoulder edge** (top, front and back, 6 mm out, fading out
+  by |x| 0.30; the underside stays inside, in the armpit), so the seam is the sleeve's own edge lying on the
+  shell like a set-in sleeve, not two surfaces crossing at a grazing angle (that flickered into a jagged
+  line on the two-colour Varsity when the arm moved).
 - The sleeve head swells 6 mm where it leaves the shell (a soft, eased seam instead of a sharp tube edge).
+- `armSide` (0.45): how much of the arm share reaches down the side panel under the arm (1.27–1.36).
 The two pieces are still two meshes (a welded single mesh would need the torso's rings and the sleeve's to
 share a seam ring, which the ring-swept builder can't do without a re-topology); with shared weights at
-the seam and the shoulder flowing into the sleeve the joint reads as one piece in the sheets. Sleeve top /
-front / back vertices drawn behind the jacket body: Σ 950–1445 per look → 290–400 (most remaining are the
-upper arm pressed against the side in grabs); the worst arms-down pose 51–74 → ≈ 20; the jacket body
-showing through the sleeve: Σ 61–291 → 0–130.
+the seam, the sleeve cap over the shoulder edge and the shoulder flowing into the sleeve, the joint reads as
+one piece in the sheets. Measured (skis, per look; board in brackets): upper-sleeve vertices sunk behind the
+jacket body, worst pose 51–74 (111–155) → 24–34 (40–52, the snowboard back-hand reaches); arms down 51–74 →
+≈ 20; the jacket body drawn in front of the sleeve Σ 61–291 → 6–222 (mostly 1–2 vertex specks).
 
 ### Checks and sheets
 
@@ -593,14 +602,25 @@ node web/scripts/jackets-sheet.mjs <url> <outDir> full,close,overview [jackets|a
   in front of the shell); **hemIn** / **sleeveIn** = a hem / upper-sleeve vertex that now has the pants /
   jacket body within 3 cm in front of it and not behind it; **torsoOut** = the jacket body drawn in front of
   the sleeve. Occlusion (a knee in front of the hem) doesn't count. `--check` limits offending vertices
-  per pose (pantsOut 15 … see the script); `--legacy` measures the same cuts without this pass's fixes.
+  per pose (pantsOut 20, hemIn 35, sleeveIn 55, torsoOut 12; the legacy cuts reach 45–139 / 66–139 /
+  51–155 / 9–17); `--legacy` measures the same cuts without this pass's fixes.
 - `jackets-sheet.mjs`: per jacket front / 3/4 / side / back / back 3/4 standing, carve both ways, tuck,
   air grab, arms up, snowboard 3/4 + back; `close` = the front hem (stand, carve, tuck, grab), the waist
   (side, front) and the armpit / shoulder (arms down, forward, up, riding, tuck); `overview`.
 
+Sheets of this pass (outside the repo): `/tmp/claude-501/ship-jackets/sheets/after-<jacket>.png` (13
+jackets), `after-close-<jacket>.png`, `after-overview.png`, `issue4-hem.png`, `issue5-waist.png`,
+`issue6-armhole.png` (before / after), `/tmp/claude-501/ship-jackets/profile.png` (+ `profile.json`),
+`/tmp/claude-501/ship-jackets/icons/icons-*.png`.
+
+`gear-clip.mjs --check` (hands, boots vs the gear) still fails one pose it already failed on the old body:
+snowboard goofy "grab Nose grab tweak", the mitt wraps under the nose 1.8 cm past the allowance (1.2 cm on
+the old body; the in-between body's knee is 2 cm lower). The `--fits` run also reports a 30 cm boot "gap" in
+the board skate pose for the one-piece, identical on the old body (the pushing foot is out of its binding).
+
 Known limits: the two snowboard grabs that reach across the body (Melon, nose / tail with the back hand)
 still pass the forearm through the jacket front (the animation's reach, not the seam). In the deepest
-grab + flip a few pants vertices still graze through the front hem between the thighs (≤ 23 vertices, a
+grab + flip a few pants vertices still graze through the front hem between the thighs (≤ 20 vertices, a
 speck). The puffers' baffles make their inner surface dip, so they keep a few more grazing vertices than
 the flat shells.
 
