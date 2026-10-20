@@ -4,7 +4,7 @@
 //   row 1 standing on skis: front, front 3/4, side, back, back 3/4
 //   row 2 in motion: carve (3/4), carve (back 3/4, the chase-cam side), tuck (side), air grab (3/4, side)
 // and laid out as <outDir>/P<n>.png per prototype, <outDir>/overview.png (all ten, front 3/4) and
-// <outDir>/bodies.png (the two bodies bare + in P1).
+// <outDir>/bodies.png (the two bodies bare + in P6).
 //
 //   node web/scripts/proto-sheet.mjs http://localhost:5213/ /tmp/claude-501/proto-jackets/sheets [1,2,3…] [--frames-only|--compose-only]
 // Env: DPR (default 1.5), EQUIP=ski|snowboard
@@ -28,6 +28,7 @@ const args = process.platform === 'darwin'
   ? ['--use-gl=angle', '--use-angle=metal', '--ignore-gpu-blocklist']
   : process.env.GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
 
+const CMP = 6;   // the prototype also shot on the other body (bodies.png): the slim shell shows the body most
 const frame = (n, pose, view) => path.join(frameDir, `P${n}-${pose}-${view}.png`);
 let meta = {};
 const metaFile = path.join(outDir, 'meta.json');
@@ -102,8 +103,8 @@ async function capture(browser, body, protos) {
 
 if (!flags.has('--compose-only')) {
   const browser = await chromium.launch({ args });
-  // Which body each prototype wears (from the page), then one page per body. P1 is also shot on the
-  // other body for the comparison sheet.
+  // Which body each prototype wears (from the page), then one page per body. P6 is also shot on the
+  // other body for the comparison sheet (CMP).
   const probe = await browser.newPage({ viewport: { width: 400, height: 300 } });
   await probe.goto(`${base}${base.includes('?') ? '&' : '?'}quality=0`);
   await probe.waitForFunction(() => window.__senditProto, null, { timeout: 300000 });
@@ -112,7 +113,7 @@ if (!flags.has('--compose-only')) {
   const errors = [];
   for (const body of ['natural', 'current']) {
     const mine = only.filter((n) => meta.list.find((p) => p.id === n)?.body === body);
-    const extra = only.includes(1) ? [1].filter((n) => !mine.includes(n)) : [];
+    const extra = only.includes(CMP) ? [CMP].filter((n) => !mine.includes(n)) : [];
     if (!mine.length && !extra.length) continue;
     errors.push(...await capture(browser, body, [...mine, ...extra]));
   }
@@ -161,13 +162,13 @@ for (const P of list.filter((p) => only.includes(p.id))) {
 // Bodies: bare current vs natural (front, side, 3/4), then P1 on each.
 {
   const BW = 420;
-  const p1 = list.find((p) => p.id === 1);
+  const p1 = list.find((p) => p.id === CMP);
   const other = p1?.body === 'natural' ? 'current' : 'natural';
-  const p1f = (body, v) => (body === p1?.body ? frame(1, 'stand', v) : frame(`1-${body}`, 'stand', v));
+  const p1f = (body, v) => (body === p1?.body ? frame(CMP, 'stand', v) : frame(`${CMP}-${body}`, 'stand', v));
   const html = `<html><head><style>${css}</style></head><body>
   <div class="h"><span class="t">Body proportions</span><span class="f" style="padding:0">current Quaternius body vs the natural prototype body (same height, hips, hands and feet)</span></div>
   <div class="rl">Bare (outfit hidden)</div><div class="row">${['current', 'natural'].flatMap((b) => ['front', 'side', 'q34'].map((v) => tile(path.join(frameDir, `body-${b}-${v}.png`), `${b} · ${VIEW_NAME[v]}`, BW))).join('')}</div>
-  <div class="rl">Dressed in P1</div><div class="row">${['current', 'natural'].flatMap((b) => ['front', 'side', 'q34'].map((v) => tile(p1f(b, v), `${b} · ${VIEW_NAME[v]}`, BW))).join('')}</div>
+  <div class="rl">Dressed in P${CMP} (slim race shell)</div><div class="row">${['current', 'natural'].flatMap((b) => ['front', 'side', 'q34'].map((v) => tile(p1f(b, v), `${b} · ${VIEW_NAME[v]}`, BW))).join('')}</div>
   <div style="height:18px"></div></body></html>`;
   void other;
   await page.setContent(html);

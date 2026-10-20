@@ -30,9 +30,9 @@ export const PROTO = Math.max(0, Math.min(10, parseInt(params.get('proto') || '0
 export const BODIES = {
   current: null,
   natural: {
-    chest: 0.84,      // trunk width × at the chest / shoulders (1.30–1.56)
+    chest: 0.81,      // trunk width × at the chest / shoulders (1.30–1.56)
     waist: 0.94,      // … at the waist (1.12)
-    chestDepth: 0.82, // trunk depth × at the chest (pecs + lats + shoulder blades)
+    chestDepth: 0.8,  // trunk depth × at the chest (pecs + lats + shoulder blades)
     waistDepth: 0.96,
     arm: 0.78,        // upper-arm girth × (biceps / deltoid), easing to 1 at the wrist
     forearm: 0.88,
@@ -275,7 +275,7 @@ export const PROTOTYPES = [
     pants: pants('baggy', { crotch: 0.815, style: PSTYLE.plain, fab: FAB.twill, leg: { thigh: 0.142, knee: 0.142, hem: 0.144 }, cuffY: 0.08, stack: { n: 3, amp: 0.014 } }),
     gloves: mitt,
     colors: {
-      jacket: { base: '#4a3226', panel: '#3c281e', accent: '#e8dcc4', gaiter: '#e8dcc4', style: 0 },
+      jacket: { base: '#4a3226', panel: '#3c281e', accent: '#e8dcc4', gaiter: '#3c281e', style: 0 },
       pants: { base: '#e3d9c4', cuff: '#c9bea6' },
       helmet: { base: '#e8dcc4', liner: '#3c281e', accent: '#4a3226' },
       goggles: { lens: '#e8b04a', lensBase: '#6b3a12', strap: '#4a3226', strapLogo: '#e8dcc4' },
@@ -283,7 +283,7 @@ export const PROTOTYPES = [
     },
   },
   {
-    id: 6, name: 'Race Shell', body: 'current',
+    id: 6, name: 'Race Shell', body: 'natural',
     fit: 'Slim technical race / freeride shell, hip bone (CB 66 cm), laminated, close sleeves; tapered shell pant',
     jacket: jacketCut('shell', {
       hemFront: 0.94, hemBack: 0.905, fab: FAB.hardshell, folds: 0.55,
@@ -331,7 +331,7 @@ export const PROTOTYPES = [
     pants: pants('relaxed', { bib: null, rise: 1.09, style: PSTYLE.retro, fab: FAB.satin, leg: { thigh: 0.126, knee: 0.118, hem: 0.116 } }),
     gloves: mitt,
     colors: {
-      jacket: { base: '#ece4cf', panel: '#16827f', accent: '#6b3fa0', gaiter: '#16827f', style: 0 },
+      jacket: { base: '#ece4cf', panel: '#16827f', accent: '#6b3fa0', gaiter: '#2a2233', style: 0 },
       pants: { base: '#16827f', cuff: '#6b3fa0' },
       helmet: { base: '#ece4cf', liner: '#2a2a2c', accent: '#6b3fa0' },
       goggles: { lens: '#ffd23f', lensBase: '#7a4a10', strap: '#6b3fa0', strapLogo: '#ece4cf' },

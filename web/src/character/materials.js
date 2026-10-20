@@ -210,7 +210,7 @@ void chFabricTex(float fid, vec2 q, inout vec3 c) {
     float d = (q.x * 0.6 + q.y) / 0.0028;
     fabH += sin(d * 6.2831853) * 0.00006 * pxFade(fwidth(d));
   } else if (fid < 3.5) {                              // 3 ripstop nylon: glossy with a visible grid
-    fabRough = 0.34; fabSpec = 0.95; fabSheen = 0.16; fabSheenRough = 0.4;
+    fabRough = 0.42; fabSpec = 0.6; fabSheen = 0.18; fabSheenRough = 0.4;
     vec2 g = q / 0.007;
     vec2 gl = abs(fract(g) - 0.5);
     float grid = smoothstep(0.38, 0.46, max(gl.x, gl.y)) * pxFade(max(fwidth(g.x), fwidth(g.y)) * 2.0);
@@ -239,7 +239,7 @@ void chFabricTex(float fid, vec2 q, inout vec3 c) {
     fabRough = 0.97; fabSpec = 0.03; fabSheen = 0.7; fabSheenRough = 0.9;
     c *= 0.97 + 0.05 * chNoise(q * 120.0);
   } else {                                             // 8 satin nylon (coach / 90s): sheen, smooth
-    fabRough = 0.42; fabSpec = 0.5; fabSheen = 0.32; fabSheenRough = 0.4;
+    fabRough = 0.55; fabSpec = 0.3; fabSheen = 0.3; fabSheenRough = 0.45;
     c *= 1.0 + 0.02 * mott;
   }
 }
