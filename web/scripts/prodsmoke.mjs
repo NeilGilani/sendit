@@ -31,11 +31,15 @@ async function open(ctx, url, { init } = {}) {
   const errors = [], bad = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-  page.on('response', (r) => { if (r.status() >= 400) bad.push(`${r.status()} ${r.url()}`); });
+  const net = { n: 0, bytes: 0 };
+  page.on('response', async (r) => {
+    if (r.status() >= 400) bad.push(`${r.status()} ${r.url()}`);
+    if (!r.url().startsWith('data:')) { net.n++; net.bytes += Number((await r.allHeaders().catch(() => ({})))['content-length'] || 0); }
+  });
   page.on('requestfailed', (r) => { const f = r.failure()?.errorText || ''; if (!/ABORTED|cancelled|NS_BINDING_ABORTED/i.test(f)) bad.push(`failed ${r.url()} ${f}`); });
   if (init) await page.addInitScript(init);
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: T });
-  return { page, errors, bad };
+  return { page, errors, bad, net };
 }
 const lobbyReady = (page) => page.waitForFunction(() => window.__sendit?.stage?.ready && window.__sendit.lobby.visible, null, { timeout: T });
 const report = (name, { errors, bad }) => {
@@ -66,7 +70,7 @@ if (only.includes('main')) {
   await s.page.waitForTimeout(1200);
   await shot(s.page, 'loading');
   await lobbyReady(s.page);
-  console.log(`      lobby ready after ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+  console.log(`      lobby ready after ${((Date.now() - t0) / 1000).toFixed(1)} s: ${s.net.n} requests, ${(s.net.bytes / 1048576).toFixed(1)} MB (content-length; gzip where the server compresses)`);
   await shot(s.page, 'lobby');
   // The cases tab is where ?casegrant would add test cases (lobby/tabs/cases.js debugGrant).
   await s.page.evaluate(() => window.__sendit.lobby.select('cases'));
