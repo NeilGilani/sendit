@@ -42,7 +42,7 @@ A.setTrail(map, 'lower');
 h = run(-600);
 ok(A.key === 'testcourse~lower' && trailKey(course, 'lower', false) === A.key, `other trail has its own key (${A.key})`);
 ok(h.penalty === 0, `trail starting at 600 m: no instant missed-gate penalty (penalty ${h.penalty})`);
-const below = A.gates.filter((g) => g.s > 605).length;
+const below = A.gates.filter((g) => g.s >= 625).length;   // (25 m below the start to line up)
 ok(h.gateTotal === below && h.nextGate === A.gates.length - below, `only the ${below} gates below the start count (${h.gateTotal})`);
 // Ride straight down the middle to the finish: gates on the line pass or miss, never the skipped ones.
 for (let z = -600; z > -1000; z -= 0.5) { player.position.z = z; A.update(1 / 60); }

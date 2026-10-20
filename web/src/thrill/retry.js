@@ -65,7 +65,7 @@ export function installRetry({ player, input, activities, ui, cam }) {
       emit('thrillRetry', { x: p.x, z: p.z, speed: player.speed });
       // Keep the take-off so the same retry works again and again.
       trail.s = trail.s.filter((s) => s.t <= p.t);
-      clock = p.t; trail.takeoffT = p.t + lead; last.ok = false;
+      clock = p.t; sampleAt = clock; trail.takeoffT = p.t + lead; last.ok = false;
     });
   }
 
@@ -84,7 +84,9 @@ export function installRetry({ player, input, activities, ui, cam }) {
   });
   on('landed', (e) => { if (pending !== null && (e.air >= C.minAir || e.result === 'crash')) mark(e.air); pending = null; });
   on('crashed', () => { if (pending !== null) mark(); pending = null; });
-  on('rideStarted', () => { trail.clear(); clock = 0; pending = null; marked = null; last.ok = false; });
+  // (sampleAt goes back with the clock: left at the last ride's distance, a new ride recorded no approach at all
+  // until it had ridden as far, so Backspace said "Retry needs a jump first" on every ride after a long one.)
+  on('rideStarted', () => { trail.clear(); clock = 0; sampleAt = 0; pending = null; marked = null; last.ok = false; });
   on('dropZone', () => { trail.clear(); last.ok = false; });
   on('resetTop', () => { last.ok = false; trail.cut(); });
   on('respawned', () => { last.ok = false; trail.cut(); });

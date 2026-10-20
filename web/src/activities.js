@@ -269,7 +269,8 @@ export class Activities {
         // (they used to count as missed, +2 s each, the moment the clock started).
         const p0 = this.course.progress(pl.position.x, pl.position.z);
         this.startProg = p0 > 0 ? p0 : 0;
-        while (this.nextGate < this.gates.length && this.gates[this.nextGate].s < this.startProg + 5) this.nextGate++;
+        // (and one right below the start, which a drop-zone start beside the line can't make: 25 m to line up)
+        while (this.nextGate < this.gates.length && this.gates[this.nextGate].s < (this.startProg > 30 ? this.startProg + 25 : this.startProg + 5)) this.nextGate++;
         this.firstGate = this.nextGate;
       }
       return;
