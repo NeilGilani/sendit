@@ -30,6 +30,8 @@ await (await import('./thrill-unit.mjs')).run(test, assert);
 await (await import('./clips-unit.mjs')).run(test, assert);
 // Gear advisor (Locker stats, best-at badges, the ★ pick): scripts/gear-advisor-unit.mjs.
 await (await import('./gear-advisor-unit.mjs')).run(test, assert);
+// First-launch auto quality (gfx/autoquality.js): scripts/autoquality-unit.mjs.
+await (await import('./autoquality-unit.mjs')).run(test, assert);
 
 // ---------------------------------------------------------------- schema
 await test('default profile is valid with a full loadout', () => {

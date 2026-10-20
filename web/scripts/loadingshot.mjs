@@ -29,13 +29,16 @@ for (const q of variants) {
   await page.waitForFunction(() => window.__loading?.firstFrameAt > 0 || document.getElementById('loading')?.classList.contains('static'), null, { timeout: 150000 });
   // Time from the first trick shot when there is one (else from the first frame).
   if (!/loaddebug=cam/.test(q)) await page.waitForFunction(() => !!window.__loading?.sceneInfo, null, { timeout: 150000 }).catch(() => {});
-  const t0 = Date.now();
+  const t0 = Date.now(), seen = [];
   const tag = q.replace(/[^a-z0-9]+/gi, '_');
   for (const t of times) {
     const wait = t * 1000 - (Date.now() - t0);
     if (wait > 0) await page.waitForTimeout(wait);
     await page.screenshot({ path: `${out}/${tag}_t${String(t).padStart(2, '0')}.png` });
+    const sh = await page.evaluate(() => window.__loading?.stats()?.shot).catch(() => null);
+    if (sh) seen.push(`t${t}: ${sh.trick} / ${sh.camera}`);
   }
+  console.log(`  frames: ${seen.join(' · ')}`);
   const st = await page.evaluate(() => window.__loading?.stats());
   console.log(`${q}: first frame ${st?.firstFrameMs} ms  shot ${JSON.stringify(st?.shot)}  scene ${JSON.stringify(st?.scene)}`);
   for (const l of logs) console.log('   ', l);

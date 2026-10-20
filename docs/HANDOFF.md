@@ -138,6 +138,9 @@ Performance target: quality 1 around 14–16 ms GPU at 1600×900. Screenshots go
    still full page reloads; loading-screen distant mountains are blocky (`src/loading/terrain.js`); re-run
    `web/scripts/loadingstills.mjs` after big look changes; one 844×390 run showed the loading overlay over a started
    ride (unverified).
+10. Quality on a MacBook Air M1 (night 3, docs/graphics-perf.md "Launch check"): Low ~13 ms, Medium ~21 ms GPU at
+   1440×900; **High is 85–280 ms** (AO, 3072 shadows, parallax terrain; its pixel-ratio cap is now 1.5). First launch
+   picks Low / Medium from the GPU and checks the first ride (gfx/autoquality.js); it never picks High.
 9. Design questions for the user: the spin throw window after take-off is short (lengthening makes timing easier);
    at 16–22 m/s the last 10 % of steering adds skid rather than turn; directional skis can't land backwards
    (rodeo / cork 540 on default skis crash — a hint explains it).
