@@ -64,13 +64,6 @@ const CSS = /* css */`
 #juiceHud .sp small { display: block; font-family: var(--font); font-style: normal; font-weight: 800; font-size: 10px; letter-spacing: .28em; color: rgba(250,248,243,.75); -webkit-text-stroke: 0; }
 /* Phones (portrait): right of the timer is where the score sits; the split goes to the free top-left corner. */
 @media (max-width: 600px) { #juiceHud .sp { left: 14px; top: 26px; font-size: 20px; } }
-/* Phones (portrait): the toasts (new spot, achievements) leave the top, where the timer and the combo panel
-   are centred across the whole width, for the free band above the replay / save pills. */
-@media (max-width: 600px) and (min-height: 600px) {
-  #juiceHud .ts { top: auto; bottom: 196px; left: 16px; transform: scale(.9); transform-origin: bottom left; }
-  /* …except while a judged run card sits low on the screen there: then on top again, as before. */
-  body:has(#flowHud .rs.on, #parkHud .card.on) #juiceHud .ts { top: 92px; bottom: auto; transform: scale(.8); transform-origin: top left; }
-}
 @keyframes jhSplit { 0% { opacity: 0; transform: translateX(-12px); } 10% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
 /* announcer */
 #juiceHud .an { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; opacity: 0; }
@@ -103,6 +96,9 @@ const CSS = /* css */`
 @keyframes jhPop { 0% { opacity: 0; transform: translateX(-50%) scale(.6); } 14% { opacity: 1; transform: translateX(-50%) scale(1.15); } 26% { transform: translateX(-50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-18px); } }
 #juiceHud .bn { position: absolute; left: 50%; top: 172px; transform: translateX(-50%); white-space: nowrap; font-size: 38px; opacity: 0; -webkit-text-stroke: 2px #1b1446; paint-order: stroke fill; }
 #juiceHud .bn.show { animation: jhBank 1.8s ease-out forwards; }
+/* A bank while a trick name is up (≤ ~960 px tall the two met at the announcer's top): above it instead. */
+#juiceHud .bn.hi { top: 104px; }
+#chal:not(.hidden) ~ #juiceHud .bn.hi { top: 118px; font-size: 30px; }
 #juiceHud .bn.lost.show { animation: jhLost 1.4s ease-out forwards; }
 @keyframes jhBank { 0% { opacity: 0; transform: translateX(-50%) scale(.5); } 10% { opacity: 1; transform: translateX(-50%) scale(1.2); } 20% { transform: translateX(-50%) scale(1); } 78% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-30px) scale(.95); } }
 @keyframes jhLost { 0% { opacity: 0; transform: translateX(-50%) scale(1.3); } 8% { opacity: 1; transform: translateX(calc(-50% - 10px)); } 14% { transform: translateX(calc(-50% + 10px)); } 20% { transform: translateX(calc(-50% - 6px)); } 26% { transform: translateX(-50%); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(26px); } }
@@ -204,8 +200,16 @@ body.fp #juiceHud .an { top: 42%; }   /* helmet cam: no rider in the middle, kee
   #juiceHud .an .s small { font-size: 11px; }
   #juiceHud .co { font-size: 18px; }
   #juiceHud .bn { top: 120px; font-size: 26px; }
+  #juiceHud .bn.hi, #chal:not(.hidden) ~ #juiceHud .bn.hi { top: 46%; font-size: 22px; }
   #juiceHud .ts { top: 92px; transform: scale(.8); transform-origin: top left; }
   body.fp #juiceHud .an { top: 34%; }
+}
+/* Phones (portrait): the toasts (new spot, achievements) leave the top, where the timer and the combo panel
+   are centred across the whole width, for the free band above the replay / save pills. */
+@media (max-width: 600px) and (min-height: 600px) {
+  #juiceHud .ts { top: auto; bottom: 196px; left: 16px; transform: scale(.9); transform-origin: bottom left; }
+  /* …except while a judged run card sits low on the screen there: then on top again, as before. */
+  body:has(#flowHud .rs.on, #parkHud .card.on) #juiceHud .ts { top: 92px; bottom: auto; transform: scale(.8); transform-origin: top left; }
 }
 body.fp #notes { bottom: 130px; }      /* the helmet cam's speed read-out sits bottom right */
 `;
@@ -250,6 +254,7 @@ export function mountJuiceHud({ player, combo, input, camera }) {
     if (!riding()) return;
     bn.textContent = text; bn.style.color = color;
     bn.classList.toggle('lost', lost);
+    bn.classList.toggle('hi', performance.now() - annT < (JUICE_HUD.announceHold + 0.35) * 1000 && innerHeight < 960);
     restart(bn);
     bnT = performance.now();
   };
