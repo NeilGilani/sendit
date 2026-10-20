@@ -238,6 +238,11 @@ export class UI {
     if (!root || !this.input) return;
     for (const a of this.input.menuActions(dt)) {
       if (!this.modal && this.base === 'lobby' && this.lobby?.onAction(a)) continue;
+      if (this.modal === 'howto' && (a === 'prevTab' || a === 'nextTab')) {   // LB / RB page the How to ride cards
+        const b = root.querySelector(a === 'nextTab' ? '[data-hw=next]' : '[data-hw=back]:not([hidden])');
+        if (b && !(a === 'nextTab' && /ride|done/i.test(b.textContent))) b.click();
+        continue;
+      }
       const el = document.activeElement;
       const range = el instanceof HTMLInputElement && el.type === 'range' && root.contains(el);
       switch (a) {
