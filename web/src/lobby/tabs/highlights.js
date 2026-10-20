@@ -93,11 +93,11 @@ const STYLE = `
 #hl-player .bar { position: absolute; left: 0; right: 0; height: 8vh; background: #000; pointer-events: none; }
 #hl-player .bar.t { top: 0; } #hl-player .bar.b { bottom: 0; }
 #hl-player .top { position: absolute; top: calc(8vh + 16px); left: clamp(16px, 3vw, 44px); right: clamp(16px, 3vw, 44px); display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; pointer-events: none; }
-#hl-player .cap small { display: flex; align-items: center; gap: 8px; font: 600 11px/1 var(--font); letter-spacing: .18em; text-transform: uppercase; color: var(--c-signal-2); }
+#hl-player .cap small { display: flex; align-items: center; gap: 8px; font: 600 11px/1 var(--font); letter-spacing: .18em; text-transform: uppercase; color: var(--c-signal-2); text-shadow: 0 1px 3px rgba(0,0,0,.7), 0 0 14px rgba(0,0,0,.5); }
 #hl-player .cap small i { width: 8px; height: 8px; background: var(--c-signal); transform: rotate(45deg); }
 #hl-player .cap b { display: block; margin-top: 6px; font-weight: 900; font-stretch: 72%; font-size: clamp(26px, 3.4vw, 44px); line-height: .95; text-transform: uppercase; letter-spacing: .01em; text-shadow: 0 2px 18px rgba(0,0,0,.45); }
-#hl-player .cap span { display: block; margin-top: 8px; font: 500 12px/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: rgba(242,244,241,.78); text-shadow: 0 1px 10px rgba(0,0,0,.6); }
-#hl-player .camname { font: 500 11px/1 var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: rgba(242,244,241,.7); text-align: right; }
+#hl-player .cap span { display: block; margin-top: 8px; font: 500 12px/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: rgba(242,244,241,.9); text-shadow: 0 1px 3px rgba(0,0,0,.75), 0 0 12px rgba(0,0,0,.55); }
+#hl-player .camname { font: 500 11px/1 var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: rgba(242,244,241,.85); text-align: right; text-shadow: 0 1px 3px rgba(0,0,0,.7), 0 0 12px rgba(0,0,0,.5); }
 #hl-player .ctrl { position: absolute; left: 50%; bottom: calc(8vh + 18px); transform: translateX(-50%); display: flex; gap: 8px; }
 #hl-player .ctrl button { display: inline-flex; align-items: center; gap: 8px; padding: 9px 13px; background: var(--c-ink-2); border: 1px solid var(--c-line-2); border-radius: var(--r2);
   color: var(--c-snow); font-size: 12px; letter-spacing: .12em; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 0 var(--c-ink-lip, #04080c);

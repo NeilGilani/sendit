@@ -71,7 +71,9 @@ export function installCaseNotifications() {
     soon();
     // Back in the lobby: a ride's progress cards go (the bar lives on Home / Cases and they would sit over the
     // panels, e.g. Career › Highlights' first play button); a "Case earned!" card stays and moves to the top right.
-    if (m !== Mode.MENU || !stack) return;
+    if (!stack) return;
+    stack.classList.toggle('hold', m === Mode.PAUSED);   // the pause menu's left column ("Back to lobby") sits there
+    if (m !== Mode.MENU) return;
     stack.classList.remove('ride');
     for (const n of stack.querySelectorAll('.cn:not(.case)')) n.remove();
   });

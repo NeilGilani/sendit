@@ -423,4 +423,5 @@ body.cr-open #lobby, body.cr-open .cn-stack { opacity: 0 !important; pointer-eve
 /* In a ride (notify.js adds .ride): left edge, below the middle, clear of the score / snowflakes (top right),
    the challenge timer (top centre), the speed read-out (bottom centre) and the score notes (bottom right). */
 .cn-stack.ride { left: 1.2em; right: auto; top: auto; bottom: 26%; align-items: flex-start; }
+.cn-stack.hold { opacity: 0; transition: opacity .2s; }
 @media (max-width: 760px) { .cn-stack.ride { left: .6em; bottom: 30%; font-size: 11px; } }

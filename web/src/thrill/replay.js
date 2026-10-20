@@ -271,7 +271,7 @@ function mountUi() {
   #thrill-replay .tag{position:absolute;top:calc(9vh + 14px);left:22px;font-weight:800;letter-spacing:.24em;font-size:15px;display:flex;align-items:center;gap:9px;text-shadow:0 1px 8px rgba(0,0,0,.5)}
   #thrill-replay .tag i{width:10px;height:10px;border-radius:50%;background:#ff3b5c;box-shadow:0 0 10px #ff3b5c;animation:thrillRec 1s steps(2) infinite}
   #thrill-replay .rate{position:absolute;top:calc(9vh + 14px);right:22px;font-weight:700;letter-spacing:.12em;font-size:14px;opacity:.85}
-  #thrill-replay .hint{position:absolute;bottom:calc(9vh + 14px);left:50%;transform:translateX(-50%);font-size:12px;letter-spacing:.14em;opacity:.75;white-space:nowrap}
+  #thrill-replay .hint{position:absolute;bottom:4.5vh;left:50%;transform:translate(-50%,50%);font-size:12px;letter-spacing:.14em;opacity:.8;width:max-content;max-width:calc(100vw - 32px);text-align:center;line-height:1.35}
   #thrill-replay .prog{position:absolute;bottom:9vh;left:0;height:3px;background:#2ff5d6;width:0}
   #thrill-pills{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);display:flex;gap:10px;align-items:center;pointer-events:none;z-index:6}
   #thrill-rp{transform:translateY(10px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;white-space:nowrap;
