@@ -110,8 +110,10 @@ mountain by reload → riding; URL cheats ignored; no console errors, no HTTP �
 
 - First paint: index.html's inline script picks a loading still and preloads it before any bundle — decoded
   ~40–60 ms after navigation on a warm local server (Chromium). The live loading scene starts in a worker.
-- Lobby ready (local server, MacBook Air M-series, Chromium/Metal): ~8–9 s; first visit downloads ≈ see
-  `prodsmoke` output ("N requests, X MB").
+- Lobby ready from a local server (MacBook Air, Chromium/Metal, other workloads running): 8–14 s; WebKit
+  24–30 s. First visit before the lobby: ~55 requests, ~16 MB uncompressed (the JS is ~3.7 MB of that,
+  ~0.9 MB gzipped). On a real connection add download time: ~16 MB is ~13 s at 10 Mbit/s, so the
+  loading screen (still at once, live scene from the worker) covers it.
 - **Quality auto-pick** (`gfx/autoquality.js`): players who never chose a quality start on Low on software
   renderers (SwiftShader / llvmpipe), older Intel HD / UHD iGPUs and phone / tablet GPUs; if the lobby still
   averages > 42 ms per frame for ~150 frames, it steps down (max twice). Off under automation

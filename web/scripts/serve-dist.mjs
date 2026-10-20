@@ -3,7 +3,8 @@
 //   node web/scripts/serve-dist.mjs web/dist 4173 /sendit/   → http://localhost:4173/sendit/
 // Anything outside `base` and any missing file is a 404 (logged to stderr as "404 <path>"), so a
 // smoke test catches root-absolute URLs that ignore the base. Serves .gz / .br siblings when present
-// and the client accepts them (what a CDN would do), and sends the cache headers docs/launch.md suggests.
+// and the client accepts them (what a CDN would do), and sends Pages-like cache headers (max-age=600 +
+// ETag; hashed bundles immutable).
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
@@ -34,8 +35,13 @@ http.createServer((req, res) => {
   const headers = {
     'Content-Type': TYPES[ext] || 'application/octet-stream',
     // Hashed bundles never change; everything else revalidates (docs/launch.md § Caching).
-    'Cache-Control': /\/assets\/[^/]+-[\w-]{8}\.\w+$/.test(url.pathname) ? 'public, max-age=31536000, immutable' : 'no-cache',
+    // Others: what GitHub Pages sends (10 min), with an ETag so a revalidation is a 304, like any real host.
+    'Cache-Control': /\/assets\/[^/]+-[\w-]{8}\.\w+$/.test(url.pathname) ? 'public, max-age=31536000, immutable' : 'public, max-age=600',
   };
+  const st = fs.statSync(file);
+  const etag = `"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}"`;
+  headers.ETag = etag;
+  if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers); res.end(); return; }
   const ae = String(req.headers['accept-encoding'] || '');
   let send = file;
   if (/\bbr\b/.test(ae) && fs.existsSync(file + '.br')) { send = file + '.br'; headers['Content-Encoding'] = 'br'; }
