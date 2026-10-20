@@ -477,8 +477,8 @@ export const ROUND2 = [
     id: 'r4', name: 'Varsity Coach', body: 'mid', pantsFrom: 'P7 relaxed bib',
     fit: 'Varsity / coach snow jacket on the R2 shape: shaped torso, rib hem bloused, striped rib, contrast sleeves; P7 relaxed bib',
     jacket: r2Cut('relaxed', {
-      style: JSTYLE.varsity, hemFront: 0.895, hemBack: 0.875, hemFlare: -0.011, fab: FAB.wool, folds: 1.0,
-      torso: { chest: [0.244, 0.166, 0.17], waist: [0.236, 0.162, 0.168], hem: [0.232, 0.16, 0.166], n: 2.25 },
+      style: JSTYLE.varsity, hemFront: 0.895, hemBack: 0.875, hemFlare: -0.014, fab: FAB.wool, folds: 1.15,
+      torso: { chest: [0.248, 0.168, 0.17], waist: [0.228, 0.16, 0.168], hem: [0.228, 0.158, 0.166], n: 2.15 },
       sleeve: { upper: 0.079, elbow: 0.078, forearm: 0.074, cuff: 0.056 }, sleeveEnd: 0.7,
       collarTop: 1.598, collarEase: 0.016, hood: 'none', hoodRoll: null,
     }),
@@ -491,7 +491,7 @@ export const ROUND2 = [
     fit: 'Duck-canvas chore jacket on the R2 shape (no box): cord collar, patch pockets, brass snaps; P9 carpenter pant',
     jacket: r2Cut('relaxed', {
       style: JSTYLE.work, hemFront: 0.875, hemBack: 0.86, hemFlare: -0.002, fab: FAB.canvas, folds: 1.05,
-      torso: { chest: [0.242, 0.166, 0.17], waist: [0.236, 0.163, 0.17], hem: [0.238, 0.165, 0.172], n: 2.3 },
+      torso: { chest: [0.244, 0.166, 0.17], waist: [0.232, 0.162, 0.17], hem: [0.236, 0.164, 0.172], n: 2.3 },
       collarTop: 1.612, collarEase: 0.026, hood: 'none', hoodRoll: null,
     }),
     pants: P_PANTS.carpenter9,
@@ -500,17 +500,17 @@ export const ROUND2 = [
   },
   {
     id: 'r6', name: 'Mocha Puffer', body: 'mid', pantsFrom: 'P4 camo cargo',
-    fit: 'Hip-length puffer on the R2 shape: slim, 8.5 cm baffles, cinched hem, quilted collar; P4 camo cargo pant',
+    fit: 'Hip-length puffer on the R2 shape: slim, 8.5 cm baffles, matte mocha, cinched hem, quilted collar; P4 camo cargo pant',
     jacket: r2Cut('puffer', {
-      hemFront: 0.88, hemBack: 0.858, hemFlare: -0.008, fab: FAB.ripstop, folds: 0.35, shoulder: 0.011,
+      hemFront: 0.88, hemBack: 0.858, hemFlare: -0.008, fab: FAB.twill, folds: 0.35, shoulder: 0.011,
       torso: { chest: [0.244, 0.17, 0.174], waist: [0.238, 0.167, 0.172], hem: [0.236, 0.166, 0.172], n: 2.2 },
       sleeve: { upper: 0.082, elbow: 0.08, forearm: 0.077, cuff: 0.064 }, sleeveEnd: 0.694,
-      collarTop: 1.636, collarEase: 0.026, quilt: { pitch: 0.085, depth: 0.0095 },
+      collarTop: 1.636, collarEase: 0.026, quilt: { pitch: 0.085, depth: 0.0082 },
     }),
     pants: P_PANTS.camo4,
     gloves: mitt,
     colors: {
-      jacket: { base: '#7a5442', panel: '#664535', accent: '#efe6d6', gaiter: '#3e2c23', style: 0 },
+      jacket: { base: '#6b5244', panel: '#5a4438', accent: '#efe6d6', gaiter: '#3e2c23', style: 0 },
       pants: PROTOTYPES[3].colors.pants,
       helmet: { base: '#efe6d6', liner: '#3e2c23', accent: '#7a5442' },
       goggles: { lens: '#e8b04a', lensBase: '#6b3a12', strap: '#3e2c23', strapLogo: '#efe6d6' },

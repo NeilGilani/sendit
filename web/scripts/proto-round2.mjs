@@ -26,10 +26,12 @@ const frameDir = path.join(outDir, 'frames');
 fs.mkdirSync(frameDir, { recursive: true });
 const DPR = Number(process.env.DPR || 1.5);
 const VW = 900, VH = 1100, CW = 540, CH = 960, CX = (VW - CW) / 2, CY = 50;
-const YAW = { front: 180, q34: 145, side: 90, back: 0, q34b: 35 };
+const YAW = { front: 180, q34: 145, side: 90, back: 0, q34b: 35, y240: 240, y270: 270, y300: 300, y120: 120 };
 const STAND = ['front', 'q34', 'side', 'back', 'q34b'];
 const MOTION = [['carve', 'q34'], ['carve', 'q34b'], ['tuck', 'side'], ['grab', 'q34'], ['grab', 'side']];
 const CMPV = ['front', 'q34', 'side', 'q34b'];
+const BOARD = (process.env.BOARD || 'y240,side').split(',');
+const BOARD_NAME = { y240: 'front 3/4', side: 'back', y270: 'front', y300: 'front 3/4 (toe side)' };
 const VIEW_NAME = { front: 'front', q34: 'front 3/4', side: 'side', back: 'back', q34b: 'back 3/4' };
 const BODY_NAME = { current: 'current body', mid: 'in-between body', natural: 'natural body' };
 const SOURCE = { r1: 10, r2: 2, r3: 1, r4: 7, r5: 9, r6: 5 };   // round-1 prototype each look comes from
@@ -106,7 +108,6 @@ function pageHelpers() {
     return {
       lines: [
         { a: toPx(B), b: toPx(ax), c: '#ffd23f', label: 'back line (torso axis)' },
-        { a: toPx(Bv), b: toPx(pl), c: '#5ad1ff', label: 'plumb line' },
       ],
       dots: [{ p: toPx(B), c: '#ffd23f' }, { p: toPx(H), c: '#ff5a5a' }, { p: toPx(H2), c: '#ff5a5a' }],
       num: { protAxis: +(protAxis * 100).toFixed(1), protPlumb: +(protPlumb * 100).toFixed(1), dip: +(dip * 100).toFixed(1) },
@@ -142,19 +143,21 @@ function pageHelpers() {
     const look = stage.rider.look, g = look.meshes.garments.geometry, P = g.attributes.position, G = g.attributes.aG;
     const bodyGeo = look.meshes.body.geometry, BP = bodyGeo.attributes.position;
     const rows = [];
-    for (let y = 1.62; y >= 0.7; y -= 0.01) {
+    for (let y = 1.62; y >= 0.74; y -= 0.01) {
       const r = { y: +y.toFixed(2) };
       for (const [k, id] of [['j', 0], ['p', 2]]) {
         let zb = 1e9, zf = -1e9, x = 0, n = 0;
         for (let i = 0; i < P.count; i++) {
-          if (Math.round(G.getX(i)) !== id || Math.abs(P.getY(i) - y) > 0.006) continue;
-          zb = Math.min(zb, P.getZ(i)); zf = Math.max(zf, P.getZ(i)); x = Math.max(x, Math.abs(P.getX(i))); n++;
+          if (Math.round(G.getX(i)) !== id || Math.abs(P.getY(i) - y) > 0.01) continue;
+          x = Math.max(x, Math.abs(P.getX(i)));
+          if (Math.abs(P.getX(i)) > 0.16) continue;
+          zb = Math.min(zb, P.getZ(i)); zf = Math.max(zf, P.getZ(i)); n++;
         }
         if (n) r[k] = [+zb.toFixed(4), +zf.toFixed(4), +x.toFixed(4)];
       }
       let zb = 1e9, zf = -1e9;
       for (let i = 0; i < BP.count; i++) {
-        if (Math.abs(BP.getY(i) - y) > 0.006 || Math.abs(BP.getX(i)) > 0.2) continue;
+        if (Math.abs(BP.getY(i) - y) > 0.012 || Math.abs(BP.getX(i)) > 0.16) continue;
         zb = Math.min(zb, BP.getZ(i)); zf = Math.max(zf, BP.getZ(i));
       }
       if (zb < 1e8) r.b = [+zb.toFixed(4), +zf.toFixed(4)];
@@ -185,7 +188,7 @@ async function capture(browser, body, jobs) {
     const baseUpdate = stage.update.bind(stage);
     stage.update = (dt) => {
       stage.idle = -1e9; stage.yawVel = 0; stage.spinInput = 0; stage.yaw = window.__yaw;
-      stage.zoom = window.__pose === 'stand' ? 0.63 : window.__pose === 'carve' ? 0.86 : 0.74; stage.setFocusRect({ x: 0, y: 0, w: innerWidth, h: innerHeight });
+      stage.zoom = window.__pose === 'board' ? 0.7 : window.__pose === 'stand' ? 0.63 : window.__pose === 'carve' ? 0.86 : 0.74; stage.setFocusRect({ x: 0, y: 0, w: innerWidth, h: innerHeight });
       baseUpdate(dt);
     };
     stage.animateRider = function (dt) {
@@ -255,8 +258,7 @@ async function capture(browser, body, jobs) {
     await page.waitForTimeout(600);
     for (const key of jobs.full) {
       await dress(key);
-      await pose('stand', 'q34', 1300);
-      await shot(frame(tagOf(key, body), 'board', 'q34'));
+      for (const v of BOARD) { await pose('board', v, 1300); await shot(frame(tagOf(key, body), 'board', v)); }
     }
     await page.evaluate(() => window.__sendit.stage.setEquipment('skis', { animate: false }));
   }
@@ -315,7 +317,7 @@ for (const [key, body] of looks) {
   <div class="f">${P.fit}</div><div class="b">${BODY_NAME[body]} · pants: ${P.pantsFrom || ''} · lobby light</div>
   <div class="rl">Standing on skis</div><div class="row">${STAND.map((v) => tile(frame(tag, 'stand', v), VIEW_NAME[v])).join('')}</div>
   <div class="rl">In motion</div><div class="row">${MOTION.map(([p, v]) => tile(frame(tag, p, v), `${p === 'grab' ? 'air grab' : p} · ${VIEW_NAME[v]}`)).join('')}</div>
-  <div class="rl">Snowboard stance</div><div class="row">${tile(frame(tag, 'board', 'q34'), 'snowboard · front 3/4')}</div>
+  <div class="rl">Snowboard stance</div><div class="row">${BOARD.map((v) => tile(frame(tag, 'board', v), `snowboard · ${BOARD_NAME[v] || v}`)).join('')}</div>
   <div style="height:22px"></div></body></html>`;
   await page.setContent(html);
   await page.setViewportSize({ width: 28 * 2 + FW * 5 + 8 * 4, height: 600 });
@@ -325,39 +327,39 @@ for (const [key, body] of looks) {
   const prof = meta.profile[tag], src = SOURCE[key], srcProf = meta.profile[`P${src}-${body}`];
   const plot = (() => {
     if (!prof) return '';
-    const W = 560, H = 1040, sc = 1050, ox = 300, oy = 40, Y = (y) => oy + (1.62 - y) * sc, Z = (z) => ox + z * sc;
+    const W = 560, H = 1040, sc = 1000, ox = 300, oy = 40, Y = (y) => oy + (1.62 - y) * sc, Z = (z) => ox + z * sc;
     const pathOf = (rows, k, i) => rows.filter((r) => r[k]).map((r, n) => `${n ? 'L' : 'M'}${Z(r[k][i]).toFixed(1)},${Y(r.y).toFixed(1)}`).join('');
     const bodyB = pathOf(prof, 'b', 0), bodyF = pathOf(prof, 'b', 1);
     const pB = pathOf(prof, 'p', 0), pF = pathOf(prof, 'p', 1);
     const jB = pathOf(prof, 'j', 0), jF = pathOf(prof, 'j', 1);
     const sB = srcProf ? pathOf(srcProf, 'j', 0) : '', sF = srcProf ? pathOf(srcProf, 'j', 1) : '';
     const blade = prof.filter((r) => r.j && r.y <= 1.44 && r.y >= 1.36).reduce((b, r) => (r.j[0] < b.j[0] ? r : b), prof.find((r) => r.j && r.y <= 1.44));
-    const grid = [1.6, 1.4, 1.2, 1.0, 0.84, 0.8].map((y) => `<line x1="20" x2="${W - 10}" y1="${Y(y)}" y2="${Y(y)}" stroke="#333" stroke-width="1"/><text x="24" y="${Y(y) - 4}" fill="#777" font-size="15">${y === 0.84 ? 'crotch 0.84' : y.toFixed(2) + ' m'}</text>`).join('');
+    const grid = [1.6, 1.4, 1.2, 1.0, 0.84].map((y) => `<line x1="20" x2="${W - 10}" y1="${Y(y)}" y2="${Y(y)}" stroke="#333" stroke-width="1"/><text x="24" y="${Y(y) - 4}" fill="#777" font-size="15">${y === 0.84 ? 'crotch 0.84' : y.toFixed(2) + ' m'}</text>`).join('');
     return `<svg width="${W}" height="${H}" style="background:#1d2026;border-radius:6px">${grid}
       <path d="${bodyB}" stroke="#7d828c" stroke-width="2" fill="none"/><path d="${bodyF}" stroke="#7d828c" stroke-width="2" fill="none"/>
       <path d="${pB}" stroke="#6fbf73" stroke-width="2.5" fill="none"/><path d="${pF}" stroke="#6fbf73" stroke-width="2.5" fill="none"/>
       ${sB ? `<path d="${sB}" stroke="#ff6b6b" stroke-width="2.5" stroke-dasharray="7 5" fill="none"/><path d="${sF}" stroke="#ff6b6b" stroke-width="2.5" stroke-dasharray="7 5" fill="none"/>` : ''}
       <path d="${jB}" stroke="#ffffff" stroke-width="3.5" fill="none"/><path d="${jF}" stroke="#ffffff" stroke-width="3.5" fill="none"/>
-      ${blade ? `<line x1="${Z(blade.j[0])}" x2="${Z(blade.j[0])}" y1="${Y(blade.y)}" y2="${Y(0.78)}" stroke="#5ad1ff" stroke-width="2.5" stroke-dasharray="10 6"/>` : ''}
-      <text x="${W - 170}" y="${H - 96}" fill="#fff" font-size="17">— ${up} jacket</text>
-      ${src ? `<text x="${W - 170}" y="${H - 74}" fill="#ff6b6b" font-size="17">- - P${src} (round 1)</text>` : ''}
-      <text x="${W - 170}" y="${H - 52}" fill="#6fbf73" font-size="17">— pants</text>
-      <text x="${W - 170}" y="${H - 30}" fill="#9aa0aa" font-size="17">— body</text>
-      <text x="24" y="${H - 30}" fill="#5ad1ff" font-size="17">plumb from the shoulder blades</text>
-      <text x="${Z(-0.1) - 20}" y="${oy - 12}" fill="#999" font-size="16">← back · front →</text></svg>`;
+      ${blade ? `<line x1="${Z(blade.j[0])}" x2="${Z(blade.j[0])}" y1="${Y(blade.y)}" y2="${Y(0.76)}" stroke="#5ad1ff" stroke-width="2.5" stroke-dasharray="10 6"/>` : ''}
+      <text x="24" y="${H - 74}" fill="#fff" font-size="18">— ${up} jacket</text>
+      ${src ? `<text x="200" y="${H - 74}" fill="#ff6b6b" font-size="18">- - P${src} jacket (round 1)</text>` : ''}
+      <text x="24" y="${H - 48}" fill="#6fbf73" font-size="18">— pants</text>
+      <text x="200" y="${H - 48}" fill="#9aa0aa" font-size="18">— body (bare)</text>
+      <text x="24" y="${H - 22}" fill="#5ad1ff" font-size="18">- - plumb from the shoulder blades</text>
+      <text x="${W - 190}" y="${H - 22}" fill="#999" font-size="18">← back · front →</text></svg>`;
   })();
   const sSide = meta.sil[`${tag}-stand-side`], sBack = meta.sil[`${tag}-stand-back`], sTuck = meta.sil[`${tag}-tuck-side`];
-  const SW = 520;
-  const numSide = (s) => (s ? `<div class="num">hem past the back line: <b>${s.num.protAxis} cm</b><br>past the plumb line: ${s.num.protPlumb} cm<br>waist dip under the blade→hem line: <b>${s.num.dip} cm</b></div>` : '');
+  const SW = 600;
+  const numSide = (s) => (s ? `<div class="num">hem past the back line: <b>${s.num.protAxis} cm</b><br>waist dip under the blade→hem line: <b>${s.num.dip} cm</b></div>` : '');
   const numBack = (s) => (s ? `<div class="num">shoulders <b>${s.num.shoulder} cm</b> · hips ${s.num.hips} cm</div>` : '');
   const html2 = `<html><head><style>${css}</style></head><body>
   <div class="h"><span class="n">${up}</span><span class="t">${P.name} · silhouette check</span></div>
   <div class="f">Rule b: the back falls straight from the shoulder blades, the hem never cups the seat or kicks out. Rule a: the shoulders are the widest point.</div>
-  <div class="row"><div class="c">${plot}<span class="l">bind pose · side profile</span></div>
+  <div class="row"><div class="c">${plot}<span class="l" style="left:auto;right:12px">bind pose · side profile</span></div>
   <div class="c">${tile(frame(tag, 'stand', 'side'), 'standing · side', SW, svgOver(sSide, SW) + numSide(sSide))}</div>
   <div class="c">${tile(frame(tag, 'stand', 'back'), 'standing · back', SW, svgOver(sBack, SW) + numBack(sBack))}</div>
   <div class="c">${tile(frame(tag, 'tuck', 'side'), 'tuck · side', SW, svgOver(sTuck, SW) + numSide(sTuck))}</div></div>
-  <div class="f" style="padding-top:10px">Yellow: line down the torso axis from the shoulder blades (side) / plumb lines at the shoulder edges (back). Blue: plumb line. Red dots: the back-most point of the hem zone (side) / the widest point of the jacket below the belt (back).</div>
+  <div class="f" style="padding-top:10px">Yellow: the straight line down the back from the shoulder blades, along the torso (side) / plumb lines at the shoulder edges (back). Blue (bind pose): plumb line from the shoulder blades. Red dots: the back-most point of the hem zone (side) / the widest point of the jacket below the belt (back).</div>
   <div style="height:16px"></div></body></html>`;
   await page.setContent(html2);
   await page.setViewportSize({ width: 28 * 2 + 560 + SW * 3 + 8 * 3, height: 600 });
