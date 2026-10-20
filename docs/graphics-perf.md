@@ -340,3 +340,47 @@ hand-over but cost memory. At q1 / 1600 × 900, one frame pixel is about one scr
   trees.
 - **CPU** (not the bottleneck): `getProgramParameter` shows up at about 0.3 ms per frame on the main thread.
   Worth tracking down if the game ever becomes CPU-bound.
+
+## Launch check (night 3, 2026-10-20): MacBook Air M1 8 GB, quality 0 / 1 / 2, chase + first person
+
+Headless Chrome, ANGLE Metal, 1440×900 CSS at 2× (the Air's own screen), dev server, GPU timer queries
+around the whole frame (shadow + scene + post), 240 frames while carving. The machine was shared with four
+other sessions' browsers and builds (load average 5–13), so GPU numbers are ±30 % and rAF intervals are only a
+rough guide; compare within a row. Script: `perf3.mjs` in the night-3 scratchpad (same method as
+`scripts/gfxperf.mjs`, plus first person, rAF long frames and heap).
+
+| map / view | q0 (1080×675) GPU med / p95 | q1 (1440×900) | q2 (2880×1800, before the cap) | heap q0 / q1 / q2 |
+|---|---|---|---|---|
+| Valcrest chase | 12.8 / 21.7 ms | 21.1 / 25.1 ms | 232 / 256 ms | 184 / 197 / 220 MB |
+| Valcrest first person | 12.7 / 17.4 | 20.3 / 22.5 | 228 / 263 | 199 / 206 / 209 MB |
+| Blackspruce chase | 13.4 / 17.6 | 23.1 / 26.1 | 196 / 309 | 186 / 197 / 221 MB |
+| Blackspruce (fp flag did not engage) | 13.5 / 17.6 | 24.5 / 28.7 | 279 / 409 | 187 / 214 / 227 MB |
+| Ravenspire chase | 13.7 / 18.9 | 20.6 / 21.6 | 274 / 341 | 200 / 207 / 212 MB |
+| Ravenspire first person | 12.9 / 19.5 | 17.6 / 19.5 | 242 / 317 | 203 / 193 / 234 MB |
+
+Long frames (rAF > 33 ms) over ~250 frames: q0 0, q1 0–3, q2 almost every frame. Main-thread CPU 2.5–9.5 ms
+median. No console errors. Boot to riding 10–24 s on this loaded machine.
+
+- **High was unplayable on a 2× laptop**: `pixelRatio` cap 2 rendered 5.2 MP with N8AO, a 3072 shadow map and
+  the parallax terrain: 200–280 ms a frame (4–5 fps). Even at 1× High costs ~85–99 ms here (AO ≈ 40 ms,
+  terrain q2 ≈ 30 ms, 3072 → 2048 shadow ≈ 20 ms in single-knob A/B; noisy). High's cap is now **1.5**
+  (2.25× fewer pixels on 2× screens; 167–237 ms measured right after, machine still busy). High remains a
+  setting for discrete GPUs; the auto pick never chooses it.
+- **Low** is mostly a pixel-count saving (0.75 scale, 1.6× cheaper than Medium here). For a weak laptop
+  (Intel UHD class, ~4× slower than an M1) that is still ~50 ms, so auto quality has one more step:
+  render scale 0.6 at Low (`PERF.lowestScale`), only for automatic settings.
+
+### Auto quality (`gfx/autoquality.js`, tests in `scripts/autoquality-unit.mjs`)
+
+First launch only (no `quality` stored yet, or `qualityAuto: true` from an earlier auto pick):
+
+1. **GPU tier** from `WEBGL_debug_renderer_info`: software renderers (SwiftShader, llvmpipe, Microsoft
+   Basic Render), phone / tablet GPUs (Mali, Adreno, PowerVR, "Apple GPU"), old Intel HD / UHD, old AMD
+   APUs (R2–R7), GeForce MX1x0/MX2x0 / GT → **Low**; an integrated GPU on a > 3.7 MP CSS screen → Low;
+   everything else (M-series, Iris Xe, Arc, discrete) → **Medium**. Never High.
+2. **First-ride check**: after 4 s of riding, the median frame over 8 s; slower than 27.5 ms (~36 fps) →
+   one level down, then check again; still slow at Low → render scale 0.6; a passing check settles it for good.
+   Lobby, pauses, replays and lifts don't count.
+3. **Never overrides a choice**: clicking a quality button clears `qualityAuto` (and the lowest scale);
+   `?quality=` turns it off; automated browsers (`navigator.webdriver`, i.e. the test scripts) are left alone
+   unless the URL has `?autoq`. Console: `[gfx] auto quality …`.
