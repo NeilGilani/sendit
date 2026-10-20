@@ -63,20 +63,24 @@ function snap(rider, views, label, w, h) {
     else if (v === 'side2') p = look.clone().addScaledVector(rider.board ? right : fwd, rider.board ? -3.4 : 3.4).addScaledVector(up, 0.2);
     else if (v === 'below') p = look.clone().addScaledVector(up, -2.4).addScaledVector(rider.board ? right : fwd, -1.3).addScaledVector(rider.board ? fwd : right, 1.0);
     else if (v === 'front') p = look.clone().addScaledVector(fwd, 2.6).addScaledVector(right, 1.6).addScaledVector(up, 0.7);
-    else if (v[0] === 'c') {
-      // Close-ups on the torso in the rider's own frame: cfront, cside (the rider's right), cq34, cback, cq34b.
+    else if ('csh'.includes(v[0]) && v.length > 2) {
+      // Close-ups in the rider's own frame: c… torso, s… right shoulder / armpit, h… front hem; then
+      // front, q34, side (the rider's right), q34b, back, left. E.g. cfront, sq34, hside.
       const L = rider.bones.thigh_l.getWorldPosition(new THREE.Vector3()).sub(rider.bones.thigh_r.getWorldPosition(new THREE.Vector3()));
       L.y = 0; L.normalize();
       const F = new THREE.Vector3().crossVectors(L, new THREE.Vector3(0, 1, 0));
-      look.copy(rider.bones.spine_01.getWorldPosition(new THREE.Vector3())).add(new THREE.Vector3(0, 0.02, 0));
-      const yaw = { cfront: 0, cq34: -45, cside: -90, cq34b: -135, cback: 180, cleft: 90 }[v] * Math.PI / 180;
+      const W = (n) => rider.bones[n].getWorldPosition(new THREE.Vector3());
+      const k = v[0], dist = { c: 1.55, s: 0.95, h: 1.05 }[k];
+      if (k === 'c') look.copy(W('spine_01')).add(new THREE.Vector3(0, 0.02, 0));
+      else if (k === 's') look.copy(W('spine_03')).lerp(W('upperarm_r'), 0.75).add(new THREE.Vector3(0, -0.06, 0));
+      else look.copy(W('pelvis')).lerp(W('thigh_r'), 0.3).add(new THREE.Vector3(0, -0.05, 0));
+      const yaw = { front: 0, q34: -45, side: -90, q34b: -135, back: 180, left: 90 }[v.slice(1)] * Math.PI / 180;
       const d = F.clone().multiplyScalar(Math.cos(yaw)).addScaledVector(L, Math.sin(yaw));
-      p = look.clone().addScaledVector(d, 1.55).add(new THREE.Vector3(0, 0.12, 0));
-      cam.up.set(0, 1, 0);
+      p = look.clone().addScaledVector(d, dist).add(new THREE.Vector3(0, k === 'c' ? 0.12 : 0.05, 0));
     }
     else p = look.clone().addScaledVector(fwd, -3.6).addScaledVector(up, 1.2);   // chase
     cam.aspect = w / h; cam.updateProjectionMatrix();
-    cam.position.copy(p); cam.up.copy(v[0] === 'c' ? new THREE.Vector3(0, 1, 0) : up); cam.lookAt(look);
+    cam.position.copy(p); cam.up.copy('csh'.includes(v[0]) && v.length > 2 ? new THREE.Vector3(0, 1, 0) : up); cam.lookAt(look);
     scene.add(rider.root);
     renderer.render(scene, cam);
     scene.remove(rider.root);
@@ -341,6 +345,7 @@ async function runGarments({ gear = 'ski', variant = 'allmountain', stance = 're
 window.__clip = {
   ready: true,
   garments: (o) => runGarments(o),
+  gc: { prepare: prepGarments, measure: measureGarments, get prep() { return gPrep; } },
   probe,
   get rider() { return rider; },
   get pl() { return pl; },

@@ -61,7 +61,8 @@ export function buildOutfitGeometry(body, cut) {
   const B = (re) => body.bones(re);
   const J = body.joint;
 
-  let collarRings = null, jacketRings = null;
+  let collarRings = null, jacketRings = null, jacketPiece = null, bibPiece = null;
+  const legPieces = [], sleevePieces = [];
   // Target sleeve radius along the arm (|x| in the T-pose): the fit's upper / elbow / forearm / cuff.
   const SL = cut.sleeve;
   const sleeveKeys = [[0.2, SL.upper * 0.98], [0.3, SL.upper * 1.02], [0.46, SL.elbow], [0.58, SL.forearm], [cut.sleeveEnd - 0.03, SL.cuff], [1, SL.cuff]];
@@ -231,6 +232,60 @@ export function buildOutfitGeometry(body, cut) {
             }
           }
         }
+        // A gentle torso profile (cut.smoothProfile; every catalogue jacket): the chest → waist → hem line
+        // is one monotonic, gently curved line with no inward kink at the waist. The body under the shell
+        // (a belly bump over a narrow waist, then the pants' seat) used to show as a dip in the side view
+        // ("a hole at the waist"). Per direction around the torso, between the shoulder blades and the
+        // hem band (its rib / drawcord stays), the outline is lifted to its least concave majorant at the
+        // front and back (the fabric hangs from the chest / belly like real cloth) and to a wide one-sided
+        // blur at the sides (the waist stays slim, the bend just gets gradual). Only ever outward, so the
+        // pants clearance holds. docs/character.md § Torso profile.
+        if (cut.smoothProfile) {
+          const SP = cut.smoothProfile, hi = SP.from ?? 1.44, lo = bot + (SP.hemBand ?? 0.09);
+          const idx = [];
+          rings.forEach((r, i) => { if (r.t <= hi && r.t >= lo) idx.push(i); });
+          if (idx.length > 5) {
+            const ts = idx.map((i) => rings[i].t);
+            for (let q = 0; q < S; q++) {
+              const th = (q / S) * TAU, c = Math.cos(th);
+              const fb = Math.pow(Math.abs(c), SP.sidePow ?? 1.6);   // 1 at the front / back, 0 at the sides
+              // outward extent along this direction from the body's fixed vertical axis
+              const s = idx.map((i) => rings[i].r[q] + rings[i].c.z * c);
+              // least concave majorant (upper hull over t)
+              const hull = [];
+              for (let k = 0; k < s.length; k++) {
+                while (hull.length >= 2) {
+                  const a = hull[hull.length - 2], b = hull[hull.length - 1];
+                  const cross = (ts[b] - ts[a]) * (s[k] - s[a]) - (s[b] - s[a]) * (ts[k] - ts[a]);
+                  if (cross <= 0) hull.pop(); else break;   // (t descending: b on or under the chord a → k)
+                }
+                hull.push(k);
+              }
+              const H = new Float32Array(s.length);
+              for (let h = 1; h < hull.length; h++) {
+                const a = hull[h - 1], b = hull[h];
+                for (let k = a; k <= b; k++) H[k] = s[a] + (s[b] - s[a]) * (k - a) / Math.max(1, b - a) ;
+              }
+              // sides: a one-sided wide blur (fills narrow dips, keeps the slow chest → waist taper)
+              let B2 = s.slice();
+              const Wd = SP.blur ?? 6;
+              for (let it = 0; it < (SP.passes ?? 8); it++) {
+                const nb = B2.slice();
+                for (let k = 0; k < B2.length; k++) {
+                  let acc = 0, ws = 0;
+                  for (let d = -Wd; d <= Wd; d++) { const j = Math.min(B2.length - 1, Math.max(0, k + d)); const w = 1 - Math.abs(d) / (Wd + 1); acc += B2[j] * w; ws += w; }
+                  nb[k] = Math.max(B2[k], acc / ws);
+                }
+                B2 = nb;
+              }
+              for (let k = 0; k < s.length; k++) {
+                const edge = Math.min(1, k / 3, (s.length - 1 - k) / 3);   // the blur eases in over the end rings
+                const want = H[k] * fb + (s[k] + (B2[k] - s[k]) * edge) * (1 - fb);
+                if (want > s[k]) rings[idx[k]].r[q] += want - s[k];
+              }
+            }
+          }
+        }
       },
     });
     const S = segs;
@@ -281,11 +336,24 @@ export function buildOutfitGeometry(body, cut) {
         // The hem band over the hips rides on the pelvis, like the pants' waist and seat under it (with
         // the spine's share it would swing forward off the seat in a crouch and let the pants show through).
         if (b === 'pelvis') return 0.9 * smooth(1.1, 0.98, y);
+        // One-piece armhole (cut.armBlend): the outer shoulder and the side under the arm ride on the upper
+        // arm too, with the same share the sleeve head takes there (layerWeights below), so the yoke and the
+        // sleeve bend as one piece: the shoulder line follows the arm down instead of standing out as a pad
+        // over a sleeve that slides in under it, and the side panel gives way under a lowered arm.
+        if (b.startsWith('upperarm') && cut.armBlend) {
+          const sgn = b.endsWith('_l') ? 1 : -1;
+          return cut.armBlend * smooth(0.15, 0.245, x * sgn) * smooth(1.25, 1.42, y);
+        }
         if (!b.startsWith('thigh')) return 0;
         const sgn = b.endsWith('_l') ? 1 : -1;
-        return 0.8 * smooth(0.9, 0.8, y) * smooth(-0.04, 0.05, z) * smooth(0.0, 0.06, x * sgn);
+        // The front of the hem band rides partly on its thigh (cut.hemThigh, from the belt line down to the
+        // hem), so a thigh that comes forward lifts the hem with it instead of pushing the pants out through
+        // it; the centre front and the back stay on the pelvis.
+        const lift = Math.max(0.8 * smooth(0.9, 0.8, y), (cut.hemThigh ?? 0) * smooth(1.0, hemF + 0.01, y));
+        return lift * smooth(-0.04, 0.05, z) * smooth(0.0, 0.06, x * sgn);
       },
     }));
+    jacketPiece = pieces[pieces.length - 1];
     // Spread the weights further over the shell than on other pieces: a jacket panel bends as one sheet
     // when the spine flexes (no groove along the spine, no shoulder-blade dents in a crouch).
     pieces[pieces.length - 1].smoothIters = 24;
@@ -331,6 +399,8 @@ export function buildOutfitGeometry(body, cut) {
         const twist = pnoise(u * 4 + r.t * 3, r.t * 5, 4) * 0.003 + Math.sin(th * 3 + r.t * 14 * s) * 0.002 * bump(r.t, 0.36, 0.1);
         r.r[k] += (elbow + wrist + twist) * folds;
         if (cut.sleeveLayer) r.r[k] += 0.0045 * bump(r.t, cut.sleeveLayer.at - 0.007, 0.008);   // the outer sleeve's hem roll
+        // One-piece armhole: the sleeve head swells a little where it leaves the shell (a soft, eased seam).
+        if (cut.armBlend) r.r[k] += 0.006 * smooth(0.3, 0.235, r.t);
         if (cut.quilt) {
           const ph = ((((r.t - 0.2) / (cut.quilt.pitch * 0.72)) % 1) + 1) % 1;
           r.r[k] += cut.quilt.depth * 0.85 * (Math.pow(Math.sin(Math.PI * ph), 0.55) - 0.35) * smooth(0.21, 0.25, r.t) * smooth(t1 - 0.03, t1 - 0.07, r.t);
@@ -344,6 +414,7 @@ export function buildOutfitGeometry(body, cut) {
       skinBones: B(new RegExp(`^(upperarm_${sd}|lowerarm_${sd}|clavicle_${sd}|spine_03|hand_${sd})$`)),
       anchor: { bone: body.bone('clavicle_' + sd), axis: 0, abs: true, y0: 0.2, y1: 0.28 },
     }));
+    sleevePieces.push(pieces[pieces.length - 1]);
   }
   // ---------------------------------------------------------------- pants
   // Real snow pants from the waist down: each leg is half of the trunk (waist, hips and seat, one
@@ -441,6 +512,7 @@ export function buildOutfitGeometry(body, cut) {
         // crouch rounds it under the hem instead of swinging it out through the jacket with the thigh.
         weightLimit: (b, x, y, z) => (b.startsWith('thigh') ? 1 - 0.85 * smooth(-0.03, -0.1, z) * smooth(seatLo - 0.02, seatLo + 0.08, y) : undefined),
       }));
+      legPieces.push(pieces[pieces.length - 1]);
     }
     // Bib: the chest and back panel above the waist, just inside the jacket (it follows the jacket's own
     // rings 2 cm in and is skinned like it), so it only shows when the jacket is off (the item icon) or
@@ -465,6 +537,7 @@ export function buildOutfitGeometry(body, cut) {
         weightFloor: (b, x, y) => (b === 'pelvis' ? 0.9 * smooth(1.1, 0.98, y) : 0),
       }));
       pieces[pieces.length - 1].smoothIters = 24;
+      bibPiece = pieces[pieces.length - 1];
       // Shoulder straps (aG.w = 2): from the top of the bib over the shoulders to the back panel. They lie
       // under the jacket's yoke, so the fabric shader only draws them when the jacket is off (the item
       // icon, uStraps); in the game they would only risk poking through the close shoulders.
@@ -703,7 +776,73 @@ export function buildOutfitGeometry(body, cut) {
   }
 
   for (const p of pieces) skinPiece(p, body, p.smoothIters ?? 6);
+  // Layered skinning: where the pants sit under the jacket they take the jacket's own weights (blending
+  // back to theirs over the band just below the hem), so the two layers move as one and the pants never
+  // poke out through the shell in any pose (docs/character.md § Garment clip).
+  if (cut.layerPants && jacketPiece) {
+    const hemF = cut.hemFront, hemB = cut.hemBack;
+    const band = cut.layerPants.band ?? 0.07;
+    for (const lp of legPieces) {
+      layerWeights(lp, jacketPiece, (x, y, z) => {
+        const back = smooth(0.2, 0.8, (1 - (z + 0.02) / Math.max(1e-6, Math.hypot(x, z + 0.02))) / 2);
+        const hemAt = hemF + (hemB - hemF) * back;
+        return smooth(hemAt - band, hemAt + 0.015, y);
+      });
+    }
+    // The bib panel lies wholly under the jacket: it follows it everywhere.
+    if (bibPiece) layerWeights(bibPiece, jacketPiece, () => 1);
+  }
+  // One-piece armhole: the sleeve head takes the shell's weights where the two meet and inside it
+  // (|x| < 0.25), blending to its own by |x| 0.33, so the seam ring moves as one piece in every pose.
+  if (cut.armBlend && jacketPiece) {
+    for (const sp of sleevePieces) layerWeights(sp, jacketPiece, (x) => smooth(0.33, 0.25, Math.abs(x)));
+  }
   return mergePieces(pieces);
+}
+
+/**
+ * Give the vertices of `inner` (a piece under `outer`) the skin weights of the nearest `outer` vertices,
+ * blended by f(x, y, z) ∈ [0, 1] (bind-pose position), so a layer under a shell follows the shell.
+ */
+function layerWeights(inner, outer, f) {
+  const nO = outer.pos.length / 3, nI = inner.pos.length / 3;
+  // a coarse grid over the outer piece's vertices (skip its lining)
+  const cell = 0.04, map = new Map();
+  const key = (x, y, z) => `${Math.floor(x / cell)},${Math.floor(y / cell)},${Math.floor(z / cell)}`;
+  for (let j = 0; j < nO; j++) {
+    if (outer.lin[j] > 0.5) continue;
+    const k = key(outer.pos[j * 3], outer.pos[j * 3 + 1], outer.pos[j * 3 + 2]);
+    let a = map.get(k); if (!a) map.set(k, a = []); a.push(j);
+  }
+  const acc = new Map();
+  for (let i = 0; i < nI; i++) {
+    const x = inner.pos[i * 3], y = inner.pos[i * 3 + 1], z = inner.pos[i * 3 + 2];
+    const w = f(x, y, z);
+    if (w <= 0) continue;
+    const cx = Math.floor(x / cell), cy = Math.floor(y / cell), cz = Math.floor(z / cell);
+    const near = [];
+    for (let r = 1; r <= 3 && near.length < 4; r++) {
+      near.length = 0;
+      for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) for (let dz = -r; dz <= r; dz++) {
+        const a = map.get(`${cx + dx},${cy + dy},${cz + dz}`); if (!a) continue;
+        for (const j of a) near.push([(outer.pos[j * 3] - x) ** 2 + (outer.pos[j * 3 + 1] - y) ** 2 + (outer.pos[j * 3 + 2] - z) ** 2, j]);
+      }
+    }
+    if (!near.length) continue;
+    near.sort((p, q) => p[0] - q[0]);
+    acc.clear();
+    let ws = 0;
+    for (const [d2, j] of near.slice(0, 4)) {
+      const ww = 1 / (Math.sqrt(d2) + 0.005);
+      ws += ww;
+      for (let q = 0; q < 4; q++) { const b = outer.si[j * 4 + q], v = outer.sw[j * 4 + q]; if (v > 0) acc.set(b, (acc.get(b) || 0) + v * ww); }
+    }
+    for (const b of acc.keys()) acc.set(b, (acc.get(b) / ws) * w);
+    for (let q = 0; q < 4; q++) { const b = inner.si[i * 4 + q], v = inner.sw[i * 4 + q]; if (v > 0) acc.set(b, (acc.get(b) || 0) + v * (1 - w)); }
+    const top = [...acc.entries()].sort((p, q) => q[1] - p[1]).slice(0, 4);
+    const s = top.reduce((a, e) => a + e[1], 0) || 1;
+    for (let q = 0; q < 4; q++) { inner.si[i * 4 + q] = top[q] ? top[q][0] : 0; inner.sw[i * 4 + q] = top[q] ? top[q][1] / s : 0; }
+  }
 }
 
 /** Collar radii at height t, resampled to `segs` directions (the collar has its own segment count). */
