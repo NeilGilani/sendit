@@ -5,7 +5,7 @@ Heavy commands run with `nice -n 19`.
 
 ## Overnight additions (branch overnight-improvements)
 - Lobby is the first screen (web/src/lobby, profile, maps, services). Guide: docs/lobby.md. Tests: `node web/scripts/lobbytest.mjs <url>`, `node web/scripts/unittest.mjs`.
-- Skis + snowboard with separate physics (web/src/physics, web/src/equipment). `?equip=ski|snowboard`, `?variant=`, `?stance=goofy`, E swaps gear while riding. Guide: docs/equipment.md, research: docs/equipment-research.md. Benches: web/scripts/physics-*.mjs.
+- Skis + snowboard with separate physics (web/src/physics, web/src/equipment). `?equip=ski|snowboard`, `?variant=`, `?stance=goofy`, `?gearswap` lets E swap gear while riding (debug only). Guide: docs/equipment.md, research: docs/equipment-research.md. Benches: web/scripts/physics-*.mjs.
 - Realistic HDR look: snow, rock, trees, sky, spray (web/src/gfx, post stack in gfx/post.js). Guide: docs/graphics.md, research: docs/graphics-research.md. Screens: `GPU=1 node web/scripts/gfxshots.mjs`.
 - Spray is fed by `rider.getContactPoints()`; the lobby stage uses the game's GradeEffect because materials render linear HDR.
 

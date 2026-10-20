@@ -840,6 +840,39 @@ It shows nothing until you have a time.
   freeride and slopestyle result cards are compact and sit low, under the achievement toasts; hints wrap inside
   the screen instead of running off both edges.
 
+## 10. Ride QA pass, night 3 (2026-10-20)
+
+`web/scripts/qa-ride.mjs` plays the real game from the lobby on a virtual 60 Hz clock (one rAF = 1/60 s), one
+mountain per run, both gears: tricks (spins, flips, corks, grabs, with a launch boost so any slope works), a crash of
+each severity, respawn, R, Backspace, Tab, F, first person through a jump and a crash, pause → settings → resume,
+then every trail picked in the Maps tab (Zen and Challenge alternating), ridden and its finish crossed, Career ›
+Highlights, an optional lift ride (Lake Tahoe) and a mountain switch. Every frame it checks NaN, the camera under the
+snow or inside the rider, a crash that never respawns; at 1280×720, 1920×1080, 844×390 and 390×844 it checks the
+HUD's text boxes for overlaps / leaving the screen; heap and GPU resources are logged after every run.
+(Don't edit `web/src` while it runs: Vite's full reload restarts the page mid-run.)
+
+Fixed:
+- **Challenge on a trail that starts part-way down** (Big Drop, Lower Gully, Ravenspire drop zones…): every gate
+  above the start counted as missed the moment the clock started (+36 s on The Big Drop before the first turn), the
+  medal was judged over the whole course, and all trails of a mountain shared one best time / ghost / splits. Now
+  the gates above the start (and one within 25 m below a mid-course start) aren't part of the run, the medal
+  distance is the stretch the trail covers, and each trail has its own record (`activities.trailKeyFor`: the
+  mountain's main trail keeps the course key, so existing saves stay with it). `web/scripts/challenge-unit.mjs`.
+- **Retry (Backspace)**: on every ride after a long first one it said "Retry needs a jump first" (the sampling clock
+  stayed at the previous ride's distance, so nothing was recorded); a jump soon after R / a respawn could send you
+  back to the previous run's line far down the mountain (the trail now has stretches cut at every move). Unit tests
+  in `thrill-unit.mjs`.
+- **Judged run cards** (Ravenspire / Kitsune freeride, Voltage slopestyle) came back over the next ride's trail sign
+  when you started a new ride within 7 s.
+- **Results card**: the riding HUD (timer, splits, speed, score, combo) showed through and around it; it now steps
+  back while the card is up.
+- **Phones (portrait)**: the split time sat on the score; new-spot / achievement toasts covered the combo panel
+  (they now use the free band above the replay / save pills, except while a judged card is there); score call-outs
+  ran into the km/h. A combo bank while a trick name is up sits above the announcer instead of across it.
+- **Replay drone** could pass under the snow between two targets over a ridge.
+- **Crash marks**: no groove under a ragdoll part that brushed the snow early in a frame and is already off it
+  (track-ghost `ravenspire-cliff`).
+
 ## Tests and tools
 
 - `node web/scripts/unittest.mjs` includes `progression-unit.mjs`. It covers:

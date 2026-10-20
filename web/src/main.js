@@ -14,7 +14,7 @@ import { patchShaderChunks, globals, makeNoiseTexture, applyMapAtmosphere } from
 import { HUD } from './config.js';
 import { ATMOSPHERE, col, createSnowfall } from './scene.js';
 import { Terrain } from './terrain.js';
-import { Activities, bestFor, courseKey } from './activities.js';
+import { Activities, bestFor, trailKeyFor } from './activities.js';
 import { Life } from './life.js';
 import { Sky } from './sky.js';
 import { Scatter } from './scatter.js';
@@ -51,6 +51,7 @@ patchShaderChunks();
 profileStore.load();
 
 const params = new URLSearchParams(location.search);
+const GEAR_SWAP_KEY = params.has('gearswap');
 const gearVariant = params.get('variant') || undefined;   // ?variant=<model id> (debug: overrides the equipped catalog item's model)
 if (params.has('quality')) settings.quality = Number(params.get('quality'));
 const canvas = document.getElementById('game');
@@ -439,12 +440,13 @@ async function startRide(instant = false, mode = 'zen') {
   setMode(Mode.RIDING);
   if (!instant) { aerialAboveTrail(); cam.startIntro(); } else cam.snap();
   ui.refresh();
+  activities.setTrail(currentMap.map, currentMap.trail);
   activities.start(mode);
   finishing = false;
   emit('rideStarted', { mapId: currentMap.map.id, trailId: currentMap.trail, equipment: profileStore.equipment });
   if (!instant) ui.fade(false, 0.9);
   const trail = getTrail(currentMap.map, currentMap.trail);
-  if (trail) setTimeout(() => { if (game.mode === Mode.RIDING) showTrailToast(currentMap.map, trail, { best: bestFor(courseKey(course)) }); }, instant ? 150 : 650);
+  if (trail) setTimeout(() => { if (game.mode === Mode.RIDING) showTrailToast(currentMap.map, trail, { best: bestFor(trailKeyFor(course, currentMap.map, currentMap.trail)) }); }, instant ? 150 : 650);
   busy = false;
 }
 
@@ -549,7 +551,9 @@ function frame(now) {
   if (!composer || warming) return;
   input.poll(dt);
   const replaying = !!thrill?.input();   // instant replay (thrill/replay.js): the ride is frozen while it plays
-  if (!replaying && game.mode === Mode.RIDING && input.pressed.has('KeyE') && rider) profileStore.setEquipment(profileStore.equipment === 'snowboard' ? 'skis' : 'snowboard');   // debug: swap gear while riding (via the profile, so the lobby stays in sync)
+  // Debug only (?gearswap): E swaps the gear mid-ride (via the profile, so the lobby stays in sync). For players E is
+  // the lobby's next-tab key and swapping skis / board mid-run by accident was confusing.
+  if (GEAR_SWAP_KEY && !replaying && game.mode === Mode.RIDING && input.pressed.has('KeyE') && rider) profileStore.setEquipment(profileStore.equipment === 'snowboard' ? 'skis' : 'snowboard');
   if (!replaying && input.justPressed('view') && (game.mode === Mode.RIDING || game.mode === Mode.LIFT)) {
     setSetting('view', settings.view === 'fp' ? 'tp' : 'fp');
     ui.pop(settings.view === 'fp' ? 'FIRST PERSON' : 'CHASE CAM', 'cyan', true);

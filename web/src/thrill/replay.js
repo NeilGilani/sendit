@@ -243,6 +243,8 @@ export function installReplay({ player, rider, camera, terrain, input, activitie
       _cam.set(active.center.x + Math.cos(th) * C.dist, active.center.y + C.rise, active.center.z + Math.sin(th) * C.dist);
       _cam.y = Math.max(_cam.y, terrain.getHeight(_cam.x, _cam.z) + 1.2);
       if (!active.camPos) active.camPos = _cam.clone(); else active.camPos.lerp(_cam, Math.min(1, dt * 8));
+      // (the eased path can cut through a ridge between two clamped targets: never under the snow)
+      active.camPos.y = Math.max(active.camPos.y, terrain.getHeight(active.camPos.x, active.camPos.z) + 0.8);
       camera.position.copy(active.camPos);
       camera.lookAt(_look.copy(active.center).add({ x: 0, y: 0.9, z: 0 }));
       if (Math.abs(camera.fov - 50) > 0.01) { camera.fov = 50; camera.updateProjectionMatrix(); }

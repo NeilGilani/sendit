@@ -192,22 +192,33 @@ export function judgeLanding(e, C = THRILL.spots) {
 // ------------------------------------------------------------------ retry from the last take-off
 // `t` is any increasing clock: retry.js feeds the distance ridden (m), so the lead is frame-rate proof.
 export class RetryTrail {
-  constructor(keep = THRILL.retry.keep) { this.keep = keep; this.s = []; this.takeoffT = null; }
+  constructor(keep = THRILL.retry.keep) { this.keep = keep; this.s = []; this.takeoffT = null; this.seg = 0; this.takeoffSeg = 0; }
   clear() { this.s.length = 0; this.takeoffT = null; }
+  /**
+   * The rider was moved (restart at the top, a crash respawn, a retry): samples from now on are a new stretch of
+   * snow. A take-off on it never picks a sample from before the move (a jump soon after R used to put you back
+   * on the last run's line, far down the mountain).
+   */
+  cut() { this.seg++; }
   /** A grounded sample { x, y, z, h, vx, vy, vz } at time t (s). */
   push(t, sample) {
-    this.s.push({ t, ...sample });
+    this.s.push({ t, seg: this.seg, ...sample });
     while (this.s.length && this.s[0].t < t - this.keep) this.s.shift();
   }
-  markTakeoff(t) { this.takeoffT = t; }
-  /** The sample `lead` s before the last take-off (the newest one at or before it), else null. */
+  /** `seg`: the stretch the take-off was on (the current one unless given). */
+  markTakeoff(t, seg = this.seg) { this.takeoffT = t; this.takeoffSeg = seg; }
+  /** The sample `lead` s before the last take-off (the newest one at or before it) on its stretch, else null. */
   pick(lead = THRILL.retry.lead) {
     if (this.takeoffT === null || !this.s.length) return null;
-    const want = this.takeoffT - lead;
-    let best = null;
-    for (const p of this.s) { if (p.t <= want) best = p; else break; }
-    // The take-off came sooner than `lead` after the oldest sample (a spawn): use the oldest before it.
-    if (!best && this.s[0].t <= this.takeoffT) best = this.s[0];
+    const want = this.takeoffT - lead, seg = this.takeoffSeg;
+    let best = null, first = null;
+    for (const p of this.s) {
+      if (p.seg !== seg) continue;
+      if (!first) first = p;
+      if (p.t <= want) best = p; else break;
+    }
+    // The take-off came sooner than `lead` after the first sample of its stretch (a spawn): use that one.
+    if (!best && first && first.t <= this.takeoffT) best = first;
     return best;
   }
 }

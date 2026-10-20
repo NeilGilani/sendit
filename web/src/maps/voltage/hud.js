@@ -179,6 +179,8 @@ export function mountParkHud(course) {
     card.classList.add('on');
     cardT = performance.now() + 7500;
   });
+  // A new ride from the lobby: the last run's card doesn't come back over the trail sign.
+  on('rideStarted', () => { card.classList.remove('on'); cardT = 0; });
 
   // ---- per frame: balance meter, speed gauge
   const tick = () => {
