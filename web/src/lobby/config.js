@@ -67,6 +67,7 @@ export const NAV = {
     leaderboards: { group: 'career', short: 'Rankings' },
     profile: { group: 'career', short: 'Profile' },
     multiplayer: { nav: 'utility', short: 'Friends' },
+    help: { nav: 'utility', short: 'Help' },
     settings: { nav: 'utility' },
   },
   home: 'home',          // where the lobby opens on a fresh profile and after every ride

@@ -43,7 +43,7 @@ let lastSlot = 'jacket';
 
 registerLobbyTab({
   id: 'locker',
-  label: 'Locker',
+  label: 'Skins',
   order: 20,
   icon: ICONS.character,
   status: 'ready',
@@ -78,7 +78,7 @@ registerLobbyTab({
       const sel = owned.find((o) => o.key === (focusKey || curKey)) || (missingOn && missingSkins.find((o) => o.key === focusKey)) || owned[0];
       const missing = total(slot) - owned.length;
       root.innerHTML = `
-        <h2 class="lp-title">Locker <span class="lp-pill gold">${Math.round(col.pct * 100)} % collected</span></h2>
+        <h2 class="lp-title">Skins <span class="lp-pill gold">${Math.round(col.pct * 100)} % collected</span></h2>
         <p class="lp-sub">Wear anything you own. It shows on your rider here and in every ride.</p>
         <div class="lk-slots" role="tablist" aria-label="Slot">${SLOTS.map(([s, label]) => `
           <button type="button" role="tab" class="lk-slot${s === slot ? ' on' : ''}" data-slot="${s}" aria-selected="${s === slot}">${esc(label)}${P.newSkins(s).length ? '<i class="lk-dot"></i>' : ''}</button>`).join('')}</div>
@@ -98,7 +98,7 @@ registerLobbyTab({
           </button>`).join('') : ''}</div>
         ${sel ? selHtml(sel) : ''}
         <p class="lk-locked">${missing > 0 ? `${missing} more ${esc(SLOTS.find((x) => x[0] === slot)[1].toLowerCase())} skin${missing === 1 ? '' : 's'} to find in cases.
-          <a class="lk-go" data-missing>${missingOn ? 'Hide missing' : 'Show missing'}</a> · <a class="lk-go" data-go="cases">Open cases ›</a>` : 'You have them all.'}</p>
+          <button type="button" class="lk-go" data-missing aria-pressed="${missingOn}">${missingOn ? 'Hide missing' : 'Show missing'}</button> · <button type="button" class="lk-go" data-go="cases">Open cases ›</button>` : 'You have them all.'}</p>
         <p class="lp-hint"><span class="g-pad"><kbd>Y</kbd> next slot</span><span class="g-kb">Click a card to wear it</span></p>`;
       root.querySelectorAll('[data-slot]').forEach((b) => b.addEventListener('click', () => setSlot(b.dataset.slot)));
       root.querySelectorAll('[data-key]').forEach((b) => {

@@ -10,14 +10,17 @@ import { HUD } from './config.js';
 import { moveFocus, focusFirst, handleArrowKey, nudgeRange } from './lobby/nav.js';
 import { fmtTime } from './activities.js';
 import { loadingScreen } from './loading/index.js';
+import { howToHtml, controlsSheetHtml, markHowToSeen, HOWTO_CARDS } from './lobby/help.js';
+import { profileStore } from './profile/store.js';
 
 const $ = (id) => document.getElementById(id);
 const BASES = ['loading', 'lobby', 'pause'];
-const MODALS = ['settings', 'credits', 'results'];
+const MODALS = ['settings', 'credits', 'results', 'howto'];
 
 export class UI {
   constructor(handlers) {
     this.h = handlers;
+    buildExtraDom();
     this.screens = [...BASES, ...MODALS].reduce((o, k) => ((o[k] = $(k)), o), {});
     this.hud = $('hud');
     this.fadeEl = $('fade');
@@ -62,7 +65,9 @@ export class UI {
       case 'restart': this.h.restart(); break;
       case 'settings': this.openModal('settings'); break;
       case 'credits': this.showCredits(); break;
+      case 'controls': this.openHowTo({ sheet: 'controls' }); break;
       case 'resume': this.h.resume(); break;
+      case 'pause': this.h.pause?.(); break;
       case 'top': this.h.resume(); this.h.top(); break;
       case 'menu': this.h.menu(); break;
       case 'back': this.closeModal(); break;
@@ -83,6 +88,7 @@ export class UI {
 
   openModal(name) {
     if (!this.screens[name]) return;
+    if (name === 'settings') organizeSettings();
     this.modalReturnFocus = document.activeElement;
     if (this.modal) this.screens[this.modal].classList.add('hidden');
     this.modal = name;
@@ -92,6 +98,7 @@ export class UI {
 
   closeModal(restoreFocus = true) {
     if (!this.modal) return false;
+    if (this.modal === 'howto') { const f = this._howtoClose; this._howtoClose = null; f?.(); }
     this.screens[this.modal].classList.add('hidden');
     this.modal = null;
     if (restoreFocus && this.modalReturnFocus?.isConnected) this.modalReturnFocus.focus({ preventScroll: true });
@@ -114,6 +121,75 @@ export class UI {
   }
 
   showCredits() { this.loadCredits(); this.openModal('credits'); }
+
+  /**
+   * How to ride (lobby/help.js). sheet 'intro' = the four first-run cards; `onRide` (the first Ride) turns the
+   * last button into "Let's ride" and Skip into "skip and ride". sheet 'controls' = the diagrams + full list.
+   * Any way out marks the cards as seen (they come back from Help or pause → Controls).
+   */
+  openHowTo({ sheet = 'intro', onRide = null } = {}) {
+    const root = this.screens.howto;
+    const touch = this.input?.device === 'touch';
+    const card = root.querySelector('.hw-host');
+    card.innerHTML = sheet === 'controls' ? controlsSheetHtml() : howToHtml({ name: profileStore.profile?.displayName || 'Rider', touch });
+    const deck = card.firstElementChild;
+    const setDev = (d) => {
+      deck.dataset.dev = d;
+      deck.querySelectorAll('[data-dev]').forEach((b) => { b.classList.toggle('on', b.dataset.dev === d); b.setAttribute('aria-pressed', String(b.dataset.dev === d)); });
+    };
+    setDev(this.input?.device === 'gamepad' || touch ? 'gp' : 'kb');
+    deck.querySelectorAll('.hw-dev [data-dev]').forEach((b) => b.addEventListener('click', () => setDev(b.dataset.dev)));
+    const offDev = on('inputDevice', (d) => { if (d === 'gamepad') setDev('gp'); else if (d === 'keyboard') setDev('kb'); });
+    const n = HOWTO_CARDS.length;
+    let i = 0, done = false;
+    const pages = [...deck.querySelectorAll('.hw-page')];
+    const next = deck.querySelector('[data-hw=next]'), back = deck.querySelector('[data-hw=back]'), skip = deck.querySelector('[data-hw=skip]');
+    const nameEl = deck.querySelector('.hw-name input');
+    if (skip) { skip.textContent = onRide ? 'Skip' : 'Close'; }
+    const show = (j) => {
+      i = Math.max(0, Math.min(n - 1, j));
+      pages.forEach((p, k) => { p.hidden = k !== i; });
+      deck.querySelectorAll('.hw-dots i').forEach((d, k) => d.classList.toggle('on', k === i));
+      if (back) back.hidden = i === 0;
+      if (next) next.textContent = i < n - 1 ? 'Next' : onRide ? "Let's ride" : 'Done';
+    };
+    const finish = (ride) => {
+      if (done) return;
+      done = true;
+      const v = nameEl?.value.trim();
+      if (v && v !== profileStore.profile?.displayName) profileStore.setDisplayName(v);
+      this.closeModal(!ride);
+      if (ride) onRide?.();
+    };
+    this._howtoClose = () => { markHowToSeen(); offDev(); document.body.classList.remove('hw-open'); done = true; };
+    if (sheet === 'intro') {
+      show(0);
+      next.addEventListener('click', () => { if (i < n - 1) { show(i + 1); next.focus({ preventScroll: true }); } else finish(!!onRide); });
+      back?.addEventListener('click', () => { show(i - 1); (i ? back : next).focus({ preventScroll: true }); });
+      skip?.addEventListener('click', () => finish(!!onRide));
+      nameEl?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); finish(!!onRide); } });
+      // Arrow keys page through the cards (focus stays on Next); the name field keeps its arrows.
+      deck.addEventListener('keydown', (e) => {
+        if (e.target === nameEl) return;
+        if (e.key === 'ArrowRight' && i < n - 1) { e.preventDefault(); e.stopPropagation(); show(i + 1); next.focus({ preventScroll: true }); }
+        else if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); e.stopPropagation(); show(i - 1); next.focus({ preventScroll: true }); }
+      });
+    } else {
+      deck.querySelector('[data-hw=close]')?.addEventListener('click', () => this.closeModal());
+    }
+    // Keep Tab inside the dialog (it is modal: the lobby behind must not take focus).
+    deck.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      const f = [...deck.querySelectorAll('button:not([hidden]), input')].filter((el) => el.offsetParent !== null);
+      if (!f.length) return;
+      const i0 = f.indexOf(document.activeElement);
+      const j = e.shiftKey ? (i0 <= 0 ? f.length - 1 : i0 - 1) : (i0 < 0 || i0 === f.length - 1 ? 0 : i0 + 1);
+      e.preventDefault();
+      f[j].focus();
+    });
+    document.body.classList.add('hw-open');
+    this.openModal('howto');
+  }
 
   /** Challenge HUD (timer, gates, best, combo) + snowflake counter, every frame. */
   updateActivity(a) {
@@ -157,10 +233,11 @@ export class UI {
     if (game.mode === Mode.MENU) this.showBase('lobby');
     else if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) this.showBase(null);
     else if (game.mode === Mode.PAUSED) {
-      $('stats').textContent = `${(game.distance / 1000).toFixed(1)} km ridden · ${game.smoothTurns} smooth turns · ${game.airTotal.toFixed(0)} s of air · score ${game.score}`;
       $('stats').style.whiteSpace = 'pre-line';
       const p = progression.getProgress(), left = progression.getChallenges().filter((c) => !c.done);
-      $('stats').textContent += `\nLevel ${p.level} ${p.rank.name} · ${p.need - p.into} XP to ${p.level + 1} · ${left.length ? `dailies: ${left.map((c) => c.title).join(', ')}` : 'all dailies done'}`;
+      $('stats').textContent = `Score ${Math.round(game.score).toLocaleString('en-US')} · ${(game.distance / 1000).toFixed(1)} km · ${game.airTotal.toFixed(0)} s of air`
+        + `\nLevel ${p.level} ${p.rank.name} · ${Math.max(0, Math.round(p.need - p.into)).toLocaleString('en-US')} XP to level ${p.level + 1}`
+        + `\n${left.length ? `${left.length} daily challenge${left.length === 1 ? '' : 's'} left` : 'All dailies done'}`;
       this.showBase('pause');
     }
   }
@@ -171,6 +248,11 @@ export class UI {
     if (!root || !this.input) return;
     for (const a of this.input.menuActions(dt)) {
       if (!this.modal && this.base === 'lobby' && this.lobby?.onAction(a)) continue;
+      if (this.modal === 'howto' && (a === 'prevTab' || a === 'nextTab')) {   // LB / RB page the How to ride cards
+        const b = root.querySelector(a === 'nextTab' ? '[data-hw=next]' : '[data-hw=back]:not([hidden])');
+        if (b && !(a === 'nextTab' && /ride|done/i.test(b.textContent))) b.click();
+        continue;
+      }
       const el = document.activeElement;
       const range = el instanceof HTMLInputElement && el.type === 'range' && root.contains(el);
       switch (a) {
@@ -334,6 +416,69 @@ export class UI {
       $('creditsText').innerHTML = markdown(md);
       this._credits = true;
     } catch { $('creditsText').textContent = 'Credits unavailable.'; }
+  }
+}
+
+// Settings, in the order and words a player expects (the grid is shared by the lobby's Settings tab and the
+// pause menu; juice/settings.js and thrill/index.js append their own rows to it). [section, [key, label]…]
+const SETTINGS_LAYOUT = [
+  ['Graphics', [['quality', 'Graphics quality'], ['fullscreen', 'Fullscreen']]],
+  ['Sound', [['master', 'Master volume'], ['music', 'Music'], ['sfx', 'Sound effects']]],
+  ['Camera', [['mouseSens', 'Mouse look sensitivity'], ['camSens', 'Controller look sensitivity'], ['fpStable', 'Steady helmet cam in flips'],
+    ['fpLens', 'Goggle lens effects (first person)'], ['snowfall', 'Snow on the goggles (first person)']]],
+  ['Effects', [['juiceShake', 'Screen shake'], ['juiceHitstop', 'Slow motion on big moments'], ['juiceSpeedFx', 'Speed lines at top speed'],
+    ['thrillAdrenaline', 'Heartbeat near big drops'], ['thrillReplayPrompt', 'Offer a replay after big tricks'], ['thrillSpotMarkers', 'Show ? over undiscovered spots']]],
+];
+/** Sort the settings grid into sections with clear labels. Idempotent; rows it doesn't know stay at the end. */
+export function organizeSettings() {
+  const grid = document.querySelector('#settings .grid');
+  if (!grid) return;
+  const rowOf = (key) => {
+    const ctl = grid.querySelector(`[data-key="${key}"]`);
+    if (!ctl) return null;
+    const label = key === 'quality' ? grid.querySelector('#set-quality-label') : ctl.id && grid.querySelector(`label[for="${ctl.id}"]`);
+    return label ? { ctl, label } : null;
+  };
+  const known = new Set();
+  const frag = document.createDocumentFragment();
+  for (const [title, rows] of SETTINGS_LAYOUT) {
+    const found = rows.map(([k, text]) => [rowOf(k), text]).filter(([r]) => r);
+    if (!found.length) continue;
+    let h = grid.querySelector(`.set-h[data-sec="${title}"]`);
+    if (!h) { h = document.createElement('h3'); h.className = 'set-h'; h.dataset.sec = title; h.textContent = title; }
+    frag.append(h);
+    for (const [r, text] of found) { r.label.textContent = text; frag.append(r.label, r.ctl); known.add(r.ctl); known.add(r.label); }
+  }
+  const rest = [...grid.children].filter((el) => !known.has(el) && !el.classList.contains('set-h'));
+  grid.replaceChildren(frag, ...rest);
+}
+
+/** DOM that is not in index.html: the How to ride / Controls modal and the pause menu's Controls button. */
+function buildExtraDom() {
+  if (!document.getElementById('howto')) {
+    const el = document.createElement('div');
+    el.id = 'howto';
+    el.className = 'screen modal hidden';
+    el.innerHTML = '<div class="vignette dim"></div><div class="hw-host"></div>';
+    (document.getElementById('fade') || document.body.lastChild).before(el);
+  }
+  // Touch screens have no Esc / Start: a small pause button in the HUD (shown only on body.device-touch).
+  const hud = document.getElementById('hud');
+  if (hud && !document.getElementById('touchpause')) {
+    const p = document.createElement('button');
+    p.id = 'touchpause';
+    p.type = 'button';
+    p.dataset.act = 'pause';
+    p.setAttribute('aria-label', 'Pause');
+    p.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M8 5h3v14H8zM13 5h3v14h-3z" fill="currentColor"/></svg>';
+    hud.appendChild(p);
+  }
+  const nav = document.querySelector('#pause nav');
+  if (nav && !nav.querySelector('[data-act=controls]')) {
+    const b = document.createElement('button');
+    b.dataset.act = 'controls';
+    b.textContent = 'Controls';
+    nav.insertBefore(b, nav.querySelector('[data-act=settings]'));
   }
 }
 

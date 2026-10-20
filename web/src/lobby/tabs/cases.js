@@ -90,7 +90,7 @@ registerLobbyTab({
           <span>Finish a run (reach the bottom, ${EARN.minRun} m or more)</span><b>+${EARN.finish} XP</b>
           <span>First finished run of the day</span><b>+${EARN.firstToday} XP</b>
           <span>Challenge medal bronze / silver / gold</span><b>+${EARN.medal.bronze} / ${EARN.medal.silver} / ${EARN.medal.gold}</b>
-          <span>First run on each map · new trail</span><b>+${EARN.firstMap} · +${EARN.firstTrail}</b>
+          <span>First run on each mountain · new trail</span><b>+${EARN.firstMap} · +${EARN.firstTrail}</b>
           <span>Next milestone: ${esc(ms.label)} (${fmtKm(Math.max(0, ms.m - r.distance))} to go)</span><b>+${ms.xp} XP</b>
           <span>Duplicates turn into progress</span><b>+10 % to a whole case</b>
           <span>Collect every skin of a case (gold not needed)</span><b>${COLLECTION_BONUS} cases</b>
@@ -133,6 +133,10 @@ registerLobbyTab({
       const hero = root.querySelector('.cs-hero .cb');
       hero.style.cursor = 'pointer';
       hero.title = `${S.name}: contents and odds`;
+      hero.tabIndex = 0;
+      hero.setAttribute('role', 'button');
+      hero.setAttribute('aria-label', `${S.name}: contents and odds`);
+      hero.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hero.click(); } });
       hero.addEventListener('click', () => { showSeries = series; render(); root.querySelector('.cs-odds')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); });
       root.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => { pickId = b.dataset.pick; caseSfx.click(); render(); }));
       root.querySelectorAll('[data-show]').forEach((b) => b.addEventListener('click', () => { showSeries = showSeries === b.dataset.show ? null : b.dataset.show; render(); root.querySelector(`[data-show="${b.dataset.show}"]`)?.focus(); }));
