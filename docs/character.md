@@ -1,5 +1,9 @@
 # Sendit rider look: outfit system
 
+> **Current state (October 2026):** every rider wears the in-between body and every jacket is cut on the
+> round-2 shape; see § Catalogue jackets (near the end). The fit tables below describe the older cuts the
+> garments started from (their `FITS` still give each jacket its shader layout and details).
+
 The rider wears modern new-school / freeride kit. Jackets come in six **fits** (slim technical shell,
 relaxed freeride shell, baggy anorak, insulated puffer, hoodie over a shell, 90s one-piece). They
 sit close at the neck and shoulders and hang straight from the chest and shoulder blades, so the volume
@@ -456,8 +460,149 @@ Sheets (`proto-round2.mjs`): `R<n>.png` (standing 5 views, motion row, snowboard
 references `1-natural`, `6-natural`, `2-current` were shot for the numbers above).
 
 Known limits: the snowboard stance shows the jacket only in the lobby idle (no carve on a board);
-first person, the crash ragdoll and the icon baker were not checked on the in-between body; the canvas
-texture's horizontal fold ridges read a little quilted at a distance.
+first person, the crash ragdoll and the icon baker were not checked on the in-between body (they are
+now: § Catalogue jackets); the canvas texture's horizontal fold ridges read a little quilted at a distance.
+
+## Catalogue jackets (October 2026): round 2 ships
+
+The user's verdict on round 2: "I like the in-between body, so implement that into the game"; "change all
+current jackets to match this vibe"; remove the shiny and zig-zag skins; and fix three things seen in the
+sheets: the jacket going through the pants in the front view, a concave "hole" at the waist (Sherpa
+Flannel and others, side and front views), and sleeves that read as separate tubes stuck into the torso.
+
+### 1. The in-between body is the game's body
+
+`proto.js` `DEFAULT_BODY = 'mid'`: `protoBodyKind()` returns it without flags, so `morphBody()` runs on
+every rider that loads `skier.gltf`: the game rider, the lobby stage, the loading-screen live rider (the
+worker gets the same default), first person (the same rig), the clip / spin harnesses and the item-icon
+mannequin (iconBaker calls `morphBody` too). `?protobody=current` still shows the old body for comparisons.
+The crash ragdoll builds its capsules from the rig's bone positions at the crash (radii are constants),
+so it follows automatically; the node ragdoll tests (`ragdoll-lib.mjs`) now warp their skeleton the same way
+(`warpJoints`: knee 2 cm lower, chest joints a few mm shallower). Background people don't use the rig.
+Checked: `gear-clip.mjs`, `ragdoll-fuzz`, `ragdoll-identity` (ski and board, bit-identical riding),
+first person (`fpshots.mjs`), lobbytest, and the sheets below (boots on the bindings, poles in the mitts,
+helmet, snowboard stance and grabs).
+
+### 2. Every jacket on the round-2 shape
+
+`outfits.js` now holds the round-2 shape (`R2_SHAPE`, `r2Cut(fit, over)`): shoulders the widest point, a
+straight back from the blades (`straightBack`), hem just over the seat (front 0.865–0.895, back
+0.852–0.875), no hip flare, a shaped chest → waist, plus this pass's fixes (`smoothProfile`, `layerPants`,
+`hemThigh`, `armBlend`, `pelvisRamp`, below). Every jacket garment is an `r2Cut`; the ids are unchanged
+so saves keep working:
+
+| garment (item) | was | now |
+|---|---|---|
+| `tuff-shell` (default, Rental) | relaxed fit, hip, slight drop tail | R2 shape, plain 2L shell, stowed hood |
+| `storm-shell` (Storm Hood) | the same, hood up | R2 shape, hood up |
+| `retro-suit` (one-piece) | suit fit, belted, hem 0.93 | R2 shape with the suit's belt and leg colours |
+| `ridge-shell` | slim shell, hip bone | R2 shape a little closer (chest 0.234), closer sleeves |
+| `tall-anorak` | longest, A-line to 0.855 | R2 shape, roomier (0.246), half zip + kangaroo, twill |
+| `cloud-puffer` | round, 10.5 cm baffles, hip | R2 puffer: slim, 10 cm baffles, matte twill face |
+| `layer-hoodie` | A-line hoodie | R2 shape, rib hem bloused at the seat |
+| `sherpa-flannel` (new) | R1 | flannel shirt-jacket over a hoodie |
+| `insulated-freedom` (new) | R2 | the base shape: 2L twill, contrast yoke |
+| `alpine-hardshell` (new) | R3 | 3L hardshell, stowed hood |
+| `varsity-coach` (new) | R4 | wool body, contrast sleeves, striped rib |
+| `duck-canvas` (new) | R5 | duck canvas chore jacket |
+| `mocha-puffer` (new) | R6 | slim 8.5 cm baffle puffer |
+
+Pants: round 2's pants are catalogue garments too (`baggy-pant` P10, `relaxed-cargo` P2, `stack-pant` P3,
+`coach-bib` P7, `carpenter-pant` P9, `camo-cargo` P4), and the three old pants get the trimmed round-2 seat
+(`SEAT`), so every jacket can hang straight over every pant. `?proto=r1…r6` now dresses in exactly these
+catalogue cuts. The case items and colourways are in docs/rewards.md (§ Items, § Retired skins).
+
+### 3. Shiny / zig-zag skins
+
+Clothing only (helmets are hard shells and keep gloss / chrome; skis and boards keep their topsheets):
+see docs/rewards.md § Retired skins for the twelve removed skins and how saves convert them.
+
+### 4. Jacket ↔ pants: layered skinning (`cut.layerPants`, `cut.hemThigh`, `cut.pelvisRamp`)
+
+Cause: the jacket's hem band rode on the pelvis (90 %) while the pants under it followed the thighs from
+1.0 down, so every crouch, carve or grab moved the two layers apart and the pants' waist / thigh came out
+through the front hem (and the hem sank into the pants at the sides).
+- **The pants (and the bib) take the jacket's own skin weights where they are under it**
+  (`layerWeights()` in garments.js: the 4 nearest jacket vertices, inverse-distance blend), blending back
+  to their own over the 7 cm band below the hem (per direction, following the drop tail). The two layers
+  then move as one and keep their 1.4 cm clearance in every pose.
+- **The front of the hem band rides partly on its thigh** (`hemThigh` 0.35 from the belt line down,
+  centre front and back on the pelvis), so a thigh coming forward lifts the hem instead of pushing through it.
+- **The spine → pelvis hand-over of the hem band is spread over 1.20 → 0.94** (was 1.10 → 0.98), so a
+  crouch bends the whole waist instead of creasing it at the belt (it also helps § 5 in poses).
+
+Measured by `garment-clip.mjs` (below) on every catalogue jacket with its pants, skis and board, 69 poses
+each (stand, cruise, carves both edges, squats, press, stop, airs, tucks, flips, spins, corks, landings,
+all grabs and tweaks, chairlift, grind, arms down / forward / up / out, pole plant): vertices of the pants
+drawn in front of the jacket fell from Σ 445–2832 per look and gear to Σ 2–280, the worst single pose
+from 45–130 to ≤ 23 vertices (a speck in the deepest grab + flip); the hem sunk behind the pants from Σ
+1420–2663 to Σ 80–420.
+
+### 5. A gentle torso profile (`cut.smoothProfile`)
+
+Cause: below the chest the shell takes the fit's target section, but it never comes closer than a few cm
+to the (shrunk) body, so the superhero belly made a bump at 1.16 and the narrow waist under it a dip at
+1.04, then the pants' seat clearance pushed it out again at 0.94: in the side view a 1.8 cm "hole" under
+the belly, and a small one at the sides. Fix, after every other rule has shaped the rings (garments.js,
+jacket body `post`): per direction around the torso, between the shoulder blades (1.44) and the hem band
+(hem + 9 cm, so ribs and drawcords stay), the outline is lifted
+- to its **least concave majorant** at the front and back (the cloth hangs from the chest / belly like real
+  fabric, `fb = |cos θ|^1.6`),
+- to a **wide one-sided blur** (8 passes of a ±6-ring kernel, `max(r, blur)`) at the sides, so a narrow
+  waist stays narrow but the bend into it is gradual.
+Only ever outward, so the pants clearance holds. In poses the longer pelvis ramp (§ 4) and a softer arm
+share low on the side (§ 6) keep it gentle. `jacket-profile.mjs` plots it (side: front / back edge; front:
+half width; bind pose and standing on skis) and measures the deepest inward dip of each edge below its
+chord over ±8 cm in the waist zone (hem + 10 cm … 1.32):
+
+| | bind front | bind side | standing front | standing side |
+|---|---|---|---|---|
+| before (every jacket) | 0.6–1.0 cm | 0.3–1.0 cm | 1.0–1.9 cm | 0.4–1.3 cm |
+| after | 0.1–0.4 cm | 0.3–0.9 cm | see `profile.json` | see `profile.json` |
+
+### 6. One-piece armhole (`cut.armBlend`)
+
+Cause: the sleeve head was anchored to the clavicle up to |x| 0.20–0.28 and only blended into the arm
+beyond, while the jacket's shoulder took at most 55 % of the upper arm, and only on the very top (y > 1.43):
+at the seam the two pieces followed different bones, so a lowered arm slid the sleeve in under a shoulder
+"pad" that stayed at T-pose width (sleeves sinking 6 cm into the torso in almost every riding pose), and
+the seam read as a tube stuck into a box.
+- **The jacket's outer shoulder and the side under the arm ride on the upper arm** (`armBlend` 0.7 as a
+  weight floor: |x| 0.15 → 0.245, full from 1.36–1.44 up, ~45 % low on the side from 1.27): the shoulder
+  line follows the arm down and the side panel gives way under a lowered arm.
+- **The sleeve head takes the shell's weights where they meet** (|x| < 0.25, blending to its own by 0.33,
+  `layerWeights`), so the seam ring moves as one piece in every pose.
+- The sleeve head swells 6 mm where it leaves the shell (a soft, eased seam instead of a sharp tube edge).
+The two pieces are still two meshes (a welded single mesh would need the torso's rings and the sleeve's to
+share a seam ring, which the ring-swept builder can't do without a re-topology); with shared weights at
+the seam and the shoulder flowing into the sleeve the joint reads as one piece in the sheets. Sleeve top /
+front / back vertices drawn behind the jacket body: Σ 950–1445 per look → 290–400 (most remaining are the
+upper arm pressed against the side in grabs); the worst arms-down pose 51–74 → ≈ 20; the jacket body
+showing through the sleeve: Σ 61–291 → 0–130.
+
+### Checks and sheets
+
+```
+node web/scripts/garment-clip.mjs <url> [--looks all|jacket/pants,…] [--gear ski|snowboard] [--legacy] [--check] [--json f] [--shots dir --views sfront,sq34,hfront,cside,…]
+node web/scripts/jacket-profile.mjs <url> <out.png> [jacket/pants,…|all]       # torso profile plots + profile.json
+node web/scripts/jackets-sheet.mjs <url> <outDir> full,close,overview [jackets|all] [--tag=after] [--legacy]
+```
+- `garment-clip.mjs` (`src/equipment/garmentclip.js`, run in the clip harness): CPU-skins the outfit and
+  ray-casts short rays along each vertex normal against the other piece: **pantsOut** = a pants vertex that
+  is under the jacket in the bind pose but now has the jacket *behind* it and nothing of it in front (drawn
+  in front of the shell); **hemIn** / **sleeveIn** = a hem / upper-sleeve vertex that now has the pants /
+  jacket body within 3 cm in front of it and not behind it; **torsoOut** = the jacket body drawn in front of
+  the sleeve. Occlusion (a knee in front of the hem) doesn't count. `--check` limits offending vertices
+  per pose (pantsOut 15 … see the script); `--legacy` measures the same cuts without this pass's fixes.
+- `jackets-sheet.mjs`: per jacket front / 3/4 / side / back / back 3/4 standing, carve both ways, tuck,
+  air grab, arms up, snowboard 3/4 + back; `close` = the front hem (stand, carve, tuck, grab), the waist
+  (side, front) and the armpit / shoulder (arms down, forward, up, riding, tuck); `overview`.
+
+Known limits: the two snowboard grabs that reach across the body (Melon, nose / tail with the back hand)
+still pass the forearm through the jacket front (the animation's reach, not the seam). In the deepest
+grab + flip a few pants vertices still graze through the front hem between the thighs (≤ 23 vertices, a
+speck). The puffers' baffles make their inner surface dip, so they keep a few more grazing vertices than
+the flat shells.
 
 ## Files
 
@@ -472,6 +617,8 @@ web/src/character/
   garments.js   the pieces: collar, jacket body, sleeves, pant legs, gaiter, stowed hood or hood up, mitts, gauntlets
   helmet.js     helmet shell + liner edge + brim, toric goggle lens + gasket, strap with rear clip
   materials.js  fabricMaterial, bodyMaterial, helmetMaterial, lensMaterial (all on world.js toonMaterial)
+  proto.js      BODIES / morphBody (every rider: DEFAULT_BODY 'mid'), the dev prototype looks (?proto)
+web/src/equipment/garmentclip.js  garment ↔ garment layer checks (scripts/garment-clip.mjs)
 web/src/lobby/tabs/locker.js      the Locker tab (replaced the old Character tab)
 web/src/profile/catalog.js        clothing items generated from outfits.js (one item per garment)
 ```
@@ -622,7 +769,9 @@ jaw and blended into the neck below; it replaces the stowed hood roll.
 `profile/catalog.js` registers them: `helmet-tuff`, `goggles-tuff`, `jacket-tuff-shell`,
 `jacket-tuff-shell-hood`, `jacket-retro-suit`, `jacket-ridge-shell`, `jacket-tall-anorak`,
 `jacket-cloud-puffer`, `jacket-layer-hoodie`, `gloves-tuff-mitt`, `gloves-pipe`, `pants-tuff-bib`,
-`pants-cargo`, `pants-wide`, and the face items. Each item has
+`pants-cargo`, `pants-wide`, round 2's `jacket-sherpa-flannel`, `jacket-insulated-freedom`, `jacket-alpine-hardshell`,
+`jacket-varsity-coach`, `jacket-duck-canvas`, `jacket-mocha-puffer`, `pants-baggy`, `pants-relaxed-cargo`,
+`pants-stack`, `pants-coach-bib`, `pants-carpenter`, `pants-camo-cargo`, and the face items. Each item has
 `model: { kind: 'outfit', ref: <garment id> }` and one variant per colourway (`variant.id` = colourway id,
 `variant.colors` = that slot's colours). The profile stores `{ item, variant }` per slot as before.
 

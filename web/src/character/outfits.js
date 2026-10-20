@@ -127,7 +127,7 @@ export const JSTYLE = { varsity: 5, retro: 6, work: 7, shirt: 8, tee: 9 };
 
 export const R2_SHAPE = {
   hemFront: 0.885, hemBack: 0.858, hemFlare: -0.004, folds: 0.8, shoulder: 0.009, seatClear: 0.022,
-  straightBack: { from: 1.44 }, smoothProfile: { from: 1.44 }, layerPants: { band: 0.07 }, hemThigh: 0.35, armBlend: 0.7, pelvisRamp: [1.2, 0.94],
+  straightBack: { from: 1.44 }, smoothProfile: { from: 1.44 }, layerPants: { band: 0.07 }, hemThigh: 0.35, armBlend: 0.7, armSide: 0.45, pelvisRamp: [1.2, 0.94],
   torso: { chest: [0.24, 0.166, 0.17], waist: [0.236, 0.163, 0.17], hem: [0.238, 0.165, 0.172], n: 2.25 },
   sleeve: { upper: 0.08, elbow: 0.079, forearm: 0.076, cuff: 0.068 }, sleeveEnd: 0.698,
 };

@@ -121,11 +121,15 @@ async function capture(browser, looks) {
     await page.waitForTimeout(wait);
   };
   const dress = async (look) => {
-    await page.evaluate(async ([j, p]) => {
+    await page.evaluate(async ([j, p, legacy]) => {
       const { CLOTHING_ITEMS } = await import('/src/profile/items.js');
-      const first = (g) => { const it = CLOTHING_ITEMS.find((i) => i.garment === g); const v = it.variants.find((x) => !x.starter) || it.variants[0]; return { garment: g, colorway: v.id, colors: v.colors }; };
-      window.__sendit.stage.rider.setOutfit({ jacket: first(j), pants: first(p) });
-    }, look);
+      const { GARMENTS } = await import('/src/character/outfits.js');
+      const first = (g) => { const it = CLOTHING_ITEMS.find((i) => i.garment === g); const v = it.variants.find((x) => x.rarity === 'legendary' && !x.colors.pat) || it.variants.find((x) => !x.starter) || it.variants[0]; return { garment: g, colorway: v.id, colors: v.colors }; };
+      const jacket = first(j);
+      // --legacy: the same cut without this pass's clip fixes (the "before" of the close-ups)
+      if (legacy) jacket.def = { id: `${j}-legacy`, cut: { ...GARMENTS.jacket[j].cut, smoothProfile: null, layerPants: null, hemThigh: 0, armBlend: 0, pelvisRamp: null } };
+      window.__sendit.stage.rider.setOutfit({ jacket, pants: first(p) });
+    }, [...look, flags.has('--legacy')]);
     await page.waitForTimeout(500);
   };
   for (const look of looks) {

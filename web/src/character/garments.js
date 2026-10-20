@@ -344,7 +344,7 @@ export function buildOutfitGeometry(body, cut) {
         // over a sleeve that slides in under it, and the side panel gives way under a lowered arm.
         if (b.startsWith('upperarm') && cut.armBlend) {
           const sgn = b.endsWith('_l') ? 1 : -1;
-          return cut.armBlend * smooth(0.15, 0.245, x * sgn) * smooth(1.27, 1.36, y) * (0.45 + 0.55 * smooth(1.36, 1.44, y));
+          return cut.armBlend * smooth(0.15, 0.245, x * sgn) * smooth(1.27, 1.36, y) * ((cut.armSide ?? 0.45) + (1 - (cut.armSide ?? 0.45)) * smooth(1.36, 1.44, y));
         }
         if (!b.startsWith('thigh')) return 0;
         const sgn = b.endsWith('_l') ? 1 : -1;
@@ -387,6 +387,27 @@ export function buildOutfitGeometry(body, cut) {
             for (let k = 0; k < S; k++) {
               const up = Math.cos((k / S) * TAU);
               if (up > 0.05) r.r[k] = Math.max(Math.min(r.r[k], lim / up), r.raw[k] * shrink);
+            }
+          }
+          // One-piece armhole: the sleeve head is laid over the shell's shoulder edge (6 mm out) on its top,
+          // front and back, so the seam is the sleeve's own edge lying on the shell, not two surfaces
+          // crossing at a grazing angle (which flickers into a jagged line when the arm moves).
+          if (cut.armBlend && jacketRings && r.t < 0.3) {
+            const w = smooth(0.3, 0.255, r.t);
+            const ringAt = (y) => { let best = jacketRings[0]; for (const q of jacketRings) if (Math.abs(q.t - y) < Math.abs(best.t - y)) best = q; return best; };
+            for (let k = 0; k < S; k++) {
+              const th = (k / S) * TAU, cy = Math.cos(th), sz = Math.sin(th);
+              if (cy < -0.25) continue;   // the underside stays inside the shell (the armpit)
+              const inside = (rr) => {
+                const y = r.c.y + cy * rr, z = r.c.z + sz * rr, jr = ringAt(y);
+                if (y > jr.t + 0.02) return false;   // above the shell's top ring
+                return Math.hypot(r.c.x - jr.c.x, z - jr.c.z) < ringRadiusToward(jr, r.c.x, z);
+              };
+              if (!inside(0) || inside(0.13)) continue;
+              let a = 0, b = 0.13;
+              for (let i = 0; i < 18; i++) { const m = (a + b) / 2; if (inside(m)) a = m; else b = m; }
+              const want = a + 0.006;
+              if (want > r.r[k]) r.r[k] += (want - r.r[k]) * w;
             }
           }
         }

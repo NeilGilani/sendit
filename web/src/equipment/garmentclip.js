@@ -1,19 +1,19 @@
 // Garment ↔ garment interpenetration (dev only; clipharness.js → scripts/garment-clip.mjs).
 //
 // CPU-skins every outfit vertex (position + normal) of the posed rider and checks pairs of pieces that
-// must stay layered (docs/character.md § Garment clip):
+// must stay layered (docs/character.md § Catalogue jackets, "Checks and sheets"):
 //   pantsOut   pants (legs + bib) that sit inside the jacket in the bind pose but poke out through its
 //              shell in the pose: the pants waist / thigh showing through the jacket front hem
 //   hemIn      the jacket's hem band that sits outside the pants in the bind pose but sinks into them
 //   sleeveIn   sleeve vertices outside the jacket body in the bind pose (beyond the armhole) that end up
 //              inside it: "the sleeve goes into the jacket"
 //   torsoOut   the jacket body outside the sleeve there: its side / shoulder poking out through the sleeve
-// A point's side of a surface = the signed distance to the k nearest vertices of the other piece along
-// their (skinned) normals, averaged. Depths in cm (max) plus the count of offending vertices.
+// Each check casts short rays along the skinned vertex normals against the other piece's triangles
+// (layerCheck / measureGarments below). Per pose: the deepest offender (cm) and the count of vertices.
 import * as THREE from 'three';
 
 const ID = { jacket: 0, sleeve: 1, pants: 2 };
-const _m = new THREE.Matrix4(), _acc = new THREE.Matrix4(), _w = new THREE.Matrix4();
+const _m = new THREE.Matrix4(), _acc = new THREE.Matrix4();
 
 /** World positions + normals of every outfit vertex in the current pose. */
 export function skinOutfit(mesh) {
@@ -39,48 +39,6 @@ export function skinOutfit(mesh) {
     pos.set([v.x, v.y, v.z], i * 3); nrm.set([nn.x, nn.y, nn.z], i * 3);
   }
   return { pos, nrm };
-}
-
-/** A uniform hash grid over a subset of vertices for k-nearest queries. */
-function grid(pos, ids, cell = 0.03) {
-  const map = new Map();
-  const key = (x, y, z) => `${Math.floor(x / cell)},${Math.floor(y / cell)},${Math.floor(z / cell)}`;
-  for (const i of ids) {
-    const k = key(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
-    let a = map.get(k); if (!a) map.set(k, a = []); a.push(i);
-  }
-  return {
-    near(x, y, z, kN = 5) {
-      const cx = Math.floor(x / cell), cy = Math.floor(y / cell), cz = Math.floor(z / cell);
-      const best = [];
-      for (let r = 1; r <= 3 && best.length < kN; r++) {
-        best.length = 0;
-        for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) for (let dz = -r; dz <= r; dz++) {
-          const a = map.get(`${cx + dx},${cy + dy},${cz + dz}`); if (!a) continue;
-          for (const i of a) {
-            const d = (pos[i * 3] - x) ** 2 + (pos[i * 3 + 1] - y) ** 2 + (pos[i * 3 + 2] - z) ** 2;
-            best.push([d, i]);
-          }
-        }
-      }
-      best.sort((p, q) => p[0] - q[0]);
-      return best.slice(0, kN);
-    },
-  };
-}
-
-/** Signed distance of point i (in `A`) to the surface made of vertices `near` (in `B`): + = outside. */
-function side(A, i, gB, B, kN = 5) {
-  const x = A.pos[i * 3], y = A.pos[i * 3 + 1], z = A.pos[i * 3 + 2];
-  const nb = gB.near(x, y, z, kN);
-  if (!nb.length || nb[0][0] > 0.06 * 0.06) return null;   // nothing of the other piece within 6 cm
-  let s = 0, ws = 0;
-  for (const [d, j] of nb) {
-    const w = 1 / (Math.sqrt(d) + 0.004);
-    s += w * ((x - B.pos[j * 3]) * B.nrm[j * 3] + (y - B.pos[j * 3 + 1]) * B.nrm[j * 3 + 1] + (z - B.pos[j * 3 + 2]) * B.nrm[j * 3 + 2]);
-    ws += w;
-  }
-  return s / ws;
 }
 
 /** Triangles of the pieces `ids` (by their first vertex's piece id), in a hash grid, for short ray casts. */

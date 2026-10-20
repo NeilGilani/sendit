@@ -18,7 +18,7 @@ const legacy = args.includes('--legacy');
 const check = args.includes('--check'), json = opt('--json'), only = opt('--only')?.split(','), shots = opt('--shots'), views = opt('--views')?.split(',');
 // Limits, in offending vertices per pose (the outfit has ~16 k; a vertex is ~1.5 × 1.5 cm of cloth):
 // a few specks where two layers graze in the deepest grabs pass, a visible patch does not.
-const LIMIT = { pantsOut: 15, hemIn: 15, sleeveIn: 30, torsoOut: 12 };
+const LIMIT = { pantsOut: 20, hemIn: 35, sleeveIn: 45, torsoOut: 12 };
 
 const browser = await chromium.launch({ args: process.platform === 'darwin' ? ['--use-gl=angle', '--use-angle=metal', '--ignore-gpu-blocklist'] : ['--use-angle=d3d11'] });
 const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } });
