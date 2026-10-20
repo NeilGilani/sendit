@@ -69,6 +69,7 @@ button.primary { color: var(--ink); border-left: 2px solid var(--accent); border
 .note b { font-weight: 300; color: var(--accent); margin-left: 10px; }
 #hint, #liftlabel { position: absolute; left: 50%; transform: translateX(-50%); font-size: 17px; color: var(--dim); opacity: 0; transition: opacity 1.2s; text-shadow: 0 1px 8px rgba(0,0,0,0.4); letter-spacing: 0.06em; white-space: nowrap; }
 #hint { top: 54px; }
+#chal:not(.hidden) ~ #hint { top: 122px; }   /* a race: under the timer and the gates row, not across them */
 #liftlabel { bottom: 140px; }
 #hint.on, #liftlabel.on { opacity: 0.9; }
 
@@ -116,12 +117,13 @@ button.primary { border-left: 4px solid #2ff5d6; }
   #speed span { font-size: 44px; -webkit-text-stroke: 3px #141a3c; text-shadow: 4px 4px 0 #141a3c; }
   #speed small { font-size: 13px; }
   #hint { top: 40px; font-size: 13px; white-space: normal; width: max-content; max-width: 62vw; text-align: center; }
+  #chal:not(.hidden) ~ #hint { top: auto; bottom: 86px; }   /* a race: the timer has the top */
   #notes { right: 20px; bottom: 24px; }
   .note { font-size: 14px; }
 }
 /* Phones (portrait): hints wrap inside the screen, below the score and the trail sign. */
 @media (max-width: 600px) {
-  #hint { top: 150px; font-size: 13px; white-space: normal; width: max-content; max-width: calc(100vw - 32px); text-align: center; }
+  #hint, #chal:not(.hidden) ~ #hint { top: 150px; font-size: 13px; white-space: normal; width: max-content; max-width: calc(100vw - 32px); text-align: center; }
   /* Score call-outs above the speed read-out (bottom-right ran into the centred km/h on a narrow screen). */
   #notes { right: 16px; bottom: 104px; }
   .note { font-size: 15px; }

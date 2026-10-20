@@ -100,6 +100,8 @@ export function mountProgressionUi({ juice }) {
     lv.querySelector('.rk').textContent = e.rankUp ? `NEW RANK · ${e.rank.name.toUpperCase()}` : e.rank.name.toUpperCase();
     lv.querySelector('.sub').textContent = nextUnlockText(e.level);
     lv.classList.remove('show', 'yield'); void lv.offsetWidth; lv.classList.add('show');
+    // Still busy after the 4 s wait (a chain of tricks): start faded back, not across the trick name.
+    if (juice?.hud?.busy?.()) lv.classList.add('yield');
     document.body.classList.add('lvlup');
     clearTimeout(play.t); play.t = setTimeout(() => document.body.classList.remove('lvlup'), 2900);
     sfx('medal', 0.8, e.rankUp ? 0.9 : 1.05);

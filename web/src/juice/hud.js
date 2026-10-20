@@ -97,7 +97,7 @@ const CSS = /* css */`
 #juiceHud .bn { position: absolute; left: 50%; top: 172px; transform: translateX(-50%); white-space: nowrap; font-size: 38px; opacity: 0; -webkit-text-stroke: 2px #1b1446; paint-order: stroke fill; }
 #juiceHud .bn.show { animation: jhBank 1.8s ease-out forwards; }
 /* A bank while a trick name is up (≤ ~960 px tall the two met at the announcer's top): above it instead. */
-#juiceHud .bn.hi { top: 104px; }
+#juiceHud .bn.hi { top: 104px; transition: top .12s ease-out; }
 #chal:not(.hidden) ~ #juiceHud .bn.hi { top: 118px; font-size: 30px; }
 #juiceHud .bn.lost.show { animation: jhLost 1.4s ease-out forwards; }
 @keyframes jhBank { 0% { opacity: 0; transform: translateX(-50%) scale(.5); } 10% { opacity: 1; transform: translateX(-50%) scale(1.2); } 20% { transform: translateX(-50%) scale(1); } 78% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-30px) scale(.95); } }
@@ -321,6 +321,8 @@ export function mountJuiceHud({ player, combo, input, camera }) {
     an.classList.remove('new');
     restart(an);
     annT = performance.now();
+    // A bank already up (it fired just before the trick name): it moves above the announcer too.
+    if (annT - bnT < 1700 && innerHeight < 960) bn.classList.add('hi');
   };
 
   on('landed', (e) => {
