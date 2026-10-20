@@ -7,6 +7,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PostStack, POST } from './gfx/post.js';
 const POST_EXPOSURE = POST.exposure;
 import { PERF } from './gfx/perf.js';
+import { initAutoQuality } from './gfx/autoquality.js';
 import { prewarm, warmQualityVariants } from './gfx/prewarm.js';
 import { rockTextureReady } from './gfx/snow.js';
 import { patchShaderChunks, globals, makeNoiseTexture, applyMapAtmosphere } from './world.js';
@@ -57,6 +58,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.NoToneMapping;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const autoQ = initAutoQuality(renderer, params);   // first launch: quality from the GPU + a frame check in the first ride (gfx/autoquality.js)
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(col(ATMOSPHERE.aerialColor), ATMOSPHERE.aerialDensity);
@@ -599,6 +601,7 @@ function frame(now) {
   juice?.update(paused || replaying ? 0 : dt, time);
   if (!replaying) progressUpdate?.(dt);
   if (!paused && !replaying) thrill?.update(dt);
+  autoQ.sample(dt, riding && !replaying);
   input.endFrame();
   composer.render(dt);
 }
