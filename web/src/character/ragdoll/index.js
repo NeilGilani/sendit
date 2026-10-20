@@ -18,6 +18,7 @@ import { crashSeverity, bySeverity } from './severity.js';
 
 const CRASH = 3;
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
+const _snowP = new THREE.Vector3();   // (snowContacts only: never touches the simulation)
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4();
 const TRACK = ['pelvis', 'spine_03', 'thigh_l', 'thigh_r', 'Head'];
 // Limb → the trunk body its flapping is measured against (measure()).
@@ -272,6 +273,14 @@ export class RagdollController {
       if (e.gear) { const s = b.samples.find((q) => q.gear === e.gear); c.axis.copy(s.axis).applyQuaternion(b.q); }
       else c.axis.set(0, 1, 0).applyQuaternion(b.q);
       c.heading = Math.atan2(-c.axis.x, -c.axis.z);
+      // How far that body is above the snow now, near the contact (a fast body that brushed the snow in an early
+      // sub-step can be centimetres up by the end of the frame: fx leaves no groove under it then).
+      c.lift = Infinity;
+      for (const s of b.samples) {
+        b.point(s.p, _snowP);
+        if (Math.hypot(_snowP.x - c.p.x, _snowP.z - c.p.z) > 0.5) continue;
+        c.lift = Math.min(c.lift, _snowP.y - s.r - this.env.height(_snowP.x, _snowP.z));
+      }
       e.n = 0;
       out.push(c);
     }

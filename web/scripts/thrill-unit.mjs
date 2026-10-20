@@ -87,6 +87,20 @@ export async function run(test, assert) {
     assert.equal(r.pick(10).t, r.s[0].t, 'falls back to the oldest sample');
   });
 
+  await test('thrill retry: a take-off after a move (R, respawn) never picks the line from before it', () => {
+    const r = new T.RetryTrail(600);
+    for (let i = 0; i <= 40; i++) r.push(i, { x: i, y: 0, z: 0, h: 0, vx: 1, vy: 0, vz: 0 });   // last run, down low
+    r.cut();                                                                                       // R: back at the top
+    for (let i = 40; i <= 45; i++) r.push(i + 0.5, { x: 1000 + i, y: 0, z: 0, h: 0, vx: 1, vy: 0, vz: 0 });
+    r.markTakeoff(46);                                                                             // a kicker 6 m in
+    assert.equal(r.pick(30).x, 1040, 'the first sample after the restart, not the last run');
+    const seg = r.seg;
+    r.cut();                                                                                       // crash respawn
+    r.push(47, { x: 2000, y: 0, z: 0, h: 0, vx: 1, vy: 0, vz: 0 });
+    r.markTakeoff(46, seg);                                                                        // retry after the crash: that jump's approach
+    assert.equal(r.pick(3).x, 1042);
+  });
+
   await test('thrill exposure: an even steep slope reads calm, a cliff ahead and big air read exposed', () => {
     const slope = (x) => -x * 0.7;                    // 35° even slope falling toward +x
     const cliff = (x) => (x < 8 ? -x * 0.3 : -2.4 - 25 - (x - 8) * 0.3);   // 25 m band at 8 m

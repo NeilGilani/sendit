@@ -69,6 +69,7 @@ button.primary { color: var(--ink); border-left: 2px solid var(--accent); border
 .note b { font-weight: 300; color: var(--accent); margin-left: 10px; }
 #hint, #liftlabel { position: absolute; left: 50%; transform: translateX(-50%); font-size: 17px; color: var(--dim); opacity: 0; transition: opacity 1.2s; text-shadow: 0 1px 8px rgba(0,0,0,0.4); letter-spacing: 0.06em; white-space: nowrap; }
 #hint { top: 54px; }
+#chal:not(.hidden) ~ #hint { top: 122px; }   /* a race: under the timer and the gates row, not across them */
 #liftlabel { bottom: 140px; }
 #hint.on, #liftlabel.on { opacity: 0.9; }
 
@@ -116,12 +117,16 @@ button.primary { border-left: 4px solid #2ff5d6; }
   #speed span { font-size: 44px; -webkit-text-stroke: 3px #141a3c; text-shadow: 4px 4px 0 #141a3c; }
   #speed small { font-size: 13px; }
   #hint { top: 40px; font-size: 13px; white-space: normal; width: max-content; max-width: 62vw; text-align: center; }
+  #chal:not(.hidden) ~ #hint { top: auto; bottom: 86px; }   /* a race: the timer has the top */
   #notes { right: 20px; bottom: 24px; }
   .note { font-size: 14px; }
 }
 /* Phones (portrait): hints wrap inside the screen, below the score and the trail sign. */
 @media (max-width: 600px) {
-  #hint { top: 150px; font-size: 13px; white-space: normal; width: max-content; max-width: calc(100vw - 32px); text-align: center; }
+  #hint, #chal:not(.hidden) ~ #hint { top: 150px; font-size: 13px; white-space: normal; width: max-content; max-width: calc(100vw - 32px); text-align: center; }
+  /* Score call-outs above the speed read-out (bottom-right ran into the centred km/h on a narrow screen). */
+  #notes { right: 16px; bottom: 104px; }
+  .note { font-size: 15px; }
 }
 #speed.tier1 span { color: #7ff9ea; }
 #speed.tier2 span { color: #ffd34d; }
@@ -170,6 +175,9 @@ button.primary { border-left: 4px solid #2ff5d6; }
 #flakesHud { position: absolute; right: 26px; top: 22px; font-weight: 900; font-style: italic; font-size: 20px; color: #ffd34d;
   -webkit-text-stroke: 1.5px #141a3c; paint-order: stroke fill; text-shadow: 2px 2px 0 #141a3c; pointer-events: none; }
 .card.results { text-align: center; }
+/* The results card owns the screen: the riding HUD (timer, splits, speed, score, combo, trail sign) steps back
+   instead of showing through and around the card. */
+body:has(#results:not(.hidden)) #hud, body:has(#results:not(.hidden)) #trail-toast, body:has(#results:not(.hidden)) #thrill-pills { opacity: 0 !important; transition: opacity .3s; }
 .medal { width: 92px; height: 92px; border-radius: 50%; margin: 0 auto 6px; display: none; box-shadow: 0 6px 0 rgba(20,26,60,0.6), inset 0 -8px 0 rgba(0,0,0,0.15);
   font: 900 italic 30px "Arial Black", Impact, sans-serif; color: rgba(20,26,60,0.75); line-height: 92px; }
 .medal.gold { display: block; background: radial-gradient(circle at 35% 30%, #fff6c4, #ffd34d 45%, #c8901a); }

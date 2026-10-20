@@ -281,7 +281,9 @@ heightfield (`getHeight − baseHeight ≤ 2 cm`), not under the fjord (`course.
 - **Crashes** (ragdoll): `ragdoll.snowContacts()` lists the body parts / gear touching the snow since the last
   frame (averaged contact point, hardest approach speed, the part's axis). Each touching part stamps its own groove,
   shaped by the part (`CRASH_MARK`: trunk 0.36–0.42 m wide, head 0.24, limbs 0.12–0.18, skis 0.09, board 0.26,
-  poles 0.04) and as deep as the hit / slide (powder deeper); nothing for a part in the air. Spray: the sliding
+  poles 0.04) and as deep as the hit / slide (powder deeper); nothing for a part in the air, and nothing for a part
+  that brushed the snow in an early sub-step but is already off it again at the end of the frame (`c.lift` > 5 cm:
+  a fast head grazing a steep face on the Ravenspire cliff left a stray 8 cm-above mark). Spray: the sliding
   trunk / thighs / skis / board throw snow (`spray.emit`), and the hardest fresh hit makes a burst, one at a time
   (0.22 s), the first as big as the old crash burst. The old crash stamped a 1.2 m mark at the player every frame
   (under a body flying off a cliff) and the `crashed` event burst at the crash spot (a rail bail in the air):

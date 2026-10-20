@@ -104,6 +104,8 @@ node web/scripts/map5-unit.mjs
 node web/scripts/map6-unit.mjs
 node web/scripts/map7-unit.mjs
 node web/scripts/trails-check.mjs --check
+node web/scripts/challenge-unit.mjs                   # Challenge on mid-course trails: gates, medal distance, per-trail records
+node web/scripts/qa-ride.mjs http://localhost:5180/ <outDir> <mapId> [--sizes 1280x720,390x844] [--lift] [--next <mountain>]   # lobby → every trail, all ride features, per-frame checks (game-feel.md §10)
 node web/scripts/ragdoll-fuzz.mjs --check             # crash ragdoll: 600 crashes, frame-rate + no-crash identity
 node web/scripts/ragdoll-identity.mjs http://localhost:5180/ ski   # real game: jumps identical with / without it
 node web/scripts/gfxpopin.mjs http://localhost:5180 <mapId> 1 20

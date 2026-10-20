@@ -161,6 +161,8 @@ export function mountFlowHud(player) {
     rsT = performance.now() + 7000;
   });
   setInterval(() => { if (rsT && performance.now() > rsT) { rs.classList.remove('on'); rsT = 0; } }, 250);
+  // A new ride from the lobby: the last run's card doesn't come back over the trail sign.
+  on('rideStarted', () => { rs.classList.remove('on'); rsT = 0; });
   const show = () => { root.style.display = game.mode === Mode.RIDING || game.mode === Mode.LIFT ? '' : 'none'; };
   on('mode', show);
   show();

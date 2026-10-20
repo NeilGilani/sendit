@@ -6,6 +6,7 @@
 // Same interface as Course (course.js): path, length, dropsAt, finishAt, progress(), height(),
 // generate(), menuFocus(), plus forestAt(), pisteAt(), water, lifts.
 import * as THREE from 'three';
+import { assetUrl } from './base.js';
 
 const smooth = (t) => { const x = t < 0 ? 0 : t > 1 ? 1 : t; return x * x * (3 - 2 * x); };
 function hash2(i, j) {
@@ -55,7 +56,7 @@ export const REAL = {
 
 export class RealCourse {
   static async load(id, runIndex = 0) {
-    const base = '/resorts/';
+    const base = assetUrl('resorts/');
     const meta = await (await fetch(`${base}${id}.json`)).json();
     const [dem, far, mask] = await Promise.all([
       fetch(`${base}${id}_dem.bin`).then((r) => r.arrayBuffer()),

@@ -7,6 +7,7 @@ import { globals, toonMaterial, SUN_DIR } from './world.js';
 import { RING, CLIFFS, MIDTERRAIN } from './scene.js';
 import { PERF, perfQ } from './gfx/perf.js';
 import { snowUniforms, SNOW_COMMON_PARS, SNOW_PARS_GLSL, SNOW_FRAG_GLSL, SNOW_BAND_GLSL, FAR_SNOW_FRAG_GLSL } from './gfx/snow.js';
+import { assetUrl } from './base.js';
 
 const CHUNK = 128;
 
@@ -115,7 +116,7 @@ export class Terrain {
   }
 
   /** Real-world data files (kept for reference builds). */
-  async load(base = '/terrain/', onProgress = () => {}) {
+  async load(base = assetUrl('terrain/'), onProgress = () => {}) {
     const get = async (f) => { const r = await fetch(base + f); if (!r.ok) throw new Error(f); return r; };
     const meta = await (await get('terrain.json')).json();
     onProgress(0.1);
