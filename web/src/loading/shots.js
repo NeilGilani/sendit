@@ -215,6 +215,12 @@ export function terrainScore(m, shot, H, n = 12) {
     }
     if (walls >= 3) score += 1;
     if (d < 3.2) score += 1;
+    // A lump of snow / rock right in front of the lens under the rider (a dark blur over the bottom of the frame).
+    for (let k = 1; k <= 4; k++) {
+      const f = k / 11;
+      const x = p.x + (com.x - p.x) * f, y = p.y + (com.y - 1.4 - p.y) * f, z = p.z + (com.z - p.z) * f;
+      if (y < H(x, z)) { score += 1; break; }
+    }
     // Rider pressed against a wall of snow: the slope rises into the line of sight within ~15 m behind
     // the rider (a gully wall filling the frame instead of sky / range).
     const dir = q.copy(com).sub(p).normalize();
