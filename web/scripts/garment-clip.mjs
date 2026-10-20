@@ -46,7 +46,7 @@ for (const look of looks) {
     if (!legacy) return { jacket: { garment: j }, pants: { garment: p } };
     // --legacy: the same cut without this pass's clip fixes (torso profile, layered skinning, one-piece armhole)
     const { GARMENTS } = await import('/src/character/outfits.js');
-    const cut = { ...GARMENTS.jacket[j].cut, smoothProfile: null, layerPants: null, hemThigh: 0, armBlend: 0 };
+    const cut = { ...GARMENTS.jacket[j].cut, smoothProfile: null, layerPants: null, hemThigh: 0, armBlend: 0, pelvisRamp: null };
     return { jacket: { garment: j, def: { id: `${j}-legacy`, cut } }, pants: { garment: p } };
   }, [look, legacy]);
   for (const gear of gears) {

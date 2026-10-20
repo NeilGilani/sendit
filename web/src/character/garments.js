@@ -335,14 +335,16 @@ export function buildOutfitGeometry(body, cut) {
       weightFloor: (b, x, y, z) => {
         // The hem band over the hips rides on the pelvis, like the pants' waist and seat under it (with
         // the spine's share it would swing forward off the seat in a crouch and let the pants show through).
-        if (b === 'pelvis') return 0.9 * smooth(1.1, 0.98, y);
+        // (cut.pelvisRamp: over how much height the hem band hands over from the spine to the pelvis; a
+        // longer ramp spreads the bend of a crouch over the whole waist instead of creasing it at the belt)
+        if (b === 'pelvis') return 0.9 * smooth(cut.pelvisRamp?.[0] ?? 1.1, cut.pelvisRamp?.[1] ?? 0.98, y);
         // One-piece armhole (cut.armBlend): the outer shoulder and the side under the arm ride on the upper
         // arm too, with the same share the sleeve head takes there (layerWeights below), so the yoke and the
         // sleeve bend as one piece: the shoulder line follows the arm down instead of standing out as a pad
         // over a sleeve that slides in under it, and the side panel gives way under a lowered arm.
         if (b.startsWith('upperarm') && cut.armBlend) {
           const sgn = b.endsWith('_l') ? 1 : -1;
-          return cut.armBlend * smooth(0.15, 0.245, x * sgn) * smooth(1.25, 1.42, y);
+          return cut.armBlend * smooth(0.15, 0.245, x * sgn) * smooth(1.27, 1.36, y) * (0.45 + 0.55 * smooth(1.36, 1.44, y));
         }
         if (!b.startsWith('thigh')) return 0;
         const sgn = b.endsWith('_l') ? 1 : -1;

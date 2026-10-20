@@ -170,7 +170,8 @@ export function prepare(rider) {
       if (y > 1.22 && ax > 0.19) sets.torsoArm.push(i);   // (where the sleeve is)
     } else if (id === ID.sleeve) {
       // the sleeve's top, front and back (its underside lies against the body when the arm is down)
-      if (ax < 0.5 && y > armY) sets.sleeve.push(i);
+      // (the upper sleeve and its head: a forearm reaching across the body in a grab is the animation's business)
+      if (ax < 0.42 && y > armY) sets.sleeve.push(i);
     } else if (id === ID.pants) { if (y > hemLow + 0.015 && Math.round(G.getW(i)) !== 2) sets.pants.push(i); }
   }
   // Bind pose = the geometry itself (positions / normals as built).
