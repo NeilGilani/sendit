@@ -194,3 +194,17 @@ body.hw-open #pause .panel-left { visibility: hidden; }
 #touchpause { display: none; }
 body.device-touch #touchpause { display: grid; place-items: center; position: absolute; left: 14px; top: 14px; width: 44px; height: 44px; padding: 0;
   pointer-events: auto; color: var(--c-snow); background: rgba(10, 18, 26, 0.7); border: 1px solid var(--c-line-2); border-radius: var(--r2); box-shadow: none; }
+
+/* Results / pause cards: the level-up flourish never draws over a menu card (it plays on the ride itself). */
+body:has(#results:not(.hidden)) #lvlUp, body:has(#pause:not(.hidden)) #lvlUp, body:has(#howto:not(.hidden)) #lvlUp { visibility: hidden; }
+/* Results on short screens (phones sideways): the whole card fits, buttons included. */
+#results .card { max-height: calc(100vh - 16px); overflow-y: auto; }
+@media (max-height: 560px) {
+  #results .card { padding: 14px 22px; }
+  #results .medal { width: 48px; height: 48px; line-height: 48px; font-size: 18px; margin-bottom: 2px; }
+  #results .card h2 { font-size: 22px; margin: 0 0 4px; }
+  #results .res-time { font-size: 36px; margin: 0 0 6px; }
+  #results .res-rows { font-size: 13px; gap: 2px 18px; margin-bottom: 8px; }
+  #results .res-nav { margin-top: 0; }
+  #results .res-nav button { font-size: 16px; padding: 4px 10px; }
+}
