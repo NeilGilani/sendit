@@ -44,6 +44,7 @@ import { FP_POLE } from './fpview.js';
 import { trackProgression } from './progression/index.js';
 import { mountProgressionUi } from './progression/ui.js';
 import './progression/lobby.js';
+import { needsHowTo } from './lobby/help.js';
 
 patchShaderChunks();
 profileStore.load();
@@ -71,7 +72,7 @@ const ui = new UI({
   retry: () => startRide(true, 'challenge'),
   zen: () => startRide(true, 'zen'),
   restart: () => { resume(); startRide(true, activities?.mode || 'zen'); },
-  resume: () => resume(), top: () => player.resetToTop(), menu: () => toMenu(),
+  resume: () => resume(), pause: () => pause(), top: () => player.resetToTop(), menu: () => toMenu(),
 });
 
 let activities, life;
@@ -180,7 +181,7 @@ async function boot() {
     input,
     onRide: (mode) => startRide(false, mode),
     onTrail: (mapId, trailId, opts) => selectTrail(mapId, trailId, opts),
-    ui: { showCredits: () => ui.showCredits() },
+    ui: { showCredits: () => ui.showCredits(), showHowTo: (o) => ui.openHowTo(o) },
     sfx,
   });
   updateLobbyMapInfo();
@@ -226,8 +227,11 @@ async function boot() {
   ui.doneLoading();
   saveLoadHint();
   ui.fade(false, 2.0);
-  if (params.has('ride') || params.has('challenge')) startRide(true, params.has('challenge') ? 'challenge' : 'zen');
-  else { setMode(Mode.MENU); ui.refresh(); }
+  if (params.has('ride') || params.has('challenge')) {
+    startRide(true, params.has('challenge') ? 'challenge' : 'zen');
+    // A first-time player who arrives on a ride link (e.g. a friend's challenge) gets the How to ride cards first.
+    if (needsHowTo()) { pause(); ui.openHowTo({ onRide: () => resume() }); }
+  } else { setMode(Mode.MENU); ui.refresh(); }
   window.__sendit = {
     activities, life,
     fx, course, player, rider, terrain, camera, game, scene, renderer, features, scatter,
@@ -413,6 +417,8 @@ let busy = false;
 /** Lobby → ride (or a restart from the pause / results screen). `instant` skips the fade and the camera intro. */
 async function startRide(instant = false, mode = 'zen') {
   if (busy) return;
+  // First ride ever: the How to ride cards (lobby/help.js), then this ride. Skippable; Help shows them again.
+  if (!instant && game.mode === Mode.MENU && needsHowTo()) { ui.openHowTo({ onRide: () => startRide(false, mode) }); return; }
   if (game.mode !== Mode.MENU) emit('rideEnded', scoreSnapshot());   // restarting mid-ride still records the ride
   busy = true;
   sound.init().then(() => sound.resume()).catch(() => {});
@@ -547,7 +553,9 @@ function frame(now) {
   }
   rider.fp = settings.view === 'fp' && game.mode !== Mode.MENU && player.state !== State.CRASH;
   document.body.classList.toggle('fp', rider.fp && (game.mode === Mode.RIDING || game.mode === Mode.LIFT));
-  if (!replaying && input.justPressed('pause')) {
+  // (P is a letter while typing a name: only Esc closes / pauses then.)
+  const typing = document.activeElement?.matches?.('input[type=text], textarea');
+  if (!replaying && input.justPressed('pause') && (!typing || input.codePressed('Escape'))) {
     if (ui.back()) { /* closed an overlay (settings / credits) */ }
     else if (game.mode === Mode.PAUSED) resume();
     else if (game.mode === Mode.RIDING || game.mode === Mode.LIFT) pause();

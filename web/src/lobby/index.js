@@ -9,6 +9,7 @@ import './tabs/maps.js';
 import './tabs/multiplayer.js';
 import './tabs/leaderboards.js';
 import './tabs/profile.js';
+import './tabs/help.js';       // the ? button: How to ride, Controls, questions
 import './tabs/settings.js';
 
 import { installCaseNotifications } from './cases/notify.js';

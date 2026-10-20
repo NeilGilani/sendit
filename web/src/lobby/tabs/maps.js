@@ -220,7 +220,7 @@ registerLobbyTab({
       }
       await ctx.maps.selectTrail(t.mapId, t.id);
       if (!alive) return;
-      ctx.toast(`${t.name} selected · Enter to ride`);
+      ctx.toast(`${t.name} selected · ${{ gamepad: 'A again to ride', touch: 'tap Ride to go' }[ctx.device?.()] || 'Enter again to ride'}`);
       const m = getMountain(view);
       if (m) { const id = t.id; renderTrails(m); el.querySelector(`.tr-row[data-trail="${CSS.escape(id)}"] .tr-pick`)?.focus({ preventScroll: true }); }
     };
