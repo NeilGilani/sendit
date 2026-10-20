@@ -211,6 +211,13 @@ export function terrainScore(m, shot, H, n = 12) {
     }
     if (walls >= 3) score += 1;
     if (d < 3.2) score += 1;
+    // Rider pressed against a wall of snow: the slope rises into the line of sight within ~15 m behind
+    // the rider (a gully wall filling the frame instead of sky / range).
+    const dir = q.copy(com).sub(p).normalize();
+    for (let k = 3; k <= 15; k += 3) {
+      const x = com.x + dir.x * k, y = com.y + dir.y * k, z = com.z + dir.z * k;
+      if (H(x, z) > y + 0.3) { score += 1; break; }
+    }
   }
   return score;
 }

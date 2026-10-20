@@ -50,9 +50,10 @@ export class PowderFX {
     const fwd = vh.clone().normalize();
     const speed = vh.length();
     // Big rolling mist: radial burst + carried downhill with the rider.
-    for (let i = 0; i < 300; i++) {
+    // (Carried a little slower than the rider, so the rider rides out of the cloud instead of vanishing in it.)
+    for (let i = 0; i < 220; i++) {
       const o = new THREE.Vector3(p.x + this.rnd(-0.8, 0.8), p.y + this.rnd(0, 0.5), p.z + this.rnd(-0.8, 0.8));
-      const v = this.dir(0.55).multiplyScalar(this.rnd(1.5, 6.5)).addScaledVector(fwd, speed * this.rnd(0.25, 0.75));
+      const v = this.dir(0.55).multiplyScalar(this.rnd(1.5, 6.5)).addScaledVector(fwd, speed * this.rnd(0.15, 0.5));
       v.y += this.rnd(1.0, 4.5);
       P.emit(t + this.rnd(0, 0.12), o, v, this.rnd(4.0, 7.0), this.rnd(0.4, 0.8), this.rnd(2.0, 4.6), 0);
     }

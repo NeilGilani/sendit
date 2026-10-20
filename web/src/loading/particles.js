@@ -41,7 +41,9 @@ void main() {
   vA = smoothstep(0.0, 0.06, life) * (1.0 - smoothstep(kind < 0.5 ? 0.35 : 0.6, 1.0, life));
   // A drone flying through the landing cloud: puffs bigger than their distance would white out the frame.
   // (Close moves end a few metres from the touchdown: the landing cloud thins out around the lens instead.)
-  if (kind < 0.5) vA *= smoothstep(0.5 * s, 2.2 * s + 0.8, -mv.z);
+  // A puff that would fill a big part of the frame fades by its on-screen size (s / depth), so a
+  // camera following the rider through the slash sees spray around it, not a white screen.
+  if (kind < 0.5) vA *= smoothstep(0.5 * s, 1.5 * s + 0.6, -mv.z) * (1.0 - smoothstep(0.18, 0.5, s / max(-mv.z, 0.01)));
   // Clumps and glints right at the lens became big hard discs (a screen of "bokeh"): fade them out.
   else vA *= smoothstep(0.6, 2.6, -mv.z);
   gl_Position = projectionMatrix * mv;
@@ -62,7 +64,7 @@ void main() {
   if (vKind < 0.5) {
     // Mist puff: cauliflower edge from noise, denser core.
     float n = texture2D(noiseTex, vUv * 0.22 + vSeed * 3.7 + vT * 0.05).r * 0.65 + texture2D(noiseTex, vUv * 0.5 + vSeed * 1.3).g * 0.35;
-    a = smoothstep(1.0, 0.15, r + (n - 0.5) * 1.1) * 0.36 * smoothstep(0.25, 0.75, n + 0.15);
+    a = smoothstep(1.0, 0.15, r + (n - 0.5) * 1.1) * 0.3 * smoothstep(0.25, 0.75, n + 0.15);
     // Self-shadowed volume: sunlit cauliflower tops, a cool sky-lit belly (that contrast is what makes
     // powder read against sunlit snow). Backlit mist glows, capped so a cloud never piles into a disc.
     float lit = smoothstep(-0.7, 0.8, vUp + (n - 0.5) * 0.9);
