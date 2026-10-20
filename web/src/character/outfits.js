@@ -283,7 +283,8 @@ export function resolveOutfit(slots = {}) {
     // No face piece given (an outfit from before the face slot): it follows the jacket's colourway.
     const s = slots[slot] || (slot === 'face' && slots.jacket?.colorway ? { colorway: slots.jacket.colorway } : {});
     const gid = GARMENTS[slot][s.garment] ? s.garment : DEFAULT_GARMENTS[slot];
-    garments[slot] = { id: gid, ...GARMENTS[slot][gid] };
+    // (`def`: an inline garment definition { id, name, cut | shape } — dev prototypes, character/proto.js)
+    garments[slot] = s.def ? { ...GARMENTS[slot][gid], ...s.def } : { id: gid, ...GARMENTS[slot][gid] };
     const cw = COLORWAYS[s.colorway] || COLORWAYS[DEFAULT_COLORWAY];
     colors[slot] = { ...cw[slot], ...(s.colors || {}) };
   }

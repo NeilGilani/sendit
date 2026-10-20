@@ -69,7 +69,13 @@ export function buildOutfitGeometry(body, cut) {
     let i = 0;
     while (i < sleeveKeys.length - 2 && sleeveKeys[i + 1][0] < t) i++;
     const [a, ra] = sleeveKeys[i], [b, rb] = sleeveKeys[i + 1];
-    return ra + (rb - ra) * smooth(a, b, t);
+    const base = ra + (rb - ra) * smooth(a, b, t);
+    // A layered sleeve (prototype tee over a hoodie): the outer sleeve ends at `at`, the under layer's
+    // narrower sleeve carries on to the cuff.
+    const SLL = cut.sleeveLayer;
+    if (!SLL) return base;
+    const inner = THREE.MathUtils.lerp(SLL.r, SL.cuff, smooth(SLL.at + 0.03, cut.sleeveEnd - 0.03, t));
+    return THREE.MathUtils.lerp(base, inner, smooth(SLL.at - 0.002, SLL.at + 0.012, t));
   };
   // ---------------------------------------------------------------- collar (zipped to the chin)
   {
@@ -282,6 +288,7 @@ export function buildOutfitGeometry(body, cut) {
         const wrist = Math.sin((r.t - t1) * TAU / 0.03 + pnoise(u * 5, 4.1, 5) * 2.2) * 0.0065 * bump(r.t, t1 - 0.06, 0.05);
         const twist = pnoise(u * 4 + r.t * 3, r.t * 5, 4) * 0.003 + Math.sin(th * 3 + r.t * 14 * s) * 0.002 * bump(r.t, 0.36, 0.1);
         r.r[k] += (elbow + wrist + twist) * folds;
+        if (cut.sleeveLayer) r.r[k] += 0.0045 * bump(r.t, cut.sleeveLayer.at - 0.007, 0.008);   // the outer sleeve's hem roll
         if (cut.quilt) {
           const ph = ((((r.t - 0.2) / (cut.quilt.pitch * 0.72)) % 1) + 1) % 1;
           r.r[k] += cut.quilt.depth * 0.85 * (Math.pow(Math.sin(Math.PI * ph), 0.55) - 0.35) * smooth(0.21, 0.25, r.t) * smooth(t1 - 0.03, t1 - 0.07, r.t);
@@ -364,6 +371,8 @@ export function buildOutfitGeometry(body, cut) {
           // Seat and crotch: a few soft folds radiating from the crotch at the back and front.
           const crotchF = Math.sin(th * 4 * s + r.t * 30 + pnoise(u * 4, 5.5 + s, 4) * 1.6) * 0.003 * bump(r.t, PT.crotch + 0.01, 0.07) * inner;
           r.r[k] += roll + kf + (drape * (1 - 0.7 * inner * smooth(PT.crotch - 0.1, PT.crotch, r.t)) + crotchF) * free;
+          // Bellows cargo pockets (prototypes): a raised pocket on the outer thigh.
+          if (cut.cargo) r.r[k] += cut.cargo * smooth(0.45, 0.85, Math.sin(th) * s) * smooth(0.52, 0.56, r.t) * smooth(0.75, 0.71, r.t);
           // Pre-bent knee: the fabric hangs forward of the kneecap.
           if (Math.cos(th) > 0) r.r[k] += Math.cos(th) * 0.01 * bump(r.t, knee, 0.12);
         }
@@ -491,7 +500,7 @@ export function buildOutfitGeometry(body, cut) {
     };
     for (let i = 0; i < n; i++) {
       const f = (i / (n - 1)) * 2 - 1;                      // −1 … 1 across the back
-      const a = f * THREE.MathUtils.degToRad(95);
+      const a = f * THREE.MathUtils.degToRad(cut.hoodSpan ?? 95);
       const y = 1.553 - f * f * 0.03;
       const surf = torsoAt(y, Math.PI - a);
       const outw = new THREE.Vector3(surf.x, 0, surf.z - jacketRings[0].c.z).normalize();
@@ -505,7 +514,7 @@ export function buildOutfitGeometry(body, cut) {
       {
         // The hoodie's hood lies on the back: its "down" runs along the jacket's back surface, which
         // slopes out from the neck to the shoulder blades.
-        const a = f * THREE.MathUtils.degToRad(95), y = pts[i].y;
+        const a = f * THREE.MathUtils.degToRad(cut.hoodSpan ?? 95), y = pts[i].y;
         const lo = torsoAt(y - 0.1, Math.PI - a), hi = torsoAt(y, Math.PI - a);
         const d = lo.sub(hi).normalize();
         up.copy(d).negate();

@@ -3,8 +3,10 @@
 // variant.colors = the colours (so a catalog variant may also carry custom colours).
 import { profileStore } from '../profile/store.js';
 import { OUTFIT_SLOTS } from './outfits.js';
+import { PROTO, protoSlots } from './proto.js';
 
 export function outfitSlotsFromProfile(store = profileStore) {
+  if (PROTO) return protoSlots(PROTO);   // dev: ?proto=N (jacket prototype round, character/proto.js)
   const slots = {};
   for (const slot of OUTFIT_SLOTS) {
     const e = store.equipped(slot);
