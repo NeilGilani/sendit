@@ -371,6 +371,94 @@ between the legs. Pockets, plackets and stitching are shader detail, not geometr
 bellows and the tee / hoodie sleeve step. Equipment colours (pink poles) are unchanged. Only the
 prototype the user picks should be turned into real catalog garments (with first-person and icon checks).
 
+## Prototype round 2 (October 2026): six refined looks, in-between body
+
+The user's verdict on round 1: P10 Sherpa Flannel 10/10 and P2 Insulated Freedom "amazing"; the rest
+failed on the same few things: hems that cup the seat or kick out over it (P1, P6, read feminine),
+narrow shoulders over a wide waist (P3), boxes and cylinders (P5, P7, P9), cartoon puffers (P5). Round 2
+keeps everything behind the dev flags (the shipped look is unchanged):
+
+```
+http://localhost:5180/?proto=r1 … ?proto=r6        a round-2 look on its body (the in-between body)
+http://localhost:5180/?proto=r3&ride                straight into a run
+http://localhost:5180/?proto=10&protobody=mid       any round-1 look on another body (current | mid | natural)
+node web/scripts/proto-round2.mjs http://localhost:5214/ <outDir> [r1,…] [--alt=r3:current,1:natural] [--no-bodies]
+node web/scripts/proto-measure.mjs "http://localhost:5214/?protobody=mid" --summary [--garment]
+```
+
+### Silhouette rules (every round-2 jacket)
+
+a) The shoulders are the widest point; never narrow shoulders over a wider waist; no flare at the hips.
+b) The back falls straight from the shoulder blades; the hem never cups the seat or kicks out over it.
+c) Length: just covering the seat (back hem ≈ crotch height, 0.85–0.86), never longer.
+d) Chest → waist shaping and drape folds (no cylinder / box); sleeves set into a soft shoulder slope.
+e) Puffers: normal length, slim, small baffles, on the R2 shape.
+
+How they are built (`proto.js` `R2_SHAPE` / `r2Cut()`, `garments.js`):
+- **`cut.straightBack`** (new, optional; no shipped cut sets it). After the seat clearance, the back-most
+  point of every jacket ring below the shoulder blades (1.44) is pushed out to the taut line over the
+  blades, the pants' seat (+ clearance) and a plumb line from the blades (the lower convex hull of the side
+  profile). The shell bridges the small of the back instead of coming in at the waist and flaring over the
+  seat. In the bind pose the back now drops 1.4 cm over 55 cm (P2: in 2.4 cm at the waist, out 6 cm over the seat).
+- **Trimmed pants seat** under the round-2 jackets (`SEAT` in proto.js: hip half width 0.226–0.232 instead of
+  0.236–0.246, back 0.168–0.172 instead of 0.18–0.188) and `seatClear` 0.022: the seat no longer pushes
+  the jacket out at the hips.
+- A small negative `hemFlare` everywhere (a slight blousing above the hem, the edge tucked, never kicked out).
+- Torso targets: chest ≥ waist ≈ hem half width (0.24 / 0.236 / 0.238 on R2), superellipse n 2.15–2.4.
+
+Measured on the standing ski pose by `proto-round2.mjs` (skinned vertices; numbers on each
+`R<n>-silhouette.png`): "hem past the back line" = how far the back of the hem zone sticks out past the
+straight line down the torso from the shoulder blades; "waist dip" = how far the back dips in under the
+line from the blades to the hem (cupping); widths across the back view:
+
+| | hem past back line | waist dip | shoulders | hips (jacket) |
+|---|---|---|---|---|
+| R1–R6 (in-between body) | −3.0 … −2.8 cm | 0 | 62.8–64.7 cm | 50.0–51.9 cm |
+| P2 round 1 (current body) | −3.8 cm | 2.3 cm | 63.9 | 53.3 |
+| P1 round 1 (natural body) | −1.8 cm | 2.3 cm | 55.8 | 53.1 |
+| P6 round 1 (natural body) | −2.0 cm | 3.5 cm | 54.7 | 52.0 |
+
+### The in-between body (`BODIES.mid`)
+
+The current body's shoulder line (joints ±0.212, broad shoulders read masculine) over a slimmer and
+shallower chest and natural arms. New warp parameter `shoulder`: the chest factor eases back to it over
+the shoulders (1.36–1.46) and every arm vertex takes it (so a factor ≠ chest doesn't shear the arm);
+the natural body leaves it unset and is unchanged. Hands, boots, helmet, hips and heights stay anchored.
+Bind-pose numbers (`proto-measure.mjs --summary`, trunk sections without the arms, m):
+
+| | current | in-between (mid) | natural |
+|---|---|---|---|
+| shoulder joints | ±0.212 | ±0.212 | ±0.174 |
+| width × depth at 1.40 (armpit) | 0.450 × 0.337 | 0.448 × 0.290 | 0.367 × 0.270 |
+| width × depth at 1.30 (chest) | 0.426 × 0.330 | 0.398 × 0.285 | 0.349 × 0.265 |
+| width × depth at 1.15 (waist) | 0.344 × 0.240 | 0.333 × 0.232 | 0.322 × 0.229 |
+| width × depth at 0.95 (hips) | 0.404 × 0.286 | same | same |
+| upper-arm thickness | 0.177 | 0.146 | 0.130 |
+| upper arm / forearm (joints) | 0.251 / 0.243 | 0.251 / 0.243 | 0.269 / 0.263 |
+| knee height | 0.542 | 0.522 | 0.522 |
+
+Under P10 and P2 (`bodies.png`) the bodies barely change the jacket's front; they show at the shoulders
+and sleeve heads: natural loses the shoulder line (the round-1 complaint), mid keeps it with slimmer arms.
+
+### The six looks (all on the in-between body)
+
+| | look | from | jacket | pants (round 1's liked pants, trimmed seat) |
+|---|---|---|---|---|
+| R1 | Sherpa Flannel | P10 | unchanged colours / flannel / sherpa / hoodie; straight back, hem 0.865 / 0.852, no hip flare | P10 baggy |
+| R2 | Insulated Freedom | P2 | the base shape: relaxed 2L twill, black yoke, hem 0.885 / 0.858 | P2 relaxed cargo |
+| R3 | Alpine Hardshell | P1 | 3L hardshell sheen, spruce teal + lime, stowed hood, a little closer than R2 | P3 baggy big stack (black) |
+| R4 | Varsity Coach | P7 | wool body, cream sleeves, striped rib hem bloused, chest 0.248 → waist 0.228 (no cylinder) | P7 relaxed bib |
+| R5 | Duck Canvas Work | P9 | duck canvas, cord collar, patch pockets, n 2.3 (no box), slight waist | P9 carpenter |
+| R6 | Mocha Puffer | P5 | hip length (not cropped), slim, 8.5 cm baffles, matte mocha, cinched hem | P4 camo cargo |
+
+Sheets (`proto-round2.mjs`): `R<n>.png` (standing 5 views, motion row, snowboard front 3/4 + back),
+`R<n>-silhouette.png`, `overview.png`, `bodies.png`; `--alt` adds a look on another body (round-1
+references `1-natural`, `6-natural`, `2-current` were shot for the numbers above).
+
+Known limits: the snowboard stance shows the jacket only in the lobby idle (no carve on a board);
+first person, the crash ragdoll and the icon baker were not checked on the in-between body; the canvas
+texture's horizontal fold ridges read a little quilted at a distance.
+
 ## Files
 
 ```

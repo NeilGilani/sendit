@@ -189,6 +189,48 @@ export function buildOutfitGeometry(body, cut) {
             }
           }
         }
+        // Prototype round 2 (cut.straightBack, character/proto.js): the back falls in one straight line
+        // from the shoulder blades to the hem. In the side view the back-most point of every ring below
+        // the blades is pushed out to the taut line (convex hull) over the blades, the seat (with the
+        // pants' clearance) and a plumb line from the blades, so the shell bridges the small of the back
+        // instead of coming in at the waist and flaring out over the seat.
+        if (cut.straightBack) {
+          const y0 = cut.straightBack.from ?? 1.44;
+          const backZ = (r) => { let m = 1e9; for (let q = 0; q < S; q++) { const c = Math.cos((q / S) * TAU); if (c < -0.7) m = Math.min(m, r.c.z + r.r[q] * c); } return m; };
+          const pts = rings.filter((r) => r.t <= y0).map((r) => [r.t, backZ(r)]).sort((a, b) => b[0] - a[0]);
+          if (pts.length > 2) {
+            pts.push([pts[pts.length - 1][0] - 1e-4, pts[0][1]]);   // the plumb line from the blades
+            // Lower hull (most negative z) of the points, walking down from the blades.
+            const hull = [];
+            for (const p of pts) {
+              while (hull.length >= 2) {
+                const [a, b] = [hull[hull.length - 2], hull[hull.length - 1]];
+                // keep b only if it lies on or outside (more negative z than) the chord a → p
+                const zc = a[1] + (p[1] - a[1]) * (b[0] - a[0]) / (p[0] - a[0]);
+                if (b[1] <= zc + 1e-6) break;
+                hull.pop();
+              }
+              hull.push(p);
+            }
+            const lineZ = (t) => {
+              for (let i = 1; i < hull.length; i++) {
+                const [a, b] = [hull[i - 1], hull[i]];
+                if (t <= a[0] && t >= b[0]) return a[1] + (b[1] - a[1]) * (a[0] - t) / Math.max(1e-6, a[0] - b[0]);
+              }
+              return hull[hull.length - 1][1];
+            };
+            for (const r of rings) {
+              if (r.t > y0 + 0.05) continue;
+              const w = smooth(y0 + 0.05, y0 - 0.01, r.t);
+              const d = (backZ(r) - lineZ(Math.min(r.t, y0))) * w;   // how far the back sits inside the line
+              if (d <= 0) continue;
+              for (let q = 0; q < S; q++) {
+                const c = Math.cos((q / S) * TAU);
+                if (c < 0) r.r[q] += d * Math.pow(-c, 1.4);
+              }
+            }
+          }
+        }
       },
     });
     const S = segs;

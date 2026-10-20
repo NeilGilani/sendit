@@ -13,8 +13,12 @@ import { jacketCut, PANT_FITS } from './outfits.js';
 
 const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
 
-/** Prototype number from ?proto=N (0 = off). */
-export const PROTO = Math.max(0, Math.min(10, parseInt(params.get('proto') || '0', 10) || 0));
+/** Prototype key from ?proto=N (1–10, round 1) or ?proto=r1…r6 (round 2); 0 = off. */
+export const PROTO = (() => {
+  const v = (params.get('proto') || '').toLowerCase();
+  if (/^r[1-6]$/.test(v)) return v;
+  return Math.max(0, Math.min(10, parseInt(v || '0', 10) || 0));
+})();
 
 // ------------------------------------------------------------------------------------------------
 // Body: a more natural adult male under the clothes.
@@ -39,13 +43,26 @@ export const BODIES = {
     trap: 0.012,      // m the trapezius slope is lowered beside the neck
     knee: -0.02,      // m the knee moves (− = down: longer thigh, shorter shin; hip and ankle stay)
   },
+  // Round 2: in between. The current body's broad shoulders (joints ±0.212, the shoulder line reads
+  // masculine) over a slimmer, shallower chest and lats and natural arms; hands, boots, helmet anchored.
+  mid: {
+    chest: 0.93,      // trunk width × at the chest / lats (1.30–1.38) …
+    shoulder: 1,      // … easing back to × 1 over the shoulders (1.46) and along the arm: joints stay put
+    waist: 0.97,
+    chestDepth: 0.86,
+    waistDepth: 0.97,
+    arm: 0.8,
+    forearm: 0.9,
+    trap: 0.006,
+    knee: -0.02,
+  },
 };
 
 /** Body kind for this page: ?protobody overrides the prototype's own choice. */
 export function protoBodyKind() {
   const forced = params.get('protobody');
   if (forced && forced in BODIES) return forced;
-  if (PROTO) return PROTOTYPES[PROTO - 1].body;
+  if (PROTO) return findProto(PROTO)?.body ?? 'current';
   return 'current';
 }
 
@@ -57,11 +74,13 @@ const hinge = (u, h) => { if (u <= -h) return 0; if (u >= h) return u; const t =
 /** The bind-space deformation (metres, Y up, facing +Z, feet at 0) for body parameters B. */
 export function bodyWarp(B) {
   const A0 = 0.212, W = 0.706, ARM_Y = 1.455, ARM_Z = -0.068, ZC = -0.02, HIP = 0.971, KNEE = 0.542, ANK = 0.086;
+  const SH = B.shoulder;   // (undefined = the chest factor carries on over the shoulders and arms)
   const sx = (y) => {
     if (y < 0.98) return 1;
     if (y < 1.12) return lerp(1, B.waist, sm(0.98, 1.12, y));
     if (y < 1.3) return lerp(B.waist, B.chest, sm(1.12, 1.3, y));
-    return lerp(B.chest, 1, sm(1.56, 1.63, y));
+    const top = SH === undefined ? B.chest : lerp(B.chest, SH, sm(1.36, 1.46, y));
+    return lerp(top, 1, sm(1.56, 1.63, y));
   };
   const sz = (y) => {
     if (y < 0.98) return 1;
@@ -79,7 +98,9 @@ export function bodyWarp(B) {
     const x = p.x, y = p.y, z = p.z, a = Math.abs(x), sg = x < 0 ? -1 : 1;
     // Lateral: the trunk scales about the mid-line; beyond the shoulder joint the arm is stretched so
     // the wrist (and the hand / mitt) stays where it was (a C1 hinge at the shoulder and at the wrist).
-    const s = sx(y), h = 0.035;
+    // With a separate shoulder factor the arm (whatever its height) takes that one, so it isn't sheared;
+    // the lats below the armpit (y < 1.36) keep the chest factor.
+    const s = SH === undefined ? sx(y) : lerp(sx(y), SH, Math.max(sm(0.16, 0.24, a) * sm(1.32, 1.38, y), sm(0.27, 0.33, a))), h = 0.035;
     const k = (W - s * A0) / (W - A0);
     const ga = s * a + (k - s) * hinge(a - A0, h) + (1 - k) * hinge(a - W, h);
     // Depth: the trunk only (fades out along the arm).
@@ -183,6 +204,7 @@ export const JSTYLE = { varsity: 5, retro: 6, work: 7, shirt: 8, tee: 9 };
 
 const pants = (fit, over = {}) => ({ ...PANT_FITS[fit], ...over, fit: `proto-${fit}`, leg: { ...PANT_FITS[fit].leg, ...over.leg }, stack: { ...PANT_FITS[fit].stack, ...over.stack } });
 const mitt = { mittLength: 0.835, gauntlet: [0.618, 0.008] };
+const pantsWith = (base, over) => ({ ...base, ...over, seat: { ...base.seat, ...over.seat }, leg: { ...base.leg, ...over.leg }, stack: { ...base.stack, ...over.stack } });
 const underSleeve = { mittLength: 0.835, gauntlet: [0.655, -0.012] };   // short cuff tucked under a long sleeve
 
 export const PROTOTYPES = [
@@ -378,11 +400,137 @@ export const PROTOTYPES = [
   },
 ];
 
-/** Slot selections for resolveOutfit() that dress a rider in prototype n (1–10). */
-export function protoSlots(n) {
-  const P = PROTOTYPES[n - 1];
+// ------------------------------------------------------------------------------------------------
+// Round 2 (docs/character.md § Prototype round 2): six refined looks after the user's feedback, all on
+// one masculine new-school silhouette, worn on the in-between body ('mid'):
+//   a) the shoulders are the widest point; never narrow shoulders over a wider waist, no flare at the hips
+//   b) the back falls straight from the shoulder blades (cut.straightBack): the hem never cups the seat
+//      or kicks out over it; a little blousing above the hem is fine
+//   c) length: just covering the seat (back hem ≈ crotch height), never longer
+//   d) chest → waist shaping and drape folds (no cylinder / box); sleeves set in with a soft slope
+//   e) puffers: normal length, slim, small baffles, built on the R2 shape
+// R2 (round 1's P2) is the base shape the others are cut from. Pants are the user's favourite pants of
+// round 1, with the seat under the jacket trimmed (pants `seat`), so the jacket can hang straight.
+// ------------------------------------------------------------------------------------------------
+const R2_SHAPE = {
+  hemFront: 0.885, hemBack: 0.858, hemFlare: -0.004, folds: 0.8, shoulder: 0.009, seatClear: 0.022,
+  straightBack: { from: 1.44 },
+  torso: { chest: [0.24, 0.166, 0.17], waist: [0.236, 0.163, 0.17], hem: [0.238, 0.165, 0.172], n: 2.25 },
+  sleeve: { upper: 0.08, elbow: 0.079, forearm: 0.076, cuff: 0.068 }, sleeveEnd: 0.698,
+};
+const r2Cut = (fit, over = {}) => jacketCut(fit, {
+  ...R2_SHAPE, ...over,
+  torso: { ...R2_SHAPE.torso, ...over.torso }, sleeve: { ...R2_SHAPE.sleeve, ...over.sleeve },
+});
+// Round 1's pants (the ones the user liked), with a trimmer seat under the jacket.
+const SEAT = {
+  relaxed: { waist: [0.198, 0.148, 0.15], hip: [0.226, 0.145, 0.168] },
+  baggy: { waist: [0.2, 0.15, 0.152], hip: [0.232, 0.15, 0.172] },
+};
+const P_PANTS = {
+  baggy10: pants('baggy', { crotch: 0.805, style: PSTYLE.plain, fab: FAB.twill, seat: SEAT.baggy, leg: { thigh: 0.138, knee: 0.134, hem: 0.134 } }),
+  cargo2: pants('relaxed', { bib: null, rise: 1.085, style: PSTYLE.cargo, fab: FAB.twill, cargo: 0.012, seat: SEAT.relaxed, leg: { thigh: 0.13, knee: 0.12, hem: 0.118 } }),
+  stack3: pants('baggy', { crotch: 0.79, fab: FAB.twill, seat: SEAT.baggy, leg: { thigh: 0.146, knee: 0.142, hem: 0.142 }, cuffY: 0.07, stack: { y0: 0.08, y1: 0.36, n: 5, amp: 0.019 } }),
+  camo4: pants('baggy', { crotch: 0.8, style: PSTYLE.cargo, fab: FAB.twill, cargo: 0.016, seat: SEAT.baggy, leg: { thigh: 0.14, knee: 0.134, hem: 0.13 }, stack: { n: 4, amp: 0.017 } }),
+  bib7: pants('relaxed', { style: PSTYLE.plain, fab: FAB.twill, seat: SEAT.relaxed }),
+  carpenter9: pants('relaxed', { bib: null, rise: 1.085, style: PSTYLE.carpenter, fab: FAB.canvas, seat: SEAT.relaxed, leg: { thigh: 0.132, knee: 0.126, hem: 0.124 }, cuffY: 0.09, stack: { n: 3, amp: 0.013 } }),
+};
+
+export const ROUND2 = [
+  {
+    id: 'r1', name: 'Sherpa Flannel', body: 'mid', pantsFrom: 'P10 baggy pant',
+    fit: 'Sherpa-lined flannel shirt-jacket over a hoodie (P10, polished): straight back, no hip flare; P10 baggy pant',
+    jacket: r2Cut('relaxed', {
+      style: JSTYLE.shirt, hemFront: 0.865, hemBack: 0.852, hemFlare: -0.003, fab: FAB.flannel, folds: 1.1,
+      torso: { chest: [0.242, 0.166, 0.17], waist: [0.238, 0.164, 0.17], hem: [0.242, 0.166, 0.174], n: 2.4 },
+      collarTop: 1.605, collarEase: 0.03, hood: 'hoodie', hoodSpan: 62, hoodRoll: null,
+    }),
+    pants: P_PANTS.baggy10,
+    gloves: mitt,
+    colors: PROTOTYPES[9].colors,
+  },
+  {
+    id: 'r2', name: 'Insulated Freedom', body: 'mid', pantsFrom: 'P2 relaxed cargo',
+    fit: 'Relaxed insulated 2L twill, contrast yoke (P2): the base shape of round 2; P2 relaxed cargo pant',
+    jacket: r2Cut('relaxed', { fab: FAB.twill, folds: 0.7, quilt: { pitch: 0.24, depth: 0.004 } }),
+    pants: P_PANTS.cargo2,
+    gloves: mitt,
+    colors: PROTOTYPES[1].colors,
+  },
+  {
+    id: 'r3', name: 'Alpine Hardshell', body: 'mid', pantsFrom: 'P3 baggy big-stack pant',
+    fit: '3L hardshell on the R2 shape: clean seams, satin sheen, stowed hood, no butt flare; P3 baggy big-stack pant',
+    jacket: r2Cut('relaxed', {
+      fab: FAB.hardshell, folds: 0.85, shoulder: 0.007,
+      torso: { chest: [0.236, 0.162, 0.168], waist: [0.232, 0.16, 0.168], hem: [0.234, 0.162, 0.17] },
+      sleeve: { upper: 0.076, elbow: 0.075, forearm: 0.072, cuff: 0.066 }, sleeveEnd: 0.7,
+      hoodRoll: [0.04, 0.062, 0.06],
+    }),
+    pants: P_PANTS.stack3,
+    gloves: mitt,
+    colors: {
+      ...PROTOTYPES[0].colors,
+      pants: { base: '#1d1f22', cuff: '#131416' },
+    },
+  },
+  {
+    id: 'r4', name: 'Varsity Coach', body: 'mid', pantsFrom: 'P7 relaxed bib',
+    fit: 'Varsity / coach snow jacket on the R2 shape: shaped torso, rib hem bloused, striped rib, contrast sleeves; P7 relaxed bib',
+    jacket: r2Cut('relaxed', {
+      style: JSTYLE.varsity, hemFront: 0.895, hemBack: 0.875, hemFlare: -0.014, fab: FAB.wool, folds: 1.15,
+      torso: { chest: [0.248, 0.168, 0.17], waist: [0.228, 0.16, 0.168], hem: [0.228, 0.158, 0.166], n: 2.15 },
+      sleeve: { upper: 0.079, elbow: 0.078, forearm: 0.074, cuff: 0.056 }, sleeveEnd: 0.7,
+      collarTop: 1.598, collarEase: 0.016, hood: 'none', hoodRoll: null,
+    }),
+    pants: P_PANTS.bib7,
+    gloves: mitt,
+    colors: PROTOTYPES[6].colors,
+  },
+  {
+    id: 'r5', name: 'Duck Canvas Work', body: 'mid', pantsFrom: 'P9 double-knee carpenter',
+    fit: 'Duck-canvas chore jacket on the R2 shape (no box): cord collar, patch pockets, brass snaps; P9 carpenter pant',
+    jacket: r2Cut('relaxed', {
+      style: JSTYLE.work, hemFront: 0.875, hemBack: 0.86, hemFlare: -0.002, fab: FAB.canvas, folds: 1.05,
+      torso: { chest: [0.244, 0.166, 0.17], waist: [0.232, 0.162, 0.17], hem: [0.236, 0.164, 0.172], n: 2.3 },
+      collarTop: 1.612, collarEase: 0.026, hood: 'none', hoodRoll: null,
+    }),
+    pants: P_PANTS.carpenter9,
+    gloves: mitt,
+    colors: PROTOTYPES[8].colors,
+  },
+  {
+    id: 'r6', name: 'Mocha Puffer', body: 'mid', pantsFrom: 'P4 camo cargo',
+    fit: 'Hip-length puffer on the R2 shape: slim, 8.5 cm baffles, matte mocha, cinched hem, quilted collar; P4 camo cargo pant',
+    jacket: r2Cut('puffer', {
+      hemFront: 0.88, hemBack: 0.858, hemFlare: -0.008, fab: FAB.twill, folds: 0.35, shoulder: 0.011,
+      torso: { chest: [0.244, 0.17, 0.174], waist: [0.238, 0.167, 0.172], hem: [0.236, 0.166, 0.172], n: 2.2 },
+      sleeve: { upper: 0.082, elbow: 0.08, forearm: 0.077, cuff: 0.064 }, sleeveEnd: 0.694,
+      collarTop: 1.636, collarEase: 0.026, quilt: { pitch: 0.085, depth: 0.0082 },
+    }),
+    pants: P_PANTS.camo4,
+    gloves: mitt,
+    colors: {
+      jacket: { base: '#6b5244', panel: '#5a4438', accent: '#efe6d6', gaiter: '#3e2c23', style: 0 },
+      pants: PROTOTYPES[3].colors.pants,
+      helmet: { base: '#efe6d6', liner: '#3e2c23', accent: '#7a5442' },
+      goggles: { lens: '#e8b04a', lensBase: '#6b3a12', strap: '#3e2c23', strapLogo: '#efe6d6' },
+      gloves: { base: '#3e2c23', cuff: '#2a1e18' },
+    },
+  },
+];
+const ALL_PROTOS = [...PROTOTYPES, ...ROUND2];
+
+/** A prototype by key: 1–10 (round 1) or 'r1'…'r6' (round 2). */
+export function findProto(key) {
+  return ALL_PROTOS.find((p) => String(p.id) === String(key).toLowerCase()) || null;
+}
+
+/** Slot selections for resolveOutfit() that dress a rider in prototype `key` (1–10, 'r1'…'r6'). */
+export function protoSlots(key) {
+  const P = findProto(key);
   if (!P) return null;
-  const def = (slot, cut) => ({ def: { id: `proto-${n}-${slot}`, name: `P${n} ${P.name}`, cut }, colors: P.colors[slot] });
+  const tag = typeof P.id === 'number' ? `P${P.id}` : P.id.toUpperCase();
+  const def = (slot, cut) => ({ def: { id: `proto-${P.id}-${slot}`, name: `${tag} ${P.name}`, cut }, colors: P.colors[slot] });
   return {
     jacket: def('jacket', P.jacket), pants: def('pants', P.pants), gloves: def('gloves', P.gloves),
     helmet: { colors: P.colors.helmet }, goggles: { colors: P.colors.goggles },
@@ -391,5 +539,8 @@ export function protoSlots(n) {
 }
 
 if (typeof window !== 'undefined') {
-  window.__senditProto = { PROTO, body: protoBodyKind(), list: PROTOTYPES.map(({ id, name, fit, body }) => ({ id, name, fit, body })), slots: protoSlots };
+  window.__senditProto = {
+    PROTO, body: protoBodyKind(), slots: protoSlots,
+    list: ALL_PROTOS.map(({ id, name, fit, body, pantsFrom }) => ({ id, name, fit, body, pantsFrom })),
+  };
 }
