@@ -121,10 +121,10 @@ mountain by reload → riding; URL cheats ignored; no console errors, no HTTP �
 - Biggest single items: the rider's PNG textures (4.9 MB: hair and body normal maps 1.2 + 1.1 MB) — converting
   them to WebP / KTX2 (character area) would cut first load by ~3–4 MB; the two music .ogg (4 MB, after the
   first click); main + loading-scene bundles (3.5 MB raw).
-- **Quality auto-pick** (`gfx/autoquality.js`): players who never chose a quality start on Low on software
-  renderers (SwiftShader / llvmpipe), older Intel HD / UHD iGPUs and phone / tablet GPUs; if the lobby still
-  averages > 42 ms per frame for ~150 frames, it steps down (max twice). Off under automation
-  (`navigator.webdriver`), with `?quality`, or once the player picked a quality.
+- **Quality auto-pick** (`gfx/autoquality.js`, graphics area; docs/graphics-perf.md "Auto quality"): a first
+  launch picks Low or Medium from the GPU name, then checks the frame time during the first ride and steps
+  down if slow. Off with `?quality`, under automation (`navigator.webdriver`) unless `?autoq` (dev builds), or
+  once the player picked a quality.
 - Only the .ogg of each sound is fetched where the browser decodes it (the .mp3 is the fallback). Lake Tahoe
   elevation (~1.8 MB per resort) loads only with that mountain.
 
