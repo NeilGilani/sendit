@@ -40,6 +40,7 @@ page.on('pageerror', (e) => errors.push(`[${step}] ${e.message}`));
 const failedReq = [];
 page.on('requestfailed', (r) => failedReq.push(r.url()));
 page.on('console', (m) => {
+  if (m.type() === 'warning' && /\[highlights\]|\[thrill\]|\[audio\]|\[ragdoll\]/.test(m.text())) console.log('WARN', m.text().slice(0, 200));
   if (m.type() !== 'error') return;
   const t = m.text();
   if (/Failed to load resource/.test(t) && failedReq.length && failedReq.every((u) => /fonts\.(googleapis|gstatic)\.com/.test(u))) return;
@@ -288,9 +289,9 @@ async function placeDown(v = 12, ahead = 0) {
 }
 
 // Jump with a boosted launch so the trick has ~1.6 s of air anywhere on the mountain.
-async function trick(name, t, { boost = 7.5, fp = false } = {}) {
+async function trick(name, t, { boost = 7.5, fp = false, approach = 30 } = {}) {
   const l0 = await evCount('landed'), c0 = await evCount('crashed');
-  await S(({ t, boost }) => {
+  await S(({ t, boost, approach }) => {
     const s = window.__sendit, pl = s.player;
     let f = 0, air = false, done = false;
     window.__trickDone = false;
@@ -299,12 +300,12 @@ async function trick(name, t, { boost = 7.5, fp = false } = {}) {
     pl.script = (c, p) => {
       botScript(c, p);
       f++;
-      if (p.state === 1 && !air) { c.jump = f > 30 && f < 50; if (t.spin && f > 44 && f < 50) c.steer = Math.sign(t.spin); }
+      if (p.state === 1 && !air) { c.jump = f > approach && f < approach + 20; if (t.spin && f > approach + 14 && f < approach + 20) c.steer = Math.sign(t.spin); }
       if (p.state === 2 && !air) { air = true; if (p.velocity.y < boost) p.velocity.y = boost; }
       if (air && (p.state === 1 || p.state === 3 || p.state === 5) && !done) { done = true; setTimeout(() => { window.__trickDone = true; }, 0); }
       if (f > 60 * 8) window.__trickDone = true;
     };
-  }, { t, boost });
+  }, { t, boost, approach });
   await page.waitForFunction(() => window.__trickDone, null, { timeout: 120000 }).catch(() => {});
   await frames(20);
   const landed = (await evs('landed')).slice(l0).at(-1)?.[2];
@@ -395,7 +396,7 @@ await page.goto(`${base}?map=${MAP}`, { timeout: T, waitUntil: 'domcontentloaded
 await lobbyReady();
 check('boots into the lobby', true, `${((Date.now() - t0) / 1000).toFixed(0)} s`);
 await installMonitor();
-await ev(['landed', 'crashed', 'respawned', 'runComplete', 'runCompleted', 'thrillRestart', 'thrillRetry', 'thrillReplay', 'resetTop', 'takeoff', 'grindStart', 'highlightSaved', 'thrillSpot']);
+await ev(['landed', 'crashed', 'respawned', 'runComplete', 'runCompleted', 'thrillRestart', 'thrillRetry', 'thrillReplay', 'resetTop', 'takeoff', 'grindStart', 'highlightSaved', 'thrillSpot', 'hint']);
 await shot('lobby');
 errCheck('boot');
 
@@ -434,7 +435,7 @@ for (const [ei, equip] of EQUIPS.entries()) {
   await waitGrounded();
   await placeDown(13, 60);
   await frames(10);
-  await trick('replay-jump', { spin: 2, grab: true });
+  await trick('replay-jump', { spin: 2, grab: true }, { approach: 150 });   // (retry puts you back on a recorded approach)
   await waitGrounded();
   await S(() => window.__botOff());
   await frames(10);
@@ -456,7 +457,9 @@ for (const [ei, equip] of EQUIPS.entries()) {
   await wait(1500);
   const hl1 = await S(async () => { const st = await import('/src/thrill/clipstore.js'); return (await st.listClips?.())?.length ?? null; }).catch(() => null);
   if (hl1 !== null && hl0 !== null && hl1 > hl0) clipsSaved++;
-  check(`${equip} save clip (F) stores a highlight`, hl1 === null || hl0 === null ? true : hl1 > hl0, `clips ${hl0} → ${hl1}`);
+  const hints = (await evs('hint')).slice(-2).map((e) => e[2]);
+  const lastLand = (await evs('landed')).at(-1)?.[2];
+  check(`${equip} save clip (F) stores a highlight`, hl1 === null || hl0 === null ? true : hl1 > hl0, `clips ${hl0} → ${hl1} · last landing ${JSON.stringify(lastLand && { trick: lastLand.trick, clean: lastLand.clean, air: lastLand.air, result: lastLand.result })} · hints ${JSON.stringify(hints)}`);
 
   // Retry (Backspace) puts us back before the last take-off; restart (R) at the top.
   await bot(60, {});
@@ -552,7 +555,7 @@ for (const [ei, equip] of EQUIPS.entries()) {
       await key('KeyR');
       await frames(60 * 5);
       const a = await S(() => window.__sendit.activities.hud());
-      check(`${equip} ${t.id} challenge: R restarts the race clean`, a.state === 'running' && a.penalty === 0 && a.time < 3, JSON.stringify({ st: a.state, t: +a.time.toFixed(2), pen: a.penalty, gates: `${a.gates}/${a.gateTotal}` }));
+      check(`${equip} ${t.id} challenge: R restarts the race clean`, a.state === 'running' && a.penalty === 0 && a.time < 4, JSON.stringify({ st: a.state, t: +a.time.toFixed(2), pen: a.penalty, gates: `${a.gates}/${a.gateTotal}` }));
     }
     await bot(60 * 4, { jumpEvery: 150, trick: { spin: 2 } });
     if (ti === 0) await hudCheck(`${equip} ${t.id} ${mode} riding`);

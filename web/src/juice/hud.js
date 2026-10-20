@@ -64,6 +64,13 @@ const CSS = /* css */`
 #juiceHud .sp small { display: block; font-family: var(--font); font-style: normal; font-weight: 800; font-size: 10px; letter-spacing: .28em; color: rgba(250,248,243,.75); -webkit-text-stroke: 0; }
 /* Phones (portrait): right of the timer is where the score sits; the split goes to the free top-left corner. */
 @media (max-width: 600px) { #juiceHud .sp { left: 14px; top: 26px; font-size: 20px; } }
+/* Phones (portrait): the toasts (new spot, achievements) leave the top, where the timer and the combo panel
+   are centred across the whole width, for the free band above the replay / save pills. */
+@media (max-width: 600px) and (min-height: 600px) {
+  #juiceHud .ts { top: auto; bottom: 196px; left: 16px; transform: scale(.9); transform-origin: bottom left; }
+  /* …except while a judged run card sits low on the screen there: then on top again, as before. */
+  body:has(#flowHud .rs.on, #parkHud .card.on) #juiceHud .ts { top: 92px; bottom: auto; transform: scale(.8); transform-origin: top left; }
+}
 @keyframes jhSplit { 0% { opacity: 0; transform: translateX(-12px); } 10% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
 /* announcer */
 #juiceHud .an { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; opacity: 0; }
