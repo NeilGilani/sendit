@@ -272,7 +272,7 @@ export class PostStack {
     q = perfQ(q);
     const ao = PERF.ao[q];
     this.ao.enabled = !!ao;
-    if (ao) { this.ao.setQualityMode(ao.mode); this.ao.configuration.halfRes = !!ao.halfRes; }
+    if (ao) { this.ao.setQualityMode(ao.mode); this.ao.configuration.halfRes = !!ao.halfRes; this.ao.configuration.denoiseIterations = ao.denoise ?? 2; }
     this.bloom.intensity = POST.bloom.intensity * PERF.bloomScale[q];
     this.smaaEffect.applyPreset(SMAAPreset[PERF.smaa[q]]);
     // MSAA on the scene pass (WebGL2 multisampled render target): geometry edges + alpha-to-coverage

@@ -372,10 +372,10 @@ export class Terrain {
     if (T.sparkle) d.SNOW_SPARKLE = 1;
     if (q === 2) d.SNOW_FLUTES = 1;          // fall-line flutes on steep snow: high only
     if (q >= 1 && PERF.rockMacro) d.ROCK_MACRO = 1;   // buttress facets (+ near joint columns on medium) on tile rock
-    // Backdrop + mid ring cover much of the screen: on high, faceted buttresses and full rock detail out to
-    // a longer distance than medium (uFarNear), plain rock tone beyond and no far flutes (FAR_LITE).
+    // Backdrop + mid ring cover much of the screen: on high, faceted buttresses (ROCK_FAR) and rock blocks
+    // out to a longer distance than medium (uFarNear), plain rock tone beyond, no far flutes (FAR_LITE).
     // (Full far rock + flutes everywhere cost ~10 ms a frame on an M1 Air for little visible gain.)
-    const far = q === 2 ? { ROCK_FAR: 1, FAR_LITE: 1 } : { FAR_LITE: 1, ROCK_LITE: 1 };
+    const far = q === 2 ? { ROCK_FAR: 1, FAR_LITE: 1, ROCK_LITE: 1 } : { FAR_LITE: 1, ROCK_LITE: 1 };
     return { terrain: d, far };
   }
 

@@ -17,7 +17,7 @@ export const PERF = {
   shadow: [{ box: 40, map: 1024 }, { box: 60, map: 2048 }, { box: 72, map: 2560 }],   // high was 85 / 3072: same texel size, 2.1 → 1.6 MB of depth writes per frame
   // Screen-space AO (N8AO): null = off. It has a ~2 ms floor on an iGPU even at its cheapest
   // settings, so medium relies on the baked terrain sky-visibility and per-tree AO instead.
-  ao: [null, null, { mode: 'Medium', halfRes: true }],
+  ao: [null, null, { mode: 'Performance', halfRes: true, denoise: 1 }],   // was Medium / 2 denoise passes (M1: same look at half res)
   smaa: ['LOW', 'LOW', 'HIGH'],                // SMAA preset
   // Scene-pass MSAA samples (trees switch to alpha-to-coverage when > 0). Off: on an Intel Arc iGPU even 2x
   // measured ~3x the frame cost (half-float multisampled target). Worth enabling on a discrete GPU.
@@ -30,7 +30,7 @@ export const PERF = {
   terrain: [
     { lod: 0.6, sparkle: false, tracks: 1, rockLite: true },
     { lod: 1.0, sparkle: true, tracks: 1, rockLite: true },
-    { lod: 1.25, sparkle: true, tracks: 2, rockLite: false },   // lod was 1.5 (≈ no visible gain, M1 cost)
+    { lod: 1.25, sparkle: true, tracks: 2, rockLite: true },   // was lod 1.5 + full near rock: a measurable M1 cost for detail hard to see in motion
   ],
   // Terrain chunk LOD (terrain.js): share of each LOD distance over which vertices geomorph to the
   // coarser grid before the swap, how far ahead (s of travel at the current velocity) detailed chunk
