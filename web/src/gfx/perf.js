@@ -7,13 +7,14 @@
 export const PERF = {
   // Render resolution = CSS pixels × min(devicePixelRatio, cap) × scale. Medium never renders above
   // CSS resolution: on a 150 % laptop screen that is 2.25× fewer pixels than the old 1.5 cap.
-  // High caps at 1.5 (was 2): on a 2× laptop screen 2 meant 5.2 MP with AO + 3072 shadows, 200–280 ms a
-  // frame on an M1 Air (night-3 numbers in docs/graphics-perf.md); 1.5 is 2.25× fewer pixels.
-  pixelRatio: [{ cap: 1, scale: 0.75 }, { cap: 1, scale: 1 }, { cap: 1.5, scale: 1 }],
+  // High renders at CSS resolution too (was cap 2, then 1.5): on a 2× laptop screen every 0.5 of cap is
+  // ~2× the pixels, and High's look comes from AO, shadows and terrain detail, not from pixel count
+  // (night-3 M1 Air numbers in docs/graphics-perf.md "High on an M1 Air").
+  pixelRatio: [{ cap: 1, scale: 0.75 }, { cap: 1, scale: 1 }, { cap: 1, scale: 1 }],
   // Auto quality's last step on a slow first ride at Low: render scale 0.75 → this (gfx/autoquality.js).
   lowestScale: 0.6,
   // Sun shadow map: half-size of the box around the rider (m) and map resolution.
-  shadow: [{ box: 40, map: 1024 }, { box: 60, map: 2048 }, { box: 85, map: 3072 }],
+  shadow: [{ box: 40, map: 1024 }, { box: 60, map: 2048 }, { box: 72, map: 2560 }],   // high was 85 / 3072: same texel size, 2.1 → 1.6 MB of depth writes per frame
   // Screen-space AO (N8AO): null = off. It has a ~2 ms floor on an iGPU even at its cheapest
   // settings, so medium relies on the baked terrain sky-visibility and per-tree AO instead.
   ao: [null, null, { mode: 'Medium', halfRes: true }],
@@ -29,7 +30,7 @@ export const PERF = {
   terrain: [
     { lod: 0.6, sparkle: false, tracks: 1, rockLite: true },
     { lod: 1.0, sparkle: true, tracks: 1, rockLite: true },
-    { lod: 1.5, sparkle: true, tracks: 2, rockLite: false },
+    { lod: 1.25, sparkle: true, tracks: 2, rockLite: false },   // lod was 1.5 (≈ no visible gain, M1 cost)
   ],
   // Terrain chunk LOD (terrain.js): share of each LOD distance over which vertices geomorph to the
   // coarser grid before the swap, how far ahead (s of travel at the current velocity) detailed chunk
