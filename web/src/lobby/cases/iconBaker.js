@@ -21,6 +21,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { globals, toonMaterial } from '../../world.js';
 import { dressRider, HEAD_SCALE } from '../../character/index.js';
 import { proportionRig } from '../../character/body.js';
+import { morphBody } from '../../character/proto.js';
 import { PIECE } from '../../character/garments.js';
 import { createEquipmentModel, disposeEquipmentModel } from '../../equipment/models.js';
 import { gearModel } from '../../profile/catalog.js';
@@ -191,6 +192,7 @@ export class IconBaker {
 
     // The mannequin: the rider rig in its rest pose, dressed by character/.
     const gltf = await new GLTFLoader().loadAsync('/models/skier/skier.gltf');
+    morphBody(gltf.scene);   // dev only (?proto / ?protobody): the same body as the riders on this page
     const rig = this.rig = gltf.scene;
     const bones = {}, restLocal = new Map();
     rig.traverse((o) => {

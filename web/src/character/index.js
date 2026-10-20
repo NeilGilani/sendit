@@ -100,10 +100,13 @@ export function dressRider(scene, { bones, fp = () => false } = {}) {
         fabric.userData.uniforms.uHemY.value.set(c.hemFront, pc.cuffY, c.sleeveEnd, pc.rise ?? 1.08);
         suit.userData.uniforms.uJHem.value = Math.min(c.hemFront, c.hemBack) + 0.12;
         fabric.userData.uniforms.uFit.value.set(c.style ?? 0, c.quilt?.pitch ?? 0.1, c.hemBack, c.kangaroo || 0);
+        // Fabric textures and prototype layouts (0 = the shipped look; character/proto.js sets them).
+        fabric.userData.uniforms.uFab.value.set(c.fab ?? 0, pc.style ?? 0, pc.fab ?? 0, c.sleeveLayer?.at ?? 0);
       }
       const C = o.colors, F = fabric.userData.uniforms, S = suit.userData.uniforms, H = helmetMat.userData.uniforms, L = lens.userData.uniforms;
       F.uJacket.value.set(C.jacket.base); F.uPanel.value.set(C.jacket.panel); F.uAccent.value.set(C.jacket.accent);
       F.uGaiter.value.set(C.jacket.gaiter); F.uStyle.value = C.jacket.style || 0;
+      F.uLayer.value.set(C.jacket.layer || C.jacket.panel);
       F.uPants.value.set(C.pants.base); F.uCuff.value.set(C.pants.cuff);
       F.uMitt.value.set(C.gloves.base); F.uGauntlet.value.set(C.gloves.cuff);
       S.uJacket.value.set(C.jacket.base); S.uPants.value.set(C.pants.base); S.uMitt.value.set(C.gloves.base);

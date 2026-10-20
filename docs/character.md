@@ -236,6 +236,141 @@ Pants above). Checked with turntables (front / 3/4 / side / back; stand, crouch,
 tuck) for every jacket fit and pants fit and the in-game sheets (carve, tuck, grab, first person, skis
 and snowboard): the hem overlaps the pants by 15–25 cm and no body shows in any of those poses.
 
+## Prototype round (October 2026): ten jacket + pants looks, natural body
+
+The user asked for a full jacket redesign: how men's ski and snowboard jackets really sit on a male
+torso, the trending market (Arc'teryx, The North Face, …), a little baggy and new-school, matching
+pants, and probably new body proportions. This round builds **ten prototypes for the user to pick
+from**. Nothing in the shipped game changes: every prototype lives behind a dev URL flag.
+
+```
+http://localhost:5213/?proto=3                 lobby + game dressed in prototype 3, on that prototype's body
+http://localhost:5213/?proto=3&ride            straight into a run
+http://localhost:5213/?protobody=natural       the natural body with the normal outfit (or =current)
+node web/scripts/proto-sheet.mjs http://localhost:5213/ <outDir> [1,2,…]   # P<n>.png, overview.png, bodies.png
+node web/scripts/proto-measure.mjs "http://localhost:5213/?protobody=natural"   # bind-pose body numbers
+```
+
+Code: `web/src/character/proto.js` (the registry `PROTOTYPES`, `protoSlots(n)`, the body morph
+`morphBody()` / `bodyWarp()`). Hooks: `profile.js` returns `protoSlots(PROTO)` when `?proto` is set,
+`resolveOutfit()` accepts an inline garment `def` (no catalog items are added), `rider.js` and the icon
+baker call `morphBody(gltf.scene)` right after loading the model (a no-op without the flags). New
+garment keys (all optional, ignored by the shipped cuts): jacket `fab`, `sleeveLayer {at, r}`,
+`hoodSpan`; pants `style`, `fab`, `cargo`. Shader: `PROTO_GLSL` in materials.js (uniforms `uFab`,
+`uLayer`), reached only for `uFab > 0` or jacket `style ≥ 5`.
+
+### Research: the market (2024–2026 men's snow outerwear)
+
+Products are described, never copied (no logos or trademarks are used).
+
+| product | fit / length | features and fabric |
+|---|---|---|
+| Arc'teryx Sabre | regular, "roomy yet articulated", hip length with a slight drop hem; **CB 79 cm (M)** | helmet hood, pit zips, powder skirt, die-cut Velcro cuffs; 3L GORE-TEX with a brushed backer: a matte, quiet face |
+| Arc'teryx Rush / Macai | regular, hip length; **CB 77 / 75 cm (M)** | Pro 3L (crisper, sharper creases) / down-insulated 3L |
+| TNF Freedom Insulated + Freedom Bib | regular, hip length; **CB 80–81 cm**; bib inseam 30/32/34 in | 2L twill, light fill, powder skirt; bib with cargo pockets, thigh vents, kick patches; classic contrast-yoke colour blocking |
+| TNF Summit Verbier / Dragline | regular, articulated; **back length 85 / 86 cm (M / L)** / hip length | 75D 3L plain weave / 3L on a ripstop face |
+| Burton Frostner, [ak] Cyclic / Swash | regular, hip length, longer back; **Frostner CB 77.5 cm (M)** | 2L; Swash PrimaLoft 60 g body / 40 g sleeves |
+| Volcom L / Longo GORE-TEX | "91 fit": relaxed, bigger chest, **dropped shoulder**, slightly shorter body (~75 cm CB, M); Longo now sold as "baggy", also as a pullover | 2L with ripstop contrast panels; Dark Olive, Desert Taupe |
+| 686 Core Shell / Geo / Infinity Cargo / ATV bib | relaxed-regular hip-length shells; 686 rates fits 1–8 | pants measured flat: M hip 21 in, front / back rise 29 / 46 cm, inseam 84 cm, leg opening 10.5 in flat (53 cm around) |
+| Picture Naikoon / Object | regular, **longer back** / thigh length (82 cm back) | recycled 2L, stonewash blue, army green |
+| Dope / Montec | Regular, **Relaxed** (dropped shoulder, the longest, drop tail; riders size up) and **Boxy** (widest and shortest, drawstring hem); Dope Annok = oversized half-zip anorak with a kangaroo pocket | bonded 2L, matte; walnut camo, olive |
+| ThirtyTwo | same chest for every fit (~64 cm pit to pit, ≈ 128 cm around); only the length changes: **Regular 76, Relaxed 86, Loose 95 cm (M)**; pants hip 42 / 45 / 50 in, opening 20 / 22.5 / 29.5 in (Regular / Loose / Wide) | tree camo; pulling back slightly from ultra baggy for 2025/26 |
+| Jones, Quiksilver, Oakley, Beyond Medals, Planks, Norrøna | regular hip-length technical shells (Jones Shralpinist CB 82.5 cm M), Jones now also Relaxed and Baggy; Beyond Medals loose / boxy unisex; Norrøna Lofoten long asymmetric back, Tamok anorak relaxed | 3L stretch, 2L ripstop |
+| Airblaster | Freedom / Beast one-piece suits, Work Jacket (chore coat look, quilted oxford, regular length), Beast Bib (semi-baggy) | stretch 2L, loud and lavender colours |
+
+**How it sits on a 1.80 m man** (cervicale ≈ 1.55 m; a CB length puts the back hem at ≈ 1.55 − CB +
+3 cm for the drape over the seat):
+
+| fit | CB | back hem | lands at |
+|---|---|---|---|
+| short / boxy | 62–72 cm | 0.86–0.96 | belt to bottom of the seat, cinched (blouson) |
+| regular "hip length" ski jacket | 76–80 cm | 0.78–0.82 | lower seat / gluteal fold, 5–10 cm *below* the crotch at the back |
+| relaxed / long | 85–89 cm | ~0.70 | mid-thigh |
+| loose new-school | 95–98 cm | ~0.62 | lower thigh |
+
+- The **front** hem is 3–6 cm higher than the back (drop tail).
+- **Shoulders**: technical shells have a set-in seam at the shoulder point; new-school cuts drop it 4–8 cm down the arm; anoraks are often raglan.
+- **Sleeves**: regular ends just past the wrist with the elbow bent; relaxed / oversized covers most of the hand and stacks 4–9 cm at the wrist; cuffs go over or under the glove gauntlet (new-school: sleeve over a short cuff).
+- **Hood**: helmet-compatible on most shells (brim at the helmet's front edge, volume round the back).
+- **Pants**: inseam 81–84 cm against an 87 cm crotch with a 3–5 cm crotch drop puts the hem at the heel; relaxed legs break 1–3 times over the boot, wide / loose legs nearly swallow the boot. Bibs rise 25–35 cm above the waistband (lower sternum), the back panel lower.
+- **New-school** bagginess barely adds chest: it adds length (+19 cm over Regular), dropped shoulders, wide sleeves, and a long rectangle over wide straight legs.
+- **Trends 2025–27**: loose / baggy and longer is the dominant snowboard silhouette; earth neutrals (olive, taupe, brown, bone) with one pop colour; camo; 80s / 90s colour blocking; workwear textures (canvas, oxford, chore coats); gorpcore black-out 3L; ripstop contrast panels; bibs under boxy or long tops.
+
+Sources: brand and retailer product pages and size charts (evo, REI, Backcountry, The Outfitters,
+ALS, Absolute Snow, Snowleader), the Burton, Dope, Montec and evo fit guides, The Good Ride reviews,
+Boardsport SOURCE FW25/26 and FW26/27 buyer's guides, and the ANSUR II public male data set.
+
+### Research: the body
+
+Real men about 1.80 m tall (15 men of 1.78–1.82 m from ANSUR II, mean 1.799 m) against the game's
+Quaternius body, measured in its bind pose with `proto-measure.mjs` (1.81 m):
+
+| | real (ANSUR II) | game body (current) | natural prototype |
+|---|---|---|---|
+| shoulder joints / biacromial | 0.416 m | joints ±0.212 (≈ 0.47 m across the acromia) | joints ±0.174 (≈ 0.40 m) |
+| chest breadth × depth (no arms) | 0.281 × 0.248 | 0.45 × 0.337 (at the armpit, 1.40) | 0.367 × 0.27 |
+| waist breadth × depth | 0.321 × 0.236 | 0.344 × 0.24 (1.15) | 0.322 × 0.229 |
+| hip breadth | 0.343 | ≈ 0.38 (glutes incl.) | unchanged |
+| upper-arm thickness | biceps 0.351 m around (≈ 0.11 Ø) | 0.177 | 0.13 |
+| shoulder (acromion) height | 1.471 | joint 1.455 | unchanged |
+| crotch / knee height | 0.877 / 0.508 | 0.84 / 0.542 | 0.834 / 0.522 |
+| upper arm / forearm | 0.341 / 0.272 (bone landmarks) | 0.251 + 0.045 rig / 0.243 + 0.015 | 0.272 + 0.045 / 0.26 + 0.015 |
+
+- **What reads "superhero"** is the width and depth of the chest, lats and shoulders (+30 %), the trapezius slope and the 18 cm upper arms, not the heights: shoulder, hip, crotch and arm span are within a few cm of real.
+- Real ratios: biacromial / hip 1.21, leg (crotch) 48.7 % of the height, torso (cervicale to crotch) : leg 0.77.
+- The game's knee is 3 cm high (short thigh, long shin) and its crotch 3–4 cm low. The rig's pelvis is deep, so the "short hip-to-crotch" impression is the opposite: the body isn't short-waisted, it is top-heavy.
+
+**The natural body** (`BODIES.natural`) is a smooth warp of the bind pose:
+- the trunk scales about the mid-line: × 0.81 wide and × 0.8 deep at the chest and shoulders, × 0.94 / 0.96 at the waist, back to × 1 at the hips and the neck;
+- beyond the shoulder joint the arm is stretched (a C1 hinge) so the wrist, hands, mitts and pole grips stay exactly where they were: the shoulder joints come in 3.8 cm a side and the arms get longer;
+- the arm girth × 0.78 → 0.88 → 1 from the deltoid to the wrist;
+- the trapezius slope is lowered 1.2 cm beside the neck;
+- the knee moves 2 cm down (longer thigh, shorter shin; hip and ankle stay).
+
+Neck, head, helmet, hands, hips, ankles and every height the outfit code keys on are unchanged, so all
+garment constants still hold. Bones keep their orientation; joints move with the warp; the rest pose
+and `boneInverses` are rebuilt before the rider reads its rest pose, so skinning, IK leg lengths, gear
+attachment (boots on bindings), poles and gloves follow. Checked in stand, crouch, carve, tuck and air
+grab on skis (sheets below). The crash ragdoll and first person read the same rest pose but were not
+checked on the natural body this round.
+
+Under relaxed and baggy cuts the body barely shows (the fit's target sections are larger than both
+bodies); it matters for slim cuts (P6), the yoke and sleeve heads, and the silhouette in crouches.
+`bodies.png` shows both bodies bare and in P6.
+
+### The ten prototypes
+
+Heights are bind-pose metres (crotch ≈ 0.84, hip joint 0.97, belt ≈ 1.05, CB neck seam ≈ 1.56).
+
+| # | name | body | jacket: fit, length (front / back hem) | pants | fabric / texture | colours |
+|---|---|---|---|---|---|---|
+| P1 | Alpine Hardshell | natural | Sabre-class relaxed 3L shell, articulated, hip length + drop tail, 0.86 / 0.80 (CB ≈ 76) | straight shell pant, clean (taped seams, vent zip, kick patch) | 3L hardshell: dense face, satin sheen | deep spruce teal, black pant, lime accent |
+| P2 | Insulated Freedom | current | relaxed insulated jacket, contrast yoke, 0.885 / 0.855 | relaxed insulated cargo pant (bellows) | 2L twill, soft loft | gold body, black yoke and pant |
+| P3 | New-School Anorak | natural | oversized long pullover, dropped shoulder, hood up over the helmet, kangaroo pocket, sleeves over the gloves, 0.79 / 0.74 (CB ≈ 82) | baggy pant, dropped crotch, 5-fold stack | peached 2L twill | sage + bone colour block, dark olive pant |
+| P4 | Tall Tee Layer | natural | tall tee (mid-thigh, 0.72 / 0.70) over a hoodie (hood on the back, sleeves from the elbow) | baggy camo cargo with raised bellows pockets | cotton jersey + fleece | bone tee with a print, charcoal hoodie, olive camo |
+| P5 | Boxy Puffer | natural | cropped oversized puffer, boxy (n 2.7), 12.5 cm baffles, tall collar, 0.965 / 0.96 (ends at the belt) | wide straight pant | ripstop with a grid and sheen | mocha brown, bone pant |
+| P6 | Race Shell | natural | slim technical shell, close sleeves, hip bone, 0.94 / 0.905 | tapered shell pant | 3L hardshell | electric blue + black, red accent |
+| P7 | Varsity Coach | natural | snap front, rib collar, cuffs and striped rib hem, contrast sleeves, welt pockets, chest patch, 0.90 / 0.885 | relaxed bib | melton wool body, smooth sleeves | forest green, cream sleeves, gold stripes, charcoal bib |
+| P8 | 90s Colour Block | current | roomy, diagonal block across chest and back with an accent stripe, 0.895 / 0.875 | relaxed pant with a side stripe | satin nylon | bone / teal / purple |
+| P9 | Duck Canvas Work | natural | boxy chore jacket (n 2.75), corduroy collar, flapped chest and patch pockets, brass snaps, triple topstitching, 0.875 / 0.865 | double-knee carpenter pant, hammer loop, rule pocket | duck canvas: slubs, faded fold ridges | brown duck, dark-brown cord, moss pant |
+| P10 | Sherpa Flannel | natural | flannel shirt-jacket over a hoodie, button placket, flapped pockets, sherpa collar and lining, 0.86 / 0.85 | baggy pant | brushed flannel buffalo plaid, sherpa | rust / black plaid, cream sherpa, grey hoodie |
+
+Contact sheets (`proto-sheet.mjs`, lobby light, same camera and scale for all): each `P<n>.png` has
+standing front, front 3/4, side, back, back 3/4 and an "in motion" row (carve 3/4 and back 3/4, tuck
+side, air grab 3/4 and side). `overview.png` puts all ten side by side (front 3/4 and back 3/4).
+
+Iterations (three capture rounds): the hoodie hood under the tee and flannel was cut to the back
+(`hoodSpan`) because it read as shoulder pads; the canvas weave was softened (it read as plaid) and
+the colour desaturated; plaid overchecks, satin and ripstop speculars were toned down (latex /
+leather look); face gaiters moved off cream (a "ghost face" next to cream hoods); the varsity back
+panel was turned into an arch; the natural chest went from × 0.84 to × 0.81.
+
+**Known limits of the prototypes.** Shirt and chore collars are stand collars (no fold-down
+collar geometry yet). Long front hems ride up on the thighs in the ski stance and open a small V
+between the legs. Pockets, plackets and stitching are shader detail, not geometry, except the cargo
+bellows and the tee / hoodie sleeve step. Equipment colours (pink poles) are unchanged. Only the
+prototype the user picks should be turned into real catalog garments (with first-person and icon checks).
+
 ## Files
 
 ```
