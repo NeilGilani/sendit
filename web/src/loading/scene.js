@@ -26,6 +26,7 @@ import { TreeSystem } from '../gfx/trees.js';
 import { StillOverlay } from './still.js';
 import { prepareClip, mapNodes, ClipShot, scoreMove } from './clip.js';
 import { nodeKeys } from '../thrill/clipcodec.js';
+import { assetUrl } from '../base.js';
 
 // Camera moves for a saved highlight (the made-up shots' weights, minus the ones built around a big cliff).
 const CLIP_CAMS = { hero: { w: 3 }, close: { w: 3.5 }, filmer: { w: 3 }, dolly: { w: 2.5 }, orbit: { w: 2 }, follow: { w: 1.4 }, low: { w: 0.8 }, reveal: { w: 1 } };   // no long lens: from 100 m up the slope a kicker air is a speck
@@ -242,7 +243,7 @@ export class LoadingScene {
 
   loadRockTexture(tex) {
     if (typeof createImageBitmap === 'undefined') return;
-    fetch('/textures/web/rock_face_03_packed_1k.jpg').then((r) => (r.ok ? r.blob() : Promise.reject(new Error(r.status))))
+    fetch(assetUrl('textures/web/rock_face_03_packed_1k.jpg')).then((r) => (r.ok ? r.blob() : Promise.reject(new Error(r.status))))
       .then((b) => createImageBitmap(b, { imageOrientation: 'flipY' }))
       .then((img) => {
         tex.image = img;

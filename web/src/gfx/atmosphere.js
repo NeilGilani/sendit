@@ -6,6 +6,7 @@
 // Everything is linear HDR in one consistent unit (the post stack exposes and tone maps it).
 import * as THREE from 'three';
 import { ATMOSPHERE, LIGHTING } from '../scene.js';
+import { urlParams } from '../flags.js';
 
 const RE = 6360e3, RA = 6420e3;
 
@@ -256,7 +257,7 @@ export function applyAtmosphere(atm = {}, { defaultExposure = 0.62 } = {}) {
   LIGHTING.sunElevation = atm.sunElevation ?? DEFAULTS.sunElevation;
   LIGHTING.sunBearing = atm.sunBearing ?? DEFAULTS.sunBearing;
   if (typeof location !== 'undefined') {
-    const q = new URLSearchParams(location.search).get('sun');
+    const q = urlParams().get('sun');
     if (q) { const [b, e] = q.split(',').map(Number); if (Number.isFinite(b)) LIGHTING.sunBearing = b; if (Number.isFinite(e)) LIGHTING.sunElevation = e; }
   }
   A.aerialColor = atm.fogColor != null ? '#' + new THREE.Color().setRGB(...linColor(atm.fogColor)).getHexString() : DEFAULTS.aerialColor;

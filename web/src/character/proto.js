@@ -10,8 +10,9 @@
 // (`def`), so no catalog item, profile or icon changes.
 import * as THREE from 'three';
 import { jacketCut, PANT_FITS } from './outfits.js';
+import { urlParams } from '../flags.js';
 
-const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
+const params = urlParams();   // dev builds only (flags.js)
 
 /** Prototype key from ?proto=N (1–10, round 1) or ?proto=r1…r6 (round 2); 0 = off. */
 export const PROTO = (() => {

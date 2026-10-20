@@ -7,6 +7,7 @@
 import { on, emit, game, Mode, settings } from '../../state.js';
 import { predictLipSpeed } from './park.js';
 import { START_X, PITCH } from './layout.js';
+import { assetUrl } from '../../base.js';
 
 const CSS = /* css */`
 #parkHud { position: absolute; inset: 0; pointer-events: none; font-family: "Arial Black", "Segoe UI Black", Impact, sans-serif; font-style: italic; color: #fffaf0; }
@@ -247,7 +248,7 @@ export function mountParkHud(course) {
     try {
       const C = window.AudioContext || window.webkitAudioContext;
       ctx = new C();
-      const r = await fetch('/audio/grind_loop.ogg').catch(() => fetch('/audio/grind_loop.mp3'));
+      const r = await fetch(assetUrl('audio/grind_loop.ogg')).catch(() => fetch(assetUrl('audio/grind_loop.mp3')));
       buf = await ctx.decodeAudioData(await r.arrayBuffer());
       gain = ctx.createGain(); gain.gain.value = 0; gain.connect(ctx.destination);
     } catch (e) { console.warn('[park] grind audio', e); }

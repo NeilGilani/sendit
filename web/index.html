@@ -16,7 +16,8 @@
       var S = /*STILLS*/[{"f":"golden-method.webp","seed":7101,"tod":"golden","mtn":"spires","gear":"snowboard"},{"f":"golden-backflip.webp","seed":7101,"tod":"golden","mtn":"spires","gear":"ski"},{"f":"bluebird-japan.webp","seed":7412,"tod":"bluebird","mtn":"ranges","gear":"ski"},{"f":"bluebird-cork.webp","seed":7533,"tod":"bluebird","mtn":"spires","gear":"snowboard"},{"f":"alpenglow-method.webp","seed":7377,"tod":"alpenglow","mtn":"spires","gear":"snowboard"},{"f":"dawn-japan.webp","seed":7690,"tod":"dawn","mtn":"inversion","gear":"ski"},{"f":"storm-japan.webp","seed":7801,"tod":"storm","mtn":"ranges","gear":"ski"},{"f":"aurora-backflip.webp","seed":7955,"tod":"aurora","mtn":"spires","gear":"ski"},{"f":"aurora-method.webp","seed":7955,"tod":"aurora","mtn":"spires","gear":"snowboard"},{"f":"dawn-method.webp","seed":7690,"tod":"dawn","mtn":"inversion","gear":"snowboard"},{"f":"bluebird-method.webp","seed":7412,"tod":"bluebird","mtn":"ranges","gear":"snowboard"},{"f":"alpenglow-backflip.webp","seed":7377,"tod":"alpenglow","mtn":"spires","gear":"ski"}]/*END*/;
       var LOOK = { 'valcrest-gully': 'golden bluebird', 'lake-tahoe': 'bluebird golden', blackspruce: 'bluebird storm golden', ravenspire: 'golden alpenglow storm',
         'voltage-park': 'aurora bluebird', dragonback: 'bluebird golden dawn', 'kitsune-peak': 'alpenglow dawn', fjordline: 'golden dawn' };
-      var q = location.search, pool = S, s = null, h = null, last = null;
+      // ?loadstill / ?nostill are dev flags: honoured on the dev server or a non-production build only (src/flags.js).
+      var q = '%MODE%' !== 'production' ? location.search : '', pool = S, s = null, h = null, last = null;
       if (!S.length || /[?&]nostill/.test(q)) return;
       try { h = JSON.parse(localStorage.getItem('sendit.loadhint') || 'null'); last = localStorage.getItem('sendit.laststill'); } catch (e) { /* storage off */ }
       if (h && h.transition && Date.now() - (h.at || 0) < 120000 && LOOK[h.mapId]) {
@@ -28,7 +29,7 @@
       if (!s) { var p2 = pool.filter(function (x) { return x.f !== last; }); if (p2.length) pool = p2; s = pool[Math.floor(Math.random() * pool.length)]; }
       try { localStorage.setItem('sendit.laststill', s.f); } catch (e) { /* ignore */ }
       window.__ldStill = s;
-      var url = '/loading/' + s.f, root = document.documentElement, img = new Image();
+      var url = '%BASE_URL%loading/' + s.f, root = document.documentElement, img = new Image();
       root.classList.add('ld-still-pending');   // no flash of the CSS mountains before the still decodes
       var l = document.createElement('link'); l.rel = 'preload'; l.as = 'image'; l.href = url; l.setAttribute('fetchpriority', 'high'); document.head.appendChild(l);
       // Ken Burns: a slow drift whose direction differs per load.

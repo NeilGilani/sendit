@@ -8,6 +8,7 @@ import { EffectComposer, RenderPass, EffectPass, BloomEffect, SMAAEffect, SMAAPr
 import { N8AOPostPass } from 'n8ao';
 import { SUN_DIR } from '../world.js';
 import { PERF, perfQ } from './perf.js';
+import { urlParams } from '../flags.js';
 
 export const POST = {
   exposure: 0.62,             // linear multiplier before the tone curve (sunlit snow ≈ 0.9 display)
@@ -226,7 +227,7 @@ class WindEffect extends Effect {
 }
 
 export class PostStack {
-  constructor(renderer, scene, camera, params = new URLSearchParams(location.search)) {
+  constructor(renderer, scene, camera, params = urlParams()) {
     this.renderer = renderer; this.camera = camera;
     if (params.has('goggles')) POST.goggles = Number(params.get('goggles')) || 0;
     if (params.has('tm')) POST.toneMap = params.get('tm');

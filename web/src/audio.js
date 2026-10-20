@@ -8,6 +8,8 @@ import * as THREE from 'three';
 import { game, Mode, on, settings } from './state.js';
 import { AudioEngine } from './audio/engine.js';
 import { readRider } from './audio/rider.js';
+import { assetUrl } from './base.js';
+import { urlParams } from './flags.js';
 
 const BUFFERS = ['music_golden_hour', 'music_upbeat', 'bird_1', 'bird_2', 'bird_3', 'bird_4', 'grind_loop', 'jump_pop'];
 const _f = new THREE.Vector3();
@@ -84,7 +86,7 @@ export class SoundScape {
     E('gate'); E('liftBoarded'); E('liftArrived'); E('stumble'); E('fjordSplash'); E('ragdollImpact');   // fjordSplash: the Fjordline map (another branch)
     on('rideStarted', ({ equipment }) => this.engine.event('rideStarted', { board: equipment === 'snowboard' ? 1 : 0 }, c.currentTime));
     on('crashed', () => this.oneShot('crash', 0.3, 1, this.engine.fxBus));
-    if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('audiodebug')) this.mountDebug();
+    if (typeof location !== 'undefined' && urlParams().has('audiodebug')) this.mountDebug();
     this.ready = true;
   }
 
@@ -148,7 +150,7 @@ export class SoundScape {
   async load(name) {
     for (const ext of name.includes('.') ? [''] : ['.ogg', '.mp3']) {   // a name with an extension loads just that file
       try {
-        const r = await fetch(`/audio/${name}${ext}`);
+        const r = await fetch(assetUrl(`audio/${name}${ext}`));
         if (!r.ok) continue;
         return await this.ctx.decodeAudioData(await r.arrayBuffer());
       } catch { /* try next format */ }

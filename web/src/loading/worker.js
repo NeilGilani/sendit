@@ -1,3 +1,4 @@
+import { assetUrl } from '../base.js';
 // Loading-scene worker: owns the OffscreenCanvas handed over by loading/index.js and renders the scene
 // (loading/scene.js) on its own requestAnimationFrame, independent of the main thread (which is busy
 // booting the game). Messages in: init {canvas, width, height, dpr, opts}, resize, visible, outro.
@@ -61,11 +62,11 @@ async function loadClip(id) {
 // Warm the HTTP cache for the rider (glTF + its buffers / textures) and the rock texture while the
 // scene's modules load and the terrain builds: the rider is what the first shot waits for.
 function prefetch() {
-  const base = new URL('/models/skier/skier.gltf', self.location.href);
+  const base = new URL(assetUrl('models/skier/skier.gltf'), self.location.href);
   fetch(base).then((r) => r.json()).then((j) => {
     for (const x of [...(j.buffers || []), ...(j.images || [])]) if (x.uri && !x.uri.startsWith('data:')) fetch(new URL(x.uri, base)).then((r) => r.arrayBuffer()).catch(() => {});
   }).catch(() => {});
-  fetch(new URL('/textures/web/rock_face_03_packed_1k.jpg', self.location.href)).then((r) => r.arrayBuffer()).catch(() => {});
+  fetch(new URL(assetUrl('textures/web/rock_face_03_packed_1k.jpg'), self.location.href)).then((r) => r.arrayBuffer()).catch(() => {});
 }
 
 let initMsg = null, SceneClass = null;

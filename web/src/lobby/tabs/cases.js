@@ -12,6 +12,7 @@ import { caseSfx } from '../cases/sfx.js';
 import { RARITIES, rarityOf } from '../../profile/rarity.js';
 import { SERIES, SERIES_ORDER } from '../../profile/items.js';
 import { CASE_XP, EARN, PITY, COLLECTION_BONUS, casePool, caseOdds, nextMilestone, skin } from '../../profile/rewards.js';
+import { urlParams } from '../../flags.js';
 
 const ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M3 12h18M9 8V6a3 3 0 0 1 6 0v2M10 12v2h4v-2"/></svg>';
 // The XP bar fills from where you last saw it (e.g. back from a ride), wrapping through 100 % for each
@@ -161,7 +162,7 @@ function debugGrant(P) {
   if (granted) return;
   granted = true;
   let q;
-  try { q = new URLSearchParams(location.search); } catch { return; }
+  try { q = urlParams(); } catch { return; }   // dev builds only (flags.js)
   const n = Math.min(50, Number(q.get('casegrant')) || (q.has('caseforce') && !P.unopened.length ? 1 : 0));
   const series = q.get('caseseries');
   for (let i = 0; i < n; i++) P.grantCase('test', series && SERIES[series] ? series : SERIES_ORDER[i % SERIES_ORDER.length]);

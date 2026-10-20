@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PostStack, POST } from './gfx/post.js';
+import { urlParams } from './flags.js';
 const POST_EXPOSURE = POST.exposure;
 import { PERF } from './gfx/perf.js';
 import { prewarm, warmQualityVariants } from './gfx/prewarm.js';
@@ -48,7 +49,7 @@ import './progression/lobby.js';
 patchShaderChunks();
 profileStore.load();
 
-const params = new URLSearchParams(location.search);
+const params = urlParams();   // dev / debug flags only in dev builds (flags.js, docs/launch.md)
 const gearVariant = params.get('variant') || undefined;   // ?variant=<model id> (debug: overrides the equipped catalog item's model)
 if (params.has('quality')) settings.quality = Number(params.get('quality'));
 const canvas = document.getElementById('game');

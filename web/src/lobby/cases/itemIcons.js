@@ -23,6 +23,7 @@
 // (window.__sendit.renderer); without one the SVG art stays.
 import { skin } from '../../profile/rewards.js';
 import './icons.css';
+import { urlParams } from '../../flags.js';
 
 export const ICON_VERSION = 4;   // 4: hip-length jackets, full-rise pants and bibs (clothing pass 3)
 export const GOLD_ICON = 'gold-star';
@@ -44,7 +45,7 @@ const waiters = new Set();       // { ids:Set, resolve }
 const listeners = new Set();
 const failed = new Set();
 let baker = null, bakerP = null, dbP = null, loaded = null, running = false, disabled = false;
-const params = (() => { try { return new URLSearchParams(location.search); } catch { return new URLSearchParams(); } })();
+const params = urlParams();   // ?noicons / ?iconrebake: dev builds only (flags.js)
 if (params.has('noicons')) disabled = true;   // debug: the old flat SVG art
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));

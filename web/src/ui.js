@@ -10,6 +10,7 @@ import { HUD } from './config.js';
 import { moveFocus, focusFirst, handleArrowKey, nudgeRange } from './lobby/nav.js';
 import { fmtTime } from './activities.js';
 import { loadingScreen } from './loading/index.js';
+import { assetUrl } from './base.js';
 
 const $ = (id) => document.getElementById(id);
 const BASES = ['loading', 'lobby', 'pause'];
@@ -330,7 +331,7 @@ export class UI {
   async loadCredits() {
     if (this._credits) return;
     try {
-      const md = await (await fetch('/CREDITS.md')).text();
+      const md = await (await fetch(assetUrl('CREDITS.md'))).text();
       $('creditsText').innerHTML = markdown(md);
       this._credits = true;
     } catch { $('creditsText').textContent = 'Credits unavailable.'; }

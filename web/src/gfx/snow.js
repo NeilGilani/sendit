@@ -8,6 +8,7 @@
 // Tunables: SNOW / ROCK in scene.js.
 import * as THREE from 'three';
 import { SNOW, ROCK } from '../scene.js';
+import { assetUrl } from '../base.js';
 
 const lin = (hex) => new THREE.Color(hex);   // three converts sRGB hex → linear working space
 
@@ -30,7 +31,7 @@ function rockTexture() {
   rockTex.colorSpace = THREE.NoColorSpace;
   rockTex.wrapS = rockTex.wrapT = THREE.RepeatWrapping;
   rockTex.needsUpdate = true;
-  rockReady = new Promise((resolve) => new THREE.ImageLoader().load('/textures/web/rock_face_03_packed_1k.jpg', (img) => {
+  rockReady = new Promise((resolve) => new THREE.ImageLoader().load(assetUrl('textures/web/rock_face_03_packed_1k.jpg'), (img) => {
     rockTex.image = img;
     rockTex.anisotropy = 4;
     rockTex.needsUpdate = true;

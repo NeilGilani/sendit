@@ -3,10 +3,11 @@
 // Loaded by harness.html; driven headlessly by scripts/audio-test.mjs.
 import { AudioEngine } from './engine.js';
 import { AUDIO } from './tuning.js';
+import { assetUrl } from '../base.js';
 
 async function loadBuffer(ctx, name) {
   for (const ext of name.includes('.') ? [''] : ['.ogg', '.mp3']) {
-    try { const r = await fetch(`/audio/${name}${ext}`); if (r.ok) return await ctx.decodeAudioData(await r.arrayBuffer()); } catch { /* next */ }
+    try { const r = await fetch(assetUrl(`audio/${name}${ext}`)); if (r.ok) return await ctx.decodeAudioData(await r.arrayBuffer()); } catch { /* next */ }
   }
   return null;
 }
